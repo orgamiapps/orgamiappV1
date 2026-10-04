@@ -1,3 +1,4 @@
+import 'package:attendus/Services/community_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,6 +14,7 @@ class CreateAnnouncementScreen extends StatefulWidget {
 }
 
 class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
+  final String _postId = CommunityService.newId();
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
@@ -86,22 +88,21 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
       }
 
       // Create announcement document
-      await FirebaseFirestore.instance
-          .collection('Organizations')
-          .doc(widget.organizationId)
-          .collection('Feed')
-          .add({
-            'type': 'announcement',
-            'title': _titleController.text.trim(),
-            'content': _contentController.text.trim(),
-            'authorId': user.uid,
-            'authorName': user.displayName ?? 'Unknown',
-            'authorEmail': user.email,
-            'createdAt': FieldValue.serverTimestamp(),
-            'isPinned': _isPinned,
-            'likes': [],
-            'comments': [],
-          });
+      await CommunityService().mutate('createFeed', {
+        'organizationId': widget.organizationId,
+        'postId': _postId,
+        'post': {
+          'type': 'announcement',
+          'title': _titleController.text.trim(),
+          'content': _contentController.text.trim(),
+          'authorId': user.uid,
+          'authorName': user.displayName ?? 'Unknown',
+          'authorEmail': user.email,
+          'isPinned': _isPinned,
+          'likes': [],
+          'comments': [],
+        },
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

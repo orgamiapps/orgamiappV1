@@ -1,3 +1,5 @@
+import 'package:attendus/widgets/deferred_shared_community_screen.dart';
+import 'package:attendus/widgets/deferred_conversation_screen.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -18,10 +20,45 @@ import 'package:attendus/Services/pending_auth_intent_service.dart';
 import 'package:attendus/widgets/deferred_premium_event_creation.dart';
 import 'package:attendus/widgets/deferred_shared_event_screen.dart';
 
+/// Resolves the persistent entry state before the gate selects a destination.
+/// Explicit Discover applies before both guest and signed-in navigation.
+class AuthGateNavigation {
+  const AuthGateNavigation({
+    required this.restoreNavigation,
+    this.pendingIntent,
+  });
+
+  final bool restoreNavigation;
+  final PendingAuthIntent? pendingIntent;
+  int get initialTab => pendingIntent?.dashboardTab ?? 0;
+
+  static Future<AuthGateNavigation> resolve({
+    bool forceDiscover = false,
+    bool restoreNavigation = true,
+  }) async {
+    if (forceDiscover) {
+      await PendingAuthIntentService.clear();
+      await NavigationStateService().clearNavigationState();
+      return const AuthGateNavigation(restoreNavigation: false);
+    }
+    final pending = await PendingAuthIntentService.consume();
+    final restore = restoreNavigation && pending == null;
+    if (!restore) await NavigationStateService().clearNavigationState();
+    return AuthGateNavigation(
+      restoreNavigation: restore,
+      pendingIntent: pending,
+    );
+  }
+}
+
 /// AuthGate determines the initial screen based on Firebase Auth state
 /// This ensures persistent login works immediately after force-close
 class AuthGate extends StatefulWidget {
-  const AuthGate({super.key});
+  const AuthGate({super.key, this.forceDiscover = false});
+
+  /// Explicit Discover navigation takes precedence over an older restored tab
+  /// or pending login destination, while keeping guest access contextual.
+  final bool forceDiscover;
 
   @override
   State<AuthGate> createState() => _AuthGateState();
@@ -46,6 +83,10 @@ class _AuthGateState extends State<AuthGate> {
 
   Future<void> _checkAuthState() async {
     try {
+      if (widget.forceDiscover) {
+        await AuthGateNavigation.resolve(forceDiscover: true);
+        if (!mounted) return;
+      }
       await GuestModeService().initialize();
       Logger.debug('🔄 AuthGate: Checking Firebase Auth state...');
 
@@ -165,16 +206,19 @@ class _AuthGateState extends State<AuthGate> {
       profilePictureUrl: user.photoURL,
     );
 
-    final pendingIntent = await PendingAuthIntentService.consume();
-    if (pendingIntent != null) restoreNavigation = false;
+    final entry = widget.forceDiscover
+        ? const AuthGateNavigation(restoreNavigation: false)
+        : await AuthGateNavigation.resolve(
+            restoreNavigation: restoreNavigation,
+          );
+    final pendingIntent = entry.pendingIntent;
+    restoreNavigation = entry.restoreNavigation;
 
     // Try to restore navigation state
     Widget? restoredScreen;
     try {
-      if (!restoreNavigation) {
-        await _navStateService.clearNavigationState();
-      }
-      final shouldRestore = await _navStateService.shouldRestore();
+      final shouldRestore =
+          restoreNavigation && await _navStateService.shouldRestore();
       if (restoreNavigation && shouldRestore) {
         Logger.info('AuthGate: Attempting to restore navigation state');
         final savedRoute = await _navStateService.restoreNavigationState();
@@ -199,7 +243,7 @@ class _AuthGateState extends State<AuthGate> {
       recoveryKey: 'dashboard',
       loadingLabel: 'Loading dashboard',
       builder: () => dashboard.DashboardScreen(
-        initialIndex: pendingIntent?.dashboardTab ?? 0,
+        initialIndex: entry.initialTab,
         restoreSavedTab: restoreNavigation,
       ),
     );
@@ -222,6 +266,30 @@ class _AuthGateState extends State<AuthGate> {
           );
         });
       });
+    } else if (pendingIntent?.action == PendingAuthAction.sharedCommunity &&
+        pendingIntent?.communityId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.of(context, rootNavigator: true).push(
+          MaterialPageRoute(
+            builder: (_) => DeferredSharedCommunityScreen(
+              organizationId: pendingIntent!.communityId!,
+            ),
+          ),
+        );
+      });
+    } else if (pendingIntent?.action == PendingAuthAction.sharedConversation &&
+        pendingIntent?.conversationId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.of(context, rootNavigator: true).push(
+          MaterialPageRoute(
+            builder: (_) => DeferredConversationScreen(
+              conversationId: pendingIntent!.conversationId!,
+            ),
+          ),
+        );
+      });
     } else if (pendingIntent?.action == PendingAuthAction.sharedEvent &&
         pendingIntent?.eventId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -229,8 +297,10 @@ class _AuthGateState extends State<AuthGate> {
           if (!mounted) return;
           Navigator.of(context, rootNavigator: true).push(
             MaterialPageRoute(
-              builder: (_) =>
-                  DeferredSharedEventScreen(eventId: pendingIntent!.eventId!),
+              builder: (_) => DeferredSharedEventScreen(
+                eventId: pendingIntent!.eventId!,
+                initialAction: pendingIntent.eventAction,
+              ),
             ),
           );
         });

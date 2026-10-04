@@ -4,6 +4,57 @@ import 'package:attendus/models/event_wizard_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('local picker instants cross the server boundary with explicit UTC', () {
+    final start = DateTime(2027, 7, 14, 9, 30);
+    final end = start.add(const Duration(hours: 2));
+    final draft = EventWizardDraft(startAt: start, endAt: end)
+      ..registrationOpensAt = start.subtract(const Duration(days: 7))
+      ..registrationClosesAt = start.subtract(const Duration(minutes: 30));
+    final form = draft.toFormJson();
+    final registration = form['registration'] as Map<String, dynamic>;
+    for (final entry in {
+      'startAt': start,
+      'endAt': end,
+      'opensAt': draft.registrationOpensAt!,
+      'closesAt': draft.registrationClosesAt!,
+    }.entries) {
+      final encoded = (form[entry.key] ?? registration[entry.key]) as String;
+      final parsed = DateTime.parse(encoded);
+      expect(parsed.isUtc, isTrue, reason: entry.key);
+      expect(parsed.isAtSameMomentAs(entry.value), isTrue, reason: entry.key);
+    }
+    final restored = EventWizardDraft.fromJson(form);
+    expect(restored.startAt, start);
+    expect(restored.startAt.isUtc, isFalse);
+    expect(restored.endAt, end);
+    expect(restored.registrationOpensAt, draft.registrationOpensAt);
+    expect(restored.registrationClosesAt, draft.registrationClosesAt);
+  });
+
+  test('explicit DST offsets retain distinct instants and recurrence dates', () {
+    // The repeated New York 01:30 occurs twice when DST ends. A transport
+    // round-trip must preserve the distinct instants, not reinterpret wall time.
+    final restored = EventWizardDraft.fromJson({
+      'startAt': '2027-11-07T01:30:00-04:00',
+      'endAt': '2027-11-07T01:30:00-05:00',
+      'eventTimeZone': 'America/New_York',
+      'recurrence': {
+        'enabled': true,
+        'endMode': 'date',
+        'endDate': '2027-11-14',
+      },
+    });
+    expect(
+      restored.endAt.difference(restored.startAt),
+      const Duration(hours: 1),
+    );
+    final form = restored.toFormJson();
+    expect(form['startAt'], '2027-11-07T05:30:00.000Z');
+    expect(form['endAt'], '2027-11-07T06:30:00.000Z');
+    expect(form['eventTimeZone'], 'America/New_York');
+    expect((form['recurrence'] as Map)['endDate'], '2027-11-14');
+  });
+
   test('event creation configuration fails closed', () {
     expect(resolveEventCreationExperienceVersion(null), 1);
     expect(resolveEventCreationExperienceVersion({}), 1);

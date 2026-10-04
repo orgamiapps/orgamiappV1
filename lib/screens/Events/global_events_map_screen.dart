@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:attendus/Utils/event_discovery_visibility.dart';
 
 import 'package:attendus/Services/guest_mode_service.dart';
 import 'package:attendus/Utils/logger.dart';
@@ -132,6 +133,7 @@ class _GlobalEventsMapScreenState extends State<GlobalEventsMapScreen> {
     for (final doc in snapshot.docs) {
       try {
         final data = Map<String, dynamic>.from(doc.data());
+        if (!isDiscoverableEventData(data)) continue;
         data['id'] = data['id'] ?? doc.id;
         events.add(EventModel.fromJson(data));
       } catch (error) {

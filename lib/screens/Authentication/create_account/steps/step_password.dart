@@ -30,7 +30,7 @@ class _StepPasswordState extends State<StepPassword> {
     // Create account using the data collected in previous step
     final vm = context.read<CreateAccountViewModel>();
     vm.createAccount(_passwordController.text).then((ok) {
-      if (ok) {
+      if (ok && mounted) {
         // Proceed to profile photo step
         widget.onNext();
       }

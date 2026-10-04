@@ -1,3 +1,4 @@
+import 'package:attendus/Services/messaging_feed.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -30,9 +31,8 @@ class _MessagingScreenState extends State<MessagingScreen> {
   List<ConversationModel> _filteredConversations = [];
   bool _isLoading = true;
   String? _errorMessage;
-  Stream<List<ConversationModel>>? _conversationsStream;
-  StreamSubscription<List<ConversationModel>>? _conversationsSubscription;
-  Timer? _timeoutTimer;
+  final _feed = MessagingFeed<ConversationModel>();
+  StreamSubscription<User?>? _authSubscription;
   final TextEditingController _searchController = TextEditingController();
   final Map<String, Map<String, dynamic>> _userInfoCache = {};
   Set<String> _blockedUserIds = <String>{};
@@ -40,99 +40,49 @@ class _MessagingScreenState extends State<MessagingScreen> {
   @override
   void initState() {
     super.initState();
-    // Defer conversation loading to prevent blocking app startup
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _loadConversations();
-      }
+    _feed.addListener(_onFeedChanged);
+    _authSubscription = _auth.authStateChanges().listen((_) {
+      _userInfoCache.clear();
+      _blockedUserIds.clear();
+      _loadConversations();
     });
+  }
+
+  void _onFeedChanged() {
+    if (!mounted) return;
+    setState(() {
+      _conversations = _feed.items;
+      _isLoading = _feed.loading;
+      _errorMessage = _feed.error;
+    });
+    _onSearchChanged(_searchController.text);
   }
 
   @override
   void dispose() {
-    // Cancel any active streams and timers
-    _conversationsSubscription?.cancel();
-    _conversationsStream = null;
-    _timeoutTimer?.cancel();
+    _authSubscription?.cancel();
+    _feed.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
   Future<void> _loadConversations() async {
-    try {
-      final user = _auth.currentUser;
-      if (user == null) {
-        Logger.error('No authenticated user found');
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'Please log in to view messages';
-        });
-        return;
-      }
-
-      Logger.info('Loading conversations for user: ${user.uid}');
-
-      // Load blocked users set first
-      await _loadBlockedUsersSet(user.uid);
-
-      // Create the stream
-      _conversationsStream = _messagingHelper.getUserConversations(user.uid);
-
-      // Set up timeout timer (extend to allow index/backoff on slow networks)
-      _timeoutTimer = Timer(const Duration(seconds: 20), () {
-        if (_isLoading) {
-          Logger.warning('Timeout loading conversations');
-          setState(() {
-            _isLoading = false;
-            _errorMessage =
-                'Request timed out. Please check your connection and try again.';
-          });
-        }
-      });
-
-      // Cancel any previous subscription before listening again
-      _conversationsSubscription?.cancel();
-
-      // Listen to the stream with proper error handling
-      _conversationsSubscription = _conversationsStream!.listen(
-        (conversations) {
-          _timeoutTimer?.cancel(); // Cancel timeout on success
-          Logger.info('Received ${conversations.length} conversations');
-          // Filter out conversations with blocked users (1-1 only)
-          final filtered =
-              conversations.where((conv) {
-                if (conv.isGroup) {
-                  // hide group conversation if any member (other than current user) is blocked
-                  return !_isGroupMemberBlocked(conv);
-                }
-                final otherId = _getOtherParticipantId(conv);
-                return !_blockedUserIds.contains(otherId);
-              }).toList()..sort(
-                (a, b) => b.lastMessageTime.compareTo(a.lastMessageTime),
-              );
-          setState(() {
-            _conversations = filtered;
-            _filteredConversations = filtered;
-            _isLoading = false;
-            _errorMessage = null;
-          });
-        },
-        onError: (error) {
-          _timeoutTimer?.cancel(); // Cancel timeout on error
-          Logger.error('Error loading conversations: $error');
-          setState(() {
-            _isLoading = false;
-            _errorMessage = 'Failed to load messages. Please try again.';
-          });
-        },
-      );
-    } catch (e) {
-      Logger.error('Exception in _loadConversations: $e');
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'An error occurred while loading messages';
-      });
-    }
+    final user = _auth.currentUser;
+    final uid = user != null && !user.isAnonymous ? user.uid : null;
+    await _feed.bind(uid, () async {
+      await _loadBlockedUsersSet(uid!);
+      return _messagingHelper
+          .getUserConversations(uid)
+          .map(
+            (conversations) => conversations
+                .where(
+                  (conversation) => !conversation.participantIds.any(
+                    (id) => id != uid && _blockedUserIds.contains(id),
+                  ),
+                )
+                .toList(),
+          );
+    });
   }
 
   Future<void> _loadBlockedUsersSet(String currentUserId) async {
@@ -142,20 +92,16 @@ class _MessagingScreenState extends State<MessagingScreen> {
           .doc(currentUserId)
           .collection('blocks')
           .get();
-      _blockedUserIds = snap.docs.map((d) => d.id).toSet();
+      if (_auth.currentUser?.uid == currentUserId) {
+        _blockedUserIds = snap.docs.map((d) => d.id).toSet();
+      }
     } catch (e) {
       Logger.error('Failed to load blocked users set: $e');
-      _blockedUserIds = <String>{};
+      rethrow;
     }
   }
 
-  Future<void> _retryLoading() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-    await _loadConversations();
-  }
+  Future<void> _retryLoading() => _loadConversations();
 
   // Search is always visible now; clearing text resets the filtered list
 
@@ -192,26 +138,14 @@ class _MessagingScreenState extends State<MessagingScreen> {
 
     try {
       if (conversation.isGroup) return '';
-      final p1 = conversation.participant1Id;
-      final p2 = conversation.participant2Id;
-      if (p1 == null || p2 == null) return '';
-      return p1 == currentUserId ? p2 : p1;
+      return conversation.participantIds.firstWhere(
+        (id) => id != currentUserId,
+        orElse: () => '',
+      );
     } catch (e) {
       Logger.error('Error getting other participant ID: $e');
       return '';
     }
-  }
-
-  bool _isGroupMemberBlocked(ConversationModel conversation) {
-    // Returns true if any other participant (besides current user) is blocked
-    final currentUserId = _auth.currentUser?.uid;
-    if (currentUserId == null) return false;
-    for (final uid in conversation.participantIds) {
-      if (uid != currentUserId && _blockedUserIds.contains(uid)) {
-        return true;
-      }
-    }
-    return false;
   }
 
   Map<String, dynamic> _getOtherParticipantInfo(
@@ -221,13 +155,15 @@ class _MessagingScreenState extends State<MessagingScreen> {
       if (conversation.isGroup) return {};
       final otherId = _getOtherParticipantId(conversation);
       final fromConv = conversation.participantInfo[otherId] ?? {};
-      if (fromConv.isNotEmpty) return fromConv;
+      if (fromConv.isNotEmpty) {
+        return {...Map<String, dynamic>.from(fromConv), 'uid': otherId};
+      }
       // Fallback to cache
       final cached = _userInfoCache[otherId];
       if (cached != null) return cached;
       // Trigger async fetch (non-blocking)
       _prefetchUserInfo(otherId);
-      return {};
+      return {'uid': otherId, 'name': 'User'};
     } catch (e) {
       Logger.error('Error getting other participant info: $e');
       return {};
@@ -235,15 +171,15 @@ class _MessagingScreenState extends State<MessagingScreen> {
   }
 
   Future<void> _prefetchUserInfo(String userId) async {
+    final currentAccount = _auth.currentUser?.uid;
     if (userId.isEmpty || _userInfoCache.containsKey(userId)) return;
     final helper = FirebaseFirestoreHelper();
     final user = await helper.getSingleCustomer(customerId: userId);
-    if (user != null && mounted) {
+    if (user != null && mounted && _auth.currentUser?.uid == currentAccount) {
       setState(() {
         _userInfoCache[userId] = {
           'uid': user.uid,
           'name': user.name,
-          'email': user.email,
           'username': user.username,
           'profilePictureUrl': user.profilePictureUrl,
           'bio': user.bio,
@@ -253,27 +189,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
   }
 
   CustomerModel _convertToCustomerModel(Map<String, dynamic> participantInfo) {
-    return CustomerModel(
-      uid: participantInfo['uid'] ?? '',
-      name: participantInfo['name'] ?? 'Unknown User',
-      email: participantInfo['email'] ?? '',
-      username: participantInfo['username'],
-      profilePictureUrl: participantInfo['profilePictureUrl'],
-      bio: participantInfo['bio'],
-      phoneNumber: participantInfo['phoneNumber'],
-      age: participantInfo['age'],
-      gender: participantInfo['gender'],
-      location: participantInfo['location'],
-      occupation: participantInfo['occupation'],
-      company: participantInfo['company'],
-      website: participantInfo['website'],
-      socialMediaLinks: participantInfo['socialMediaLinks'],
-      isDiscoverable: participantInfo['isDiscoverable'] ?? true,
-      favorites: List<String>.from(participantInfo['favorites'] ?? []),
-      createdAt: participantInfo['createdAt'] != null
-          ? (participantInfo['createdAt'] as Timestamp).toDate()
-          : DateTime.now(),
-    );
+    return CustomerModel.fromPublicProfile(participantInfo);
   }
 
   @override
@@ -321,7 +237,7 @@ class _MessagingScreenState extends State<MessagingScreen> {
       return const AttendUsLoadingState(label: 'Loading conversations...');
     }
 
-    if (_errorMessage != null) {
+    if (_errorMessage != null && _conversations.isEmpty) {
       return Center(
         child: AttendUsEmptyState(
           icon: Icons.cloud_off_outlined,
@@ -340,7 +256,21 @@ class _MessagingScreenState extends State<MessagingScreen> {
       return _buildEmptyState();
     }
 
-    return _buildConversationsList();
+    return Column(
+      children: [
+        if (_errorMessage != null)
+          MaterialBanner(
+            content: Text(_errorMessage!),
+            actions: [
+              TextButton(
+                onPressed: _retryLoading,
+                child: const Text('Try again'),
+              ),
+            ],
+          ),
+        Expanded(child: _buildConversationsList()),
+      ],
+    );
   }
 
   Widget _buildEmptyState() {

@@ -1,0 +1,54 @@
+title = "Attendus reviewed public identifiers and documentation fixtures"
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Firebase client API identifiers intentionally shipped in public app configuration"
+ruleIds = ["gcp-api-key"]
+regexTarget = "secret"
+regexes = [
+  '''^AIzaSyA\-PFyqhP5aEVE6XwGku3jMe91G3efMaVw$''',
+  '''^AIzaSyAf1t5cToh1UoF7R52vTSJxMajw8CvmVUA$''',
+  '''^AIzaSyBCFt_7BJNVVzgAZ2Fa7S_5UMGYIVDQ\-dg$''',
+  '''^AIzaSyCD0XNVuDDTljnD9R7n8TCr_9Ze21PA0VU$''',
+ ]
+
+[[allowlists]]
+description = "Literal ID-token placeholder in analytics documentation, not a credential"
+ruleIds = ["curl-auth-header"]
+regexTarget = "match"
+regexes = ['YOUR_ID_TOKEN']
+
+[[allowlists]]
+description = "Reviewed SHA-256 file digests in the historical candidate manifest"
+condition = "AND"
+ruleIds = ["generic-api-key"]
+paths = ['docs/launch-candidate-manifest-20260927\.json$']
+regexTarget = "secret"
+regexes = ['^[a-f0-9]{64}$']
+
+[[allowlists]]
+description = "Reviewed historical public Firebase client identifiers"
+ruleIds = ["gcp-api-key"]
+regexTarget = "secret"
+regexes = [
+  '''^AIzaSyAgxBhWgtmRA_cc\-JcuMP8fXl7NjZIthOI$''',
+]
+
+[[allowlists]]
+description = "CocoaPods dependency SHA-1 checksums, not credentials"
+condition = "AND"
+ruleIds = ["generic-api-key"]
+paths = ['ios/Podfile\.lock$']
+regexTarget = "secret"
+regexes = ['^[a-f0-9]{40}$']
+
+[[allowlists]]
+description = "Reviewed retired public VAPID configuration literal (historically malformed)"
+condition = "AND"
+paths = ['lib/firebase/firebase_messaging_helper\.dart$']
+ruleIds = ["generic-api-key"]
+regexTarget = "secret"
+regexes = [
+  '''^BCFlVkRk4wUzL3pNaP7bVYqg8uH3M2vYsmYcB5dOSdpnqjWcW1O9xv5v3kHcQ8bYl1o3tB6Qx4HjG3C2D5E6F7G8$''',
+]

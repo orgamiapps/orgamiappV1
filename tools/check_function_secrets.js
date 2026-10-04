@@ -1,21 +1,30 @@
 "use strict";
 
 const {spawnSync} = require("node:child_process");
-const {readdirSync, readFileSync, statSync} = require("node:fs");
 const {join} = require("node:path");
 
 const allowedProjects = new Set(["attendus-staging", "orgami-66nxok"]);
 const functionsRoot = join(__dirname, "..", "functions");
 
-function javascriptFiles(directory) {
-  const files = [];
-  for (const entry of readdirSync(directory)) {
-    if (["node_modules", "test", "tools"].includes(entry)) continue;
-    const path = join(directory, entry);
-    if (statSync(path).isDirectory()) files.push(...javascriptFiles(path));
-    else if (entry.endsWith(".js")) files.push(path);
+function boundSecrets(functions) {
+  const secrets = new Set();
+  for (const fn of Object.values(functions)) {
+    for (const binding of fn?.__endpoint?.secretEnvironmentVariables || []) {
+      const name = typeof binding === "string" ? binding : binding.key;
+      if (!name) throw new Error("Invalid function secret binding.");
+      secrets.add(name);
+    }
   }
-  return files;
+  return secrets;
+}
+
+function deploymentSecrets(functions, declaredParams = []) {
+  const secrets = boundSecrets(functions);
+  for (const parameter of declaredParams) {
+    const specification = typeof parameter.toSpec === "function" ? parameter.toSpec() : parameter;
+    if (specification.type === "secret") secrets.add(specification.name);
+  }
+  return secrets;
 }
 
 function main() {
@@ -26,13 +35,11 @@ function main() {
         "<attendus-staging|orgami-66nxok>",
     );
   }
-  const secrets = new Set();
-  for (const file of javascriptFiles(functionsRoot)) {
-    const source = readFileSync(file, "utf8");
-    for (const match of source.matchAll(/defineSecret\(\s*["']([^"']+)["']/g)) {
-      secrets.add(match[1]);
-    }
-  }
+  // Firebase resolves declared secret parameters even when no endpoint binds
+  // them, so inspect both the parameter specs and endpoint bindings.
+  const functions = require(join(functionsRoot, "index.js"));
+  const {declaredParams} = require(require.resolve("firebase-functions/params", {paths: [functionsRoot]}));
+  const secrets = deploymentSecrets(functions, declaredParams);
   const missing = [];
   const gcloudCommand = process.platform === "win32" ? "gcloud.cmd" : "gcloud";
   for (const secret of [...secrets].sort()) {
@@ -60,9 +67,13 @@ function main() {
   );
 }
 
-try {
-  main();
-} catch (error) {
-  process.stderr.write(`${error.message}\n`);
-  process.exit(1);
+if (require.main === module) {
+  try {
+    main();
+  } catch (error) {
+    process.stderr.write(`${error.message}\n`);
+    process.exit(1);
+  }
 }
+
+module.exports = {boundSecrets, deploymentSecrets};

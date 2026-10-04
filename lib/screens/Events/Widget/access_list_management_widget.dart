@@ -1,3 +1,4 @@
+import 'package:attendus/Services/community_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -43,7 +44,9 @@ class _AccessListManagementWidgetState
         searchQuery: q,
         limit: 20,
       );
-      setState(() => _results = users);
+      if (mounted && _searchController.text.trim() == q) {
+        setState(() => _results = users);
+      }
     } finally {
       if (mounted) setState(() => _isSearching = false);
     }
@@ -52,37 +55,43 @@ class _AccessListManagementWidgetState
   Future<void> _addToAccess(String userId) async {
     setState(() => _updating = true);
     try {
-      await FirebaseFirestore.instance
-          .collection(EventModel.firebaseKey)
-          .doc(widget.eventModel.id)
-          .update({
-            'accessList': FieldValue.arrayUnion([userId]),
-          });
+      await CommunityService().mutate('setEventAccess', {
+        'eventId': widget.eventModel.id,
+        'userId': userId,
+        'allowed': true,
+      });
+      if (!mounted) return;
       setState(() => _accessList.add(userId));
       ShowToast().showNormalToast(msg: 'User added to access list');
     } catch (e) {
       ShowToast().showNormalToast(msg: 'Failed to add user: $e');
     } finally {
-      setState(() => _updating = false);
+      if (mounted) setState(() => _updating = false);
     }
   }
 
   Future<void> _removeFromAccess(String userId) async {
     setState(() => _updating = true);
     try {
-      await FirebaseFirestore.instance
-          .collection(EventModel.firebaseKey)
-          .doc(widget.eventModel.id)
-          .update({
-            'accessList': FieldValue.arrayRemove([userId]),
-          });
+      await CommunityService().mutate('setEventAccess', {
+        'eventId': widget.eventModel.id,
+        'userId': userId,
+        'allowed': false,
+      });
+      if (!mounted) return;
       setState(() => _accessList.remove(userId));
       ShowToast().showNormalToast(msg: 'User removed from access list');
     } catch (e) {
       ShowToast().showNormalToast(msg: 'Failed to remove user: $e');
     } finally {
-      setState(() => _updating = false);
+      if (mounted) setState(() => _updating = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   void _shareInviteLink() async {

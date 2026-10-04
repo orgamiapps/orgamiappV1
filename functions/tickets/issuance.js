@@ -11,6 +11,7 @@ function ticketDocumentId(eventId, uid) {
 }
 
 function validateFreeTicketEvent(event) {
+  if (event?.launchScheduleNeedsReview === true) throw new HttpsError("failed-precondition", "The organizer must confirm the event schedule before registration or check-in.");
   if (event.ticketsEnabled !== true) {
     throw new HttpsError("failed-precondition", "Tickets are not enabled.");
   }
@@ -20,12 +21,10 @@ function validateFreeTicketEvent(event) {
         "Paid tickets must be issued from a verified Stripe webhook.",
     );
   }
-  const maximum = Number(event.maxTickets || 0);
-  const issued = Number(event.issuedTickets || 0);
-  const reserved = Math.max(0, Number(event.reservedTickets || 0));
-  if (!Number.isSafeInteger(maximum) || maximum <= 0 ||
-      !Number.isSafeInteger(issued) || issued < 0 ||
-      issued + reserved >= maximum) {
+  if (event.registrationPolicy?.approvalMode === "manual") {
+    throw new HttpsError("failed-precondition", "Update the app to request organizer approval.");
+  }
+  if (require("../events/capacity").ticketCapacityState(event).full) {
     throw new HttpsError("resource-exhausted", "No tickets are available.");
   }
   if (!event.selectedDateTime) {
@@ -71,12 +70,14 @@ function createIssueFreeTicket() {
     const customerRef = db.collection("Customers").doc(uid);
 
     const result = await db.runTransaction(async (transaction) => {
-      const [eventSnapshot, ticketSnapshot, customerSnapshot] =
+      const [eventSnapshot, ticketSnapshot, customerSnapshot, deleting] =
         await Promise.all([
           transaction.get(eventRef),
           transaction.get(ticketRef),
           transaction.get(customerRef),
+          transaction.get(db.collection("account_deletion_jobs").doc(uid)),
         ]);
+      if (deleting.exists) throw new HttpsError("failed-precondition", "Account deletion is in progress.");
       if (ticketSnapshot.exists) {
         return {ticketId, created: false};
       }
@@ -96,6 +97,7 @@ function createIssueFreeTicket() {
       const ticketCode = crypto.randomBytes(4).toString("hex").toUpperCase();
       transaction.create(ticketRef, {
         id: ticketId,
+        registrationId: registrationRef.id,
         eventId,
         eventTitle: String(event.title || "Event").slice(0, 300),
         eventImageUrl: String(event.imageUrl || "").slice(0, 2000),
@@ -113,9 +115,12 @@ function createIssueFreeTicket() {
       });
       transaction.update(eventRef, {
         issuedTickets: admin.firestore.FieldValue.increment(1),
+        ...require("../events/capacity").confirmedDelta(event, 1),
       });
       transaction.set(registrationRef, {
         id: registrationRef.id,
+        ticketId,
+        status: "confirmed",
         eventId,
         userName: customerName,
         realName: customerName,

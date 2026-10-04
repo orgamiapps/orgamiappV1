@@ -1,0 +1,43 @@
+name: Qualify the observed staging web candidate
+'on':
+  workflow_dispatch:
+    inputs:
+      candidate_run:
+        description: Successful immutable candidate workflow run ID
+        required: true
+      evidence_runs:
+        description: Comma-separated successful collector run IDs spanning all gates and at least 24 hours
+        required: true
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    environment: web-production-read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CANDIDATE_RUN: ${{ inputs.candidate_run }}
+      EVIDENCE_RUNS: ${{ inputs.evidence_runs }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - run: npm ci
+      working-directory: functions
+    - uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+        service_account: ${{ vars.READER_SERVICE_ACCOUNT }}
+    - run: node tools/web_release_pipeline.js qualify --candidate-run "$CANDIDATE_RUN" --evidence-runs "$EVIDENCE_RUNS"
+        --output build/web-qualification
+      name: Verify immutable provenance, raw evidence and continuous 24-hour observation
+    - uses: actions/upload-artifact@v4
+      with:
+        name: web-qualification
+        path: build/web-qualification/qualification.json
+        include-hidden-files: true
+        retention-days: 90
+        if-no-files-found: error

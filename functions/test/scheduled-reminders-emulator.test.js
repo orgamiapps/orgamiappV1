@@ -6,6 +6,7 @@ const admin = require("../firebase-admin-compat");
 const {
   reconcileReminder,
   reminderDocumentId,
+  reminderInboxId,
   runScheduledWorker,
 } = require("../notifications/scheduled-reminders");
 const {uniqueId, waitFor} = require("./emulator-test-helpers");
@@ -109,7 +110,7 @@ test("worker records in-app-only delivery when no push token exists", async () =
       db.collection("Events").doc(eventId),
       db.collection("scheduledNotifications").doc(queueId),
       db.collection("users").doc(userId).collection("notifications")
-          .doc(queueId),
+          .doc(reminderInboxId(queueId, startsAt)),
       db.collection("event_analytics").doc(eventId),
       db.collection("user_analytics").doc(userId),
       db.collection("_user_analytics_recompute").doc(userId),
@@ -131,7 +132,7 @@ test("worker records in-app-only delivery when no push token exists", async () =
   const queue = await db.collection("scheduledNotifications").doc(queueId).get();
   assert.equal(queue.get("deliveryState"), "in_app_only");
   const inApp = await db.collection("users").doc(userId)
-      .collection("notifications").doc(queueId).get();
+      .collection("notifications").doc(reminderInboxId(queueId, queue.get("eventTime"))).get();
   assert.equal(inApp.exists, true);
   assert.equal(inApp.get("type"), "event_reminder");
 });

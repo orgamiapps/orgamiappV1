@@ -1,3 +1,6 @@
+import 'package:attendus/Utils/event_discovery_visibility.dart';
+import 'package:attendus/Services/discovery_history_coordinator.dart';
+import 'package:attendus/models/discovery_route_state.dart';
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -67,6 +70,68 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+  DiscoveryHistoryCoordinator? _history;
+  ModalRoute<dynamic>? _historyRoute;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // dispose saves the final scroll position after this element deactivates.
+    // Keep the route itself so that save never consults an inactive context.
+    _historyRoute = ModalRoute.of(context);
+  }
+
+  DiscoveryRouteState _routeSnapshot() => DiscoveryRouteState({
+    'q': _searchValue,
+    'type': _currentSearchType.name,
+    'categories': selectedCategories.join(','),
+    'sort': currentSortOption.name,
+    'radius': radiusInMiles.toString(),
+    if (currentLocation != null && radiusInMiles > 0) ...{
+      'lat': currentLocation!.latitude.toString(),
+      'lng': currentLocation!.longitude.toString(),
+    },
+  });
+  Future<void> _restoreRoute(DiscoveryRouteState route) async {
+    if (!mounted) return;
+    setState(() {
+      _searchValue = route['q'] ?? '';
+      _searchController.text = _searchValue;
+      _currentSearchType =
+          route['type'] == 'users' && !GuestModeService().isGuestMode
+          ? SearchType.users
+          : SearchType.events;
+      _isSearchExpanded = _searchValue.isNotEmpty;
+      selectedCategories = (route['categories'] ?? '')
+          .split(',')
+          .where((s) => s.isNotEmpty)
+          .toList();
+      currentSortOption =
+          SortOption.values
+              .where((value) => value.name == route['sort'])
+              .firstOrNull ??
+          SortOption.none;
+      radiusInMiles = double.tryParse(route['radius'] ?? '') ?? 0;
+      _distanceSlider = radiusInMiles == 0
+          ? 1
+          : _mapMilesToSlider(radiusInMiles).clamp(0, 1);
+      if (route['lat'] != null) {
+        currentLocation = LatLng(
+          double.parse(route['lat']!),
+          double.parse(route['lng']!),
+        );
+      }
+    });
+    if (_isSearchExpanded) _searchAnimationController.forward();
+    await _performSearch();
+  }
+
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    _history?.schedule();
+  }
+
   late final PublicEventsDataSource _publicEventsDataSource;
   final PublicEventsFeedState _publicEventsFeedState = PublicEventsFeedState();
 
@@ -237,7 +302,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     // Defer location lookup until after first frame to avoid jank on navigation
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        getCurrentLocation();
+        _history = DiscoveryHistoryCoordinator(
+          snapshot: _routeSnapshot,
+          restore: _restoreRoute,
+          scrollController: () => _scrollController,
+          isActive: () => mounted && (_historyRoute?.isCurrent ?? false),
+        );
+        _scrollController?.addListener(() => _history?.scheduleScroll());
+        _history!.initialize().then((_) {
+          if (mounted && currentLocation == null) getCurrentLocation();
+        });
       }
     });
 
@@ -309,6 +383,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _history?.dispose();
     _scrollController?.dispose();
     _pulseController.dispose();
     _fadeController.dispose();
@@ -340,7 +415,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
+  int _searchRevision = 0;
   Future<void> _performSearch() async {
+    final revision = ++_searchRevision;
+    final query = _searchValue;
     if (GuestModeService().isGuestMode &&
         _currentSearchType == SearchType.users) {
       setState(() => _currentSearchType = SearchType.events);
@@ -360,18 +438,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
       try {
         final users = await FirebaseFirestoreHelper().searchUsers(
-          searchQuery: _searchValue,
+          searchQuery: query,
           limit: 100,
         );
 
-        if (mounted) {
+        if (mounted && revision == _searchRevision) {
           setState(() {
             _searchUsers = users;
             _isSearchingUsers = false;
           });
         }
       } catch (e) {
-        if (mounted) {
+        if (mounted && revision == _searchRevision) {
           setState(() {
             _isSearchingUsers = false;
           });
@@ -394,26 +472,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             .get();
 
         final allEvents = eventsQuery.docs
+            .where((doc) => isDiscoverableEventData(doc.data()))
             .map((doc) {
               final data = doc.data();
               data['id'] = doc.id; // Ensure document ID is included
               return EventModel.fromJson(data);
             })
             .where(
-              (event) => event.title.toLowerCase().contains(
-                _searchValue.toLowerCase(),
-              ),
+              (event) =>
+                  event.title.toLowerCase().contains(query.toLowerCase()),
             )
             .toList();
 
-        if (mounted) {
+        if (mounted && revision == _searchRevision) {
           setState(() {
             _searchEvents = allEvents;
             _isSearchingEvents = false;
           });
         }
       } catch (e) {
-        if (mounted) {
+        if (mounted && revision == _searchRevision) {
           setState(() {
             _isSearchingEvents = false;
           });
@@ -626,13 +704,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                     child: Material(
                       color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(28),
-                        onTap: _onFabPressed,
-                        child: Icon(
-                          Icons.add,
-                          color: Theme.of(context).colorScheme.onPrimary,
-                          size: 28,
+                      child: Semantics(
+                        label: 'Create event',
+                        button: true,
+                        child: Tooltip(
+                          message: 'Create event',
+                          excludeFromSemantics: true,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(28),
+                            onTap: _onFabPressed,
+                            child: Icon(
+                              Icons.add,
+                              color: Theme.of(context).colorScheme.onPrimary,
+                              size: 28,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -813,10 +899,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                     const GlobalEventsMapScreen(),
                                   );
                                 },
-                                child: const Icon(
-                                  Icons.map,
-                                  color: Colors.white,
-                                  size: 20,
+                                child: Semantics(
+                                  label: 'View events map',
+                                  button: true,
+                                  child: const Tooltip(
+                                    message: 'View events map',
+                                    excludeFromSemantics: true,
+                                    child: Icon(
+                                      Icons.map,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -1641,11 +1735,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           .get();
 
       if (mounted) {
-        List<EventModel> events = querySnapshot.docs.map((doc) {
-          final data = doc.data();
-          data['id'] = doc.id; // Ensure document ID is included
-          return EventModel.fromJson(data);
-        }).toList();
+        List<EventModel> events = querySnapshot.docs
+            .where((doc) => isDiscoverableEventData(doc.data()))
+            .map((doc) {
+              final data = doc.data();
+              data['id'] = doc.id; // Ensure document ID is included
+              return EventModel.fromJson(data);
+            })
+            .toList();
 
         // Include all events (past and present) for search screen
         // Sort by event date (most recent first) on the client side

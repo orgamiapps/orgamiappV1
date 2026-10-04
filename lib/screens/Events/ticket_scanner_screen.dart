@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:attendus/Utils/check_in_questions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -19,12 +22,16 @@ class TicketScannerScreen extends StatefulWidget {
   final String eventId;
   final String eventTitle;
   final String? sessionId;
+  final FirebaseAuth? auth;
+  final Future<TicketModel?> Function(String)? lookupTicket;
 
   const TicketScannerScreen({
     super.key,
     required this.eventId,
     required this.eventTitle,
     this.sessionId,
+    this.auth,
+    this.lookupTicket,
   });
 
   @override
@@ -34,8 +41,30 @@ class TicketScannerScreen extends StatefulWidget {
 class _TicketScannerScreenState extends State<TicketScannerScreen> {
   final TextEditingController _ticketCodeController = TextEditingController();
   final NFCBadgeService _nfcService = NFCBadgeService();
-  final AttendanceCheckInService _attendanceService =
-      AttendanceCheckInService();
+  AttendanceCheckInService? _attendance;
+  AttendanceCheckInService get _attendanceService =>
+      _attendance ??= AttendanceCheckInService();
+  FirebaseAuth get _auth => widget.auth ?? FirebaseAuth.instance;
+  StreamSubscription<User?>? _authSubscription;
+  String? _ownerUid;
+  bool _accountChanged = false;
+  bool get _currentAccount =>
+      mounted &&
+      !_accountChanged &&
+      _ownerUid != null &&
+      _auth.currentUser?.uid == _ownerUid;
+
+  Widget _accountBound(Widget child) => StreamBuilder<User?>(
+    stream: _auth.authStateChanges(),
+    builder: (_, _) => _currentAccount
+        ? child
+        : const Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'Your account changed. Close this view and reopen the scanner.',
+            ),
+          ),
+  );
 
   bool isLoading = false;
   TicketModel? scannedTicket;
@@ -47,6 +76,19 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
   @override
   void initState() {
     super.initState();
+    _ownerUid = _auth.currentUser?.uid;
+    _authSubscription = _auth.authStateChanges().listen((user) {
+      if (mounted && user?.uid != _ownerUid) {
+        setState(() {
+          _accountChanged = true;
+          scannedTicket = null;
+          isScanning = false;
+          isLoading = false;
+          _ticketCodeController.clear();
+        });
+        _stopNFCScanning();
+      }
+    });
     _ticketCodeController.addListener(_onTicketCodeChanged);
     _initializeNFC();
   }
@@ -68,6 +110,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _ticketCodeController.removeListener(_onTicketCodeChanged);
     _ticketCodeController.dispose();
     _stopNFCScanning();
@@ -85,6 +128,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
   }
 
   Future<void> _startNFCScanning() async {
+    if (!_currentAccount) return;
     if (!isNFCAvailable) {
       _showScanResult(
         success: false,
@@ -175,16 +219,20 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
   }
 
   Future<void> _processTicketCode(String ticketCode) async {
+    if (!_currentAccount || isLoading) return;
     setState(() {
       isLoading = true;
     });
 
     try {
-      final ticket = await FirebaseFirestoreHelper().getTicketByCode(
-        ticketCode: ticketCode,
-      );
+      final ticket =
+          await (widget.lookupTicket?.call(ticketCode) ??
+              FirebaseFirestoreHelper().getTicketByCode(
+                ticketCode: ticketCode,
+                eventId: widget.eventId,
+              ));
 
-      if (mounted) {
+      if (mounted && _currentAccount) {
         setState(() {
           scannedTicket = ticket;
           isLoading = false;
@@ -218,124 +266,193 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
         }
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && _currentAccount) {
         _showScanResult(
           success: false,
           title: 'Scan Error',
-          message: 'Error scanning ticket. Please try again. ($e)',
+          message:
+              'Could not load this ticket. Check your connection and staff access, then retry.',
         );
       }
+    } finally {
+      if (mounted && _currentAccount) setState(() => isLoading = false);
     }
   }
 
-  Future<List<String>?> _collectRequiredAnswers() async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('Events')
-        .doc(widget.eventId)
-        .collection('EventQuestions')
-        .get();
-    if (snapshot.docs.isEmpty) return const [];
-    if (!mounted) return null;
-    final controllers = {
-      for (final doc in snapshot.docs) doc.id: TextEditingController(),
-    };
-    final answers = await showDialog<List<String>>(
+  Future<List<String>?> _collectRequiredAnswers({
+    String? qrData,
+    String? ticketId,
+  }) async {
+    if (!_currentAccount) return null;
+    List<Map<String, dynamic>> questions;
+    var saved = <String>[];
+    if (qrData?.startsWith('attendus_pass:v2:') == true) {
+      final data = await _attendanceService.scanContext(
+        widget.eventId,
+        qrData!,
+        await _activeSessionId(),
+        ticketId: ticketId,
+      );
+      saved = (data['answers'] as List? ?? [])
+          .map((value) => value.toString())
+          .toList();
+      questions = (data['questions'] as List? ?? [])
+          .whereType<Map>()
+          .map((q) => Map<String, dynamic>.from(q))
+          .toList();
+    } else {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('Events')
+          .doc(widget.eventId)
+          .collection('EventQuestions')
+          .get();
+      questions = snapshot.docs.map((q) => q.data()).toList();
+    }
+    questions = questions
+        .where(
+          (q) => isRequiredCheckInQuestion(q) && !hasCheckInAnswer(q, saved),
+        )
+        .toList();
+    if (questions.isEmpty) return saved;
+    if (!mounted || !_currentAccount) return null;
+    final controllers = [for (final _ in questions) TextEditingController()];
+    final form = GlobalKey<FormState>();
+    final route = DialogRoute<List<String>>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Attendee questions'),
-        content: SizedBox(
-          width: 480,
-          child: ListView(
-            shrinkWrap: true,
-            children: snapshot.docs.map((doc) {
-              final data = doc.data();
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: TextField(
-                  controller: controllers[doc.id],
-                  decoration: InputDecoration(
-                    labelText:
-                        '${data['questionTitle']}${data['required'] == true ? ' *' : ''}',
-                    border: const OutlineInputBorder(),
-                  ),
-                ),
-              );
-            }).toList(),
+      builder: (context) => _accountBound(
+        AlertDialog(
+          title: const Text('Missing attendee answers'),
+          content: SizedBox(
+            width: 480,
+            child: Form(
+              key: form,
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  for (var i = 0; i < questions.length; i++)
+                    TextFormField(
+                      controller: controllers[i],
+                      decoration: InputDecoration(
+                        labelText: checkInQuestionTitle(questions[i]),
+                      ),
+                      validator: (value) => value?.trim().isNotEmpty == true
+                          ? null
+                          : 'Please answer this question',
+                    ),
+                ],
+              ),
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (form.currentState!.validate()) {
+                  Navigator.pop(context, [
+                    ...saved,
+                    for (var i = 0; i < questions.length; i++)
+                      '${checkInQuestionTitle(questions[i])}--ans--${controllers[i].text.trim()}',
+                  ]);
+                }
+              },
+              child: const Text('Check in'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (snapshot.docs.any(
-                (doc) =>
-                    doc.data()['required'] == true &&
-                    controllers[doc.id]!.text.trim().isEmpty,
-              )) {
-                return;
-              }
-              Navigator.pop(
-                context,
-                snapshot.docs
-                    .map(
-                      (doc) =>
-                          '${doc.data()['questionTitle']}--ans--${controllers[doc.id]!.text.trim()}',
-                    )
-                    .toList(),
-              );
-            },
-            child: const Text('Validate'),
-          ),
-        ],
       ),
     );
-    for (final controller in controllers.values) {
-      controller.dispose();
+    try {
+      return await Navigator.of(context, rootNavigator: true).push(route);
+    } finally {
+      unawaited(
+        route.completed.then((_) {
+          for (final controller in controllers) {
+            controller.dispose();
+          }
+        }),
+      );
     }
-    return answers;
   }
 
   Future<String> _activeSessionId() async {
+    if (!_currentAccount) throw StateError('Your account changed.');
     if (widget.sessionId != null && widget.sessionId!.isNotEmpty) {
       return widget.sessionId!;
     }
     final session = await _attendanceService.findActiveSession(widget.eventId);
+    if (!_currentAccount) throw StateError('Your account changed.');
     if (session == null) {
       throw StateError('Start check-in before scanning passes.');
     }
     return session.id;
   }
 
-  Future<void> _validatePersonalPass(String qrData) async {
-    if (isLoading) return;
+  Future<void> _validatePersonalPass(String qrData, {String? ticketId}) async {
+    if (isLoading || !_currentAccount) return;
     setState(() {
       isLoading = true;
       isScanning = false;
     });
     try {
-      final answers = await _collectRequiredAnswers();
-      if (answers == null) return;
+      final answers = await _collectRequiredAnswers(
+        qrData: qrData,
+        ticketId: ticketId,
+      );
+      if (answers == null || !_currentAccount) return;
       final sessionId = await _activeSessionId();
       final receipt = await _attendanceService.submitCheckIn(
         eventId: widget.eventId,
         sessionId: sessionId,
-        credential: {'type': 'personal_pass', 'value': qrData},
+        credential: {
+          'type': qrData.startsWith('attendus_pass:v2:')
+              ? 'attendance_pass'
+              : 'personal_pass',
+          'value': qrData,
+          'ticketId': ?ticketId,
+        },
         answers: answers,
         allowOfflineQueue: true,
       );
-      if (!mounted) return;
+      if (!mounted || !_currentAccount) return;
       _showScanResult(
         success: true,
-        title: receipt.queuedOffline ? 'Saved Offline' : 'Checked In',
+        title: receipt.queuedOffline ? 'Pending verification' : 'Checked In',
         message: receipt.queuedOffline
-            ? 'The scan will reconcile when this device reconnects.'
+            ? 'Provisionally accepted on this device. Final verification happens when it reconnects.'
             : '${receipt.attendeeName} was checked in successfully.',
       );
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || !_currentAccount) return;
+      if (error is FirebaseFunctionsException &&
+          error.details is Map &&
+          (error.details as Map)['tickets'] is List) {
+        final selected = await showDialog<String>(
+          context: context,
+          builder: (context) => _accountBound(
+            SimpleDialog(
+              title: const Text('Select the ticket to admit'),
+              children: [
+                for (final ticket
+                    in ((error.details as Map)['tickets'] as List)
+                        .whereType<Map>())
+                  SimpleDialogOption(
+                    onPressed: () =>
+                        Navigator.pop(context, ticket['id'].toString()),
+                    child: Text(ticket['label'].toString()),
+                  ),
+              ],
+            ),
+          ),
+        );
+        if (selected != null && mounted && _currentAccount) {
+          setState(() => isLoading = false);
+          await _validatePersonalPass(qrData, ticketId: selected);
+        }
+        return;
+      }
       final message = error is FirebaseFunctionsException
           ? error.message
           : error.toString();
@@ -349,224 +466,191 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
     }
   }
 
-  Future<void> _processUserBadge(String userId) async {
-    setState(() {
-      isLoading = true;
-    });
-
-    try {
-      final ticket = await FirebaseFirestoreHelper()
-          .getActiveTicketForUserAndEvent(
-            customerUid: userId,
-            eventId: widget.eventId,
-          );
-
-      if (mounted) {
-        setState(() {
-          scannedTicket = ticket;
-          isLoading = false;
-        });
-
-        if (ticket == null) {
-          _showScanResult(
-            success: false,
-            title: 'No Ticket Found',
-            message: 'This badge has no active ticket for this event.',
-          );
-        } else {
-          _showTicketValidationDialog(ticket);
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        _showScanResult(
-          success: false,
-          title: 'Scan Error',
-          message: 'Error scanning badge. Please try again. ($e)',
-        );
-      }
-    } finally {
-      if (mounted) setState(() => isLoading = false);
-    }
-  }
-
   void _showTicketValidationDialog(TicketModel ticket) {
+    if (!_currentAccount) return;
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'Validate Ticket',
+      builder: (context) => _accountBound(
+        AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Validate Ticket',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Roboto',
+                  ),
+                ),
+              ),
+              if (ticket.isSkipTheLine) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFFD700).withValues(alpha: 0.3),
+                        blurRadius: 6,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.flash_on, color: Colors.white, size: 16),
+                      SizedBox(width: 4),
+                      Text(
+                        'VIP',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (ticket.isSkipTheLine) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFFFFD700).withValues(alpha: 0.15),
+                        const Color(0xFFFFA500).withValues(alpha: 0.15),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFFFFD700).withValues(alpha: 0.5),
+                      width: 2,
+                    ),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(
+                        Icons.priority_high,
+                        color: Color(0xFFFFA500),
+                        size: 24,
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'SKIP THE LINE - VIP TICKET',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFFF8C00),
+                                fontFamily: 'Roboto',
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Priority entry - Let them skip the queue!',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF6B7280),
+                                fontFamily: 'Roboto',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              Text(
+                'Ticket Code: ${ticket.ticketCode}',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Roboto',
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Customer: ${ticket.customerName}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF6B7280),
+                  fontFamily: 'Roboto',
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Issued: ${DateFormat('MMM dd, yyyy').format(ticket.issuedDateTime)}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF6B7280),
+                  fontFamily: 'Roboto',
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Do you want to validate this ticket?',
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Color(0xFF6B7280),
+                  fontFamily: 'Roboto',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Color(0xFF6B7280),
                   fontFamily: 'Roboto',
                 ),
               ),
             ),
-            if (ticket.isSkipTheLine) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFFFD700).withValues(alpha: 0.3),
-                      blurRadius: 6,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.flash_on, color: Colors.white, size: 16),
-                    SizedBox(width: 4),
-                    Text(
-                      'VIP',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
+            ElevatedButton(
+              onPressed: () => _validateTicket(ticket),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF667EEA),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
-            ],
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (ticket.isSkipTheLine) ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      const Color(0xFFFFD700).withValues(alpha: 0.15),
-                      const Color(0xFFFFA500).withValues(alpha: 0.15),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFFFFD700).withValues(alpha: 0.5),
-                    width: 2,
-                  ),
+              child: const Text(
+                'Validate',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Roboto',
                 ),
-                child: const Row(
-                  children: [
-                    Icon(
-                      Icons.priority_high,
-                      color: Color(0xFFFFA500),
-                      size: 24,
-                    ),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'SKIP THE LINE - VIP TICKET',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFFFF8C00),
-                              fontFamily: 'Roboto',
-                            ),
-                          ),
-                          SizedBox(height: 2),
-                          Text(
-                            'Priority entry - Let them skip the queue!',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF6B7280),
-                              fontFamily: 'Roboto',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            Text(
-              'Ticket Code: ${ticket.ticketCode}',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'Roboto',
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Customer: ${ticket.customerName}',
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF6B7280),
-                fontFamily: 'Roboto',
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Issued: ${DateFormat('MMM dd, yyyy').format(ticket.issuedDateTime)}',
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF6B7280),
-                fontFamily: 'Roboto',
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Do you want to validate this ticket?',
-              style: TextStyle(
-                fontSize: 14,
-                color: Color(0xFF6B7280),
-                fontFamily: 'Roboto',
               ),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Color(0xFF6B7280), fontFamily: 'Roboto'),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => _validateTicket(ticket),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF667EEA),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text(
-              'Validate',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'Roboto',
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -577,6 +661,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
     required String title,
     String? message,
   }) {
+    if (!_currentAccount) return;
     // Pause scanning so we don't immediately scan again under the sheet
     if (mounted) {
       setState(() {
@@ -589,89 +674,91 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
       isDismissible: true,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color:
-                      (success
-                              ? const Color(0xFF667EEA)
-                              : const Color(0xFFEF4444))
-                          .withAlpha(30),
-                  shape: BoxShape.circle,
+        return _accountBound(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color:
+                        (success
+                                ? const Color(0xFF667EEA)
+                                : const Color(0xFFEF4444))
+                            .withAlpha(30),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    success ? Icons.check_circle : Icons.error_outline,
+                    color: success
+                        ? const Color(0xFF667EEA)
+                        : const Color(0xFFEF4444),
+                    size: 36,
+                  ),
                 ),
-                child: Icon(
-                  success ? Icons.check_circle : Icons.error_outline,
-                  color: success
-                      ? const Color(0xFF667EEA)
-                      : const Color(0xFFEF4444),
-                  size: 36,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: success
-                      ? const Color(0xFF065F46)
-                      : const Color(0xFF991B1B),
-                  fontFamily: 'Roboto',
-                ),
-              ),
-              if (message != null) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 Text(
-                  message,
+                  title,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF6B7280),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: success
+                        ? const Color(0xFF065F46)
+                        : const Color(0xFF991B1B),
                     fontFamily: 'Roboto',
                   ),
                 ),
-              ],
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    if (mounted) {
-                      setState(() {
-                        // Clear any previous ticket info and resume scanning
-                        scannedTicket = null;
-                        _ticketCodeController.clear();
-                        isScanning = true;
-                      });
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF667EEA),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Scan Next',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                if (message != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF6B7280),
                       fontFamily: 'Roboto',
                     ),
                   ),
+                ],
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      if (mounted) {
+                        setState(() {
+                          // Clear any previous ticket info and resume scanning
+                          scannedTicket = null;
+                          _ticketCodeController.clear();
+                          isScanning = true;
+                        });
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF667EEA),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Scan Next',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -679,6 +766,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
   }
 
   Future<void> _validateTicket(TicketModel ticket) async {
+    if (!_currentAccount) return;
     Navigator.pop(context); // Close dialog
 
     setState(() {
@@ -687,7 +775,7 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
 
     try {
       final answers = await _collectRequiredAnswers();
-      if (answers == null) return;
+      if (answers == null || !_currentAccount) return;
       final sessionId = await _activeSessionId();
       final receipt = await _attendanceService.submitCheckIn(
         eventId: widget.eventId,
@@ -697,17 +785,19 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
         allowOfflineQueue: true,
       );
 
-      if (mounted) {
+      if (mounted && _currentAccount) {
         _showScanResult(
           success: true,
-          title: receipt.queuedOffline ? 'Saved Offline' : 'Ticket Checked In',
+          title: receipt.queuedOffline
+              ? 'Pending verification'
+              : 'Ticket Checked In',
           message: receipt.queuedOffline
-              ? 'The scan will reconcile when this device reconnects.'
+              ? 'Provisionally accepted on this device. Final verification happens when it reconnects.'
               : '${receipt.attendeeName} was checked in successfully.',
         );
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && _currentAccount) {
         _showScanResult(
           success: false,
           title: 'Activation Failed',
@@ -720,11 +810,13 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
   }
 
   Future<void> _toggleScanning() async {
+    if (!_currentAccount) return;
     if (!isScanning) {
       // Check camera permission before starting scanner
       final hasPermission = await PermissionsHelperClass.checkCameraPermission(
         context: context,
       );
+      if (!_currentAccount) return;
 
       if (!hasPermission) {
         ShowToast().showNormalToast(
@@ -741,6 +833,14 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_accountChanged || _ownerUid == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Ticket Scanner')),
+        body: const Center(
+          child: Text('Your account changed. Reopen this screen to continue.'),
+        ),
+      );
+    }
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       resizeToAvoidBottomInset: true,
@@ -928,7 +1028,8 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
                         // Use debug helper to log scan results
                         QRDebugHelper.logQRScanResult(raw);
 
-                        if (raw.startsWith('attendus_pass:v1:')) {
+                        if (raw.startsWith('attendus_pass:v1:') ||
+                            raw.startsWith('attendus_pass:v2:')) {
                           _validatePersonalPass(raw);
                           return;
                         }
@@ -947,8 +1048,12 @@ class _TicketScannerScreenState extends State<TicketScannerScreen> {
                         // Then try user badge QR
                         final userId = UserBadgeModel.parseBadgeQr(raw);
                         if (userId != null) {
-                          debugPrint('Processing user badge: $userId');
-                          _processUserBadge(userId);
+                          _showScanResult(
+                            success: false,
+                            title: 'New pass required',
+                            message:
+                                'Ask the attendee to open My Attendus pass. Legacy profile badges cannot admit attendees.',
+                          );
                           return;
                         }
 

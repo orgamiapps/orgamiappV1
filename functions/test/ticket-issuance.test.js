@@ -55,3 +55,30 @@ test("private event access requires ownership or invitation", () => {
   assert.equal(canReadEvent(event, "invitee"), true);
   assert.equal(canReadEvent(event, "stranger"), false);
 });
+
+
+test("reconciled capacity includes reservations without double counting issued tickets", () => {
+  const {capacityState, ticketCapacityState, confirmedDelta} = require("../events/capacity");
+  const event = {...freeEvent, maxTickets: 3, confirmedRegistrationCount: 2, issuedTickets: 2, reservedTickets: 1};
+  assert.equal(capacityState(event).full, true);
+  assert.throws(() => validateFreeTicketEvent(event), {code: "resource-exhausted"});
+  assert.equal(capacityState({...event, reservedTickets: 0}).full, false);
+  assert.equal(ticketCapacityState({...freeEvent, maxTickets: 3, reservedTickets: 1}).full, true);
+  assert.deepEqual(confirmedDelta(freeEvent, 1), {});
+  assert.throws(() => capacityState(freeEvent), {code: "failed-precondition"});
+  assert.throws(() => capacityState({...event, reservedTickets: -1}), {code: "failed-precondition"});
+  assert.throws(() => confirmedDelta({...event, confirmedRegistrationCount: 0}, -1), {code: "failed-precondition"});
+});
+
+test("legacy issuance cannot bypass manual approval", () => {
+  assert.throws(() => validateFreeTicketEvent({...freeEvent, registrationPolicy: {approvalMode: "manual"}}), {code: "failed-precondition"});
+});
+
+
+test("migration schedule review gates admission until organizer correction", () => {
+  const event = {...freeEvent, launchScheduleNeedsReview: true};
+  assert.throws(() => validateFreeTicketEvent(event), {code: "failed-precondition"});
+  assert.throws(() => require("../public-web/accountless").validateEvent(event), {code: "failed-precondition"});
+  assert.throws(() => require("../public-web/checkout").validateActionableEvent(event), {code: "failed-precondition"});
+  assert.equal(require("../attendance/arrival-core").activeEvent(event), false);
+});

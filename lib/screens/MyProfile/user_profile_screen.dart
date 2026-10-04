@@ -1,3 +1,5 @@
+import 'package:attendus/Utils/app_constants.dart';
+import 'package:attendus/widgets/profile_safety_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
@@ -88,7 +90,6 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       List<EventModel> createdEvents = [];
       try {
         debugPrint('?? Loading created events for user: ${widget.user.uid}');
-        debugPrint('?? User email: ${widget.user.email}');
         debugPrint('?? User name: ${widget.user.name}');
 
         final createdResult = await FirebaseFirestoreHelper()
@@ -236,9 +237,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   Widget build(BuildContext context) {
     // Reduced build logging to prevent main thread blocking
     if (_isLoading && _createdEvents.isEmpty) {
-      debugPrint(
-        '??? UserProfileScreen: Loading profile for ${widget.user.email}',
-      );
+      debugPrint('UserProfileScreen: Loading profile ${widget.user.uid}');
     }
 
     if (_isLoading) {
@@ -1025,10 +1024,20 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
     // Check if conversation already exists
     final messagingHelper = FirebaseMessagingHelper();
-    final existingConversationId = await messagingHelper.getConversationId(
-      currentUserId,
-      widget.user.uid,
-    );
+    String? existingConversationId;
+    try {
+      existingConversationId = await messagingHelper.getConversationId(
+        currentUserId,
+        widget.user.uid,
+      );
+    } catch (_) {
+      if (mounted) {
+        ShowToast().showNormalToast(
+          msg: 'Could not open this conversation. Please try again.',
+        );
+      }
+      return;
+    }
 
     if (!mounted) return;
 
@@ -1573,8 +1582,8 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         widget.user.name.toLowerCase() != 'user') {
       return widget.user.name;
     }
-    // Fallback to email prefix if name is not good
-    return widget.user.email.split('@').first;
+    final username = widget.user.username?.trim();
+    return username?.isNotEmpty == true ? '@$username' : 'Attendus member';
   }
 
   Future<void> _refreshUserDataFromFirestore() async {
@@ -1593,7 +1602,6 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           setState(() {
             widget.user.name = latestUserData.name;
             widget.user.profilePictureUrl = latestUserData.profilePictureUrl;
-            widget.user.phoneNumber = latestUserData.phoneNumber;
           });
           debugPrint('Updated user profile name to: ${latestUserData.name}');
         }
@@ -1675,55 +1683,32 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     );
   }
 
-  void _showReportDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Report User'),
-        content: const Text('Are you sure you want to report this user?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ShowToast().showNormalToast(msg: 'User reported successfully');
-            },
-            child: const Text('Report'),
-          ),
-        ],
-      ),
-    );
-  }
+  Future<void> _showReportDialog(BuildContext context) =>
+      _showSafetyDialog(context, true);
 
-  void _showBlockDialog(BuildContext context) {
-    showDialog(
+  Future<void> _showBlockDialog(BuildContext context) =>
+      _showSafetyDialog(context, false);
+
+  Future<void> _showSafetyDialog(BuildContext context, bool report) async {
+    final success = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Block User'),
-        content: const Text('Are you sure you want to block this user?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ShowToast().showNormalToast(msg: 'User blocked successfully');
-            },
-            child: const Text('Block'),
-          ),
-        ],
-      ),
+      barrierDismissible: false,
+      builder: (_) =>
+          ProfileSafetyDialog(userId: widget.user.uid, report: report),
     );
+    if (success == true) {
+      ShowToast().showNormalToast(
+        msg: report ? 'Report submitted for review' : 'User blocked',
+      );
+    }
   }
 
   void _copyProfileLink() {
     Clipboard.setData(
-      ClipboardData(text: 'https://attendus.app/profile/${widget.user.uid}'),
+      ClipboardData(
+        text:
+            '${AppConstants.publicWebDomain}/profile/${Uri.encodeComponent(widget.user.uid)}',
+      ),
     );
     ShowToast().showNormalToast(msg: 'Profile link copied to clipboard');
   }

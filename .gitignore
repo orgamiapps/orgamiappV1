@@ -8,6 +8,7 @@
 .buildlog/
 .history
 pubspec.lock
+!/pubspec.lock
 .svn/
 migrate_working_dir/
 
@@ -39,6 +40,7 @@ android/.kotlin/
 .firebase/
 analyze_output.txt
 launch_analyze_output.txt
+/launch_*_output.txt
 
 # Symbolication related
 app.*.symbols
@@ -53,3 +55,11 @@ app.*.map.json
 
 # Local platform API keys (see docs/maps-configuration.md).
 /ios/Flutter/Maps.xcconfig
+# Generated only in the protected native release runner.
+ios/Flutter/ProtectedRelease.xcconfig
+
+# Materialized native release environment configuration.
+/android/native-release.properties
+/ios/Flutter/NativeEnvironment.xcconfig
+
+/ios/Runner/GoogleService-Info.plist

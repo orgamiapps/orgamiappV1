@@ -1,12 +1,10 @@
-import 'dart:convert';
+import 'package:attendus/Services/event_draft_local_store.dart';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:attendus/models/event_wizard_model.dart';
 
 int resolveEventCreationExperienceVersion(Map<String, dynamic>? data) =>
@@ -42,6 +40,8 @@ abstract interface class EventWizardRepository {
   Future<EventWizardPublishResult> publish(
     EventWizardDraft draft, {
     int? expectedEventRevision,
+    String? changeReason,
+    String? changePreviewToken,
     String recurrenceScope,
   });
   Future<void> saveTemplate({
@@ -60,15 +60,22 @@ class EventWizardService implements EventWizardRepository {
   }) : _functions =
            functions ?? FirebaseFunctions.instanceFor(region: 'us-central1'),
        _firestore = firestore ?? FirebaseFirestore.instance,
-       _storage = storage ?? FirebaseStorage.instance;
+       _storage = storage ?? FirebaseStorage.instance,
+       _ownerUid = FirebaseAuth.instance.currentUser?.uid;
 
   final FirebaseFunctions _functions;
   final FirebaseFirestore _firestore;
   final FirebaseStorage _storage;
-  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
-
-  static const _localDraftPrefix = 'event_wizard_draft_v2_';
-  static const _lastDraftKey = 'event_wizard_last_draft_v2';
+  final String? _ownerUid;
+  late final EventDraftLocalStore _localDrafts = EventDraftLocalStore(
+    currentUid: () => FirebaseAuth.instance.currentUser?.uid,
+  );
+  void _checkSession() {
+    if (_ownerUid == null ||
+        FirebaseAuth.instance.currentUser?.uid != _ownerUid) {
+      throw StateError('Account changed. Reopen the event editor.');
+    }
+  }
 
   Future<int> experienceVersion() async {
     try {
@@ -83,52 +90,25 @@ class EventWizardService implements EventWizardRepository {
   }
 
   @override
-  Future<EventWizardDraft?> restoreLocalDraft([String? draftId]) async {
-    final preferences = await SharedPreferences.getInstance();
-    final id = draftId ?? preferences.getString(_lastDraftKey);
-    if (id == null || id.isEmpty) return null;
-    final raw = await _secureStorage.read(key: '$_localDraftPrefix$id');
-    if (raw == null) return null;
-    try {
-      return EventWizardDraft.fromJson(
-        Map<String, dynamic>.from(jsonDecode(raw) as Map),
-      );
-    } catch (_) {
-      return null;
-    }
+  Future<EventWizardDraft?> restoreLocalDraft([String? draftId]) {
+    _checkSession();
+    return _localDrafts.read(draftId);
   }
 
   @override
-  Future<void> saveLocalDraft(EventWizardDraft draft) async {
-    final preferences = await SharedPreferences.getInstance();
-    final id = draft.draftId ?? 'local';
-    await _secureStorage.write(
-      key: '$_localDraftPrefix$id',
-      value: jsonEncode({
-        'id': draft.draftId,
-        'revision': draft.revision,
-        'mode': draft.mode,
-        'sourceEventId': draft.sourceEventId,
-        'sourceSeriesId': draft.sourceSeriesId,
-        'sourceEventRevision': draft.sourceEventRevision,
-        'currentStage': draft.currentStage.index,
-        'formData': draft.toFormJson(),
-      }),
-    );
-    await preferences.setString(_lastDraftKey, id);
+  Future<void> saveLocalDraft(EventWizardDraft draft) {
+    _checkSession();
+    return _localDrafts.write(draft);
   }
 
-  Future<void> clearLocalDraft(EventWizardDraft draft) async {
-    final preferences = await SharedPreferences.getInstance();
-    final id = draft.draftId ?? 'local';
-    await _secureStorage.delete(key: '$_localDraftPrefix$id');
-    if (preferences.getString(_lastDraftKey) == id) {
-      await preferences.remove(_lastDraftKey);
-    }
+  Future<void> clearLocalDraft(EventWizardDraft draft) {
+    _checkSession();
+    return _localDrafts.clear(draft);
   }
 
   @override
   Future<EventWizardDraft> saveDraft(EventWizardDraft draft) async {
+    _checkSession();
     await saveLocalDraft(draft);
     final result = await _functions.httpsCallable('saveEventDraftV1').call({
       'draftId': draft.draftId,
@@ -145,6 +125,7 @@ class EventWizardService implements EventWizardRepository {
           '${FirebaseAuth.instance.currentUser?.uid ?? 'unknown'}-${DateTime.now().microsecondsSinceEpoch}',
       'formData': draft.toFormJson(),
     });
+    _checkSession();
     final data = Map<String, dynamic>.from(result.data as Map);
     draft.draftId = data['draftId']?.toString();
     draft.revision = (data['revision'] as num?)?.round() ?? draft.revision;
@@ -154,7 +135,9 @@ class EventWizardService implements EventWizardRepository {
 
   @override
   Future<List<EventWizardDraft>> listDrafts() async {
+    _checkSession();
     final result = await _functions.httpsCallable('listEventDraftsV1').call();
+    _checkSession();
     final data = Map<String, dynamic>.from(result.data as Map);
     return (data['drafts'] as List? ?? [])
         .map(
@@ -168,9 +151,11 @@ class EventWizardService implements EventWizardRepository {
   Future<List<Map<String, dynamic>>> listSavedTemplates({
     String? organizationId,
   }) async {
+    _checkSession();
     final result = await _functions.httpsCallable('listEventTemplatesV1').call({
       'organizationId': organizationId,
     });
+    _checkSession();
     final data = Map<String, dynamic>.from(result.data as Map);
     return [
       ...(data['personal'] as List? ?? const []),
@@ -179,24 +164,29 @@ class EventWizardService implements EventWizardRepository {
   }
 
   Future<EventWizardDraft> duplicateEvent(String eventId) async {
+    _checkSession();
     final result = await _functions
         .httpsCallable('duplicateEventToDraftV1')
         .call({'eventId': eventId});
+    _checkSession();
     return EventWizardDraft.fromJson(
       Map<String, dynamic>.from(result.data as Map),
     );
   }
 
   Future<EventWizardDraft> createEditDraft(String eventId) async {
+    _checkSession();
     final result = await _functions
         .httpsCallable('createEditEventDraftV1')
         .call({'eventId': eventId});
+    _checkSession();
     return EventWizardDraft.fromJson(
       Map<String, dynamic>.from(result.data as Map),
     );
   }
 
   Future<void> archiveDraft(String draftId) async {
+    _checkSession();
     await _functions.httpsCallable('archiveEventDraftV1').call({
       'draftId': draftId,
     });
@@ -208,6 +198,7 @@ class EventWizardService implements EventWizardRepository {
     required Uint8List bytes,
     String contentType = 'image/jpeg',
   }) async {
+    _checkSession();
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) throw StateError('A signed-in organizer is required.');
     if (draft.draftId == null) await saveDraft(draft);
@@ -222,8 +213,11 @@ class EventWizardService implements EventWizardRepository {
   Future<EventWizardPublishResult> publish(
     EventWizardDraft draft, {
     int? expectedEventRevision,
+    String? changeReason,
+    String? changePreviewToken,
     String recurrenceScope = 'this_occurrence',
   }) async {
+    _checkSession();
     if (draft.draftId == null) await saveDraft(draft);
     final result = await _functions.httpsCallable('publishEventDraftV1').call({
       'draftId': draft.draftId,
@@ -231,8 +225,11 @@ class EventWizardService implements EventWizardRepository {
       'expectedEventRevision':
           expectedEventRevision ?? draft.sourceEventRevision,
       'recurrenceScope': recurrenceScope,
+      'changeReason': ?changeReason,
+      'changePreviewToken': ?changePreviewToken,
       'idempotencyKey': 'publish-${draft.draftId}-${draft.revision}',
     });
+    _checkSession();
     final data = Map<String, dynamic>.from(result.data as Map);
     await clearLocalDraft(draft);
     return EventWizardPublishResult(
@@ -250,6 +247,7 @@ class EventWizardService implements EventWizardRepository {
     bool includeLocation = false,
     bool includeContact = false,
   }) async {
+    _checkSession();
     await _functions.httpsCallable('saveEventTemplateV1').call({
       'name': name,
       'organizationId': draft.organizationId,

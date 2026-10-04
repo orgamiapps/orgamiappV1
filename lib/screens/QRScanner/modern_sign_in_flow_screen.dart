@@ -1,3 +1,4 @@
+import 'package:attendus/widgets/smart_arrival_card.dart';
 import 'package:flutter/material.dart';
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
@@ -64,7 +65,6 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
         );
 
     _animationController.forward();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _openScanner());
   }
 
   @override
@@ -94,6 +94,7 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
                       children: [
                         _buildWelcomeSection(),
                         const SizedBox(height: 32),
+                        const SmartArrivalCard(),
                         _buildSignInMethods(),
                         const SizedBox(height: 32),
                         _buildQuickTips(),

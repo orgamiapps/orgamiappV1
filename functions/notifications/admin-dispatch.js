@@ -10,6 +10,10 @@ const {
   reserveIdempotencyKey,
 } = require("../security/callable");
 
+const {createHash} = require("node:crypto");
+const {canDeliverPush} = require("./push-tokens");
+const {qualificationDecision, captureQualification} = require("../communications/qualification-isolation");
+
 const NOTIFICATION_ROLES = ["super_admin", "support", "moderator"];
 
 async function audit(db, admin, entry) {
@@ -43,51 +47,60 @@ function createAdminDispatchHandlers({admin}) {
       operation: "sendCustomNotifications",
       uid: actor.uid,
       key: operation.idempotencyKey,
+      fingerprint: createHash("sha256").update(JSON.stringify({
+        userIds: [...userIds].sort(), title, body, type,
+        data: Object.fromEntries(Object.entries(data).sort(([a], [b]) => a.localeCompare(b))), reason: operation.reason,
+      })).digest("hex"),
     });
     if (reservation.result) return reservation.result;
 
     const now = admin.firestore.Timestamp.now();
     const refs = userIds.map((uid) => db.collection("users").doc(uid));
     const recipients = await db.getAll(...refs);
-    const tokens = [];
-    let batch = db.batch();
-    let writes = 0;
+    const messages = [];
+    let recipientCount = 0;
     for (const recipient of recipients) {
-      const notificationRef = recipient.ref.collection("notifications").doc();
-      batch.set(notificationRef, {
-        title,
-        body,
-        type,
-        data,
-        isRead: false,
-        createdAt: now,
-        createdBy: actor.uid,
+      const context = {actorUid: actor.uid, recipientUid: recipient.id, eventId: data.eventId, organizationId: data.organizationId, conversationId: data.conversationId};
+      const notificationRef = recipient.ref.collection("notifications").doc(`admin_${reservation.ref.id}`);
+      const accepted = await db.runTransaction(async (transaction) => {
+        const [current, deleting, existing] = await Promise.all([
+          transaction.get(recipient.ref), transaction.get(db.collection("account_deletion_jobs").doc(recipient.id)),
+          transaction.get(notificationRef),
+        ]);
+        if (!current.exists || deleting.exists) return false;
+        const isolation = await qualificationDecision(db, context, transaction);
+        if (isolation.mode !== "normal") {
+          if (isolation.mode === "capture") await captureQualification(db, transaction, isolation, context, `admin:${reservation.ref.id}`, {title, body, type, data});
+          return false;
+        }
+        if (!existing.exists) transaction.create(notificationRef, {
+          title, body, type, data, isRead: false, createdAt: now, createdBy: actor.uid,
+        });
+        return true;
       });
-      writes += 1;
+      if (!accepted) continue;
+      recipientCount += 1;
       const token = recipient.data()?.fcmToken;
-      if (typeof token === "string" && token.length >= 10) tokens.push(token);
-      if (writes === 400) {
-        await batch.commit();
-        batch = db.batch();
-        writes = 0;
-      }
+      if (await canDeliverPush(db, recipient.id, token)) messages.push({
+        token, notification: {title, body}, data: {...data, type, recipientUid: recipient.id},
+      });
     }
-    if (writes) await batch.commit();
-
+    // Recheck ownership at the provider boundary after the bounded inbox fanout.
+    const deliverable = [];
+    for (const message of messages) {
+      const context = {actorUid: actor.uid, recipientUid: message.data.recipientUid, eventId: data.eventId, organizationId: data.organizationId, conversationId: data.conversationId};
+      if ((await qualificationDecision(db, context)).mode === "normal" && await canDeliverPush(db, message.data.recipientUid, message.token)) deliverable.push(message);
+    }
     let pushSuccessCount = 0;
     let pushFailureCount = 0;
-    if (tokens.length) {
-      const response = await admin.messaging().sendEachForMulticast({
-        tokens,
-        notification: {title, body},
-        data: {type, ...data},
-      });
+    if (deliverable.length) {
+      const response = await admin.messaging().sendEach(deliverable);
       pushSuccessCount = response.successCount;
       pushFailureCount = response.failureCount;
     }
     const result = {
       status: "ok",
-      recipientCount: userIds.length,
+      recipientCount,
       pushSuccessCount,
       pushFailureCount,
     };
@@ -98,7 +111,7 @@ function createAdminDispatchHandlers({admin}) {
       actorRoles: actor.roles,
       reason: operation.reason,
       idempotencyKey: operation.idempotencyKey,
-      recipientCount: userIds.length,
+      recipientCount,
       result,
     });
     return result;

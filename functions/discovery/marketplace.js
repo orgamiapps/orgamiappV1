@@ -1,12 +1,12 @@
 "use strict";
 
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
-const {onDocumentWritten} = require("firebase-functions/v2/firestore");
+
 const {logger} = require("firebase-functions");
-const {FieldValue, Timestamp} = require("firebase-admin/firestore");
+const {Timestamp} = require("firebase-admin/firestore");
 const {
   distanceBetween,
-  geohashForLocation,
+
   geohashQueryBounds,
 } = require("geofire-common");
 const {
@@ -21,17 +21,22 @@ const MIN_SECTION_SIZE = 3;
 const TARGET_LOCAL_RESULTS = 6;
 const MAX_BOUND_RESULTS = 80;
 const MAX_SEARCH_RESULTS = 50;
-const BLOCKED_STATUSES = new Set([
-  "cancelled", "canceled", "declined", "draft", "pending",
-  "pending_approval", "unpublished",
-]);
+const PUBLIC_STATUSES = new Set(["active", "scheduled"]);
 
 function finiteNumber(value, label) {
+  if (value === null || value === undefined || value === "" || typeof value === "boolean") throw new HttpsError("invalid-argument", `${label} must be a number.`);
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) {
     throw new HttpsError("invalid-argument", `${label} must be a number.`);
   }
   return parsed;
+}
+
+function boundedNumber(value, fallback, minimum, maximum, integer = false) {
+  if (value === undefined || value === null) return fallback;
+  const number = finiteNumber(value, "Search parameter");
+  if (integer && !Number.isSafeInteger(number)) throw new HttpsError("invalid-argument", "A whole number is required.");
+  return Math.min(maximum, Math.max(minimum, number));
 }
 
 function validateCenter(data) {
@@ -90,18 +95,31 @@ function normalizeDate(value) {
 }
 
 function activePublicEvent(data, now = new Date()) {
-  if (!data || data.private === true) return false;
-  if (BLOCKED_STATUSES.has(String(data.status || "").toLowerCase())) return false;
+  if (!data || data.private !== false || data.deleted === true || data.isHidden === true ||
+      !PUBLIC_STATUSES.has(String(data.status || "").toLowerCase())) return false;
   const startsAt = normalizeDate(data.selectedDateTime);
   if (!startsAt) return false;
-  const durationHours = Math.max(1, Number(data.eventDuration || 2));
-  const endsAt = new Date(startsAt.getTime() + durationHours * 3600000);
+  const endsAt = require("../events/schedule").schedule(data).end || startsAt;
   return endsAt.getTime() > now.getTime() - 3 * 3600000;
 }
 
 function normalizeTimestamp(value) {
   const date = normalizeDate(value);
   return date ? date.toISOString() : null;
+}
+
+function publicFields(data, fields) {
+  return Object.fromEntries(fields.filter((field) => data && data[field] !== undefined).map((field) => [field, data[field]]));
+}
+
+function publicExperience(raw = {}) {
+  return {
+    ...publicFields(raw, ["accessibilityOptions", "accessibilityDetails", "thingsToBring"]),
+    agenda: (Array.isArray(raw.agenda) ? raw.agenda : []).slice(0, 50)
+        .map((entry) => publicFields(entry, ["id", "title", "details", "offsetMinutes", "order"])),
+    publicContact: raw.publicContact?.visible === true ? publicFields(raw.publicContact, ["name", "email", "visible"]) : {visible: false},
+    checkInPolicy: publicFields(raw.checkInPolicy, ["version", "profile", "eligibility", "opensBeforeMinutes", "closesAfterMinutes", "allowReentry", "checkoutEnabled"]),
+  };
 }
 
 function eventDto(document, center = null) {
@@ -155,6 +173,11 @@ function eventDto(document, center = null) {
     ticketPrice: data.ticketPrice === null || data.ticketPrice === undefined ?
       null : Number(data.ticketPrice),
     eventDuration: Math.max(1, Number(data.eventDuration || 2)),
+    eventDurationMinutes: Number(data.eventDurationMinutes) || null,
+    eventTimeZone: data.eventTimeZone || null,
+    confirmedRegistrationCount: Number(data.confirmedRegistrationCount) || 0,
+    registrationPolicy: publicFields(data.registrationPolicy, ["mode", "capacity", "approvalMode", "waitlistEnabled", "opensAt", "closesAt", "priceUsd", "refundTerms"]),
+    experience: publicExperience(data.experience),
     saveCount: Math.max(0, Number(data.saveCount || 0)),
     attendanceCount: Math.max(0, Number(data.attendanceCount || 0)),
     commentCount: Math.max(0, Number(data.commentCount || 0)),
@@ -442,7 +465,7 @@ function createGetDiscoveryHome(admin) {
     requireCaller(request);
     await enforceDiscoveryRateLimit(db, request);
     const center = validateCenter(request.data);
-    const requestedRadius = Math.min(100, Math.max(25, Number(request.data?.radiusMiles || 25)));
+    const requestedRadius = boundedNumber(request.data?.radiusMiles, 25, 25, 100);
     const now = new Date();
     if (request.data?.nationwide === true) {
       const [events, preferences] = await Promise.all([
@@ -499,8 +522,10 @@ function encodeCursor(offset) {
 function decodeCursor(value) {
   if (!value) return 0;
   try {
-    const parsed = JSON.parse(Buffer.from(String(value), "base64url").toString("utf8"));
-    return Math.max(0, Number(parsed.offset || 0));
+    if (typeof value !== "string" || value.length > 200) throw Error("Invalid cursor");
+    const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
+    if (!Number.isSafeInteger(parsed.offset) || parsed.offset < 0 || parsed.offset > 10000) throw Error("Invalid offset");
+    return parsed.offset;
   } catch (_) {
     throw new HttpsError("invalid-argument", "Invalid search cursor.");
   }
@@ -571,7 +596,7 @@ function createGetDiscoveryHomeV2(admin) {
     requireCaller(request);
     await enforceDiscoveryRateLimit(db, request);
     const center = validateCenter(request.data);
-    const requestedRadius = Math.min(100, Math.max(25, Number(request.data?.radiusMiles || 25)));
+    const requestedRadius = boundedNumber(request.data?.radiusMiles, 25, 25, 100);
     const now = new Date();
     const preferences = await loadPreferencesSafely(db, request);
     const selectedCategoryId = selectedDiscoveryCategory(request.data);
@@ -621,8 +646,8 @@ function createSearchDiscoveryEventsV2(admin) {
     requireCaller(request);
     await enforceDiscoveryRateLimit(db, request);
     const center = validateCenter(request.data);
-    const radiusMiles = Math.min(100, Math.max(1, Number(request.data?.radiusMiles || 25)));
-    const limit = Math.min(MAX_SEARCH_RESULTS, Math.max(1, Number(request.data?.limit || 24)));
+    const radiusMiles = boundedNumber(request.data?.radiusMiles, 25, 1, 100);
+    const limit = boundedNumber(request.data?.limit, 24, 1, MAX_SEARCH_RESULTS, true);
     const query = String(request.data?.query || "").trim().toLowerCase().slice(0, 120);
     const now = new Date();
     const preferences = await loadPreferencesSafely(db, request);
@@ -651,8 +676,8 @@ function createSearchDiscoveryEvents(admin) {
     requireCaller(request);
     await enforceDiscoveryRateLimit(db, request);
     const center = validateCenter(request.data);
-    const radiusMiles = Math.min(100, Math.max(1, Number(request.data?.radiusMiles || 25)));
-    const limit = Math.min(MAX_SEARCH_RESULTS, Math.max(1, Number(request.data?.limit || 20)));
+    const radiusMiles = boundedNumber(request.data?.radiusMiles, 25, 1, 100);
+    const limit = boundedNumber(request.data?.limit, 20, 1, MAX_SEARCH_RESULTS, true);
     const query = String(request.data?.query || "").trim().toLowerCase().slice(0, 120);
     const category = String(request.data?.category || "").trim().toLowerCase();
     const onlineOnly = request.data?.onlineOnly === true;
@@ -695,53 +720,7 @@ function createSearchDiscoveryEvents(admin) {
   });
 }
 
-function createMaintainDiscoveryMetadata(_admin) {
-  return onDocumentWritten({document: "Events/{eventId}", region: "us-central1"}, async (event) => {
-    const after = event.data?.after;
-    if (!after?.exists) return;
-    const data = after.data();
-    const physical = data.locationType !== "online";
-    const latitude = Number(data.latitude || 0);
-    const longitude = Number(data.longitude || 0);
-    const city = String(data.city || "").trim();
-    const regionCode = String(data.regionCode || "").trim().toUpperCase();
-    const countryCode = String(data.countryCode || "").trim().toUpperCase();
-    const valid = physical && Number.isFinite(latitude) && Number.isFinite(longitude) &&
-      latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180 &&
-      !(latitude === 0 && longitude === 0) && city.length > 0 &&
-      regionCode.length > 0 && countryCode === "US";
-    const discoveryCategories = inferDiscoveryCategories(data);
-    const desired = {
-      geohash: valid ? geohashForLocation([latitude, longitude]) : null,
-      city: valid ? city : "",
-      regionCode: valid ? regionCode : "",
-      countryCode: valid ? countryCode : null,
-      discoveryLocationValid: valid,
-      ...discoveryCategories,
-    };
-    if (data.geohash === desired.geohash && data.city === desired.city &&
-        data.regionCode === desired.regionCode && data.countryCode === desired.countryCode &&
-        data.discoveryLocationValid === desired.discoveryLocationValid &&
-        data.primaryDiscoveryCategoryId === desired.primaryDiscoveryCategoryId &&
-        JSON.stringify(data.discoveryCategoryIds || []) === JSON.stringify(desired.discoveryCategoryIds) &&
-        data.discoveryCategorySource === desired.discoveryCategorySource &&
-        data.discoveryCategoryVersion === desired.discoveryCategoryVersion) return;
-    await after.ref.set({...desired, discoveryMetadataUpdatedAt: FieldValue.serverTimestamp()}, {merge: true});
-  });
-}
-
-function createSavedEventCounter(admin) {
-  return onDocumentWritten({
-    document: "Customers/{uid}/SavedEvents/{eventId}", region: "us-central1",
-  }, async (event) => {
-    const before = event.data?.before?.exists === true;
-    const after = event.data?.after?.exists === true;
-    if (before === after) return;
-    await admin.firestore().collection("Events").doc(event.params.eventId).set({
-      saveCount: FieldValue.increment(after ? 1 : -1),
-    }, {merge: true});
-  });
-}
+const {createMaintainDiscoveryMetadata, createSavedEventCounter} = require("./maintenance");
 
 module.exports = {
   DISCOVERY_RADII_MILES,
@@ -756,6 +735,9 @@ module.exports = {
   createSearchDiscoveryEvents,
   createSearchDiscoveryEventsV2,
   eventDto,
+  boundedNumber,
+  decodeCursor,
+  enforceDiscoveryRateLimit,
   loadPreferencesSafely,
   scoreEvent,
 };

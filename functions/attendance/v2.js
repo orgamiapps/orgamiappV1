@@ -1,14 +1,14 @@
 "use strict";
 
 const crypto = require("node:crypto");
-const jwt = require("jsonwebtoken");
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
-const {defineSecret} = require("firebase-functions/params");
 const {FieldValue, Timestamp} = require("firebase-admin/firestore");
 
 const PROFILES = new Set(["self_check_in", "staff_entry", "hybrid"]);
 const ELIGIBILITY = new Set(["open", "registered_only", "ticket_required"]);
 const CREDENTIAL_TYPES = new Set([
+  "location",
+  "attendance_pass",
   "venue_token",
   "personal_pass",
   "staff_roster",
@@ -23,9 +23,6 @@ const RATE_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT = 40;
 const STAFF_RATE_LIMIT = 1200;
 const NAME_PATTERN = /^[\p{L}\p{M}][\p{L}\p{M}\s.'-]*$/u;
-const GOOGLE_WALLET_SERVICE_ACCOUNT = defineSecret(
-    "GOOGLE_WALLET_SERVICE_ACCOUNT_JSON",
-);
 
 function hash(value, bytes = 32) {
   return crypto.createHash("sha256").update(String(value))
@@ -42,7 +39,9 @@ function normalizePolicy(event) {
   const supplied = event?.checkInPolicy;
   if (supplied && typeof supplied === "object") {
     return {
-      version: 2,
+      version: supplied.version >= 3 ? 3 : 2,
+      smartArrival: require("./arrival-core").arrivalPolicy(supplied),
+      openingMode: require("./arrival-core").arrivalPolicy(supplied).openingMode,
       profile: PROFILES.has(supplied.profile) ? supplied.profile : "hybrid",
       eligibility: ELIGIBILITY.has(supplied.eligibility) ?
         supplied.eligibility : "open",
@@ -103,10 +102,11 @@ function eventDateMillis(event) {
 
 function policyWindow(event, policy) {
   const start = eventDateMillis(event);
-  const durationHours = boundedInteger(event?.eventDuration, 2, 1, 168);
+  const durationMinutes = boundedInteger(event?.eventDurationMinutes,
+      boundedInteger(event?.eventDuration, 2, 1, 168) * 60, 1, 10080);
   return {
     opensAtMs: start - (policy.opensBeforeMinutes * 60 * 1000),
-    closesAtMs: start + (durationHours * 60 * 60 * 1000) +
+    closesAtMs: start + (durationMinutes * 60 * 1000) +
       (policy.closesAfterMinutes * 60 * 1000),
   };
 }
@@ -239,72 +239,6 @@ function personalPassToken({eventId, sessionId, uid, ticketId, expiresAtMs,
   return `${payload}.${signature}`;
 }
 
-function walletLinks({event, eventId, sessionId, uid, attendeeName,
-  walletCredential}) {
-  let googleWalletUrl = null;
-  let appleWalletUrl = null;
-  const googleIssuerId = cleanString(process.env.GOOGLE_WALLET_ISSUER_ID, 100);
-  const googleClassId = cleanString(process.env.GOOGLE_WALLET_CLASS_ID, 300);
-  const googleAccountValue = process.env.GOOGLE_WALLET_SERVICE_ACCOUNT_JSON;
-  if (googleIssuerId && googleClassId && googleAccountValue) {
-    try {
-      const account = JSON.parse(googleAccountValue);
-      if (account.client_email && account.private_key) {
-        const objectId = `${googleIssuerId}.${hash(
-            `${eventId}:${sessionId}:${uid}`, 16,
-        )}`;
-        const claims = {
-          iss: account.client_email,
-          aud: "google",
-          typ: "savetowallet",
-          payload: {
-            eventTicketObjects: [{
-              id: objectId,
-              classId: googleClassId,
-              state: "ACTIVE",
-              ticketHolderName: attendeeName,
-              ticketNumber: hash(`${eventId}:${uid}`, 8).toUpperCase(),
-              barcode: {
-                type: "QR_CODE",
-                value: `attendus_pass:v1:${walletCredential}`,
-                alternateText: "Attendus event pass",
-              },
-              textModulesData: [{
-                id: "entry",
-                header: "Entry",
-                body: cleanString(event.title || "Event", 300),
-              }],
-            }],
-          },
-        };
-        const token = jwt.sign(claims, account.private_key, {
-          algorithm: "RS256",
-        });
-        googleWalletUrl = `https://pay.google.com/gp/v/save/${token}`;
-      }
-    } catch (_) {
-      googleWalletUrl = null;
-    }
-  }
-  const applePassService = cleanString(
-      process.env.APPLE_WALLET_PASS_URL, 1000,
-  );
-  if (applePassService) {
-    try {
-      const url = new URL(applePassService);
-      url.searchParams.set("eventId", eventId);
-      url.searchParams.set("sessionId", sessionId);
-      url.searchParams.set(
-          "credential", `attendus_pass:v1:${walletCredential}`,
-      );
-      appleWalletUrl = url.toString();
-    } catch (_) {
-      appleWalletUrl = null;
-    }
-  }
-  return {appleWalletUrl, googleWalletUrl};
-}
-
 function decodePersonalPass(token, publicKeyValue, atMs = Date.now()) {
   const parts = cleanString(token, 4096).split(".");
   if (parts.length !== 2 || !publicKeyValue) {
@@ -376,24 +310,6 @@ async function enforceRateLimit(
   }
 }
 
-async function validateRequiredQuestions(db, eventId, answers) {
-  const supplied = new Map(answers.map((answer) => {
-    const parts = answer.split("--ans--");
-    return [parts.shift(), parts.join("--ans--").trim()];
-  }));
-  const snapshot = await db.collection("Events").doc(eventId)
-      .collection("EventQuestions").get();
-  for (const doc of snapshot.docs) {
-    const question = doc.data();
-    const title = String(question.questionTitle || "");
-    if (question.required === true && !supplied.get(title)) {
-      throw new HttpsError(
-          "failed-precondition",
-          "Answer all required event questions before checking in.",
-      );
-    }
-  }
-}
 
 async function getEvent(db, eventId) {
   const snapshot = await db.collection("Events").doc(eventId).get();
@@ -420,7 +336,7 @@ async function getSessionBundle(db, sessionId) {
 }
 
 async function accessAllowed(db, event, uid) {
-  if (event.private !== true || isManager(event, uid)) return true;
+  if (event.private !== true || (await require("../events/access").capabilities(db, uid, event)).operateDoor) return true;
   if (Array.isArray(event.accessList) && event.accessList.includes(uid)) {
     return true;
   }
@@ -429,46 +345,11 @@ async function accessAllowed(db, event, uid) {
   return attendee.exists;
 }
 
-async function registrationFor(db, eventId, uid) {
-  const snapshot = await db.collection("RegisterAttendance")
-      .where("eventId", "==", eventId)
-      .where("customerUid", "==", uid).limit(1).get();
-  return snapshot.empty ? null : snapshot.docs[0];
-}
-
-async function ticketFor(db, eventId, uid) {
-  const snapshot = await db.collection("Tickets")
-      .where("eventId", "==", eventId)
-      .where("customerUid", "==", uid).limit(1).get();
-  return snapshot.empty ? null : snapshot.docs[0];
-}
 
 async function enforceEligibility(db, eventId, policy, uid, options = {}) {
   if (options.staffOverride) return {registration: null, ticket: null};
-  if (!uid || options.anonymous) {
-    if (policy.eligibility !== "open") {
-      throw new HttpsError(
-          "permission-denied",
-          "This event requires a registered attendee credential.",
-      );
-    }
-    return {registration: null, ticket: null};
-  }
-  if (policy.eligibility === "registered_only") {
-    const registration = await registrationFor(db, eventId, uid);
-    if (!registration) {
-      throw new HttpsError("permission-denied", "Registration is required.");
-    }
-    return {registration, ticket: null};
-  }
-  if (policy.eligibility === "ticket_required") {
-    const ticket = await ticketFor(db, eventId, uid);
-    if (!ticket) {
-      throw new HttpsError("permission-denied", "A valid ticket is required.");
-    }
-    return {registration: null, ticket};
-  }
-  return {registration: null, ticket: null};
+  const {data: event} = await getEvent(db, eventId);
+  return require("./arrival").entitlement(db, db, event, uid, options);
 }
 
 async function customerName(db, uid) {
@@ -503,7 +384,7 @@ function createStartCheckInSession(adminSdk) {
       throw new HttpsError("invalid-argument", "A valid eventId is required.");
     }
     const {data: event} = await getEvent(db, eventId);
-    if (!isManager(event, uid)) {
+    if (!(await require("../events/access").capabilities(db, uid, event)).operateDoor) {
       throw new HttpsError("permission-denied", "Event staff access is required.");
     }
     const policy = normalizePolicy(event);
@@ -523,11 +404,15 @@ function createStartCheckInSession(adminSdk) {
       format: "pem",
       type: "pkcs8",
     });
-    const window = policyWindow(event, policy);
     const nowMs = Date.now();
     const code = venueCode(secret);
     let existingSessionId = null;
     await db.runTransaction(async (transaction) => {
+      const freshEvent = await require("./arrival").readEvent(transaction, db, eventId);
+      if (!(await require("../events/access").capabilities(db, uid, freshEvent)).operateDoor) throw new HttpsError("permission-denied", "Event staff access is required.");
+      const freshPolicy = normalizePolicy(freshEvent);
+      if (freshPolicy.needsOrganizerReview) throw new HttpsError("failed-precondition", "Review the arrival profile before starting check-in.");
+      const currentWindow = policyWindow(freshEvent, freshPolicy);
       const state = await transaction.get(stateRef);
       const activeSessionId = cleanString(state.data()?.activeSessionId, 500);
       let activeSession = null;
@@ -544,8 +429,8 @@ function createStartCheckInSession(adminSdk) {
         id: sessionRef.id,
         eventId,
         status: "active",
-        opensAt: Timestamp.fromMillis(window.opensAtMs),
-        closesAt: Timestamp.fromMillis(window.closesAtMs),
+        opensAt: Timestamp.fromMillis(currentWindow.opensAtMs),
+        closesAt: Timestamp.fromMillis(currentWindow.closesAtMs),
         startedAt: FieldValue.serverTimestamp(),
         startedBy: uid,
         tokenVersion: 1,
@@ -564,8 +449,9 @@ function createStartCheckInSession(adminSdk) {
         eventId,
         activeSessionId: sessionRef.id,
         status: "active",
+        transitions: FieldValue.arrayUnion({status: "open", atMs: nowMs, actorUid: uid}),
         updatedAt: FieldValue.serverTimestamp(),
-      });
+      }, {merge: true});
     });
     if (existingSessionId) {
       return {sessionId: existingSessionId, created: false};
@@ -588,28 +474,27 @@ function createEndCheckInSession(adminSdk) {
     const sessionId = cleanString(request.data?.sessionId, 500);
     const bundle = await getSessionBundle(db, sessionId);
     const {data: event} = await getEvent(db, bundle.session.eventId);
-    if (!isManager(event, uid)) {
+    if (!(await require("../events/access").capabilities(db, uid, event)).operateDoor) {
       throw new HttpsError("permission-denied", "Event staff access is required.");
     }
-    const batch = db.batch();
-    batch.update(bundle.sessionRef, {
-      status: "closed",
-      endedAt: FieldValue.serverTimestamp(),
-      endedBy: uid,
-      venueCode: FieldValue.delete(),
-      venueCodeExpiresAt: FieldValue.delete(),
+    await db.runTransaction(async (tx) => {
+      const currentEvent = await require("./arrival").readEvent(tx, db, bundle.session.eventId);
+      if (!(await require("../events/access").capabilities(db, uid, currentEvent)).operateDoor) throw new HttpsError("permission-denied", "Event staff access is required.");
+      const stateRef = db.collection("check_in_event_state").doc(bundle.session.eventId);
+      const state = await tx.get(stateRef);
+      const session = await tx.get(bundle.sessionRef);
+      if (!session.exists) throw new HttpsError("not-found", "Session not found.");
+      tx.update(bundle.sessionRef, {
+        status: "closed", endedAt: FieldValue.serverTimestamp(), endedBy: uid,
+        venueCode: FieldValue.delete(), venueCodeExpiresAt: FieldValue.delete(),
+      });
+      // Ending an old session must never close a newer session concurrently opened by staff.
+      if (!state.data()?.activeSessionId || state.data().activeSessionId === sessionId) tx.set(stateRef, {
+        eventId: bundle.session.eventId, activeSessionId: null, status: "closed",
+        transitions: FieldValue.arrayUnion({status: "closed", atMs: Date.now(), actorUid: uid}),
+        updatedAt: FieldValue.serverTimestamp(),
+      }, {merge: true});
     });
-    batch.set(
-        db.collection("check_in_event_state").doc(bundle.session.eventId),
-        {
-          eventId: bundle.session.eventId,
-          activeSessionId: null,
-          status: "closed",
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        {merge: true},
-    );
-    await batch.commit();
     await writeAudit(db, {
       action: "session_ended",
       eventId: bundle.session.eventId,
@@ -628,7 +513,7 @@ function createMintVenueCredential(adminSdk) {
     const sessionId = cleanString(request.data?.sessionId, 500);
     const bundle = await getSessionBundle(db, sessionId);
     const {data: event} = await getEvent(db, bundle.session.eventId);
-    if (!isManager(event, uid) || bundle.session.status !== "active") {
+    if (!(await require("../events/access").capabilities(db, uid, event)).operateDoor || bundle.session.status !== "active") {
       throw new HttpsError("permission-denied", "Active event staff access is required.");
     }
     const nowMs = Date.now();
@@ -780,12 +665,21 @@ function validateSubmitInput(data) {
   const credential = data?.credential && typeof data.credential === "object" ?
     data.credential : {};
   const type = cleanString(credential.type, 50);
-  if (!eventId || !sessionId || !idempotencyKey ||
+  if (!eventId || (!sessionId && type !== "location") || !idempotencyKey ||
       eventId.includes("/") || sessionId.includes("/") ||
       !CREDENTIAL_TYPES.has(type)) {
     throw new HttpsError("invalid-argument", "Invalid check-in request.");
   }
+  if (data?.offline === true && (!Number.isFinite(Date.parse(data.observedAt)) ||
+      Date.now() - Date.parse(data.observedAt) > OFFLINE_GRACE_MS || Date.parse(data.observedAt) > Date.now() + 5000)) {
+    throw new HttpsError("failed-precondition", "The offline replay window has expired.");
+  }
+  if (data?.offline === true && !cleanString(data?.offlineKitRevision, 100)) {
+    throw new HttpsError("failed-precondition", "The downloaded roster revision is required for offline reconciliation.");
+  }
   return {
+    offline: data?.offline === true,
+    offlineKitRevision: cleanString(data?.offlineKitRevision, 100),
     eventId,
     sessionId,
     idempotencyKey,
@@ -799,6 +693,7 @@ function createSubmitCheckIn(adminSdk) {
   const db = adminSdk.firestore();
   return onCall(callableOptions(), async (request) => {
     const actorUid = requireAuth(request);
+    const beganAt = Date.now();
     try {
     const input = validateSubmitInput(request.data);
     const {data: event} = await getEvent(db, input.eventId);
@@ -809,7 +704,7 @@ function createSubmitCheckIn(adminSdk) {
           "The organizer must choose a current arrival profile.",
       );
     }
-    const actorIsManager = isManager(event, actorUid);
+    const actorIsManager = (await require("../events/access").capabilities(db, actorUid, event)).operateDoor;
     await enforceRateLimit(
         db,
         actorUid,
@@ -817,15 +712,21 @@ function createSubmitCheckIn(adminSdk) {
         Date.now(),
         rateLimitForActor(actorIsManager),
     );
+    let prepared = null;
+    if (input.credential.type === "location" || input.credential.type === "attendance_pass") {
+      prepared = await require("./arrival").prepareCredential(db, input, event, actorUid, actorIsManager);
+      if (!input.sessionId && input.credential.type === "location") {
+        input.sessionId = await require("./arrival").ensureSession(db, event, actorUid, input.credential.position, input.credential);
+      }
+    }
     const bundle = await getSessionBundle(db, input.sessionId);
     if (bundle.session.eventId !== input.eventId) {
       throw new HttpsError("permission-denied", "Session event mismatch.");
     }
     const offlineStaff = actorIsManager &&
-      input.observedAtMs < Date.now() - VENUE_CODE_TTL_MS;
+      (input.offline || input.observedAtMs < Date.now() - VENUE_CODE_TTL_MS);
     const effectiveAtMs = offlineStaff ? input.observedAtMs : Date.now();
-    const opensAtMs = bundle.session.opensAt.toMillis();
-    const closesAtMs = bundle.session.closesAt.toMillis();
+    const {opensAtMs, closesAtMs} = policyWindow(event, policy);
     if (effectiveAtMs < opensAtMs || effectiveAtMs > closesAtMs) {
       throw new HttpsError("failed-precondition", "Check-in is outside its window.");
     }
@@ -855,7 +756,16 @@ function createSubmitCheckIn(adminSdk) {
     let source = type;
     let overrideReason = "";
 
-    if (type === "venue_token") {
+    if (prepared) {
+      if (type === "location" && policy.profile === "staff_entry") {
+        throw new HttpsError("permission-denied", "Self check-in is not enabled.");
+      }
+      subjectUid = prepared.uid;
+      subjectKey = `user:${subjectUid}`;
+      ticket = prepared.ticket;
+      displayName = prepared.name;
+      verificationLevel = prepared.verificationLevel;
+    } else if (type === "venue_token") {
       if (policy.profile === "staff_entry") {
         throw new HttpsError("permission-denied", "Self check-in is not enabled.");
       }
@@ -876,9 +786,6 @@ function createSubmitCheckIn(adminSdk) {
         anonymous: isAnonymous(request),
       });
       ticket = eligible.ticket;
-      if (ticket?.data()?.isUsed === true && !policy.allowReentry) {
-        throw new HttpsError("already-exists", "This ticket was already used.");
-      }
       displayName = isAnonymous(request) ?
         cleanName(input.credential.fullName) : await customerName(db, actorUid);
     } else if (type === "personal_pass") {
@@ -892,9 +799,6 @@ function createSubmitCheckIn(adminSdk) {
       subjectUid = resolved.uid;
       subjectKey = `user:${subjectUid}`;
       ticket = resolved.ticket;
-      if (ticket?.data()?.isUsed === true && !policy.allowReentry) {
-        throw new HttpsError("already-exists", "This ticket was already used.");
-      }
       displayName = ticket?.data()?.customerName ||
         await customerName(db, subjectUid);
       verificationLevel = "signed_personal_pass";
@@ -912,9 +816,6 @@ function createSubmitCheckIn(adminSdk) {
         staffOverride: Boolean(overrideReason),
       });
       ticket = eligible.ticket;
-      if (ticket?.data()?.isUsed === true && !policy.allowReentry) {
-        throw new HttpsError("already-exists", "This ticket was already used.");
-      }
       displayName = cleanString(input.credential.displayName, 200) ||
         await customerName(db, subjectUid);
       verificationLevel = overrideReason ? "staff_override" : "staff_roster";
@@ -932,76 +833,15 @@ function createSubmitCheckIn(adminSdk) {
       displayName = cleanName(input.credential.fullName);
       subjectUid = "without_login";
       subjectKey = `staff_guest:${hash(
-          `${input.sessionId}:${displayName.toLocaleLowerCase("en-US")}`, 20,
+          `${input.eventId}:${displayName.toLocaleLowerCase("en-US")}`, 20,
       )}`;
       verificationLevel = overrideReason ? "staff_override" : "staff_guest";
     }
 
-    await validateRequiredQuestions(db, input.eventId, input.answers);
-    const attendanceId = `v2_${hash(
-        `${input.eventId}:${input.sessionId}:${subjectKey}`, 20,
-    )}`;
-    const attendanceRef = db.collection("Attendance").doc(attendanceId);
-    const idempotencyRef = db.collection("check_in_idempotency")
-        .doc(hash(`${actorUid}:${input.idempotencyKey}`, 20));
-    const now = Timestamp.now();
-    const observedAt = Timestamp.fromMillis(input.observedAtMs);
-
-    const result = await db.runTransaction(async (transaction) => {
-      const [existing, idempotency] = await Promise.all([
-        transaction.get(attendanceRef),
-        transaction.get(idempotencyRef),
-      ]);
-      if (idempotency.exists) {
-        return {attendanceId: idempotency.data().attendanceId, created: false};
-      }
-      if (existing.exists && existing.data().status === "checked_in" &&
-          !policy.allowReentry) {
-        throw new HttpsError("already-exists", "This attendee is already checked in.");
-      }
-      const reentryCount = existing.exists ?
-        Number(existing.data().reentryCount || 0) + 1 : 0;
-      transaction.set(attendanceRef, {
-        id: attendanceId,
-        eventId: input.eventId,
-        sessionId: input.sessionId,
-        subjectKey,
-        customerUid: subjectUid,
-        guestSessionId: isAnonymous(request) ? actorUid : null,
-        userName: displayName,
-        realName: displayName,
-        attendanceDateTime: now,
-        checkedInAt: now,
-        observedAt,
-        answers: input.answers,
-        isAnonymous: subjectKey.startsWith("guest:") ||
-          subjectKey.startsWith("staff_guest:"),
-        signInMethod: type,
-        source,
-        verificationLevel,
-        actorUid,
-        status: "checked_in",
-        reentryCount,
-        overrideReason: overrideReason || null,
-        offlineReconciled: offlineStaff,
-        updatedAt: now,
-      }, {merge: existing.exists});
-      transaction.create(idempotencyRef, {
-        actorUid,
-        eventId: input.eventId,
-        sessionId: input.sessionId,
-        attendanceId,
-        createdAt: now,
-        expiresAt: Timestamp.fromMillis(Date.now() + OFFLINE_GRACE_MS),
-      });
-      if (ticket?.exists && ticket.data().isUsed !== true) {
-        transaction.update(ticket.ref, {
-          isUsed: true,
-          usedDateTime: now,
-          usedBy: actorUid,
-        });
-      }
-      return {attendanceId, created: !existing.exists, reentryCount};
+    const result = await require("./arrival").commitAttendance(db, {
+      input, actorUid, subjectUid, displayName, source, verificationLevel,
+      overrideReason, offlineStaff, ticket, prepared, subjectKey,
+      anonymous: isAnonymous(request),
     });
     await writeAudit(db, {
       action: result.created ? "checked_in" : "check_in_replayed",
@@ -1013,6 +853,7 @@ function createSubmitCheckIn(adminSdk) {
       source,
       verificationLevel,
       offlineReconciled: offlineStaff,
+      completionMs: Date.now() - beganAt,
       overrideReason: overrideReason || null,
     });
     return {
@@ -1020,8 +861,8 @@ function createSubmitCheckIn(adminSdk) {
       eventId: input.eventId,
       sessionId: input.sessionId,
       attendeeName: displayName,
-      status: "checked_in",
-      checkedInAt: now.toDate().toISOString(),
+      status: result.status,
+      checkedInAt: result.checkedInAt,
     };
     } catch (error) {
       await writeAudit(db, {
@@ -1035,14 +876,15 @@ function createSubmitCheckIn(adminSdk) {
             16,
         ),
         reasonCode: error instanceof HttpsError ? error.code : "internal",
+        locationFallback: ["inaccurate", "stale", "mocked", "outside_boundary"].includes(error.details?.reason) ? error.details.reason : null,
       });
       throw error;
     }
   });
 }
 
-async function checkoutAttendance({db, policy, bundle, actorUid,
-  actorIsManager, input, anonymous}) {
+async function checkoutAttendance({db, policy, actorUid,
+  actorIsManager, input}) {
   if (!policy.checkoutEnabled) {
     throw new HttpsError("failed-precondition", "Checkout is not enabled.");
   }
@@ -1054,23 +896,25 @@ async function checkoutAttendance({db, policy, bundle, actorUid,
     }
     attendanceRef = db.collection("Attendance").doc(explicitId);
   } else {
-    const subjectKey = anonymous ? `guest:${actorUid}` : `user:${actorUid}`;
-    const id = `v2_${hash(
-        `${input.eventId}:${input.sessionId}:${subjectKey}`, 20,
-    )}`;
-    attendanceRef = db.collection("Attendance").doc(id);
-  }
-  const snapshot = await attendanceRef.get();
-  if (!snapshot.exists || snapshot.data().eventId !== input.eventId ||
-      snapshot.data().sessionId !== bundle.session.id) {
-    throw new HttpsError("not-found", "Attendance record not found.");
+    const matches = await db.collection("Attendance").where("eventId", "==", input.eventId)
+        .where("customerUid", "==", actorUid).where("status", "==", "checked_in").get();
+    if (matches.size !== 1) throw new HttpsError("failed-precondition", "Ask staff to select the attendance record to check out.");
+    attendanceRef = matches.docs[0].ref;
   }
   const now = Timestamp.now();
-  await attendanceRef.update({
-    status: "checked_out",
-    checkedOutAt: now,
-    checkoutActorUid: actorUid,
-    updatedAt: now,
+  await db.runTransaction(async (tx) => {
+    const event = await require("./arrival").readEvent(tx, db, input.eventId);
+    const currentPolicy = normalizePolicy(event);
+    if (!currentPolicy.checkoutEnabled) throw new HttpsError("failed-precondition", "Checkout is not enabled.");
+    const snapshot = await tx.get(attendanceRef);
+    if (!snapshot.exists || snapshot.data().eventId !== input.eventId ||
+        (snapshot.data().customerUid !== actorUid && !(await require("../events/access").capabilities(db, actorUid, event)).operateDoor)) {
+      throw new HttpsError("not-found", "Attendance record not found.");
+    }
+    if (snapshot.data().status === "voided") throw new HttpsError("failed-precondition", "Attendance was voided.");
+    if (snapshot.data().status !== "checked_out") tx.update(attendanceRef, {
+      status: "checked_out", checkedOutAt: now, checkoutActorUid: actorUid, updatedAt: now,
+    });
   });
   await writeAudit(db, {
     action: "checked_out",
@@ -1103,7 +947,7 @@ function createVoidAttendance(adminSdk) {
     if (!snapshot.exists) throw new HttpsError("not-found", "Attendance not found.");
     const attendance = snapshot.data();
     const {data: event} = await getEvent(db, attendance.eventId);
-    if (!isManager(event, uid)) {
+    if (!(await require("../events/access").capabilities(db, uid, event)).operateDoor) {
       throw new HttpsError("permission-denied", "Event staff access is required.");
     }
     await ref.update({
@@ -1127,86 +971,26 @@ function createVoidAttendance(adminSdk) {
 
 function createGetPersonalPass(adminSdk) {
   const db = adminSdk.firestore();
-  return onCall({
-    ...callableOptions(),
-    secrets: [GOOGLE_WALLET_SERVICE_ACCOUNT],
-  }, async (request) => {
+  return onCall({...callableOptions(), secrets: [require("./arrival").SIGNING_KEY]}, async (request) => {
     const uid = requireFullAccount(request);
     await enforceRateLimit(db, uid, "personal_pass_issue");
     const eventId = cleanString(request.data?.eventId, 500);
-    let sessionId = cleanString(request.data?.sessionId, 500);
     const {data: event} = await getEvent(db, eventId);
-    const policy = normalizePolicy(event);
-    if (!sessionId) {
-      const active = await db.collection("CheckInSessions")
-          .where("eventId", "==", eventId)
-          .where("status", "==", "active").limit(1).get();
-      if (active.empty) {
-        throw new HttpsError("failed-precondition", "Check-in is not open yet.");
-      }
-      sessionId = active.docs[0].id;
-    }
-    const bundle = await getSessionBundle(db, sessionId);
-    if (bundle.session.eventId !== eventId || bundle.session.status !== "active") {
-      throw new HttpsError("failed-precondition", "An active session is required.");
-    }
-    if (!bundle.passPrivateKey || !bundle.session.passPublicKey) {
-      throw new HttpsError(
-          "failed-precondition",
-          "Restart this legacy check-in session to enable signed passes.",
-      );
-    }
-    if (!(await accessAllowed(db, event, uid))) {
-      throw new HttpsError("permission-denied", "Event access is required.");
-    }
-    const eligible = await enforceEligibility(db, eventId, policy, uid);
-    const ticket = eligible.ticket || await ticketFor(db, eventId, uid);
-    const passExpiresAtMs = Math.min(
-        bundle.session.closesAt.toMillis(),
-        Date.now() + (policy.passLockEnabled ? 2 : 15) * 60 * 1000,
-    );
-    const attendeeName = await customerName(db, uid);
-    const token = personalPassToken({
-      eventId,
-      sessionId,
-      uid,
-      ticketId: ticket?.id,
-      expiresAtMs: passExpiresAtMs,
-      privateKey: bundle.passPrivateKey,
+    const pass = await require("./arrival").issuePass(db, uid, {
+      kind: "event", eventId,
+      registrationId: request.data?.registrationId,
+      ticketId: request.data?.ticketId,
     });
-    const walletCredential = personalPassToken({
-      eventId,
-      sessionId,
-      uid,
-      ticketId: ticket?.id,
-      expiresAtMs: bundle.session.closesAt.toMillis(),
-      privateKey: bundle.passPrivateKey,
-    });
-    const wallet = walletLinks({
-      event,
-      eventId,
-      sessionId,
-      uid,
-      attendeeName,
-      walletCredential,
-    });
-    return {
-      eventId,
-      sessionId,
-      attendeeName,
-      token,
-      qrData: `attendus_pass:v1:${token}`,
-      expiresAt: new Date(passExpiresAtMs).toISOString(),
-      passLockRequired: policy.passLockEnabled,
-      appleWalletUrl: wallet.appleWalletUrl,
-      googleWalletUrl: wallet.googleWalletUrl,
-      walletStatus: wallet.appleWalletUrl || wallet.googleWalletUrl ?
-        "available" : "configuration_required",
-    };
+    const response = await require("./arrival").passResponse(db, pass);
+    return {...response, eventId, sessionId: cleanString(request.data?.sessionId, 500),
+      token: pass.qrData, passLockRequired: normalizePolicy(event).passLockEnabled,
+      walletStatus: response.appleWalletUrl || response.googleWalletUrl ? "available" : "configuration_required"};
   });
 }
 
 module.exports = {
+  hash, isManager, isAnonymous, requireAuth, requireFullAccount, cleanName,
+  enforceRateLimit, getSessionBundle, eventDateMillis,
   createEndCheckInSession,
   createGetPersonalPass,
   createMintVenueCredential,

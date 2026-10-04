@@ -19,6 +19,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   List<Map<String, dynamic>> markets = const [];
   bool loading = true;
   ApiException? error;
+  int _loadRevision = 0;
   static const columns = [
     'date',
     'usersTotal',
@@ -47,49 +48,42 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   String day(DateTime value) => value.toIso8601String().substring(0, 10);
   Future<void> load() async {
+    if (!mounted) return;
+    final revision = ++_loadRevision;
+    final query = {'from': day(from), 'to': day(to)};
     setState(() {
       loading = true;
       error = null;
+      rows = const [];
+      markets = const [];
+      funnel = const {};
     });
     try {
       final client = context.read<AdminApiClient>();
-      final response = await client.getJson(
-        '/v1/metrics',
-        query: {'from': day(from), 'to': day(to)},
-      );
+      final response = await client.getJson('/v1/metrics', query: query);
+      if (!mounted || revision != _loadRevision) return;
       final funnelResponse = await client.getJson(
         '/v1/guest-funnel',
-        query: {'from': day(from), 'to': day(to)},
+        query: query,
       );
+      if (!mounted || revision != _loadRevision) return;
       final marketResponse = await client.getJson(
         '/v1/discovery/market-health',
       );
-      final daily =
-          ((response['data'] as Map<String, dynamic>)['daily'] as List? ??
-          const []);
-      if (mounted) {
-        setState(
-          () => rows = daily
-              .cast<Map>()
-              .map((row) => row.cast<String, dynamic>())
-              .toList(),
-        );
-        setState(
-          () => markets = (marketResponse['data'] as List? ?? const [])
-              .cast<Map>()
-              .map((row) => row.cast<String, dynamic>())
-              .toList(),
-        );
-        setState(
-          () => funnel = Map<String, dynamic>.from(
-            funnelResponse['data'] as Map? ?? const {},
-          ),
-        );
+      final daily = requireApiRows(requireApiObject(response['data'])['daily']);
+      final nextMarkets = requireApiRows(marketResponse['data']);
+      final nextFunnel = requireApiObject(funnelResponse['data']);
+      if (mounted && revision == _loadRevision) {
+        setState(() {
+          rows = daily;
+          markets = nextMarkets;
+          funnel = nextFunnel;
+        });
       }
     } on ApiException catch (e) {
-      if (mounted) setState(() => error = e);
+      if (mounted && revision == _loadRevision) setState(() => error = e);
     } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted && revision == _loadRevision) setState(() => loading = false);
     }
   }
 

@@ -7,7 +7,8 @@ service cloud.firestore {
 
     function fullUser() {
       return signedIn() &&
-        request.auth.token.firebase.sign_in_provider != 'anonymous';
+        request.auth.token.firebase.sign_in_provider != 'anonymous' &&
+        !exists(/databases/$(database)/documents/account_deletion_jobs/$(request.auth.uid));
     }
 
     function self(uid) {
@@ -26,7 +27,9 @@ service cloud.firestore {
       return fullUser() && (
         eventOwner(eventId) ||
         request.auth.uid in eventData(eventId).get('coHosts', []) ||
-        request.auth.uid in eventData(eventId).get('checkInStaff', [])
+        request.auth.uid in eventData(eventId).get('checkInStaff', []) ||
+        (eventData(eventId).get('organizationId', '') != '' &&
+          orgAdmin(eventData(eventId).organizationId))
       );
     }
 
@@ -40,8 +43,10 @@ service cloud.firestore {
 
     function canReadEvent(eventId) {
       return signedIn() && (
-        eventData(eventId).get('private', false) == false ||
-        eventParticipant(eventId)
+        eventData(eventId).get('private', null) == false ||
+        eventParticipant(eventId) ||
+        (eventData(eventId).get('organizationId', '') != '' &&
+          orgMember(eventData(eventId).organizationId))
       );
     }
 
@@ -84,6 +89,10 @@ service cloud.firestore {
     match /admin_idempotency/{doc} { allow read, write: if false; }
     match /admin_rate_limits/{doc} { allow read, write: if false; }
     match /service_rate_limits/{doc} { allow read, write: if false; }
+    match /ProfileReadLimits/{uid} { allow read, write: if false; }
+    match /QualificationScopes/{doc} { allow read, write: if false; }
+    match /QualificationBindings/{doc} { allow read, write: if false; }
+    match /QualificationCaptures/{doc} { allow read, write: if false; }
     match /stripe_webhook_events/{doc} { allow read, write: if false; }
     match /TicketReservations/{doc} { allow read, write: if false; }
     match /GuestAttendees/{doc} { allow read, write: if false; }
@@ -102,8 +111,23 @@ service cloud.firestore {
     match /account_deletion_jobs/{doc} { allow read, write: if false; }
     match /biometric_quarantine/{doc} { allow read, write: if false; }
     match /FaceEnrollments/{doc} { allow read, write: if false; }
+    match /feedback_submissions/{doc} { allow read, write: if false; }
+    match /LegacyNotificationDeliveries/{doc} { allow read, write: if false; }
+    match /PushTokenBindings/{doc} { allow read, write: if false; }
+    match /PushInstallations/{doc} { allow read, write: if false; }
+    match /app_feedback/{doc} { allow read, write: if false; }
+    match /LiveQuizzes/{doc} { allow read, write: if false; }
+    match /LiveQuizSecrets/{document=**} { allow read, write: if false; }
+    match /LiveQuizQuestionLookup/{doc} { allow read, write: if false; }
+    match /QuizQuestions/{doc} { allow read, write: if false; }
+    match /QuizParticipants/{doc} { allow read, write: if false; }
+    match /QuizResponses/{doc} { allow read, write: if false; }
 
     match /subscriptions/{uid} {
+      allow read: if self(uid);
+      allow write: if false;
+    }
+    match /account_entitlements/{uid} {
       allow read: if self(uid);
       allow write: if false;
     }
@@ -137,14 +161,24 @@ service cloud.firestore {
     }
 
     match /Customers/{uid} {
-      allow read: if fullUser();
-      allow create: if self(uid) && request.resource.data.uid == request.auth.uid;
+      // Other accounts use the allowlisted public-profile callables.
+      allow read: if self(uid);
+      allow create: if self(uid) && request.resource.data.uid == request.auth.uid &&
+        !request.resource.data.keys().hasAny([
+          'role', 'roles', 'isAdmin', 'approved', 'approvalStatus',
+          'tier', 'planId', 'subscriptionStatus', 'paid', 'isPaid',
+          'eventsCreatedThisMonth', 'usage'
+        ]) &&
+        request.resource.data.get('eventsCreated', 0) is int &&
+        request.resource.data.get('eventsCreated', 0) == 0 &&
+        request.resource.data.get('groupsCreated', 0) is int &&
+        request.resource.data.get('groupsCreated', 0) == 0;
       allow update: if self(uid) &&
         request.resource.data.uid == resource.data.uid &&
         !changedKeys().hasAny([
           'role', 'roles', 'isAdmin', 'approved', 'approvalStatus',
           'tier', 'planId', 'subscriptionStatus', 'paid', 'isPaid',
-          'eventsCreatedThisMonth', 'groupsCreated', 'usage'
+          'eventsCreated', 'eventsCreatedThisMonth', 'groupsCreated', 'usage'
         ]);
       allow delete: if false;
 
@@ -177,10 +211,14 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read, create: if self(uid);
+      allow read: if self(uid);
+      allow create: if self(uid) && !request.resource.data.keys().hasAny([
+        'role', 'roles', 'isAdmin', 'approved', 'approvalStatus',
+        'tier', 'planId', 'subscriptionStatus', 'paid', 'isPaid', 'usage', 'fcmToken'
+      ]);
       allow update: if self(uid) && !changedKeys().hasAny([
         'role', 'roles', 'isAdmin', 'approved', 'approvalStatus',
-        'tier', 'planId', 'subscriptionStatus', 'paid', 'isPaid', 'usage'
+        'tier', 'planId', 'subscriptionStatus', 'paid', 'isPaid', 'usage', 'fcmToken'
       ]);
       allow delete: if false;
       match /{subcollection}/{document} {
@@ -190,30 +228,29 @@ service cloud.firestore {
 
     match /Events/{eventId} {
       allow read: if signedIn() && (
-        resource.data.get('private', false) == false ||
-        eventManager(eventId) ||
+        resource.data.private == false ||
         resource.data.customerUid == request.auth.uid ||
-        request.auth.uid in resource.data.get('accessList', [])
+        request.auth.uid in resource.data.get('coHosts', []) ||
+        request.auth.uid in resource.data.get('checkInStaff', []) ||
+        request.auth.uid in resource.data.get('accessList', []) ||
+        (resource.data.get('organizationId', '') != '' &&
+          orgMember(resource.data.organizationId))
       );
-      allow create: if fullUser() &&
-        request.resource.data.customerUid == request.auth.uid &&
-        request.resource.data.get('isFeatured', false) == false &&
-        request.resource.data.get('issuedTickets', 0) == 0;
+      // Publication, schedule/lifecycle, organization and counters are callable-owned.
+      // Legacy clients must update to the event wizard for protected mutations.
+      allow create: if false;
       allow update: if eventOwner(eventId) &&
-        request.resource.data.customerUid == resource.data.customerUid &&
-        !changedKeys().hasAny([
-          'isFeatured', 'featureEndDate', 'issuedTickets', 'reservedTickets',
-          'paidTicketCount',
-          'grossRevenue', 'netRevenue', 'attendanceCount', 'commentCount',
-          'saveCount', 'geohash', 'countryCode', 'discoveryLocationValid',
-          'discoveryMetadataUpdatedAt'
-        ]);
-      allow delete: if eventOwner(eventId);
+        changedKeys().hasOnly(['title', 'description', 'imageUrl', 'updatedAt']);
+      // Permanent deletion is server checked for dependent records.
+      allow delete: if false;
 
       match /Attendees/{uid} {
         allow read: if self(uid) || eventManager(eventId);
-        allow create: if self(uid) && request.resource.data.customerUid == request.auth.uid;
-        allow update, delete: if false;
+        allow write: if false;
+      }
+      match /Comments/{id} {
+        allow read: if canReadEvent(eventId);
+        allow write: if false;
       }
       match /Questions/{id} {
         allow read: if canReadEvent(eventId);
@@ -224,19 +261,23 @@ service cloud.firestore {
           request.resource.data.userId == request.auth.uid &&
           request.resource.data.status == 'pending';
         allow read, delete: if self(uid) || eventOwner(eventId);
-        allow update: if eventOwner(eventId);
+        allow update: if false;
       }
       match /{subcollection}/{document} {
-        allow read: if canReadEvent(eventId);
-        allow write: if eventOwner(eventId);
+        allow read: if subcollection != 'Attendees' && canReadEvent(eventId);
+        allow write: if !(subcollection in ['Attendees', 'Comments', 'AccessRequests']) && eventOwner(eventId);
       }
     }
 
     match /Organizations/{orgId} {
       allow read: if signedIn();
-      allow create: if fullUser() && request.resource.data.createdBy == request.auth.uid;
+      allow create: if fullUser() && request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.name_lowercase is string &&
+        getAfter(/databases/$(database)/documents/OrganizationNames/$(request.resource.data.name_lowercase)).data.organizationId == orgId;
       allow update: if orgAdmin(orgId) &&
-        request.resource.data.createdBy == resource.data.createdBy;
+        request.resource.data.createdBy == resource.data.createdBy &&
+        (!changedKeys().hasAny(['name_lowercase']) ||
+          getAfter(/databases/$(database)/documents/OrganizationNames/$(request.resource.data.name_lowercase)).data.organizationId == orgId);
       allow delete: if orgAdmin(orgId);
 
       match /Members/{uid} {
@@ -244,11 +285,14 @@ service cloud.firestore {
         allow create: if fullUser() && (
           orgAdmin(orgId) ||
           (self(uid) &&
+            exists(/databases/$(database)/documents/Organizations/$(orgId)) &&
             request.resource.data.userId == request.auth.uid &&
             request.resource.data.role in ['Member', 'member'] &&
-            request.resource.data.status in ['pending', 'approved']) ||
+            request.resource.data.status == 'pending' &&
+            request.resource.data.get('permissions', []) == []) ||
           (self(uid) &&
             get(/databases/$(database)/documents/Organizations/$(orgId)).data.createdBy == request.auth.uid &&
+            request.resource.data.userId == request.auth.uid &&
             request.resource.data.role in ['Admin', 'admin', 'Owner', 'owner'] &&
             request.resource.data.status == 'approved')
         );
@@ -261,10 +305,15 @@ service cloud.firestore {
       }
       match /Feed/{id} {
         allow read: if orgMember(orgId);
-        allow create: if orgMember(orgId) &&
-          request.resource.data.createdBy == request.auth.uid;
-        allow update, delete: if orgAdmin(orgId) ||
-          (orgMember(orgId) && resource.data.createdBy == request.auth.uid);
+        // Author identity, poll votes, comments, counters and moderation are
+        // validated atomically by communityMutationV1.
+        allow write: if false;
+        match /Comments/{commentId} {
+          allow read: if orgMember(orgId) &&
+            exists(/databases/$(database)/documents/Organizations/$(orgId)/Feed/$(id)) &&
+            get(/databases/$(database)/documents/Organizations/$(orgId)/Feed/$(id)).data.get('deleted', false) == false;
+          allow write: if false;
+        }
       }
       match /JoinRequests/{uid} {
         allow create: if self(uid) &&
@@ -283,15 +332,22 @@ service cloud.firestore {
       }
       match /{subcollection}/{document} {
         allow read: if orgMember(orgId);
-        allow write: if orgAdmin(orgId);
+        allow write: if subcollection != 'Feed' && orgAdmin(orgId);
       }
     }
 
     match /OrganizationNames/{name} {
       allow read: if signedIn();
-      allow create: if fullUser();
-      allow update: if false;
-      allow delete: if fullUser() && resource.data.createdBy == request.auth.uid;
+      allow create: if fullUser() &&
+        request.resource.data.organizationId is string &&
+        getAfter(/databases/$(database)/documents/Organizations/$(request.resource.data.organizationId)).data.name_lowercase == name &&
+        (getAfter(/databases/$(database)/documents/Organizations/$(request.resource.data.organizationId)).data.createdBy == request.auth.uid ||
+          orgAdmin(request.resource.data.organizationId));
+      allow update: if fullUser() &&
+        request.resource.data.organizationId == resource.data.organizationId &&
+        orgAdmin(resource.data.organizationId) &&
+        getAfter(/databases/$(database)/documents/Organizations/$(resource.data.organizationId)).data.name_lowercase == name;
+      allow delete: if fullUser() && orgAdmin(resource.data.organizationId);
     }
 
     match /Attendance/{id} {
@@ -304,10 +360,7 @@ service cloud.firestore {
       allow read: if fullUser() &&
         (resource.data.customerUid == request.auth.uid ||
           eventManager(resource.data.eventId));
-      allow create: if fullUser() &&
-        request.resource.data.customerUid == request.auth.uid &&
-        canReadEvent(request.resource.data.eventId);
-      allow update, delete: if false;
+      allow write: if false;
     }
 
     match /Tickets/{id} {
@@ -326,6 +379,14 @@ service cloud.firestore {
       allow read: if eventManager(resource.data.eventId);
       allow write: if false;
     }
+    match /AttendancePasses/{id} { allow read, write: if false; }
+    match /AttendanceSubjects/{id} { allow read, write: if false; }
+    match /AttendanceSigningKeys/{id} { allow read, write: if false; }
+    match /AttendanceWalletDownloads/{id} { allow read, write: if false; }
+    match /AttendanceWalletDevices/{id} { allow read, write: if false; }
+    match /AttendanceWalletJobs/{id} { allow read, write: if false; }
+    match /AttendanceWalletDeliveryJobs/{id} { allow read, write: if false; }
+    match /AttendanceWalletDelivery/{id} { allow read, write: if false; }
     match /check_in_session_secrets/{id} { allow read, write: if false; }
     match /check_in_idempotency/{id} { allow read, write: if false; }
     match /check_in_event_state/{id} { allow read, write: if false; }
@@ -333,67 +394,63 @@ service cloud.firestore {
 
     match /Conversations/{id} {
       allow read: if fullUser() && request.auth.uid in resource.data.participantIds;
-      allow create: if fullUser() &&
+      // Direct conversations and all message writes are server-owned. Group
+      // creation remains compatible with the existing group composer.
+      allow create: if fullUser() && request.resource.data.isGroup == true &&
+        !request.resource.data.keys().hasAny(['redirectConversationId', 'migrationState', 'formerParticipant']) &&
         request.auth.uid in request.resource.data.participantIds &&
-        request.resource.data.participantIds.size() >= 2 &&
-        request.resource.data.participantIds.size() <= 100;
-      allow update: if fullUser() &&
-        request.auth.uid in resource.data.participantIds &&
-        request.resource.data.participantIds == resource.data.participantIds;
+        request.resource.data.participantIds is list &&
+        request.resource.data.participantIds.size() >= 3 &&
+        request.resource.data.participantIds.size() <= 100 &&
+        request.resource.data.participantIds.toSet().size() == request.resource.data.participantIds.size() &&
+        request.resource.data.messagingVersion == 2 &&
+        request.resource.data.sequence == 0 &&
+        request.resource.data.lastMessage == '' &&
+        request.resource.data.receivedTotals == {} && request.resource.data.readTotals == {} &&
+        request.resource.data.readSequences == {} && request.resource.data.unreadCounts == {};
+      allow update: if fullUser() && request.auth.uid in resource.data.participantIds &&
+        !resource.data.keys().hasAny(['redirectConversationId']) &&
+        resource.data.get('migrationState', 'complete') != 'moving' &&
+        changedKeys().hasOnly(['groupName', 'groupAvatarUrl']);
       allow delete: if false;
-
       match /Messages/{messageId} {
         allow read: if conversationParticipant(id);
-        allow create: if conversationParticipant(id) &&
-          request.resource.data.senderId == request.auth.uid &&
-          request.resource.data.conversationId == id;
-        allow update: if conversationParticipant(id) && (
-          (resource.data.senderId == request.auth.uid &&
-            request.resource.data.senderId == resource.data.senderId) ||
-          changedKeys().hasOnly(['isRead', 'readByUserIds'])
-        );
-        allow delete: if conversationParticipant(id) &&
-          resource.data.senderId == request.auth.uid;
+        allow write: if false;
       }
     }
 
     match /Messages/{id} {
       allow read: if conversationParticipant(resource.data.conversationId);
-      allow create: if fullUser() &&
-        request.resource.data.senderId == request.auth.uid &&
-        conversationParticipant(request.resource.data.conversationId);
-      allow update: if conversationParticipant(resource.data.conversationId) &&
-        changedKeys().hasOnly(['isRead', 'readByUserIds']);
-      allow delete: if conversationParticipant(resource.data.conversationId) &&
-        resource.data.senderId == request.auth.uid;
-
+      allow write: if false;
       match /messages/{subId} {
         allow read: if conversationParticipant(id);
-        allow create: if conversationParticipant(id) &&
-          request.resource.data.senderId == request.auth.uid &&
-          request.resource.data.conversationId == id;
-        allow update, delete: if conversationParticipant(id) &&
-          resource.data.senderId == request.auth.uid;
+        allow write: if false;
       }
     }
 
     match /Comments/{id} {
-      allow read: if signedIn();
-      allow create: if fullUser() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if fullUser() && resource.data.userId == request.auth.uid;
+      allow read: if canReadEvent(resource.data.eventId);
+      allow create: if fullUser() && request.resource.data.userId == request.auth.uid &&
+        canReadEvent(request.resource.data.eventId) &&
+        request.resource.data.comment is string &&
+        request.resource.data.comment.size() > 0 && request.resource.data.comment.size() <= 4000;
+      allow update: if fullUser() && resource.data.userId == request.auth.uid &&
+        changedKeys().hasOnly(['comment']) && request.resource.data.comment is string &&
+        request.resource.data.comment.size() > 0 && request.resource.data.comment.size() <= 4000;
+      allow delete: if fullUser() && resource.data.userId == request.auth.uid;
     }
     match /reports/{id} {
-      allow create: if fullUser() && request.resource.data.reporterUid == request.auth.uid;
-      allow read, update, delete: if false;
+      allow read, write: if false;
     }
     match /event_feedback/{id} {
       allow read: if fullUser() &&
         (resource.data.userId == request.auth.uid || eventOwner(resource.data.eventId));
-      allow create: if fullUser() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if false;
+      allow write: if false;
     }
     match /notifications/{id} {
-      allow read, update, delete: if fullUser() && resource.data.userId == request.auth.uid;
+      allow read, delete: if fullUser() && resource.data.userId == request.auth.uid;
+      allow update: if fullUser() && resource.data.userId == request.auth.uid &&
+        changedKeys().hasOnly(['isRead', 'read', 'readAt']);
       allow create: if false;
     }
     match /notification_history/{id} {

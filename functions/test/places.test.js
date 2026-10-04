@@ -18,6 +18,16 @@ async function expectCode(promise, code) {
   await assert.rejects(promise, (error) => error.code === code);
 }
 
+test("Places rejects null or coerced coordinate inputs before any provider request", async () => {
+  let calls = 0;
+  global.fetch = async () => { calls++; throw new Error("Unexpected provider request"); };
+  for (const latitude of [null, false, "35", ""]) {
+    await expectCode(functions.reverseGeocode.run(request("invalid-coordinates", {latitude, longitude: -80})), "invalid-argument");
+    await expectCode(functions.placesAutocomplete.run(request("invalid-bias", {query: "venue", sessionToken: "fixture-session", useCase: "event", locationBias: {latitude, longitude: -80}})), "invalid-argument");
+  }
+  assert.equal(calls, 0);
+});
+
 test("Places callables reject missing and anonymous authentication", async () => {
   const data = {
     query: "Boston",

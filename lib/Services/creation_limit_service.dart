@@ -1,3 +1,4 @@
+import 'package:attendus/Services/event_creation_entitlement_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/widgets.dart';
@@ -32,7 +33,9 @@ class CreationLimitService extends ChangeNotifier {
 
   // Computed properties for remaining creations
   int get eventsRemaining {
-    if (_subscriptionService.hasPremium) return -1; // -1 indicates unlimited
+    if (_subscriptionService.hasUnlimitedEvents()) {
+      return -1; // -1 indicates unlimited
+    }
     return (freeEventLimit - _eventsCreated).clamp(0, freeEventLimit);
   }
 
@@ -67,7 +70,7 @@ class CreationLimitService extends ChangeNotifier {
 
   // Check if user is approaching limit (1 remaining)
   bool get isApproachingEventLimit {
-    if (_subscriptionService.hasPremium) return false;
+    if (_subscriptionService.hasUnlimitedEvents()) return false;
     return eventsRemaining == 1;
   }
 
@@ -78,6 +81,7 @@ class CreationLimitService extends ChangeNotifier {
 
   /// Initialize the service and load user's creation counts
   Future<void> initialize() async {
+    EventCreationEntitlementService.instance.initialize();
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
 
@@ -123,6 +127,7 @@ class CreationLimitService extends ChangeNotifier {
 
   /// Get event limit description text for UI
   String getEventLimitText() {
+    if (_subscriptionService.hasUnlimitedEvents()) return 'Unlimited events';
     final tier = _subscriptionService.currentTier;
 
     switch (tier) {
@@ -198,7 +203,7 @@ class CreationLimitService extends ChangeNotifier {
     if (userId == null) return;
 
     // Premium users don't track counts
-    if (_subscriptionService.hasPremium) return;
+    if (_subscriptionService.hasUnlimitedEvents()) return;
 
     if (_eventsCreated <= 0) return;
 
@@ -263,7 +268,7 @@ class CreationLimitService extends ChangeNotifier {
 
   /// Get formatted limit status text
   String getEventLimitStatus() {
-    if (_subscriptionService.hasPremium) {
+    if (_subscriptionService.hasUnlimitedEvents()) {
       return 'Unlimited';
     }
     return '$_eventsCreated / $freeEventLimit';
@@ -278,7 +283,7 @@ class CreationLimitService extends ChangeNotifier {
 
   /// Get progress percentage (0.0 to 1.0)
   double getEventProgress() {
-    if (_subscriptionService.hasPremium) return 0.0;
+    if (_subscriptionService.hasUnlimitedEvents()) return 0.0;
     return (_eventsCreated / freeEventLimit).clamp(0.0, 1.0);
   }
 

@@ -193,7 +193,7 @@
         '__ATTENDUS_FIREBASE_HOSTING_ORIGIN__',
         '__ATTENDUS_FIREBASE_APP_ORIGIN__',
       ];
-      const workerBridgeEnabled = __ATTENDUS_WORKER_BRIDGE_ENABLED__;
+      const workerBridgeEnabled = '__ATTENDUS_WORKER_BRIDGE_ENABLED__' === 'true';
       const cleanupKey = 'attendus-legacy-flutter-cache-cleanup-v3';
       const reloadGuardKey = 'attendus-legacy-worker-reload-v3';
       const currentUrl = new URL(window.location.href);

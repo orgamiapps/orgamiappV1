@@ -1,3 +1,4 @@
+import 'package:attendus/models/event_schedule.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:attendus/models/check_in_policy.dart';
@@ -39,6 +40,8 @@ class EventModel {
   double? ticketPrice; // Price per ticket in USD
   bool ticketUpgradeEnabled; // Whether skip-the-line upgrades are available
   double? ticketUpgradePrice; // Total skip-the-line upgrade price
+  int? eventDurationMinutes;
+  int confirmedRegistrationCount;
   int eventDuration; // Duration in hours
   List<String> coHosts; // Array of user IDs who are co-hosts
   List<String> checkInStaff; // User IDs with event-day console access
@@ -113,6 +116,8 @@ class EventModel {
     this.ticketPrice,
     this.ticketUpgradeEnabled = false,
     this.ticketUpgradePrice,
+    this.eventDurationMinutes,
+    this.confirmedRegistrationCount = 0,
     this.eventDuration = 2, // Default 2 hours
     this.coHosts = const [],
     this.checkInStaff = const [],
@@ -163,7 +168,7 @@ class EventModel {
       status: data['status'],
       selectedDateTime: data['selectedDateTime'] is Timestamp
           ? (data['selectedDateTime'] as Timestamp).toDate()
-          : DateTime.tryParse(data['selectedDateTime'].toString()) ??
+          : DateTime.tryParse(data['selectedDateTime'].toString())?.toLocal() ??
                 DateTime.now(),
       eventGenerateTime: data['eventGenerateTime'] is Timestamp
           ? (data['eventGenerateTime'] as Timestamp).toDate()
@@ -203,6 +208,11 @@ class EventModel {
       ticketUpgradeEnabled: data['ticketUpgradeEnabled'] ?? false,
       ticketUpgradePrice: data['ticketUpgradePrice']?.toDouble(),
       eventDuration: data['eventDuration'] ?? 2,
+      eventDurationMinutes:
+          (data['eventDurationMinutes'] as num?)?.toInt() ??
+          ((data['eventDuration'] as num?)?.toInt() ?? 0) * 60,
+      confirmedRegistrationCount:
+          (data['confirmedRegistrationCount'] as num?)?.toInt() ?? 0,
       coHosts: (data.containsKey('coHosts') && data['coHosts'] != null)
           ? List<String>.from(data['coHosts'])
           : [],
@@ -271,8 +281,17 @@ class EventModel {
   String get rawId => id;
 
   /// Returns the event end time based on selectedDateTime + eventDuration
-  DateTime get eventEndTime =>
-      selectedDateTime.add(Duration(hours: eventDuration));
+  DateTime get eventEndTime => schedule.end ?? selectedDateTime;
+
+  EventSchedule get schedule => EventSchedule(
+    selectedDateTime,
+    eventDurationMinutes == null
+        ? eventDuration * 60
+        : eventDurationMinutes! > 0
+        ? eventDurationMinutes
+        : null,
+    eventTimeZone,
+  );
 
   /// Returns the dwell tracking end time (event end + 1 hour buffer)
   DateTime get dwellTrackingEndTime =>
@@ -437,6 +456,10 @@ class EventModel {
       data['ticketUpgradePrice'] = ticketUpgradePrice;
     }
     data['eventDuration'] = eventDuration;
+    data['eventDurationMinutes'] = eventDurationMinutes;
+    data['confirmedRegistrationCount'] = confirmedRegistrationCount;
+    data['registrationPolicy'] = registrationPolicy;
+    data['experience'] = experience;
     data['coHosts'] = coHosts;
     data['checkInStaff'] = checkInStaff;
     if (organizationId != null) data['organizationId'] = organizationId;

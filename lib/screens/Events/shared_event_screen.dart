@@ -17,11 +17,15 @@ enum SharedEventLoadState { loading, event, restricted, notFound, error }
 class SharedEventScreen extends StatefulWidget {
   final String eventId;
   final String? initialAction;
+  final String? registrationId;
+  final String? ticketId;
 
   const SharedEventScreen({
     super.key,
     required this.eventId,
     this.initialAction,
+    this.registrationId,
+    this.ticketId,
   });
 
   @override
@@ -36,20 +40,42 @@ class _SharedEventScreenState extends State<SharedEventScreen> {
   String? _requestStatus;
   bool _submittingRequest = false;
   bool _approvalReloadScheduled = false;
+  int _loadGeneration = 0;
+  String? _loadedUid;
+  String? _selectionOwnerUid;
+  StreamSubscription<User?>? _auth;
 
   @override
   void initState() {
     super.initState();
+    _loadedUid = FirebaseAuth.instance.currentUser?.uid;
+    _selectionOwnerUid = _loadedUid;
+    _auth = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (!mounted || user?.uid == _loadedUid) return;
+      _loadedUid = user?.uid;
+      _loadGeneration++;
+      _requestSubscription?.cancel();
+      setState(() {
+        _event = null;
+        _requestStatus = null;
+        _approvalReloadScheduled = false;
+        _state = SharedEventLoadState.loading;
+      });
+      _load();
+    });
     _load();
   }
 
   @override
   void dispose() {
+    _loadGeneration++;
+    _auth?.cancel();
     _requestSubscription?.cancel();
     super.dispose();
   }
 
   Future<void> _load() async {
+    final generation = ++_loadGeneration;
     if (mounted) {
       setState(() => _state = SharedEventLoadState.loading);
     }
@@ -57,11 +83,17 @@ class _SharedEventScreenState extends State<SharedEventScreen> {
       await FirebaseInitializer.initializeOnce();
       await GuestModeService().initialize();
       await GuestModeService().ensureGuestSession();
+      if (!mounted || generation != _loadGeneration) return;
+      final uid = FirebaseAuth.instance.currentUser?.uid;
       final snapshot = await FirebaseFirestore.instance
           .collection(EventModel.firebaseKey)
           .doc(widget.eventId)
           .get();
-      if (!mounted) return;
+      if (!mounted ||
+          generation != _loadGeneration ||
+          FirebaseAuth.instance.currentUser?.uid != uid) {
+        return;
+      }
       if (!snapshot.exists || snapshot.data() == null) {
         setState(() => _state = SharedEventLoadState.notFound);
         return;
@@ -76,7 +108,7 @@ class _SharedEventScreenState extends State<SharedEventScreen> {
       });
     } on FirebaseException catch (error) {
       Logger.warning('Shared event ${widget.eventId} failed to load: $error');
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       if (error.code == 'permission-denied') {
         setState(() => _state = SharedEventLoadState.restricted);
         _watchAccessRequest();
@@ -85,7 +117,9 @@ class _SharedEventScreenState extends State<SharedEventScreen> {
       }
     } catch (error) {
       Logger.warning('Shared event ${widget.eventId} failed to load: $error');
-      if (mounted) setState(() => _state = SharedEventLoadState.error);
+      if (mounted && generation == _loadGeneration) {
+        setState(() => _state = SharedEventLoadState.error);
+      }
     }
   }
 
@@ -101,7 +135,10 @@ class _SharedEventScreenState extends State<SharedEventScreen> {
         .snapshots()
         .listen(
           (snapshot) {
-            if (!mounted) return;
+            if (!mounted ||
+                FirebaseAuth.instance.currentUser?.uid != user.uid) {
+              return;
+            }
             final status = snapshot.data()?['status']?.toString();
             setState(() => _requestStatus = status);
             if (status == 'approved' && !_approvalReloadScheduled) {
@@ -150,6 +187,13 @@ class _SharedEventScreenState extends State<SharedEventScreen> {
       return SingleEventScreen(
         eventModel: _event!,
         initialAction: widget.initialAction,
+        registrationId:
+            _selectionOwnerUid == FirebaseAuth.instance.currentUser?.uid
+            ? widget.registrationId
+            : null,
+        ticketId: _selectionOwnerUid == FirebaseAuth.instance.currentUser?.uid
+            ? widget.ticketId
+            : null,
       );
     }
     return Scaffold(

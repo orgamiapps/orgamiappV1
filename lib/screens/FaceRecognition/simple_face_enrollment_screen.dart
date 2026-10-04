@@ -1,3 +1,4 @@
+import 'package:attendus/config/safety_flags.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
@@ -107,6 +108,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
   }
 
   void _startEnrollmentProcess() async {
+    if (!SafetyFlags.biometricCheckInEnabled) return;
     _logWithTimestamp('Starting enrollment process...');
     _updateState(EnrollmentState.initializing);
 
@@ -159,6 +161,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
   }
 
   Future<void> _initializeDummyCamera() async {
+    if (!SafetyFlags.biometricCheckInEnabled) return;
     try {
       _cameras = await availableCameras();
       if (_cameras!.isNotEmpty) {
@@ -187,6 +190,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
   }
 
   void _initializeRealMode() async {
+    if (!SafetyFlags.biometricCheckInEnabled) return;
     try {
       _logWithTimestamp('Initializing real face detection mode...');
 
@@ -225,6 +229,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
   }
 
   Future<void> _initializeFaceDetection() async {
+    if (!SafetyFlags.biometricCheckInEnabled) return;
     try {
       _logWithTimestamp('Initializing ML Kit face detector...');
 
@@ -248,6 +253,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
   }
 
   Future<void> _initializeCamera() async {
+    if (!SafetyFlags.biometricCheckInEnabled) return;
     try {
       _logWithTimestamp('Getting available cameras...');
       _cameras = await availableCameras();
@@ -682,6 +688,18 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (!SafetyFlags.biometricCheckInEnabled) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Check-in')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(SafetyFlags.biometricMaintenanceMessage),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(

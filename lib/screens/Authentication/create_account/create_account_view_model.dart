@@ -9,6 +9,60 @@ import 'package:attendus/Services/guest_mode_service.dart';
 import 'package:attendus/Services/product_funnel_service.dart';
 
 class CreateAccountViewModel extends ChangeNotifier {
+  CreateAccountViewModel({
+    FirebaseAuth? auth,
+    Future<bool> Function(String)? usernameAvailable,
+    Future<CustomerModel> Function(CustomerModel)? saveProfile,
+    Future<void> Function(String)? ensureProfile,
+    Future<void> Function()? completeSession,
+    void Function(String)? showMessage,
+  }) : _authOverride = auth,
+       _usernameAvailable =
+           usernameAvailable ?? FirebaseFirestoreHelper().isUsernameAvailable,
+       _saveProfileOverride = saveProfile,
+       _ensureProfile =
+           ensureProfile ??
+           FirebaseFirestoreHelper().ensureUserProfileCompleteness,
+       _completeSession = completeSession ?? _finishProductionSession,
+       _showMessage =
+           showMessage ??
+           ((message) => ShowToast().showNormalToast(msg: message));
+  final FirebaseAuth? _authOverride;
+  FirebaseAuth get _auth => _authOverride ?? FirebaseAuth.instance;
+  final Future<bool> Function(String) _usernameAvailable;
+  final Future<CustomerModel> Function(CustomerModel)? _saveProfileOverride;
+  final Future<void> Function(String) _ensureProfile;
+  final Future<void> Function() _completeSession;
+  final void Function(String) _showMessage;
+  bool _disposed = false;
+  User? _createdUser;
+  String? _createdEmail;
+  Future<CustomerModel> _saveProfile(CustomerModel customer) async {
+    if (_saveProfileOverride != null) return _saveProfileOverride(customer);
+    final reference = FirebaseFirestore.instance
+        .collection(CustomerModel.firebaseKey)
+        .doc(customer.uid);
+    return FirebaseFirestore.instance.runTransaction<CustomerModel>((
+      transaction,
+    ) async {
+      final existing = await transaction.get(reference);
+      _check(customer.uid);
+      if (existing.exists) return CustomerModel.fromFirestore(existing);
+      transaction.set(reference, CustomerModel.getMap(customer));
+      return customer;
+    });
+  }
+
+  static Future<void> _finishProductionSession() async {
+    await GuestModeService().disableGuestMode();
+    await GuestModeService().clearGuestDisplayName();
+    await ProductFunnelService().record(
+      'guest_auth_completed',
+      dimensions: {'authChoice': 'create_account', 'result': 'success'},
+    );
+    await ProductFunnelService().rotateSession();
+  }
+
   String? firstName;
   String? lastName;
   String? username;
@@ -35,7 +89,7 @@ class CreateAccountViewModel extends ChangeNotifier {
     this.email = email?.trim().toLowerCase();
     this.dateOfBirth = dateOfBirth;
     this.location = location?.trim();
-    notifyListeners();
+    _notify();
   }
 
   int? _computeAge(DateTime? dob) {
@@ -49,159 +103,113 @@ class CreateAccountViewModel extends ChangeNotifier {
   }
 
   Future<bool> createAccount(String password) async {
-    if ((email == null || email!.isEmpty)) {
-      ShowToast().showNormalToast(
-        msg: 'Email is required to create an account',
-      );
+    if (_disposed || isCreating) return false;
+    if (email?.trim().isEmpty != false ||
+        firstName?.trim().isEmpty != false ||
+        lastName?.trim().isEmpty != false ||
+        username?.trim().isEmpty != false) {
+      _show('Please complete your name, username and email.');
       return false;
     }
-    if (firstName == null || lastName == null || username == null) {
-      ShowToast().showNormalToast(
-        msg: 'Please complete your basic information',
-      );
-      return false;
-    }
-
+    final accountEmail = email!.trim().toLowerCase();
+    final fullName = '${firstName!.trim()} ${lastName!.trim()}';
+    final requestedUsername = username!.trim().toLowerCase();
+    final profilePhone = phoneNumber;
+    final profileLocation = location;
+    final profileAge = _computeAge(dateOfBirth);
+    isCreating = true;
+    _notify();
     try {
-      isCreating = true;
-      notifyListeners();
-
-      final auth = FirebaseAuth.instance;
-      final newUserCred = await auth.createUserWithEmailAndPassword(
-        email: email!.trim().toLowerCase(),
-        password: password,
-      );
-
-      if (newUserCred.user == null) {
-        ShowToast().showNormalToast(msg: 'Account creation failed');
-        isCreating = false;
-        notifyListeners();
+      var user = _createdUser;
+      if (user != null &&
+          (_auth.currentUser?.uid != user.uid ||
+              _createdEmail != accountEmail)) {
+        _show(
+          'Your account details changed. Log in with the account you just created to finish your profile.',
+        );
         return false;
       }
-
-      // Now that we're authenticated, check username availability safely.
-      // If taken or an error occurs, auto-adjust by appending a number.
-      String desired = username!.toLowerCase();
-      bool available = false;
-      try {
-        available = await FirebaseFirestoreHelper().isUsernameAvailable(
-          desired,
-        );
-      } catch (_) {
-        available = true; // don't block on transient errors
+      if (user == null) {
+        user = (await _auth.createUserWithEmailAndPassword(
+          email: accountEmail,
+          password: password,
+        )).user;
+        _createdUser = user;
+        _createdEmail = accountEmail;
       }
-      if (!available) {
-        // try suffixed variants
-        int counter = 1;
-        while (counter <= 50) {
-          final candidate = '$desired$counter';
-          bool ok = false;
-          try {
-            ok = await FirebaseFirestoreHelper().isUsernameAvailable(candidate);
-          } catch (_) {
-            ok = true;
-          }
-          if (ok) {
-            desired = candidate;
-            break;
-          }
-          counter++;
+      if (user == null) throw StateError('Account creation was not confirmed.');
+      _check(user.uid);
+      String? availableUsername;
+      for (var index = 0; index <= 50; index++) {
+        final candidate = index == 0
+            ? requestedUsername
+            : '$requestedUsername$index';
+        final available = await _usernameAvailable(candidate);
+        _check(user.uid);
+        if (available) {
+          availableUsername = candidate;
+          break;
         }
       }
-
-      final fullName = '${firstName!} ${lastName!}'.trim();
-      final age = _computeAge(dateOfBirth);
-
-      final newCustomerModel = CustomerModel(
-        uid: newUserCred.user!.uid,
+      if (availableUsername == null) {
+        throw StateError('Choose another username and retry.');
+      }
+      final customer = CustomerModel(
+        uid: user.uid,
         name: fullName,
-        email: email!.trim().toLowerCase(),
-        username: desired,
-        phoneNumber: (phoneNumber != null && phoneNumber!.isNotEmpty)
-            ? phoneNumber
-            : null,
-        age: age,
-        gender: null,
-        location: (location != null && location!.isNotEmpty) ? location : null,
-        occupation: null,
-        company: null,
-        website: null,
-        bio: null,
+        email: accountEmail,
+        username: availableUsername,
+        phoneNumber: profilePhone,
+        age: profileAge,
+        location: profileLocation,
         isDiscoverable: true,
         createdAt: DateTime.now(),
       );
-
-      await FirebaseFirestore.instance
-          .collection(CustomerModel.firebaseKey)
-          .doc(newCustomerModel.uid)
-          .set(CustomerModel.getMap(newCustomerModel));
-
-      await FirebaseFirestoreHelper().ensureUserProfileCompleteness(
-        newCustomerModel.uid,
-      );
-
-      CustomerController.logeInCustomer = newCustomerModel;
-      await GuestModeService().disableGuestMode();
-      await GuestModeService().clearGuestDisplayName();
-      await ProductFunnelService().record(
-        'guest_auth_completed',
-        dimensions: {'authChoice': 'create_account', 'result': 'success'},
-      );
-      await ProductFunnelService().rotateSession();
-
-      isCreating = false;
-      notifyListeners();
+      final saved = await _saveProfile(customer);
+      _check(user.uid);
+      await _ensureProfile(user.uid);
+      _check(user.uid);
+      await _completeSession();
+      _check(user.uid);
+      CustomerController.logeInCustomer = saved;
       return true;
-    } on FirebaseAuthException catch (e) {
-      isCreating = false;
-      notifyListeners();
-
-      switch (e.code) {
-        case 'email-already-in-use':
-          ShowToast().showNormalToast(
-            msg:
-                'An account with this email already exists. Please try signing in instead.',
-          );
-          break;
-        case 'weak-password':
-          ShowToast().showNormalToast(
-            msg: 'The password is too weak. Please choose a stronger password.',
-          );
-          break;
-        case 'invalid-email':
-          ShowToast().showNormalToast(
-            msg: 'Please enter a valid email address.',
-          );
-          break;
-        case 'network-request-failed':
-          ShowToast().showNormalToast(
-            msg:
-                'Network error. Please check your internet connection and try again.',
-          );
-          break;
-        case 'too-many-requests':
-          ShowToast().showNormalToast(
-            msg: 'Too many requests. Please try again later.',
-          );
-          break;
-        case 'operation-not-allowed':
-          ShowToast().showNormalToast(
-            msg:
-                'Email and password sign-up is not enabled. Please contact support.',
-          );
-          break;
-        default:
-          ShowToast().showNormalToast(
-            msg:
-                'Failed to create account: ${e.message ?? 'An error occurred'}',
-          );
-      }
+    } on FirebaseAuthException catch (error) {
+      _show(switch (error.code) {
+        'email-already-in-use' =>
+          'An account with this email exists. Please log in instead.',
+        'weak-password' => 'Please choose a stronger password.',
+        'invalid-email' => 'Please enter a valid email address.',
+        'network-request-failed' => 'Check your connection and retry.',
+        'too-many-requests' => 'Please wait a moment before retrying.',
+        _ => 'Could not create your account. Please retry.',
+      });
       return false;
-    } catch (e) {
-      isCreating = false;
-      notifyListeners();
-      ShowToast().showNormalToast(msg: 'Failed to create account: $e');
+    } catch (_) {
+      _show('Could not finish creating your account. Reconnect and retry.');
       return false;
+    } finally {
+      isCreating = false;
+      _notify();
     }
+  }
+
+  void _check(String uid) {
+    if (_disposed || _auth.currentUser?.uid != uid) {
+      throw StateError('Account changed');
+    }
+  }
+
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  void _show(String text) {
+    if (!_disposed) _showMessage(text);
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }

@@ -1,0 +1,2724 @@
+{
+  "project": "orgami-66nxok",
+  "generatedAt": "2026-09-27T08:50:26.148Z",
+  "readOnly": true,
+  "events": [
+    {
+      "eventId": "100020",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100021",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100022",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100023",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100024",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100025",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 2,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 2,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100026",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 2,
+      "ticketRecords": 0,
+      "attendanceRecords": 6,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 2,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 3,
+        "inside": null,
+        "remaining": 1,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100027",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100028",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100029",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 3,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 3,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 3,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100030",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 2,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 2,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 2,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100031",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100032",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100033",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100034",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100035",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100036",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100037",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100038",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100039",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 1,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 1,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100040",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 1,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 1,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100041",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100042",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100043",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100044",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100045",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100046",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100047",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 1,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100048",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100049",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 1,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100050",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 1,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 1,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100052",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100053",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100054",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100055",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100056",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100057",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 1,
+      "ticketRecords": 0,
+      "attendanceRecords": 2,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 2,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100059",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100060",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 1,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100061",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100062",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100063",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 1,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 1,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100064",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100065",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100066",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100067",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100068",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100069",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100070",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100071",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100072",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100073",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 1,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100074",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100075",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100076",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100077",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100078",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100079",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100080",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100081",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100082",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 1,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100083",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100084",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100085",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100086",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100087",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 1,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 1,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100088",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100089",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 1,
+      "ticketRecords": 0,
+      "attendanceRecords": 2,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 2,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100090",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100091",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100092",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 2,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 2,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100093",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100094",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100095",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 2,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 2,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100096",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100097",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100098",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 1,
+      "attendanceRecords": 4,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 2,
+        "inside": null,
+        "remaining": 1,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100099",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100100",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100101",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100105",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100106",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100107",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "100108",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "1754961645146",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "1754973428877",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "BOLD-472YO",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "BRAVE-859G2",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "BRIGHT-203QY",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 1,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 1,
+        "noShow": 1
+      }
+    },
+    {
+      "eventId": "BRIGHT-432V3",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 1,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 1,
+        "noShow": 1
+      }
+    },
+    {
+      "eventId": "COOL-284P2",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "CREATE-900WD",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 4,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 4,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "DANCE-574OH",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "DOLPHIN-146YO",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "DOLPHIN-701",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "DREAM-378",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "GENTLE-655",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "GO-149",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 2,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "GO-316P",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "GOAL-54D1",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "HAPPY-426IP",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 1,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 1,
+        "noShow": 1
+      }
+    },
+    {
+      "eventId": "HAPPY-924",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 1,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 1,
+        "noShow": 1
+      }
+    },
+    {
+      "eventId": "HEART-169QL",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "HEART-377EO",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 1,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "HOPE-787WF",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "LION-1197M",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "LOOK-624ZN",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "MOON-376",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "MOUNTAIN-56",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "PEACE-436UT",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "PLAY-426",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "PORTCITY26-ACOUSTIC",
+      "revision": 1,
+      "scheduleQuality": "exact",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "PORTCITY26-AI",
+      "revision": 1,
+      "scheduleQuality": "exact",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "PORTCITY26-CLEANUP",
+      "revision": 1,
+      "scheduleQuality": "exact",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "PORTCITY26-COFFEE",
+      "revision": 1,
+      "scheduleQuality": "exact",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "PORTCITY26-MINDFULNESS",
+      "revision": 1,
+      "scheduleQuality": "exact",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "PORTCITY26-NATURE",
+      "revision": 1,
+      "scheduleQuality": "exact",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "PORTCITY26-PHOTO",
+      "revision": 1,
+      "scheduleQuality": "exact",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "PORTCITY26-PICNIC",
+      "revision": 1,
+      "scheduleQuality": "exact",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "PORTCITY26-RUN",
+      "revision": 1,
+      "scheduleQuality": "exact",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "PORTCITY26-SKETCH",
+      "revision": 1,
+      "scheduleQuality": "exact",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "POWER-970",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 2,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 2,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "RISE-2012M",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "RISE-892",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "RIVER-552",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 1,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 1,
+        "noShow": 1
+      }
+    },
+    {
+      "eventId": "RIVER-666",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 2,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "RIVER-719",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "SEEK-931",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "SHINE-679XB",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "SING-883NN",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "SING-89PU",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "SLOW-6253S",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "SLOW-675ND",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "SLOW-9158Z",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "SMILE-393",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "SOUL-4690C",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "SPARK-5112S",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 1,
+      "ticketRecords": 0,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 1,
+        "noShow": 1
+      }
+    },
+    {
+      "eventId": "SUNNY-637MC",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "TIGER-862",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "registrationRecords": 0,
+      "ticketRecords": 1,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 1,
+        "noShow": null
+      }
+    },
+    {
+      "eventId": "TIGER-885Y5",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "WATCH-963",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 0,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      }
+    },
+    {
+      "eventId": "WISE-234NT",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 1,
+      "ticketRecords": 1,
+      "attendanceRecords": 1,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 2,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 2,
+        "noShow": 2
+      }
+    },
+    {
+      "eventId": "YOUNG-618",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "registrationRecords": 0,
+      "ticketRecords": 1,
+      "attendanceRecords": 0,
+      "archivedRecords": 0,
+      "storedConfirmed": null,
+      "projected": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 1,
+        "noShow": 1
+      }
+    }
+  ]
+}

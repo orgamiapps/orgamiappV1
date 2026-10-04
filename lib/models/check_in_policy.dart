@@ -34,7 +34,7 @@ enum CheckInEligibility {
 /// describes the event; [proximityAssist] is the explicit opt-in for using a
 /// one-time location signal during check-in.
 class CheckInPolicy {
-  static const int currentVersion = 2;
+  static const int currentVersion = 3;
 
   final int version;
   final CheckInProfile profile;
@@ -44,6 +44,11 @@ class CheckInPolicy {
   final bool allowReentry;
   final bool checkoutEnabled;
   final bool proximityAssist;
+  final bool smartArrivalEnabled;
+  final double? arrivalLatitude;
+  final double? arrivalLongitude;
+  final double arrivalRadiusMeters;
+  final String openingMode;
   final bool staffFallback;
   final bool passLockEnabled;
   final bool needsOrganizerReview;
@@ -57,6 +62,11 @@ class CheckInPolicy {
     this.allowReentry = false,
     this.checkoutEnabled = false,
     this.proximityAssist = false,
+    this.smartArrivalEnabled = false,
+    this.arrivalLatitude,
+    this.arrivalLongitude,
+    this.arrivalRadiusMeters = 150,
+    this.openingMode = 'manual',
     this.staffFallback = true,
     this.passLockEnabled = false,
     this.needsOrganizerReview = false,
@@ -74,7 +84,17 @@ class CheckInPolicy {
       return parsed.clamp(0, 1440);
     }
 
+    final arrival = data['smartArrival'] is Map
+        ? data['smartArrival'] as Map
+        : const {};
     return CheckInPolicy(
+      smartArrivalEnabled:
+          (data['version'] as num? ?? 2) >= 3 && arrival['enabled'] == true,
+      arrivalLatitude: (arrival['latitude'] as num?)?.toDouble(),
+      arrivalLongitude: (arrival['longitude'] as num?)?.toDouble(),
+      arrivalRadiusMeters:
+          ((arrival['radiusMeters'] as num?)?.toDouble() ?? 150).clamp(50, 500),
+      openingMode: data['openingMode'] == 'scheduled' ? 'scheduled' : 'manual',
       version: data['version'] is num
           ? (data['version'] as num).toInt()
           : currentVersion,
@@ -117,6 +137,11 @@ class CheckInPolicy {
     bool? allowReentry,
     bool? checkoutEnabled,
     bool? proximityAssist,
+    bool? smartArrivalEnabled,
+    double? arrivalLatitude,
+    double? arrivalLongitude,
+    double? arrivalRadiusMeters,
+    String? openingMode,
     bool? staffFallback,
     bool? passLockEnabled,
     bool? needsOrganizerReview,
@@ -129,6 +154,11 @@ class CheckInPolicy {
     allowReentry: allowReentry ?? this.allowReentry,
     checkoutEnabled: checkoutEnabled ?? this.checkoutEnabled,
     proximityAssist: proximityAssist ?? this.proximityAssist,
+    smartArrivalEnabled: smartArrivalEnabled ?? this.smartArrivalEnabled,
+    arrivalLatitude: arrivalLatitude ?? this.arrivalLatitude,
+    arrivalLongitude: arrivalLongitude ?? this.arrivalLongitude,
+    arrivalRadiusMeters: arrivalRadiusMeters ?? this.arrivalRadiusMeters,
+    openingMode: openingMode ?? this.openingMode,
     staffFallback: staffFallback ?? this.staffFallback,
     passLockEnabled: passLockEnabled ?? this.passLockEnabled,
     needsOrganizerReview: needsOrganizerReview ?? this.needsOrganizerReview,
@@ -143,6 +173,13 @@ class CheckInPolicy {
     'allowReentry': allowReentry,
     'checkoutEnabled': checkoutEnabled,
     'proximityAssist': proximityAssist,
+    'smartArrival': {
+      'enabled': smartArrivalEnabled,
+      'latitude': arrivalLatitude,
+      'longitude': arrivalLongitude,
+      'radiusMeters': arrivalRadiusMeters,
+    },
+    'openingMode': openingMode,
     'staffFallback': staffFallback,
     'passLockEnabled': passLockEnabled,
     'needsOrganizerReview': needsOrganizerReview,

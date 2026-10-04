@@ -1,4 +1,68 @@
 import 'package:intl/intl.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:attendus/firebase_options.dart';
+
+/// Public links belong to the same environment as the records they identify.
+class PublicLinkConfiguration {
+  const PublicLinkConfiguration._(this.canonicalOrigin, this.acceptedOrigins);
+
+  final String canonicalOrigin;
+  final Set<String> acceptedOrigins;
+
+  factory PublicLinkConfiguration.forEnvironment(
+    String environment, {
+    String emulatorPublicOrigin = 'http://127.0.0.1:4173',
+    bool debug = false,
+  }) {
+    switch (environment) {
+      case 'production':
+        return const PublicLinkConfiguration._('https://attendus.app', {
+          'https://attendus.app',
+        });
+      case 'staging':
+        return const PublicLinkConfiguration._(
+          'https://attendus-staging.web.app',
+          {
+            'https://attendus-staging.web.app',
+            'https://attendus-staging.firebaseapp.com',
+          },
+        );
+      case 'emulator':
+        final uri = Uri.tryParse(emulatorPublicOrigin);
+        if (!debug ||
+            uri == null ||
+            uri.scheme != 'http' ||
+            !{'127.0.0.1', 'localhost', '::1', '[::1]'}.contains(uri.host) ||
+            uri.userInfo.isNotEmpty ||
+            (uri.path.isNotEmpty && uri.path != '/') ||
+            uri.hasQuery ||
+            uri.hasFragment ||
+            uri.port < 1 ||
+            uri.port > 65535) {
+          throw StateError(
+            'Emulator public links require a debug build and loopback HTTP origin.',
+          );
+        }
+        return PublicLinkConfiguration._(
+          uri.origin,
+          Set.unmodifiable({uri.origin}),
+        );
+      default:
+        throw StateError('Unsupported public link environment: $environment');
+    }
+  }
+
+  bool accepts(Uri uri) {
+    // Relative in-app routes already belong to the running Firebase project.
+    if (!uri.hasScheme && !uri.hasAuthority) return true;
+    if (!uri.hasAuthority ||
+        uri.userInfo.isNotEmpty ||
+        (uri.scheme != 'https' && uri.scheme != 'http')) {
+      return false;
+    }
+    return acceptedOrigins.contains(uri.origin);
+  }
+}
 
 class AppConstants {
   static const appName = 'Attendus';
@@ -23,7 +87,16 @@ class AppConstants {
   );
 
   // Public web/deep-link configuration.
-  static const String publicWebDomain = 'https://attendus.app';
+  static final PublicLinkConfiguration publicLinks =
+      PublicLinkConfiguration.forEnvironment(
+        DefaultFirebaseOptions.environment,
+        emulatorPublicOrigin: const String.fromEnvironment(
+          'ATTENDUS_EMULATOR_PUBLIC_ORIGIN',
+          defaultValue: 'http://127.0.0.1:4173',
+        ),
+        debug: kDebugMode,
+      );
+  static String get publicWebDomain => publicLinks.canonicalOrigin;
   static const String stripeReturnUrl = 'attendus://callback';
   static const String stripeMerchantDisplayName = 'Attendus';
   static const String applePayMerchantIdentifier = 'merchant.app.attendus';
@@ -31,7 +104,10 @@ class AppConstants {
   // Feature flags
   // Apple Sign-In is hidden until the Apple Developer Service ID, callback URL,
   // and Firebase provider settings are configured for AttendUs.
-  static const bool enableAppleSignIn = false;
+  static const bool enableAppleSignIn = bool.fromEnvironment(
+    'ATTENDUS_ENABLE_APPLE_SIGN_IN',
+    defaultValue: false,
+  );
 
   // Web App Check is enabled in production builds with the score-based
   // reCAPTCHA Enterprise key registered for attendus.app.
@@ -53,9 +129,11 @@ class AppConstants {
     defaultValue: '',
   );
 
-  static Uri buildEventUri(String eventId) {
+  static Uri buildEventUri(String eventId, {PublicLinkConfiguration? links}) {
     final encodedId = Uri.encodeComponent(eventId.trim());
-    return Uri.parse('$publicWebDomain/event/$encodedId');
+    return Uri.parse(
+      '${(links ?? publicLinks).canonicalOrigin}/event/$encodedId',
+    );
   }
 
   static String getMilesSliderLabel(double value) {

@@ -1,8 +1,8 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:attendus/Services/onboarding_profile_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/firebase/firebase_storage_helper.dart';
-import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
 
 class StepProfilePhoto extends StatefulWidget {
@@ -25,22 +25,24 @@ class _StepProfilePhotoState extends State<StepProfilePhoto> {
 
   Future<void> _pickFromGallery() async {
     final file = await FirebaseStorageHelper.pickImageFromGallery();
-    if (file != null) setState(() => _image = file);
+    if (file != null && mounted) setState(() => _image = file);
   }
 
   Future<void> _pickFromCamera() async {
     final file = await FirebaseStorageHelper.pickImageFromCamera();
-    if (file != null) setState(() => _image = file);
+    if (file != null && mounted) setState(() => _image = file);
   }
 
   Future<void> _uploadIfNeededAndContinue() async {
+    if (_isUploading) return;
     if (_image == null) {
       widget.onNext();
       return;
     }
 
-    if (CustomerController.logeInCustomer == null) {
-      widget.onNext();
+    final userId = CustomerController.logeInCustomer?.uid;
+    if (userId == null || FirebaseAuth.instance.currentUser?.uid != userId) {
+      setState(() => _error = 'Sign in again to upload your photo.');
       return;
     }
 
@@ -50,27 +52,22 @@ class _StepProfilePhotoState extends State<StepProfilePhoto> {
         _error = null;
       });
 
-      final userId = CustomerController.logeInCustomer!.uid;
       final url = await FirebaseStorageHelper.uploadProfilePicture(
         userId,
         _image!,
       );
-      if (url != null) {
-        // Save to Firestore
-        await FirebaseFirestore.instance
-            .collection(CustomerModel.firebaseKey)
-            .doc(userId)
-            .update({'profilePictureUrl': url});
-
-        // Update local cache
-        CustomerController.logeInCustomer!.profilePictureUrl = url;
-      }
-
-      widget.onNext();
+      if (!mounted) return;
+      if (url == null) throw StateError('Upload failed');
+      await OnboardingProfileService().save({
+        'profilePictureUrl': url,
+      }, expectedUid: userId);
+      if (mounted) widget.onNext();
     } catch (e) {
-      setState(() {
-        _error = 'Failed to upload photo. You can try again or skip.';
-      });
+      if (mounted) {
+        setState(
+          () => _error = 'Failed to upload photo. You can try again or skip.',
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {

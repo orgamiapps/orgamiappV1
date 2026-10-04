@@ -46,7 +46,16 @@ function createAdminApi(adminSdk) {
       query = db.collection(collection).orderBy(orderField).startAfter(snap).limit(size + 1);
     }
     const result = await query.get();
-    return {actor, data: result.docs.slice(0, size).map((doc) => docDto(doc, fields)), nextPageToken: result.size > size ? pageToken(result.docs[size - 1].id) : null};
+    return {actor, data: result.docs.slice(0, size).map((doc) => {
+      const item = docDto(doc, fields);
+      if (collection === "reports") {
+        item.reporterUid ||= doc.get("reporterUserId") || null;
+        item.targetUid ||= doc.get("targetUserId") || null;
+        item.eventId ||= doc.get("type") === "event" ? doc.get("contentId") || null : null;
+        item.contentId = doc.get("contentId") || null;
+      }
+      return item;
+    }), nextPageToken: result.size > size ? pageToken(result.docs[size - 1].id) : null};
   }
 
   async function accounts(req) {
@@ -286,7 +295,7 @@ function createAdminApi(adminSdk) {
         encryptedEmail, maskedEmail: maskedEmail(email), isProviderTest: true,
         payload: {firstName: "Attendus", eventTitle: "Attendus communications test",
           eventStart: new Date(Date.now() + 86400000), eventLocation: "Attendus",
-          kind: "rsvp", manageUrl: "https://attendus.app"},
+          kind: "rsvp", manageUrl: require("../public-web/origin").publicOrigin()},
         createdAt: adminSdk.firestore.FieldValue.serverTimestamp(), nextAttemptAt: new Date(),
         requestedBy: actor.uid};
       await ref.create(message);
@@ -364,7 +373,8 @@ function createAdminApi(adminSdk) {
       const result = await operation(reason);
       const auditId = await writeAudit(db, adminSdk, {actor, action: spec.action, targetType: spec.targetType, targetId: spec.targetId, reason, requestId: req.requestId, before: result.before, after: result.after, metadata: result.metadata});
       return {ok: true, auditId, ...result.response};
-    });
+    }, {method: req.method, path: routePath(req), action: spec.action,
+      targetType: spec.targetType, targetId: spec.targetId, body: req.body || {}});
   }
 
   async function accountMutation(req, uid, action) {

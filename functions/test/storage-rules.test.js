@@ -65,3 +65,12 @@ test("draft images are private to the owning full account", async () => {
 test("unknown storage paths are denied", async () => {
   await assertFails(storageFor("user-a").ref("unreviewed/user-a/file.png").put(png, {contentType: "image/png"}));
 });
+
+
+test("account deletion blocks new profile, banner and draft objects", async () => {
+  await env.withSecurityRulesDisabled((context) => context.firestore()
+      .collection("account_deletion_jobs").doc("deleting").set({status: "running"}));
+  for (const path of ["profile_pictures/deleting.jpg", "user_banners/deleting/banner.png", "event-drafts/deleting/draft/cover.png"]) {
+    await assertFails(storageFor("deleting").ref(path).put(png, {contentType: "image/png"}));
+  }
+});

@@ -1,3 +1,4 @@
+import 'package:attendus/config/safety_flags.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
@@ -98,6 +99,7 @@ class _PictureFaceEnrollmentScreenState
   }
 
   void _startEnrollment() async {
+    if (!SafetyFlags.biometricCheckInEnabled) return;
     _updateState(EnrollmentState.initializing);
 
     // Set timeout
@@ -145,6 +147,7 @@ class _PictureFaceEnrollmentScreenState
   }
 
   Future<void> _initializeFaceDetector() async {
+    if (!SafetyFlags.biometricCheckInEnabled) return;
     try {
       final options = FaceDetectorOptions(
         enableContours: false,
@@ -166,6 +169,7 @@ class _PictureFaceEnrollmentScreenState
   }
 
   Future<void> _initializeCamera() async {
+    if (!SafetyFlags.biometricCheckInEnabled) return;
     try {
       final cameras = await availableCameras();
 
@@ -508,6 +512,18 @@ class _PictureFaceEnrollmentScreenState
 
   @override
   Widget build(BuildContext context) {
+    if (!SafetyFlags.biometricCheckInEnabled) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Check-in')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(SafetyFlags.biometricMaintenanceMessage),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(

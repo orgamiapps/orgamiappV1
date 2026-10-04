@@ -10,6 +10,7 @@ const {
   emailHash,
   enforceRateLimit,
   encryptEmail,
+  decryptEmail,
   maskedEmail,
   normalizeRegistrationIdentity,
   ticketQrSvg,
@@ -17,7 +18,7 @@ const {
   validateRegistrationWindow,
 } = require("../public-web/accountless");
 
-const PUBLIC_ORIGIN = "https://attendus.app";
+const {publicOrigin} = require("../public-web/origin");
 
 function caller(request) {
   const uid = request.auth?.uid;
@@ -48,10 +49,29 @@ function createStartPublicRegistrationV3(admin) {
       throw new HttpsError("invalid-argument", "A valid idempotency key is required.");
     }
     const {fullName, greetingName, email} = normalizeRegistrationIdentity(request.data);
+    const flowId = `flow_${digest("v3", eventId, actor.uid, idempotencyKey)}`;
+    const flowRef = db.collection("PublicRegistrationFlows").doc(flowId);
+    const rawAnswers = request.data?.answers || {};
+    const fingerprint = digest(fullName, email, JSON.stringify(Object.keys(rawAnswers).sort()
+        .map((key) => [key, rawAnswers[key]])));
+    async function response(flow) {
+      if (flow.requestFingerprint !== fingerprint) {
+        throw new HttpsError("already-exists", "This submission key was already used for different information.");
+      }
+      const token = flow.encryptedManageToken ? await decryptEmail(flow.encryptedManageToken) : null;
+      return {...flow.result, flowId, ticketQrSvg: await ticketQrSvg(flow.result?.ticketCode),
+        ...(token ? {claimToken: token, manageUrl: `${publicOrigin()}/manage/${token}`} : {})};
+    }
+    const deletionGuard = await db.collection("account_deletion_jobs").doc(actor.uid).get();
+    if (deletionGuard.exists) throw new HttpsError("failed-precondition", "This account is being deleted.");
+    const previous = await flowRef.get();
+    if (previous.exists) return response(previous.data());
     const eventRef = db.collection("Events").doc(eventId);
-    const [configSnapshot, eventSnapshot] = await Promise.all([
+    const [configSnapshot, eventSnapshot, deletion] = await Promise.all([
       db.collection("AppConfig").doc("publicWeb").get(), eventRef.get(),
+      db.collection("account_deletion_jobs").doc(actor.uid).get(),
     ]);
+    if (deletion.exists) throw new HttpsError("failed-precondition", "Account deletion is in progress.");
     if (configSnapshot.get("accountlessRegistrationEnabled") !== true) {
       throw new HttpsError("failed-precondition", "This action is temporarily unavailable.");
     }
@@ -66,108 +86,108 @@ function createStartPublicRegistrationV3(admin) {
     if (mode === "paid_ticket") {
       throw new HttpsError("failed-precondition", "Paid guest checkout is not enabled for this registration flow.");
     }
-    const answers = await registrationAnswers(eventRef, request.data?.answers);
+    const answers = await registrationAnswers(eventRef, rawAnswers);
     const hash = emailHash(email);
-    const claimId = digest(eventId, hash);
-    const claimRef = db.collection("GuestEventEmailClaims").doc(claimId);
-    const existingClaim = await claimRef.get();
-    if (existingClaim.exists) {
-      const existing = existingClaim.data();
-      const raw = crypto.randomBytes(32).toString("base64url");
-      await Promise.all([
-        db.collection("GuestManageTokens").doc(digest(raw)).set({
-          guestId: existing.guestId, registrationId: existing.registrationId,
-          ownerUid: "email_proof_only", status: "active",
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          expiresAt: new Date(Date.now() + 72 * 3600000),
-        }),
-        db.collection("OutboundMessages").doc(`resend_${crypto.randomUUID()}`).set({
-          templateId: "guest_registration_confirmation", channel: "email", status: "pending",
-          attempts: 0, registrationId: existing.registrationId, guestId: existing.guestId,
-          eventId, encryptedEmail: await encryptEmail(email), maskedEmail: maskedEmail(email),
-          payload: {firstName: greetingName, eventTitle: String(event.title || "Event"),
-            eventStart: event.selectedDateTime, eventLocation: String(event.location || ""),
-            kind: mode, duplicate: true, manageUrl: `${PUBLIC_ORIGIN}/manage/${raw}`},
-          createdAt: admin.firestore.FieldValue.serverTimestamp(), nextAttemptAt: new Date(),
-        }),
-      ]);
-      return {status: "confirmation_pending", kind: mode};
-    }
+    const claimRef = db.collection("GuestEventEmailClaims").doc(digest(eventId, hash));
     const encryptedEmail = await encryptEmail(email);
     const guestId = `guest_${crypto.randomUUID()}`;
-    const flowId = `flow_${digest("v3", eventId, actor.uid, idempotencyKey)}`;
     const registrationId = `registration_${digest(eventId, guestId)}`;
-    const registrationRef = db.collection("RegisterAttendance").doc(registrationId);
-    const guestRef = db.collection("GuestAttendees").doc(guestId);
-    const flowRef = db.collection("PublicRegistrationFlows").doc(flowId);
     const rawManageToken = crypto.randomBytes(32).toString("base64url");
-    const manageTokenRef = db.collection("GuestManageTokens").doc(digest(rawManageToken));
+    const encryptedManageToken = await encryptEmail(rawManageToken);
+    const ticketCode = crypto.randomBytes(4).toString("hex").toUpperCase();
     const now = admin.firestore.Timestamp.now();
-    let resultStatus = policy.approvalMode === "manual" ? "pending" : "confirmed";
-    let ticketId = null;
-    let ticketCode = null;
-    await db.runTransaction(async (transaction) => {
-      const [freshEvent, freshClaim] = await Promise.all([
-        transaction.get(eventRef), transaction.get(claimRef),
+    const result = await db.runTransaction(async (transaction) => {
+      const [prior, freshEvent, freshClaim, deleting] = await Promise.all([
+        transaction.get(flowRef), transaction.get(eventRef), transaction.get(claimRef),
+        transaction.get(db.collection("account_deletion_jobs").doc(actor.uid)),
       ]);
-      if (freshClaim.exists) throw new HttpsError("already-exists", "Registration already exists.");
-      validateEvent(freshEvent.data());
-      validateRegistrationWindow(freshEvent.data());
+      if (deleting.exists) throw new HttpsError("failed-precondition", "Account deletion is in progress.");
+      if (prior.exists) return prior.data();
       const current = freshEvent.data();
-      const currentPolicy = current.registrationPolicy || policy;
-      const capacity = Number(currentPolicy.capacity || current.maxTickets || 0);
-      const confirmed = Number(current.confirmedRegistrationCount || 0);
-      if (resultStatus === "confirmed" && capacity > 0 && confirmed >= capacity) {
-        if (currentPolicy.waitlistEnabled === false) {
-          throw new HttpsError("resource-exhausted", "This event is full.");
-        }
-        resultStatus = "waitlisted";
+      validateEvent(current);
+      validateRegistrationWindow(current);
+      const currentPolicy = current.registrationPolicy || {};
+      const currentMode = currentPolicy.mode || (current.ticketsEnabled ?
+        (Number(current.ticketPrice || 0) > 0 ? "paid_ticket" : "free_ticket") : "rsvp");
+      if (currentMode !== mode || current.eventRevision !== event.eventRevision) {
+        throw new HttpsError("aborted", "The event changed. Refresh before registering.");
       }
-      transaction.create(guestRef, {id: guestId, ownerUid: actor.uid, fullName, greetingName,
-        emailHash: hash, emailHashVersion: 1, encryptedEmail, maskedEmail: maskedEmail(email),
-        verificationStatus: "pending", claimedByUid: actor.isAnonymous ? null : actor.uid,
-        createdAt: now, retentionAt: new Date(Date.now() + 180 * 86400000)});
-      transaction.create(claimRef, {eventId, guestId, registrationId, emailHash: hash,
-        status: resultStatus, createdAt: now});
-      transaction.create(manageTokenRef, {guestId, registrationId, ownerUid: actor.uid,
-        status: "active", createdAt: now, expiresAt: new Date(Date.now() + 72 * 3600000)});
-      transaction.create(flowRef, {id: flowId, eventId, guestId, registrationId,
-        ownerUid: actor.uid, kind: mode, status: resultStatus, createdAt: now});
-      transaction.create(registrationRef, {id: registrationId, eventId, userName: fullName,
-        realName: fullName, customerUid: actor.uid, guestId,
-        identityType: actor.isAnonymous ? "guest" : "account", emailRef: guestRef.path,
-        attendanceDateTime: now, answers, isAnonymous: actor.isAnonymous,
-        registrationSource: "public_event_page_v3", status: resultStatus});
-      if (resultStatus === "confirmed") {
-        transaction.update(eventRef, {confirmedRegistrationCount:
-          admin.firestore.FieldValue.increment(1)});
-        if (mode === "free_ticket") {
-          ticketId = `free_${digest(eventId, guestId)}`;
-          ticketCode = crypto.randomBytes(4).toString("hex").toUpperCase();
-          transaction.create(db.collection("Tickets").doc(ticketId), {id: ticketId, eventId,
-            eventTitle: String(current.title || "Event"), eventImageUrl: String(current.imageUrl || ""),
-            eventLocation: String(current.location || ""), eventDateTime: current.selectedDateTime,
-            customerUid: actor.uid, guestId, identityType: actor.isAnonymous ? "guest" : "account",
-            customerName: fullName, ticketCode, issuedDateTime: now, price: 0,
-            isPaid: false, isUsed: false, isSkipTheLine: false,
-            issuanceSource: "server_guest_ticket_v3", revoked: false});
-          transaction.update(eventRef, {issuedTickets: admin.firestore.FieldValue.increment(1)});
+      let status = currentPolicy.approvalMode === "manual" ? "pending" : "confirmed";
+      let ticketId = null;
+      let ownedRegistrationId = registrationId;
+      let recipientGuestId = guestId;
+      if (freshClaim.exists) {
+        // Never reveal a registration belonging to another session through an email match.
+        status = "confirmation_pending";
+        ownedRegistrationId = freshClaim.get("registrationId");
+        recipientGuestId = freshClaim.get("guestId");
+      } else {
+        const {full, confirmed} = require("./capacity").capacityState(current);
+        if (status === "confirmed" && full) {
+          if (currentPolicy.waitlistEnabled === false) {
+            throw new HttpsError("resource-exhausted", "This event is full.");
+          }
+          status = "waitlisted";
         }
+        if (status === "confirmed" && mode === "free_ticket") ticketId = `free_${digest(eventId, guestId)}`;
+        transaction.create(db.collection("GuestAttendees").doc(guestId), {
+          id: guestId, ownerUid: actor.uid, fullName, greetingName, emailHash: hash,
+          emailHashVersion: 1, encryptedEmail, maskedEmail: maskedEmail(email),
+          verificationStatus: "pending", claimedByUid: actor.isAnonymous ? null : actor.uid,
+          createdAt: now, retentionAt: new Date(Date.now() + 180 * 86400000),
+        });
+        transaction.create(claimRef, {eventId, guestId, registrationId, emailHash: hash, status, createdAt: now});
+        transaction.create(db.collection("RegisterAttendance").doc(registrationId), {
+          id: registrationId, eventId, userName: fullName, realName: fullName,
+          customerUid: actor.uid, guestId, ticketId, emailHash: hash,
+          identityType: actor.isAnonymous ? "guest" : "account", emailRef: `GuestAttendees/${guestId}`,
+          attendanceDateTime: now, answers, isAnonymous: actor.isAnonymous,
+          registrationSource: "public_event_page_v3", status,
+        });
+        if (status === "confirmed") {
+          transaction.update(eventRef, {confirmedRegistrationCount: confirmed + 1,
+            ...(ticketId ? {issuedTickets: admin.firestore.FieldValue.increment(1)} : {})});
+        }
+        if (ticketId) transaction.create(db.collection("Tickets").doc(ticketId), {
+          id: ticketId, eventId, registrationId, eventTitle: String(current.title || "Event"),
+          eventImageUrl: String(current.imageUrl || ""), eventLocation: String(current.location || ""),
+          eventDateTime: current.selectedDateTime, customerUid: actor.uid, guestId,
+          identityType: actor.isAnonymous ? "guest" : "account", customerName: fullName,
+          ticketCode, issuedDateTime: now, price: 0, isPaid: false, isUsed: false,
+          isSkipTheLine: false, issuanceSource: "server_guest_ticket_v3", revoked: false,
+        });
       }
-      transaction.create(db.collection("OutboundMessages").doc(`${resultStatus}_${registrationId}`), {
-        templateId: resultStatus === "pending" ? "guest_registration_pending" :
-          resultStatus === "waitlisted" ? "guest_registration_waitlisted" : "guest_registration_confirmation",
-        channel: "email", status: "pending", attempts: 0, registrationId, guestId, eventId,
-        encryptedEmail, maskedEmail: maskedEmail(email), payload: {firstName: greetingName,
-          eventTitle: String(current.title || "Event"), eventStart: current.selectedDateTime,
-          eventLocation: String(current.location || ""), kind: mode,
-          manageUrl: `${PUBLIC_ORIGIN}/manage/${rawManageToken}`},
+      transaction.create(db.collection("GuestManageTokens").doc(digest(rawManageToken)), {
+        guestId: recipientGuestId, registrationId: ownedRegistrationId,
+        ownerUid: status === "confirmation_pending" ? "email_proof_only" : actor.uid,
+        status: "active", createdAt: now, expiresAt: new Date(Date.now() + 72 * 3600000),
+      });
+      const flow = {id: flowId, eventId, ownerUid: actor.uid, kind: mode, status,
+        requestFingerprint: fingerprint, createdAt: now,
+        ...(status === "confirmation_pending" ? {} : {
+          guestId, registrationId, ticketId, encryptedManageToken,
+        }),
+        result: {status, kind: mode, deliveryStatus: "pending",
+          ...(status === "confirmation_pending" ? {} : {registrationId, ticketId,
+            ticketCode: ticketId ? ticketCode : null})},
+      };
+      transaction.create(flowRef, flow);
+      transaction.create(db.collection("OutboundMessages").doc(`registration_${flowId}`), {
+        templateId: status === "pending" ? "guest_registration_pending" :
+          status === "waitlisted" ? "guest_registration_waitlisted" : "guest_registration_confirmation",
+        channel: "email", status: "pending", attempts: 0, registrationId: ownedRegistrationId,
+        guestId: recipientGuestId, eventId, encryptedEmail, maskedEmail: maskedEmail(email),
+        payload: {firstName: greetingName, eventTitle: String(current.title || "Event"),
+          eventStart: current.selectedDateTime, eventDurationMinutes: current.eventDurationMinutes || null,
+          eventDuration: current.eventDuration || null, eventTimeZone: current.eventTimeZone || "UTC",
+          eventRevision: current.eventRevision || 0, eventLocation: String(current.location || ""),
+          kind: mode, duplicate: status === "confirmation_pending",
+          manageUrl: `${publicOrigin()}/manage/${rawManageToken}`},
         createdAt: now, nextAttemptAt: new Date(),
       });
+      return flow;
     });
-    return {status: resultStatus, kind: mode, flowId, registrationId, ticketId, ticketCode,
-      ticketQrSvg: await ticketQrSvg(ticketCode), claimToken: rawManageToken,
-      manageUrl: `${PUBLIC_ORIGIN}/manage/${rawManageToken}`, deliveryStatus: "pending"};
+    return response(result);
   });
 }
 

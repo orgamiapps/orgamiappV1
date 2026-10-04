@@ -1,4 +1,5 @@
 "use strict";
+const {publicOrigin} = require("../public-web/origin");
 
 const crypto = require("node:crypto");
 const {defineSecret} = require("firebase-functions/params");
@@ -48,6 +49,7 @@ function eventStart(data) {
 }
 
 function validateActionableEvent(data, now = new Date()) {
+  if (data?.launchScheduleNeedsReview === true) throw new HttpsError("failed-precondition", "The organizer must confirm the event schedule before registration or check-in.");
   const status = String(data?.status || "").toLowerCase();
   if (!data || data.private === true ||
       (status !== "active" && status !== "scheduled")) {
@@ -79,8 +81,6 @@ function customerName(req, profile) {
 async function ensureCustomer(db, req, profile) {
   const uid = req.auth.uid;
   const ref = db.collection("Customers").doc(uid);
-  const snapshot = await ref.get();
-  if (snapshot.exists) return snapshot.data();
   const email = String(req.auth.token.email || "").trim().toLowerCase();
   const name = customerName(req, profile);
   const data = {
@@ -96,10 +96,13 @@ async function ensureCustomer(db, req, profile) {
     accountSource: "public_event_page",
     profileCompletionRequired: true,
   };
-  await ref.create(data).catch(async (error) => {
-    if (error.code !== 6 && error.code !== "already-exists") throw error;
+  return db.runTransaction(async (tx) => {
+    const [snapshot, deleting] = await Promise.all([tx.get(ref), tx.get(db.collection("account_deletion_jobs").doc(uid))]);
+    if (deleting.exists) throw new HttpsError("failed-precondition", "Account deletion is in progress.");
+    if (snapshot.exists) return snapshot.data();
+    tx.create(ref, data);
+    return data;
   });
-  return (await ref.get()).data() || data;
 }
 
 function ticketDocumentId(eventId, uid) {
@@ -130,9 +133,11 @@ function createRegisterPublicEvent(admin) {
     const registrationId = registrationDocumentId(eventId, uid, "public");
     const registrationRef = db.collection("RegisterAttendance").doc(registrationId);
     return db.runTransaction(async (transaction) => {
-      const [eventSnapshot, registrationSnapshot] = await Promise.all([
+      const [eventSnapshot, registrationSnapshot, deleting] = await Promise.all([
         transaction.get(eventRef), transaction.get(registrationRef),
+        transaction.get(db.collection("account_deletion_jobs").doc(uid)),
       ]);
+      if (deleting.exists) throw new HttpsError("failed-precondition", "Account deletion is in progress.");
       if (registrationSnapshot.exists) {
         return {status: "already_registered", registrationId};
       }
@@ -142,7 +147,14 @@ function createRegisterPublicEvent(admin) {
       if (event.ticketsEnabled === true) {
         throw new HttpsError("failed-precondition", "A ticket is required for this event.");
       }
+      if (event.registrationPolicy?.approvalMode === "manual") throw new HttpsError("failed-precondition", "Update the app to request organizer approval.");
+      const countUpdate = require("../events/capacity").confirmedDelta(event, 1);
+      if (Object.keys(countUpdate).length) {
+        if (require("../events/capacity").capacityState(event).full) throw new HttpsError("resource-exhausted", "This event is full.");
+        transaction.update(eventRef, countUpdate);
+      }
       transaction.create(registrationRef, {
+        status: "confirmed",
         id: registrationId,
         eventId,
         userName: String(customer.name || "Attendee").slice(0, 200),
@@ -207,11 +219,13 @@ function createPublicTicketCheckout(admin) {
     const idempotencyHash = digest(eventId, uid, key);
     const attemptId = digest(idempotencyHash, now.toISOString());
     const reservation = await db.runTransaction(async (transaction) => {
-      const [eventSnapshot, existingReservation, ticketSnapshot] = await Promise.all([
+      const [eventSnapshot, existingReservation, ticketSnapshot, deleting] = await Promise.all([
         transaction.get(eventRef),
         transaction.get(reservationRef),
         transaction.get(ticketRef),
+        transaction.get(db.collection("account_deletion_jobs").doc(uid)),
       ]);
+      if (deleting.exists) throw new HttpsError("failed-precondition", "Account deletion is in progress.");
       if (ticketSnapshot.exists && ticketSnapshot.data().revoked !== true) {
         throw new HttpsError("already-exists", "You already have a ticket.");
       }
@@ -235,10 +249,7 @@ function createPublicTicketCheckout(admin) {
       if (event.ticketsEnabled !== true || Number(event.ticketPrice || 0) <= 0) {
         throw new HttpsError("failed-precondition", "This is not a paid event.");
       }
-      const maximum = Number(event.maxTickets || 0);
-      const issued = Number(event.issuedTickets || 0);
-      const reserved = Math.max(0, Number(event.reservedTickets || 0));
-      if (!Number.isSafeInteger(maximum) || maximum <= 0 || issued + reserved >= maximum) {
+      if (require("../events/capacity").ticketCapacityState(event).full) {
         throw new HttpsError("resource-exhausted", "No tickets are available.");
       }
       const amount = Math.round(Number(event.ticketPrice) * 100);
@@ -414,8 +425,11 @@ async function fulfillPayment(admin, stripeEvent) {
     const registrationId = reservation.registrationId || registrationDocumentId(
         reservation.eventId, reservation.customerUid, "ticket",
     );
+    const [eventSnapshot, deleting] = await Promise.all([transaction.get(eventRef),
+      transaction.get(db.collection("account_deletion_jobs").doc(reservation.customerUid))]);
+    if (deleting.exists) throw new Error("Account deletion requires payment review before fulfillment");
     transaction.set(ticketRef,
-        paidTicketData(admin, reservation, intent.id, ticketId), {merge: false});
+        {...paidTicketData(admin, reservation, intent.id, ticketId), registrationId}, {merge: false});
     transaction.set(db.collection("RegisterAttendance").doc(registrationId), {
       id: registrationId,
       eventId: reservation.eventId,
@@ -429,11 +443,13 @@ async function fulfillPayment(admin, stripeEvent) {
       answers: Array.isArray(reservation.answers) ? reservation.answers : [],
       isAnonymous: false,
       registrationSource: "stripe_webhook_v1",
+      ticketId,
       status: "confirmed",
     }, {merge: true});
     transaction.update(eventRef, {
       reservedTickets: admin.firestore.FieldValue.increment(-1),
       issuedTickets: admin.firestore.FieldValue.increment(1),
+      ...require("../events/capacity").confirmedDelta(eventSnapshot.data(), 1),
     });
     transaction.update(reservationRef, {
       status: "completed",
@@ -446,7 +462,7 @@ async function fulfillPayment(admin, stripeEvent) {
       completedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, {merge: true});
     if (reservation.guestId) {
-      const manageUrl = `https://attendus.app/manage/${reservation.manageToken}`;
+      const manageUrl = `${publicOrigin()}/manage/${reservation.manageToken}`;
       transaction.set(db.collection("OutboundMessages")
           .doc(`confirmation_${registrationId}`), {
         templateId: "guest_registration_confirmation",
@@ -517,6 +533,10 @@ async function handleRefund(admin, stripeEvent) {
     if (processed.exists) return;
     if (!paymentSnapshot.exists) throw new Error("Payment record not found");
     const payment = paymentSnapshot.data();
+    if (payment.status === "refunded") {
+      transaction.create(processedRef, {type: stripeEvent.type, processedAt: admin.firestore.FieldValue.serverTimestamp()});
+      return;
+    }
     const fullyRefunded = Number(charge.amount_refunded || 0) >=
       Number(charge.amount || payment.amountCents || 0);
     if (!fullyRefunded) {
@@ -525,19 +545,67 @@ async function handleRefund(admin, stripeEvent) {
         amountRefundedCents: Number(charge.amount_refunded || 0),
       });
     } else if (payment.status !== "refunded") {
+      let ticket; let event; let registration;
+      if (payment.ticketId) {
+        const ticketRef = db.collection("Tickets").doc(payment.ticketId);
+        const eventRef = db.collection("Events").doc(payment.eventId);
+        [ticket, event] = await Promise.all([transaction.get(ticketRef), transaction.get(eventRef)]);
+        if (!ticket.exists || !event.exists || ticket.get("eventId") !== payment.eventId ||
+            (ticket.get("paymentIntentId") && ticket.get("paymentIntentId") !== paymentIntentId)) {
+          throw new Error("Refund admission identity requires review");
+        }
+        const linked = await transaction.get(db.collection("RegisterAttendance").where("eventId", "==", payment.eventId)
+            .where("ticketId", "==", payment.ticketId).limit(2));
+        if (linked.size > 1) throw new Error("Refund admission links require review");
+        let registrationId = ticket.get("registrationId") || linked.docs[0]?.id;
+        if (!registrationId && payment.reservationId) {
+          const reservation = await transaction.get(db.collection("TicketReservations").doc(payment.reservationId));
+          if (reservation.exists) {
+            if (reservation.get("eventId") !== payment.eventId || reservation.get("ticketId") !== payment.ticketId) {
+              throw new Error("Refund reservation identity requires review");
+            }
+            registrationId = reservation.get("registrationId") || registrationDocumentId(payment.eventId, reservation.get("customerUid"), "ticket");
+          }
+        }
+        if (registrationId) {
+          registration = await transaction.get(db.collection("RegisterAttendance").doc(registrationId));
+          if (!registration.exists || registration.get("eventId") !== payment.eventId ||
+              (registration.get("ticketId") && registration.get("ticketId") !== payment.ticketId) ||
+              (linked.size && linked.docs[0].id !== registrationId)) {
+            throw new Error("Refund registration identity requires review");
+          }
+        } else if (ticket.get("guestId")) {
+          // Older guest admissions may have a guest-only relationship. Do not
+          // release their reconciled count without proving which row it owns.
+          const legacy = await transaction.get(db.collection("RegisterAttendance").where("eventId", "==", payment.eventId)
+              .where("guestId", "==", ticket.get("guestId")).limit(1));
+          if (!legacy.empty) throw new Error("Legacy refund admission requires linkage review");
+        }
+      }
       transaction.update(paymentRef, {
         status: "refunded",
         refundedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      if (payment.ticketId) {
-        transaction.set(db.collection("Tickets").doc(payment.ticketId), {
+      if (ticket) {
+        const {validTicket, confirmedRegistration} = require("../attendance/arrival-core");
+        const wasIssued = validTicket(ticket.data(), event.data());
+        const wasConfirmed = wasIssued && (!registration || confirmedRegistration(registration.data()));
+        transaction.update(ticket.ref, {
           revoked: true,
           revokedReason: "refunded",
+          paymentStatus: "refunded",
           revokedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }, {merge: true});
-        transaction.update(db.collection("Events").doc(payment.eventId), {
-          issuedTickets: admin.firestore.FieldValue.increment(-1),
         });
+        if (registration) transaction.update(registration.ref, {
+          status: "cancelled", paymentStatus: "refunded", cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        const countUpdate = require("../events/capacity").confirmedDelta(event.data(), wasConfirmed ? -1 : 0);
+        if (wasIssued) {
+          const issued = Number(event.get("issuedTickets") || 0);
+          if (!Number.isSafeInteger(issued) || issued < 1) throw new Error("Refund ticket totals require review");
+          countUpdate.issuedTickets = issued - 1;
+        }
+        if (Object.keys(countUpdate).length) transaction.update(event.ref, countUpdate);
       }
     }
     transaction.create(processedRef, {

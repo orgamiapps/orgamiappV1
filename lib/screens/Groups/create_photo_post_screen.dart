@@ -1,3 +1,4 @@
+import 'package:attendus/Services/community_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -14,6 +15,7 @@ class CreatePhotoPostScreen extends StatefulWidget {
 }
 
 class _CreatePhotoPostScreenState extends State<CreatePhotoPostScreen> {
+  final String _postId = CommunityService.newId();
   final _captionController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   final List<SelectedImageData> _selectedImages = [];
@@ -170,23 +172,22 @@ class _CreatePhotoPostScreenState extends State<CreatePhotoPostScreen> {
       final String userRole = memberDoc.data()?['role'] ?? 'member';
 
       // Create photo post document
-      await FirebaseFirestore.instance
-          .collection('Organizations')
-          .doc(widget.organizationId)
-          .collection('Feed')
-          .add({
-            'type': 'photo',
-            'caption': _captionController.text.trim(),
-            'imageUrls': imageUrls,
-            'authorId': user.uid,
-            'authorName': user.displayName ?? 'Unknown',
-            'authorEmail': user.email,
-            'authorRole': userRole,
-            'createdAt': FieldValue.serverTimestamp(),
-            'likes': [],
-            'comments': [],
-            'isPinned': false,
-          });
+      await CommunityService().mutate('createFeed', {
+        'organizationId': widget.organizationId,
+        'postId': _postId,
+        'post': {
+          'type': 'photo',
+          'caption': _captionController.text.trim(),
+          'imageUrls': imageUrls,
+          'authorId': user.uid,
+          'authorName': user.displayName ?? 'Unknown',
+          'authorEmail': user.email,
+          'authorRole': userRole,
+          'likes': [],
+          'comments': [],
+          'isPinned': false,
+        },
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

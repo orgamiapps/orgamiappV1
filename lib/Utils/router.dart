@@ -1,3 +1,5 @@
+import 'package:attendus/widgets/deferred_shared_community_screen.dart';
+import 'package:attendus/widgets/deferred_conversation_screen.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:attendus/screens/Home/dashboard_screen.dart'
@@ -99,6 +101,29 @@ class RouterClass {
           ),
         );
       });
+    } else if (pendingIntent?.action == PendingAuthAction.sharedCommunity &&
+        pendingIntent?.communityId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        appNavigatorKey.currentState?.push(
+          MaterialPageRoute(
+            builder: (_) => DeferredSharedCommunityScreen(
+              organizationId: pendingIntent!.communityId!,
+            ),
+          ),
+        );
+      });
+    } else if (pendingIntent?.action == PendingAuthAction.sharedConversation &&
+        pendingIntent?.conversationId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (appNavigatorKey.currentState == null) return;
+        appNavigatorKey.currentState!.push(
+          MaterialPageRoute(
+            builder: (_) => DeferredConversationScreen(
+              conversationId: pendingIntent!.conversationId!,
+            ),
+          ),
+        );
+      });
     } else if (pendingIntent?.action == PendingAuthAction.sharedEvent &&
         pendingIntent?.eventId != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -106,8 +131,10 @@ class RouterClass {
         if (rootContext == null) return;
         Navigator.of(rootContext, rootNavigator: true).push(
           MaterialPageRoute(
-            builder: (_) =>
-                DeferredSharedEventScreen(eventId: pendingIntent!.eventId!),
+            builder: (_) => DeferredSharedEventScreen(
+              eventId: pendingIntent!.eventId!,
+              initialAction: pendingIntent.eventAction,
+            ),
           ),
         );
       });

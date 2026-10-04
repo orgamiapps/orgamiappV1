@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:attendus/Services/pending_auth_intent_service.dart';
+import 'package:attendus/Services/arrival_route_observer.dart';
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -30,6 +32,9 @@ final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  final startupConversationId = kIsWeb
+      ? Uri.base.queryParameters['conversationId']
+      : null;
   usePathUrlStrategy();
   // Initialize global error handling with better crash reporting
   ErrorHandler.initialize();
@@ -49,7 +54,11 @@ void main() {
 
   final Stopwatch startupStopwatch = Stopwatch()..start();
   Logger.info('Starting Firebase initialization in parallel with first paint');
-  final firebaseInitialization = FirebaseInitializer.initializeOnce();
+  final firebaseInitialization = FirebaseInitializer.initializeOnce().then((
+    _,
+  ) async {
+    await PendingAuthIntentService.rememberConversation(startupConversationId);
+  });
 
   // Build the app after Firebase is ready
   // Use lazy initialization for providers to improve startup time
@@ -324,6 +333,17 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             final name = settings.name;
             if (name == null) return null;
             final uri = Uri.parse(name);
+            if (uri.path == '/app/discover') {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: (_) => AppStartupGate(
+                  initialization: _firebaseInitialization,
+                  onRetry: widget.onFirebaseRetry ?? FirebaseInitializer.retry,
+                  onReady: widget.onFirebaseReady,
+                  child: const AuthGate(forceDiscover: true),
+                ),
+              );
+            }
             final eventId = EventShareService.eventIdFromUri(uri);
             if (eventId != null) {
               return MaterialPageRoute<void>(
@@ -360,7 +380,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 child: const AuthGate(),
               ),
           // Add navigation observer for debugging and state tracking
-          navigatorObservers: [_NavigationLogger()],
+          navigatorObservers: [_NavigationLogger(), arrivalRouteObserver],
         );
       },
     );

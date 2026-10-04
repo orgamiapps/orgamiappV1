@@ -1,3 +1,4 @@
+import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
@@ -466,7 +467,12 @@ class _TicketManagementScreenState extends State<TicketManagementScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      EventCreationExperienceGate(event: widget.eventModel);
+
+  // Retained while legacy layout references migrate to the canonical editor.
+  // ignore: unused_element
+  Widget _legacyLayout(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFAFBFC),
       body: SafeArea(

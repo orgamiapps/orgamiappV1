@@ -1,4 +1,7 @@
 "use strict";
+process.env.GCLOUD_PROJECT = "demo-attendus-admin";
+process.env.GOOGLE_CLOUD_PROJECT = "demo-attendus-admin";
+process.env.FUNCTIONS_EMULATOR = "true";
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
@@ -42,6 +45,9 @@ const future = {
 test("event eligibility rejects private, unpublished, and malformed events", () => {
   assert.equal(eventEligibility(future), true);
   assert.equal(eventEligibility({...future, private: true}), false);
+  assert.equal(eventEligibility({...future, private: undefined}), false);
+  assert.equal(eventEligibility({...future, isHidden: true}), false);
+  assert.equal(eventEligibility({...future, deleted: true}), false);
   assert.equal(eventEligibility({...future, status: "draft"}), false);
   assert.equal(eventEligibility({...future, selectedDateTime: null}), false);
 });

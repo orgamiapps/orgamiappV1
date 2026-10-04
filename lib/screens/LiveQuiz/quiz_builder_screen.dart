@@ -402,7 +402,7 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen>
           // Max participants
           _buildSettingRow(
             'Maximum Participants',
-            _maxParticipants == 1000 ? 'Unlimited' : '$_maxParticipants',
+            '$_maxParticipants',
             () => _showParticipantLimitDialog(),
           ),
           const SizedBox(height: 20),
@@ -998,9 +998,7 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen>
             mainAxisSize: MainAxisSize.min,
             children: [50, 100, 250, 500, 1000].map((limit) {
               return ListTile(
-                title: Text(
-                  limit == 1000 ? 'Unlimited' : '$limit participants',
-                ),
+                title: Text('$limit participants'),
                 leading: Radio<int>(value: limit),
               );
             }).toList(),
@@ -1020,6 +1018,7 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen>
       context,
       MaterialPageRoute(
         builder: (context) => QuestionEditorScreen(
+          defaultTimeLimit: _timePerQuestion,
           onSave: (question) => Navigator.pop(context, question),
         ),
       ),
@@ -1160,9 +1159,6 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen>
                       final question = _questions[i];
                       final updatedQuestion = question.copyWith(orderIndex: i);
                       _questions[i] = updatedQuestion;
-                      _liveQuizService.updateQuestion(updatedQuestion.id, {
-                        'orderIndex': i,
-                      });
                     }
                   });
                   _showSuccess('Question deleted!');
@@ -1193,7 +1189,7 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen>
     try {
       if (widget.existingQuizId != null || _quizId != null) {
         quizId = widget.existingQuizId ?? _quizId!;
-        await _liveQuizService.updateQuiz(quizId, {
+        final saved = await _liveQuizService.updateQuiz(quizId, {
           'title': _titleController.text.trim(),
           'description': _descriptionController.text.trim().isEmpty
               ? null
@@ -1204,6 +1200,9 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen>
           'allowAnonymous': _allowAnonymous,
           'maxParticipants': _maxParticipants,
         });
+        if (!saved) {
+          throw StateError('Quiz details were not saved. Refresh and retry.');
+        }
       } else {
         final newQuizId = await _liveQuizService.createLiveQuiz(
           eventId: widget.eventId,
@@ -1263,11 +1262,13 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen>
 // Question Editor Screen - Implementation continues in a separate file for maintainability
 class QuestionEditorScreen extends StatefulWidget {
   final QuizQuestionModel? existingQuestion;
+  final int defaultTimeLimit;
   final Function(QuizQuestionModel) onSave;
 
   const QuestionEditorScreen({
     super.key,
     this.existingQuestion,
+    this.defaultTimeLimit = 30,
     required this.onSave,
   });
 
@@ -1291,6 +1292,7 @@ class _QuestionEditorScreenState extends State<QuestionEditorScreen> {
   @override
   void initState() {
     super.initState();
+    _timeLimit = widget.defaultTimeLimit;
     _loadExistingQuestion();
   }
 

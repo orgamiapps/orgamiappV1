@@ -1,3 +1,4 @@
+import 'package:attendus/Services/community_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -12,6 +13,7 @@ class CreatePollScreen extends StatefulWidget {
 }
 
 class _CreatePollScreenState extends State<CreatePollScreen> {
+  final String _postId = CommunityService.newId();
   final _questionController = TextEditingController();
   final List<TextEditingController> _optionControllers = [
     TextEditingController(),
@@ -151,24 +153,23 @@ class _CreatePollScreenState extends State<CreatePollScreen> {
       }
 
       // Create poll document
-      await FirebaseFirestore.instance
-          .collection('Organizations')
-          .doc(widget.organizationId)
-          .collection('Feed')
-          .add({
-            'type': 'poll',
-            'question': _questionController.text.trim(),
-            'options': pollOptions,
-            'authorId': user.uid,
-            'authorName': user.displayName ?? 'Unknown',
-            'authorEmail': user.email,
-            'createdAt': FieldValue.serverTimestamp(),
-            'endDate': _endDate != null ? Timestamp.fromDate(_endDate!) : null,
-            'allowMultipleVotes': _allowMultipleVotes,
-            'totalVotes': 0,
-            'voters': [],
-            'isActive': true,
-          });
+      await CommunityService().mutate('createFeed', {
+        'organizationId': widget.organizationId,
+        'postId': _postId,
+        'post': {
+          'type': 'poll',
+          'question': _questionController.text.trim(),
+          'options': pollOptions,
+          'authorId': user.uid,
+          'authorName': user.displayName ?? 'Unknown',
+          'authorEmail': user.email,
+          'endDate': _endDate?.toUtc().toIso8601String(),
+          'allowMultipleVotes': _allowMultipleVotes,
+          'totalVotes': 0,
+          'voters': [],
+          'isActive': true,
+        },
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -1,3 +1,6 @@
+import 'package:attendus/Services/public_profile_service.dart';
+import 'package:attendus/Services/community_service.dart';
+import 'package:attendus/Utils/event_discovery_visibility.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:math' show Random;
@@ -11,7 +14,6 @@ import 'package:attendus/models/event_model.dart';
 import 'package:attendus/models/event_question_model.dart';
 import 'package:attendus/models/ticket_model.dart';
 import 'package:attendus/models/event_feedback_model.dart';
-import 'package:attendus/models/app_feedback_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -84,11 +86,16 @@ class FirebaseFirestoreHelper {
         .limit(limit * 2); // Get more for filtering
 
     final snapshot = await query.get();
-    List<EventModel> events = snapshot.docs.map((doc) {
-      final data = doc.data() as Map<String, dynamic>;
-      data['id'] = data['id'] ?? doc.id;
-      return EventModel.fromJson(data);
-    }).toList();
+    List<EventModel> events = snapshot.docs
+        .where(
+          (doc) => isDiscoverableEventData(doc.data() as Map<String, dynamic>),
+        )
+        .map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          data['id'] = data['id'] ?? doc.id;
+          return EventModel.fromJson(data);
+        })
+        .toList();
 
     // Apply category filtering
     if (categories.isNotEmpty) {
@@ -201,11 +208,16 @@ class FirebaseFirestoreHelper {
         .limit(limit);
 
     final snapshot = await firestoreQuery.get();
-    List<EventModel> events = snapshot.docs.map((doc) {
-      final data = doc.data() as Map<String, dynamic>;
-      data['id'] = data['id'] ?? doc.id;
-      return EventModel.fromJson(data);
-    }).toList();
+    List<EventModel> events = snapshot.docs
+        .where(
+          (doc) => isDiscoverableEventData(doc.data() as Map<String, dynamic>),
+        )
+        .map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          data['id'] = data['id'] ?? doc.id;
+          return EventModel.fromJson(data);
+        })
+        .toList();
 
     // Filter by text matching
     events = events.where((event) {
@@ -294,80 +306,35 @@ class FirebaseFirestoreHelper {
     }
   }
 
-  /// Retrieves a single customer from Firestore with caching
-  ///
-  /// IMPORTANT: Ensure Firestore security rules allow read access for authenticated users:
-  /// match /Customers/{customerId} {
-  /// allow read, write: if request.auth != null && request.auth.uid == customerId;
-  /// }
-  ///
-  /// This method handles PERMISSION_DENIED errors gracefully by returning null
-  /// instead of throwing exceptions, allowing the app to continue functioning.
+  /// Private profile data is loaded only for the authenticated owner.
   Future<CustomerModel?> getSingleCustomer({required String customerId}) async {
-    // Check cache first
-    final cacheKey = 'customer_$customerId';
-    final cachedData = _cache[cacheKey];
-    if (cachedData != null) {
-      final timestamp = cachedData['timestamp'] as DateTime;
-      if (DateTime.now().difference(timestamp) < _cacheExpiry) {
-        Logger.debug('Using cached customer data for: $customerId');
-        return cachedData['data'] as CustomerModel;
-      }
-    }
-
     try {
-      // Get from Firestore (primary collection)
-      final doc = await _firestore
-          .collection('Customers')
-          .doc(customerId)
-          .get();
-
-      if (doc.exists) {
-        final customer = CustomerModel.fromFirestore(doc);
-
-        // Cache the result
-        _cache[cacheKey] = {'data': customer, 'timestamp': DateTime.now()};
-
-        return customer;
-      }
-
-      // Fallback: legacy collection name support ('Customer')
-      try {
-        final legacyDoc = await _firestore
-            .collection('Customer')
-            .doc(customerId)
-            .get();
-
-        if (legacyDoc.exists) {
-          final legacyCustomer = CustomerModel.fromFirestore(legacyDoc);
-
-          // Migrate to current collection name for consistency
+      return await PublicProfileService().getCustomer(
+        customerId,
+        loadSelf: (check) async {
+          final doc = await _firestore
+              .collection('Customers')
+              .doc(customerId)
+              .get();
+          check();
+          if (doc.exists) return CustomerModel.fromFirestore(doc);
+          final legacyDoc = await _firestore
+              .collection('Customer')
+              .doc(customerId)
+              .get();
+          check();
+          if (!legacyDoc.exists) return null;
+          final customer = CustomerModel.fromFirestore(legacyDoc);
           await _firestore
               .collection('Customers')
               .doc(customerId)
-              .set(
-                CustomerModel.getMap(legacyCustomer),
-                SetOptions(merge: true),
-              );
-
-          // Cache and return
-          _cache[cacheKey] = {
-            'data': legacyCustomer,
-            'timestamp': DateTime.now(),
-          };
-          Logger.debug(
-            'Migrated legacy user document to \'Customers\' for: $customerId',
-          );
-          return legacyCustomer;
-        }
-      } catch (e) {
-        Logger.debug('Legacy collection lookup failed for $customerId: $e');
-      }
-
-      Logger.warning('Customer document not found: $customerId');
-      return null;
-    } catch (e) {
-      Logger.error('Error getting customer data', e);
+              .set(CustomerModel.getMap(customer), SetOptions(merge: true));
+          check();
+          return customer;
+        },
+      );
+    } catch (error) {
+      Logger.error('Unable to load profile', error);
       return null;
     }
   }
@@ -1600,11 +1567,15 @@ class FirebaseFirestoreHelper {
     }
   }
 
-  Future<TicketModel?> getTicketByCode({required String ticketCode}) async {
+  Future<TicketModel?> getTicketByCode({
+    required String ticketCode,
+    required String eventId,
+  }) async {
     try {
       final querySnapshot = await _firestore
           .collection(TicketModel.firebaseKey)
           .where('ticketCode', isEqualTo: ticketCode)
+          .where('eventId', isEqualTo: eventId)
           .get();
 
       if (querySnapshot.docs.isNotEmpty) {
@@ -1613,7 +1584,7 @@ class FirebaseFirestoreHelper {
       return null;
     } catch (e) {
       Logger.debug('Error getting ticket by code: $e');
-      return null;
+      rethrow;
     }
   }
 
@@ -1691,12 +1662,21 @@ class FirebaseFirestoreHelper {
   /// Deletes an event from Firestore
   ///
   /// This method deletes the event document and all related data
+  /// Only an empty event may be deleted; populated events use the cancellation preview flow.
   Future<void> deleteEvent(String eventId) async {
-    try {
-      await _firestore.collection(EventModel.firebaseKey).doc(eventId).delete();
-    } catch (e) {
-      rethrow;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final document = await _firestore
+        .collection(EventModel.firebaseKey)
+        .doc(eventId)
+        .get();
+    if (!document.exists) return;
+    if (uid == null || FirebaseAuth.instance.currentUser?.uid != uid) {
+      throw StateError('Account changed. Reload events.');
     }
+    await FirebaseFunctions.instance.httpsCallable('deleteEmptyEventV1').call({
+      'eventId': eventId,
+      'expectedEventRevision': document.data()?['eventRevision'] ?? 0,
+    });
   }
 
   // Event Feedback Methods
@@ -1708,18 +1688,12 @@ class FirebaseFirestoreHelper {
     String? userId,
   }) async {
     try {
-      final feedbackData = {
+      await CommunityService().mutate('submitFeedback', {
         'eventId': eventId,
-        'userId': isAnonymous ? null : userId,
         'rating': rating,
         'comment': comment,
-        'timestamp': Timestamp.now(),
         'isAnonymous': isAnonymous,
-      };
-
-      await _firestore
-          .collection(EventFeedbackModel.firebaseKey)
-          .add(feedbackData);
+      });
 
       Logger.debug('Feedback submitted successfully for event: $eventId');
 
@@ -1754,7 +1728,7 @@ class FirebaseFirestoreHelper {
           .toList();
     } catch (e) {
       Logger.debug('Error getting event feedback: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -1778,7 +1752,7 @@ class FirebaseFirestoreHelper {
       return null;
     } catch (e) {
       Logger.debug('Error getting feedback analytics: $e');
-      return null;
+      rethrow;
     }
   }
 
@@ -1787,151 +1761,21 @@ class FirebaseFirestoreHelper {
     required String userId,
   }) async {
     try {
-      final querySnapshot = await _firestore
-          .collection(EventFeedbackModel.firebaseKey)
-          .where('eventId', isEqualTo: eventId)
-          .where('userId', isEqualTo: userId)
-          .get();
-
-      return querySnapshot.docs.isNotEmpty;
+      final result = await CommunityService().mutate('feedbackStatus', {
+        'eventId': eventId,
+      });
+      return result['submitted'] == true;
     } catch (e) {
       Logger.debug('Error checking if user submitted feedback: $e');
       return false;
     }
   }
 
-  // Enhanced user search with username support
   Future<List<CustomerModel>> searchUsers({
     required String searchQuery,
-    int limit = 100,
-  }) async {
-    try {
-      Logger.debug('Searching users with query: "$searchQuery"');
+    int limit = 50,
+  }) => PublicProfileService().search(searchQuery, limit: limit);
 
-      List<CustomerModel> users = [];
-
-      // Remove @ prefix if present for searching
-      String cleanSearchQuery = searchQuery.startsWith('@')
-          ? searchQuery.substring(1)
-          : searchQuery;
-
-      // If search query is empty, get all discoverable users
-      if (searchQuery.isEmpty) {
-        try {
-          final allUsersQuery = await _firestore
-              .collection(CustomerModel.firebaseKey)
-              .where('isDiscoverable', isEqualTo: true)
-              .orderBy('name', descending: false)
-              .limit(limit)
-              .get();
-
-          users = allUsersQuery.docs
-              .map((doc) => CustomerModel.fromFirestore(doc))
-              .toList();
-        } catch (e) {
-          Logger.debug(
-            'Composite index query failed, falling back to client-side filtering: $e',
-          );
-          // Fallback: get all users and filter client-side
-          final allUsersQuery = await _firestore
-              .collection(CustomerModel.firebaseKey)
-              .get();
-
-          users = allUsersQuery.docs
-              .map((doc) => CustomerModel.fromFirestore(doc))
-              .where((user) => user.isDiscoverable == true)
-              .take(limit)
-              .toList();
-        }
-      } else {
-        // Search by username first (exact match)
-        if (cleanSearchQuery.isNotEmpty) {
-          try {
-            final usernameQuery = await _firestore
-                .collection(CustomerModel.firebaseKey)
-                .where('username', isEqualTo: cleanSearchQuery.toLowerCase())
-                .where('isDiscoverable', isEqualTo: true)
-                .get();
-
-            users.addAll(
-              usernameQuery.docs
-                  .map((doc) => CustomerModel.fromFirestore(doc))
-                  .toList(),
-            );
-          } catch (e) {
-            Logger.debug('Error searching by username: $e');
-          }
-        }
-
-        // Search by name (prefix search)
-        try {
-          Query query = _firestore
-              .collection(CustomerModel.firebaseKey)
-              .where('isDiscoverable', isEqualTo: true)
-              .orderBy('name', descending: false)
-              .limit(limit);
-
-          if (searchQuery.isNotEmpty) {
-            query = query
-                .where('name', isGreaterThanOrEqualTo: searchQuery)
-                .where('name', isLessThan: '$searchQuery\uf8ff');
-          }
-
-          final querySnapshot = await query.get();
-          Logger.debug('Found ${querySnapshot.docs.length} users in Firestore');
-
-          final nameUsers = querySnapshot.docs
-              .map((doc) => CustomerModel.fromFirestore(doc))
-              .toList();
-
-          // Combine and remove duplicates
-          users.addAll(nameUsers);
-          users = users.toSet().toList(); // Remove duplicates
-        } catch (e) {
-          Logger.debug(
-            'Composite index query failed, falling back to client-side filtering: $e',
-          );
-          // Fallback: get all users and filter client-side
-          final allUsersQuery = await _firestore
-              .collection(CustomerModel.firebaseKey)
-              .get();
-
-          final allUsers = allUsersQuery.docs
-              .map((doc) => CustomerModel.fromFirestore(doc))
-              .where((user) => user.isDiscoverable == true)
-              .toList();
-
-          // Filter by search query
-          users = allUsers
-              .where(
-                (user) =>
-                    user.name.toLowerCase().contains(
-                      searchQuery.toLowerCase(),
-                    ) ||
-                    (user.username != null &&
-                        user.username!.toLowerCase().contains(
-                          cleanSearchQuery.toLowerCase(),
-                        )),
-              )
-              .take(limit)
-              .toList();
-        }
-      }
-
-      // Sort users alphabetically by name
-      users.sort(
-        (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
-      );
-
-      Logger.debug('Returning ${users.length} users after sorting');
-      return users;
-    } catch (e) {
-      Logger.debug('Error searching users: $e');
-      return [];
-    }
-  }
-
-  /// Updates user discoverability setting
   Future<void> updateUserDiscoverability({
     required String userId,
     required bool isDiscoverable,
@@ -1968,19 +1812,22 @@ class FirebaseFirestoreHelper {
           .collection('followers')
           .doc(followerId);
 
-      final batch = _firestore.batch();
-
-      batch.set(followerFollowingRef, {
-        'followingId': followingId,
-        'followedAt': FieldValue.serverTimestamp(),
+      await _firestore.runTransaction((transaction) async {
+        final following = await transaction.get(followerFollowingRef);
+        final follower = await transaction.get(followingFollowersRef);
+        if (!following.exists) {
+          transaction.set(followerFollowingRef, {
+            'followingId': followingId,
+            'followedAt': FieldValue.serverTimestamp(),
+          });
+        }
+        if (!follower.exists) {
+          transaction.set(followingFollowersRef, {
+            'followerId': followerId,
+            'followedAt': FieldValue.serverTimestamp(),
+          });
+        }
       });
-
-      batch.set(followingFollowersRef, {
-        'followerId': followerId,
-        'followedAt': FieldValue.serverTimestamp(),
-      });
-
-      await batch.commit();
 
       Logger.debug('User $followerId is now following $followingId');
     } catch (e) {
@@ -2139,7 +1986,10 @@ class FirebaseFirestoreHelper {
           .doc(user.uid)
           .get();
 
-      if (!userDoc.exists) return;
+      if (!userDoc.exists ||
+          FirebaseAuth.instance.currentUser?.uid != user.uid) {
+        return;
+      }
 
       final data = userDoc.data()!;
       Map<String, dynamic> updates = {};
@@ -2158,11 +2008,13 @@ class FirebaseFirestoreHelper {
 
       // Update if there are any missing fields
       if (updates.isNotEmpty) {
+        if (FirebaseAuth.instance.currentUser?.uid != user.uid) return;
         await userDoc.reference.update(updates);
         Logger.debug('Updated current user with: $updates');
 
         // Update the CustomerController if user is logged in
-        if (CustomerController.logeInCustomer != null) {
+        if (FirebaseAuth.instance.currentUser?.uid == user.uid &&
+            CustomerController.logeInCustomer?.uid == user.uid) {
           CustomerController.logeInCustomer!.isDiscoverable =
               updates['isDiscoverable'] ??
               CustomerController.logeInCustomer!.isDiscoverable;
@@ -2176,37 +2028,8 @@ class FirebaseFirestoreHelper {
     }
   }
 
-  Future<List<CustomerModel>> getUsersByIds({
-    required List<String> userIds,
-  }) async {
-    try {
-      if (userIds.isEmpty) return [];
-
-      // Firestore has a limit of 10 items in 'in' queries
-      // So we need to batch the requests
-      List<CustomerModel> allUsers = [];
-
-      for (int i = 0; i < userIds.length; i += 10) {
-        final batch = userIds.skip(i).take(10).toList();
-
-        final querySnapshot = await _firestore
-            .collection(CustomerModel.firebaseKey)
-            .where(FieldPath.documentId, whereIn: batch)
-            .get();
-
-        final users = querySnapshot.docs
-            .map((doc) => CustomerModel.fromFirestore(doc))
-            .toList();
-
-        allUsers.addAll(users);
-      }
-
-      return allUsers;
-    } catch (e) {
-      Logger.debug('Error getting users by IDs: $e');
-      return [];
-    }
-  }
+  Future<List<CustomerModel>> getUsersByIds({required List<String> userIds}) =>
+      PublicProfileService().getByIds(userIds);
 
   // Utility method to update existing users to have isDiscoverable field
   Future<void> updateExistingUsersWithDiscoverability() async {
@@ -2338,25 +2161,8 @@ class FirebaseFirestoreHelper {
     }
   }
 
-  // Check if username is available
-  Future<bool> isUsernameAvailable(String username) async {
-    try {
-      // Remove @ prefix if present for checking
-      String cleanUsername = username.startsWith('@')
-          ? username.substring(1)
-          : username;
-
-      final querySnapshot = await _firestore
-          .collection(CustomerModel.firebaseKey)
-          .where('username', isEqualTo: cleanUsername.toLowerCase())
-          .get();
-
-      return querySnapshot.docs.isEmpty;
-    } catch (e) {
-      Logger.debug('Error checking username availability: $e');
-      return false;
-    }
-  }
+  Future<bool> isUsernameAvailable(String username) =>
+      PublicProfileService().isUsernameAvailable(username);
 
   // Generate a unique username from full name
   Future<String> generateUniqueUsername(String fullName) async {
@@ -2511,37 +2317,11 @@ class FirebaseFirestoreHelper {
     required String coHostUserId,
   }) async {
     try {
-      // Get the current event
-      final eventDoc = await _firestore
-          .collection(EventModel.firebaseKey)
-          .doc(eventId)
-          .get();
-
-      if (!eventDoc.exists) {
-        Logger.debug('Event not found: $eventId');
-        return false;
-      }
-
-      final eventData = eventDoc.data()!;
-      List<String> coHosts = List<String>.from(eventData['coHosts'] ?? []);
-
-      // Check if user is already a co-host
-      if (coHosts.contains(coHostUserId)) {
-        Logger.debug('User is already a co-host: $coHostUserId');
-        return false;
-      }
-
-      // Add the new co-host
-      coHosts.add(coHostUserId);
-
-      // Update the event
-      await _firestore.collection(EventModel.firebaseKey).doc(eventId).update({
-        'coHosts': coHosts,
+      await CommunityService().mutate('setEventCoHost', {
+        'eventId': eventId,
+        'userId': coHostUserId,
+        'enabled': true,
       });
-
-      Logger.debug(
-        'Co-host added successfully: $coHostUserId to event: $eventId',
-      );
       return true;
     } catch (e) {
       Logger.debug('Error adding co-host: $e');
@@ -2554,37 +2334,11 @@ class FirebaseFirestoreHelper {
     required String coHostUserId,
   }) async {
     try {
-      // Get the current event
-      final eventDoc = await _firestore
-          .collection(EventModel.firebaseKey)
-          .doc(eventId)
-          .get();
-
-      if (!eventDoc.exists) {
-        Logger.debug('Event not found: $eventId');
-        return false;
-      }
-
-      final eventData = eventDoc.data()!;
-      List<String> coHosts = List<String>.from(eventData['coHosts'] ?? []);
-
-      // Check if user is a co-host
-      if (!coHosts.contains(coHostUserId)) {
-        Logger.debug('User is not a co-host: $coHostUserId');
-        return false;
-      }
-
-      // Remove the co-host
-      coHosts.remove(coHostUserId);
-
-      // Update the event
-      await _firestore.collection(EventModel.firebaseKey).doc(eventId).update({
-        'coHosts': coHosts,
+      await CommunityService().mutate('setEventCoHost', {
+        'eventId': eventId,
+        'userId': coHostUserId,
+        'enabled': false,
       });
-
-      Logger.debug(
-        'Co-host removed successfully: $coHostUserId from event: $eventId',
-      );
       return true;
     } catch (e) {
       Logger.debug('Error removing co-host: $e');
@@ -2748,17 +2502,10 @@ class FirebaseFirestoreHelper {
     required String eventId,
     required String userId,
   }) async {
-    final eventRef = _firestore.collection(EventModel.firebaseKey).doc(eventId);
-    await eventRef
-        .update({
-          'accessList': FieldValue.arrayUnion([userId]),
-        })
-        .catchError((_) {});
-
-    await eventRef.collection('AccessRequests').doc(userId).set({
-      'status': 'approved',
-      'reviewedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    await CommunityService().mutate('approveAccessRequest', {
+      'eventId': eventId,
+      'userId': userId,
+    });
   }
 
   Future<void> declineEventAccess({
@@ -2766,18 +2513,18 @@ class FirebaseFirestoreHelper {
     required String userId,
     String? reason,
   }) async {
-    final eventRef = _firestore.collection(EventModel.firebaseKey).doc(eventId);
-    await eventRef.collection('AccessRequests').doc(userId).set({
-      'status': 'declined',
-      'reason': reason ?? '',
-      'reviewedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    await CommunityService().mutate('rejectAccessRequest', {
+      'eventId': eventId,
+      'userId': userId,
+      'reason': reason,
+    });
   }
 
   // ====== End Private Event Access Request Workflow ======
 
   Future<void> submitAppFeedback({
     String? userId,
+    String? submissionId,
     required int rating,
     String? comment,
     required bool isAnonymous,
@@ -2786,20 +2533,15 @@ class FirebaseFirestoreHelper {
     String? contactNumber,
   }) async {
     try {
-      final feedbackData = {
-        'userId': isAnonymous ? null : userId,
+      await CommunityService().mutate('submitAppFeedback', {
+        'submissionId': submissionId ?? CommunityService.newId(),
         'rating': rating,
         'comment': comment,
-        'timestamp': Timestamp.now(),
         'isAnonymous': isAnonymous,
         'name': name,
         'email': email,
         'contactNumber': contactNumber,
-      };
-
-      await _firestore
-          .collection(AppFeedbackModel.firebaseKey)
-          .add(feedbackData);
+      });
 
       Logger.debug('App feedback submitted successfully');
     } catch (e) {

@@ -30,7 +30,9 @@ class CreateButtonWithLimit extends StatelessWidget {
         final limitService = CreationLimitService();
         final subscriptionService = SubscriptionService();
 
-        if (subscriptionService.hasPremium) {
+        if (subscriptionService.hasPremium ||
+            (type.toLowerCase() == 'event' &&
+                subscriptionService.hasUnlimitedEvents())) {
           // Premium users - no badge needed
           return GestureDetector(onTap: onPressed, child: child);
         }

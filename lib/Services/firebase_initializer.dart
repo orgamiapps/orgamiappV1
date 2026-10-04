@@ -7,6 +7,7 @@ import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Utils/app_constants.dart';
 import 'package:attendus/firebase_options.dart';
 import 'package:attendus/Utils/platform_helper.dart';
+import 'package:attendus/Utils/firebase_emulator_config.dart';
 
 /// Centralized, idempotent Firebase initialization with App Check.
 class FirebaseInitializer {
@@ -27,7 +28,7 @@ class FirebaseInitializer {
         PlatformHelper.getFirebaseTimeout(),
         onTimeout: () {
           Logger.warning(
-            'Firebase initialization timed out, continuing anyway',
+            'Firebase initialization timed out; startup can be retried',
           );
           throw TimeoutException('Firebase initialization timeout');
         },
@@ -35,6 +36,13 @@ class FirebaseInitializer {
 
       if (kDebugMode) {
         Logger.success('Firebase core initialized');
+      }
+
+      if (DefaultFirebaseOptions.environment == 'emulator') {
+        await FirebaseEmulatorConfig.connect(Firebase.app().options.projectId);
+        _completedSuccessfully = true;
+        _completer!.complete();
+        return;
       }
 
       // FlutterFire normally defaults to local persistence on web, but make
@@ -82,10 +90,12 @@ class FirebaseInitializer {
             ? const AppleDebugProvider()
             : const AppleDeviceCheckProvider();
 
-        await FirebaseAppCheck.instance.activate(
-          providerAndroid: androidProvider,
-          providerApple: appleProvider,
-        );
+        await FirebaseAppCheck.instance
+            .activate(
+              providerAndroid: androidProvider,
+              providerApple: appleProvider,
+            )
+            .timeout(const Duration(seconds: 5));
 
         Logger.info(
           'Firebase App Check activated (${kDebugMode ? 'debug' : 'playIntegrity'})',

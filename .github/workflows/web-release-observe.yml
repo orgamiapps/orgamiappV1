@@ -1,0 +1,76 @@
+name: Collect executable staging web evidence
+'on':
+  workflow_dispatch:
+    inputs:
+      candidate_run:
+        description: Successful immutable candidate workflow run ID
+        required: true
+      producer:
+        type: choice
+        options:
+        - browser
+        - backend
+        - operations
+        - safari
+        required: true
+      prior_evidence_runs:
+        description: Optional comma-separated immutable prior collector run IDs for replay and observation comparison
+        required: false
+        default: ''
+      gates:
+        type: choice
+        options:
+        - all
+        - observation
+        default: all
+        required: true
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+jobs:
+  collect:
+    runs-on: ${{ inputs.producer == 'safari' && 'macos-15' || 'ubuntu-latest' }}
+    timeout-minutes: 60
+    environment: staging
+    env:
+      GH_TOKEN: ${{ github.token }}
+      STAGING_WEB_QA_CONTEXT_JSON: ${{ secrets.STAGING_WEB_QA_CONTEXT_JSON }}
+      CANDIDATE_RUN: ${{ inputs.candidate_run }}
+      PRODUCER: ${{ inputs.producer }}
+      PRIOR_EVIDENCE_RUNS: ${{ inputs.prior_evidence_runs }}
+      GATES: ${{ inputs.gates }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - run: npm ci
+      working-directory: functions
+    - run: npm ci
+      working-directory: tests/browser
+    - run: npx playwright install --with-deps chromium firefox webkit msedge
+      if: ${{ inputs.producer != 'safari' }}
+      working-directory: tests/browser
+    - uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+        service_account: ${{ vars.EVIDENCE_SERVICE_ACCOUNT }}
+    - run: 'args=()
+
+        if [ -n "$PRIOR_EVIDENCE_RUNS" ]; then args+=(--prior-evidence-runs "$PRIOR_EVIDENCE_RUNS"); fi
+
+        node tools/web_release_evidence.js --candidate-run "$CANDIDATE_RUN" --producer "$PRODUCER" --gates "$GATES"
+        --output build/staging-evidence "${args[@]}"'
+      name: Execute allowlisted producer against frozen staging
+    - uses: actions/upload-artifact@v4
+      with:
+        name: web-staging-evidence
+        path: build/staging-evidence-publish/
+        include-hidden-files: true
+        retention-days: 90
+        if-no-files-found: error
+      if: always()
+concurrency:
+  group: attendus-web-staging-evidence
+  cancel-in-progress: false

@@ -1,3 +1,5 @@
+> New Smart Arrival and session-independent Wallet passes use the [Smart Arrival rollout guide](smart-arrival-wallet-rollout.md). The issuer instructions below describe the legacy v1 path only.
+
 # Attendus Attendance 2.0
 
 Attendance 2.0 uses a single server-authoritative contract for self, staff,

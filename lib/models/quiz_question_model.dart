@@ -5,6 +5,7 @@ enum QuestionType { multipleChoice, trueFalse, shortAnswer }
 class QuizQuestionModel {
   static String firebaseKey = 'QuizQuestions';
 
+  final int session;
   final String id;
   final String quizId;
   final int orderIndex;
@@ -26,6 +27,7 @@ class QuizQuestionModel {
   final String? explanation; // Shown after answering
 
   const QuizQuestionModel({
+    this.session = 0,
     required this.id,
     required this.quizId,
     required this.orderIndex,
@@ -43,6 +45,7 @@ class QuizQuestionModel {
 
   factory QuizQuestionModel.fromJson(Map<String, dynamic> data) {
     return QuizQuestionModel(
+      session: (data['session'] as num?)?.toInt() ?? 0,
       id: data['id'] ?? '',
       quizId: data['quizId'] ?? '',
       orderIndex: data['orderIndex'] ?? 0,
@@ -105,6 +108,7 @@ class QuizQuestionModel {
     String? explanation,
   }) {
     return QuizQuestionModel(
+      session: session,
       id: id ?? this.id,
       quizId: quizId ?? this.quizId,
       orderIndex: orderIndex ?? this.orderIndex,

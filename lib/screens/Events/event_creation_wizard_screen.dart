@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 import 'package:attendus/models/check_in_policy.dart';
 import 'package:attendus/models/discovery_category.dart';
@@ -51,6 +52,8 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
   final _titleFocus = FocusNode();
   final _locationFocus = FocusNode();
   final _scrollController = ScrollController();
+  StreamSubscription<User?>? _authSubscription;
+  bool _accountChanged = false;
   Timer? _autosaveTimer;
   EventWizardSaveState _saveState = EventWizardSaveState.idle;
   bool _publishing = false;
@@ -78,6 +81,17 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _service = widget.service ?? EventWizardService();
+    if (_service is EventWizardService) {
+      final owner = FirebaseAuth.instance.currentUser?.uid;
+      _authSubscription = FirebaseAuth.instance.authStateChanges().listen((
+        user,
+      ) {
+        if (mounted && user?.uid != owner) {
+          _autosaveTimer?.cancel();
+          setState(() => _accountChanged = true);
+        }
+      });
+    }
     _draft =
         widget.initialDraft ??
         (widget.event != null
@@ -220,6 +234,7 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _autosaveTimer?.cancel();
     _titleFocus.dispose();
@@ -276,6 +291,7 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
   }
 
   Future<void> _saveNow() async {
+    if (!mounted || _accountChanged) return;
     _autosaveTimer?.cancel();
     _syncControllersToDraft();
     if (!mounted) return;
@@ -304,26 +320,37 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
           'formData': _draft.toFormJson(),
         });
         _draft = conflict;
-        await _service.saveLocalDraft(_draft);
-        if (!mounted) return;
-        setState(() => _saveState = EventWizardSaveState.savedOnDevice);
+        if (!await _saveLocalFallback(EventWizardSaveState.savedOnDevice)) {
+          return;
+        }
+        if (!mounted || _accountChanged) return;
         _showError(
           'This draft changed on another device. Your work was preserved as a conflict copy.',
         );
         return;
       }
-      await _service.saveLocalDraft(_draft);
-      if (!mounted) return;
-      setState(() {
-        _saveState = error.code == 'unavailable'
+      await _saveLocalFallback(
+        error.code == 'unavailable'
             ? EventWizardSaveState.offline
-            : EventWizardSaveState.savedOnDevice;
-      });
+            : EventWizardSaveState.savedOnDevice,
+      );
     } catch (_) {
+      await _saveLocalFallback(EventWizardSaveState.savedOnDevice);
+    }
+  }
+
+  Future<bool> _saveLocalFallback(EventWizardSaveState successState) async {
+    if (!mounted || _accountChanged) return false;
+    try {
       await _service.saveLocalDraft(_draft);
-      if (mounted) {
-        setState(() => _saveState = EventWizardSaveState.savedOnDevice);
+      if (!mounted || _accountChanged) return false;
+      setState(() => _saveState = successState);
+      return true;
+    } catch (_) {
+      if (mounted && !_accountChanged) {
+        setState(() => _saveState = EventWizardSaveState.failed);
       }
+      return false;
     }
   }
 
@@ -477,9 +504,67 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
       ),
     );
     try {
+      String? changeReason;
+      String? changePreviewToken;
+      if (_draft.mode == 'edit' && _draft.sourceEventId != null) {
+        _autosaveTimer?.cancel();
+        _draft = await _service.saveDraft(_draft);
+        final preview = await FirebaseFunctions.instance
+            .httpsCallable('previewEventChangeV1')
+            .call({
+              'eventId': _draft.sourceEventId,
+              'draftId': _draft.draftId,
+              'expectedDraftRevision': _draft.revision,
+              'recurrenceScope': recurrenceScope,
+            })
+            .timeout(const Duration(seconds: 120));
+        changePreviewToken = preview.data['previewToken'];
+        if (!mounted) return;
+        final reason = TextEditingController();
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Review event changes'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${preview.data['count']} affected attendees across ${preview.data['occurrences']} occurrence(s). Schedule or location changes will send an update.',
+                ),
+                TextField(
+                  controller: reason,
+                  maxLength: 1000,
+                  decoration: const InputDecoration(
+                    labelText: 'Reason for the change',
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Back'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  if (reason.text.trim().length >= 5) {
+                    Navigator.pop(context, true);
+                  }
+                },
+                child: const Text('Apply changes'),
+              ),
+            ],
+          ),
+        );
+        changeReason = reason.text.trim();
+        reason.dispose();
+        if (confirmed != true || !mounted) return;
+      }
       final result = await _service.publish(
         _draft,
         recurrenceScope: recurrenceScope,
+        changeReason: changeReason,
+        changePreviewToken: changePreviewToken,
       );
       unawaited(
         _funnel.record(
@@ -771,6 +856,19 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_accountChanged) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Event editor')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'Your account changed. Close this editor and reopen it from your current account.',
+            ),
+          ),
+        ),
+      );
+    }
     final width = MediaQuery.sizeOf(context).width;
     final desktop = width >= 1050;
     final showPreview = desktop && _showPreview;
@@ -1159,7 +1257,8 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
             ),
             const SizedBox(height: 14),
             Text(
-              'Timezone: ${_draft.eventTimeZone}',
+              'Dates and times use your device’s local timezone. '
+              'Event recurrence timezone: ${_draft.eventTimeZone}.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const Divider(height: 32),
@@ -2176,24 +2275,88 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
       ),
       SwitchListTile.adaptive(
         contentPadding: EdgeInsets.zero,
-        value: _draft.checkInPolicy.proximityAssist,
-        title: const Text('One-time proximity assist'),
+        value: _draft.checkInPolicy.smartArrivalEnabled,
+        title: const Text('Smart Arrival'),
         subtitle: const Text(
-          'Uses location only during check-in; never in the background.',
+          'Attendees confirm arrival using a fresh location check.',
         ),
-        onChanged: _draft.locationType == 'online'
+        onChanged:
+            _draft.locationType == 'online' ||
+                !_draft.checkInPolicy.attendeeSelfCheckInEnabled
             ? null
-            : (value) => _setCheckInPolicy(
-                _draft.checkInPolicy.copyWith(proximityAssist: value),
-              ),
+            : (value) async {
+                if (!value) {
+                  _setCheckInPolicy(
+                    _draft.checkInPolicy.copyWith(smartArrivalEnabled: false),
+                  );
+                  return;
+                }
+                final result = await Navigator.of(context)
+                    .push<LocationPickerResult>(
+                      MaterialPageRoute(
+                        builder: (_) => LocationPickerScreen(
+                          initialLocation: LatLng(
+                            _draft.latitude,
+                            _draft.longitude,
+                          ),
+                          initialRadius:
+                              _draft.checkInPolicy.arrivalRadiusMeters,
+                          initialDisplayName: _draft.locationName,
+                          initialAddress: _draft.location,
+                        ),
+                      ),
+                    );
+                if (result == null || !mounted) return;
+                _setCheckInPolicy(
+                  _draft.checkInPolicy.copyWith(
+                    smartArrivalEnabled: true,
+                    openingMode: 'scheduled',
+                    arrivalLatitude: result.location.latitude,
+                    arrivalLongitude: result.location.longitude,
+                    arrivalRadiusMeters: result.radius.clamp(50, 500),
+                  ),
+                );
+              },
       ),
+      if (_draft.checkInPolicy.smartArrivalEnabled) ...[
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Confirmed check-in boundary'),
+          subtitle: Text(
+            '${_draft.checkInPolicy.arrivalRadiusMeters.round()} meters around your selected map point',
+          ),
+        ),
+        Slider(
+          value: _draft.checkInPolicy.arrivalRadiusMeters,
+          min: 50,
+          max: 500,
+          divisions: 18,
+          label: '${_draft.checkInPolicy.arrivalRadiusMeters.round()} m',
+          onChanged: (value) => _setCheckInPolicy(
+            _draft.checkInPolicy.copyWith(arrivalRadiusMeters: value),
+          ),
+        ),
+        SwitchListTile.adaptive(
+          contentPadding: EdgeInsets.zero,
+          value: _draft.checkInPolicy.openingMode == 'scheduled',
+          title: const Text('Open check-in on schedule'),
+          subtitle: const Text(
+            'Uses the check-in times above. Staff can pause or close it.',
+          ),
+          onChanged: (value) => _setCheckInPolicy(
+            _draft.checkInPolicy.copyWith(
+              openingMode: value ? 'scheduled' : 'manual',
+            ),
+          ),
+        ),
+      ],
       if (_draft.checkInPolicy.staffEntryEnabled)
         SwitchListTile.adaptive(
           contentPadding: EdgeInsets.zero,
           value: _draft.checkInPolicy.passLockEnabled,
           title: const Text('Device Pass Lock'),
           subtitle: const Text(
-            'Attendees unlock short-lived passes with device security.',
+            'Protects the in-app pass display. Saved Wallet passes remain usable.',
           ),
           onChanged: (value) => _setCheckInPolicy(
             _draft.checkInPolicy.copyWith(passLockEnabled: value),

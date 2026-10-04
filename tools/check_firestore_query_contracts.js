@@ -46,12 +46,13 @@ function discoverQueries(root) {
   return discovered;
 }
 
-function hasGroupFieldOverride(manifest, collectionGroup, fieldPath) {
+function hasGroupFieldOverride(manifest, collectionGroup, fieldPath, operator) {
   const override = (manifest.fieldOverrides || []).find((entry) =>
     entry.collectionGroup === collectionGroup && entry.fieldPath === fieldPath,
   );
   return Boolean(override?.indexes?.some((index) =>
-    index.queryScope === "COLLECTION_GROUP" && index.order === "ASCENDING",
+    index.queryScope === "COLLECTION_GROUP" &&
+      (operator === "array-contains" ? index.arrayConfig === "CONTAINS" : index.order === "ASCENDING"),
   ));
 }
 
@@ -65,8 +66,43 @@ function hasCompositeIndex(manifest, contract) {
   );
 }
 
-function validate(root, manifest) {
+const messagingContracts = [
+  {collectionGroup: "Conversations", queryScope: "COLLECTION", fields: [
+    {fieldPath: "participantIds", arrayConfig: "CONTAINS"}, {fieldPath: "lastMessageTime", order: "DESCENDING"},
+  ]},
+  {collectionGroup: "Messages", queryScope: "COLLECTION", fields: [
+    {fieldPath: "conversationId", order: "ASCENDING"}, {fieldPath: "timestamp", order: "ASCENDING"},
+  ]},
+];
+
+function validateMessagingQueries(root, manifest) {
+  const normalize = (index) => JSON.stringify([index.collectionGroup, index.queryScope, index.fields]);
   const errors = [];
+  for (const contract of messagingContracts) {
+    if (!manifest.indexes.some((index) => normalize(index) === normalize(contract))) {
+      errors.push(`Missing messaging collection index ${contract.collectionGroup}`);
+    }
+  }
+  const helper = fs.readFileSync(path.join(root, "lib/firebase/firebase_messaging_helper.dart"), "utf8");
+  for (const match of helper.matchAll(/\.collection\(['"](Conversations|Messages)['"]\)([\s\S]*?);/g)) {
+    const source = match[2];
+    if (!/^\s*\.where\(/.test(source)) continue;
+    const where = source.match(/\.where\(['"]([^'"]+)['"],\s*(arrayContains|isEqualTo):/);
+    const order = source.match(/\.orderBy\(['"]([^'"]+)['"]([^)]*)\)/);
+    if (!where || !order) { errors.push(`Unordered or unsupported messaging query ${match[1]}`); continue; }
+    const expected = messagingContracts.find((contract) => contract.collectionGroup === match[1]);
+    if (where[1] !== expected.fields[0].fieldPath ||
+        (where[2] === "arrayContains") !== Boolean(expected.fields[0].arrayConfig) ||
+        order[1] !== expected.fields[1].fieldPath ||
+        /descending:\s*true/.test(order[2]) !== (expected.fields[1].order === "DESCENDING")) {
+      errors.push(`Messaging query differs from indexed contract ${match[1]}`);
+    }
+  }
+  return errors;
+}
+
+function validate(root, manifest) {
+  const errors = validateMessagingQueries(root, manifest);
   for (const query of discoverQueries(root)) {
     for (const fieldPath of query.fields) {
       if (!contracts.some((contract) =>
@@ -80,7 +116,7 @@ function validate(root, manifest) {
   for (const contract of contracts) {
     if (contract.filters.length === 1) {
       const field = contract.filters[0].fieldPath;
-      if (!hasGroupFieldOverride(manifest, contract.collectionGroup, field)) {
+      if (!hasGroupFieldOverride(manifest, contract.collectionGroup, field, contract.filters[0].operator)) {
         errors.push(`Missing collection-group field index ${contract.collectionGroup}.${field}`);
       }
     } else if (!hasCompositeIndex(manifest, contract)) {

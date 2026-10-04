@@ -125,7 +125,7 @@ class _ButtonLabel extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (icon != null) ...[Icon(icon, size: 18), const SizedBox(width: 8)],
-        Text(label),
+        Flexible(child: Text(label, textAlign: TextAlign.center)),
       ],
     );
   }
@@ -370,6 +370,7 @@ class AttendUsPageSection extends StatelessWidget {
 }
 
 class AttendUsSectionHeader extends StatelessWidget {
+  final int? subtitleMaxLines;
   final String title;
   final String? subtitle;
   final IconData? icon;
@@ -381,6 +382,7 @@ class AttendUsSectionHeader extends StatelessWidget {
     this.subtitle,
     this.icon,
     this.actions = const [],
+    this.subtitleMaxLines = 2,
   });
 
   @override
@@ -403,8 +405,10 @@ class AttendUsSectionHeader extends StatelessWidget {
                 Text(
                   subtitle!,
                   style: theme.textTheme.bodySmall,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                  maxLines: subtitleMaxLines,
+                  overflow: subtitleMaxLines == null
+                      ? TextOverflow.visible
+                      : TextOverflow.ellipsis,
                 ),
               ],
             ],
@@ -672,6 +676,7 @@ class AttendUsBottomSheet extends StatelessWidget {
             AttendUsSectionHeader(
               title: title,
               subtitle: subtitle,
+              subtitleMaxLines: null,
               actions: actions,
             ),
             const SizedBox(height: 18),
@@ -685,6 +690,7 @@ class AttendUsBottomSheet extends StatelessWidget {
       top: false,
       child: Align(
         alignment: Alignment.bottomCenter,
+        heightFactor: 1,
         child: scrollable ? SingleChildScrollView(child: sheet) : sheet,
       ),
     );

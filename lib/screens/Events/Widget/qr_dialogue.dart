@@ -1,13 +1,10 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/logger.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:attendus/Services/artifact_download_service.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 import 'package:screenshot/screenshot.dart';
@@ -31,7 +28,6 @@ class _ShareQRDialogState extends State<ShareQRDialog>
   final _downloadBtnCtlr = RoundedLoadingButtonController();
   final _copyBtnCtlr = RoundedLoadingButtonController();
 
-  File? imageMade;
   ScreenshotController screenshotController = ScreenshotController();
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
@@ -87,10 +83,7 @@ class _ShareQRDialogState extends State<ShareQRDialog>
             child: Center(
               child: Container(
                 width: _screenWidth * 0.9,
-                constraints: BoxConstraints(
-                  maxHeight: _screenHeight * 0.85,
-                  minHeight: 400,
-                ),
+                constraints: BoxConstraints(maxHeight: _screenHeight * 0.85),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(24),
@@ -102,16 +95,14 @@ class _ShareQRDialogState extends State<ShareQRDialog>
                     ),
                   ],
                 ),
-                child: Flexible(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildHeader(),
-                        _buildQRContent(),
-                        _buildActionButtons(),
-                      ],
-                    ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildHeader(),
+                      _buildQRContent(),
+                      _buildActionButtons(),
+                    ],
                   ),
                 ),
               ),
@@ -446,102 +437,64 @@ class _ShareQRDialogState extends State<ShareQRDialog>
   }
 
   Future<void> _shareQRCode() async {
+    final origin = artifactShareOrigin(context);
     try {
       HapticFeedback.lightImpact();
       _btnCtlr.start();
 
       final capturedQR = await screenshotController.capture();
       if (capturedQR == null) {
-        _btnCtlr.reset();
+        if (mounted) _btnCtlr.reset();
         return;
       }
 
-      final directoryPath = (await getTemporaryDirectory()).path;
-      final imagePath = '$directoryPath/event_qr_$uniqueId.png';
-      final imageFile = await File(imagePath).create(recursive: true);
-      imageFile.writeAsBytesSync(capturedQR);
-
-      final file = XFile(imagePath);
+      if (!mounted) return;
+      final file = XFile.fromData(
+        capturedQR,
+        mimeType: 'image/png',
+        name: 'event_qr_$uniqueId.png',
+      );
       await SharePlus.instance.share(
         ShareParams(
           files: [file],
           text:
               'Join my event: $eventTitle\nLocation: $eventLocation\nEvent ID: $uniqueId',
           subject: 'Event QR Code - $eventTitle',
+          sharePositionOrigin: origin,
         ),
       );
 
-      _btnCtlr.reset();
+      if (mounted) _btnCtlr.reset();
     } catch (e) {
       Logger.error('Error sharing QR code: $e');
-      _btnCtlr.reset();
+      if (mounted) _btnCtlr.reset();
     }
   }
 
   Future<void> _downloadQRCode() async {
+    final origin = artifactShareOrigin(context);
     try {
       HapticFeedback.lightImpact();
       _downloadBtnCtlr.start();
-
-      // Check storage permission
-      var status = await Permission.storage.status;
-      if (status.isDenied) {
-        status = await Permission.storage.request();
-        if (status.isDenied) {
-          if (mounted) {
-            ShowToast().showSnackBar(
-              'Storage permission is required to save QR code',
-              context,
-            );
-          }
-          _downloadBtnCtlr.reset();
-          return;
-        }
-      }
-
       final capturedQR = await screenshotController.capture();
-      if (capturedQR == null) {
-        _downloadBtnCtlr.reset();
-        return;
-      }
-
-      // Save to gallery directory
-      final directoryPath = (await getApplicationDocumentsDirectory()).path;
-      final imagePath = '$directoryPath/event_qr_$uniqueId.png';
-      final imageFile = await File(imagePath).create(recursive: true);
-      imageFile.writeAsBytesSync(capturedQR);
-
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                const Text('QR code saved successfully'),
-              ],
-            ),
-            backgroundColor: AppThemeColor.darkGreenColor,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-
-      _downloadBtnCtlr.reset();
+      if (capturedQR == null || !mounted) return;
+      final result = await downloadArtifact(
+        capturedQR,
+        'event_qr_$uniqueId.png',
+        'image/png',
+        sharePositionOrigin: origin,
+      );
+      if (mounted) ShowToast().showSnackBar(result.message, context);
     } catch (e) {
       Logger.error('Error downloading QR code: $e');
       if (mounted) {
         ShowToast().showSnackBar(
-          'Failed to save QR code. Please try again.',
+          'Could not open the download or share action. Please retry.',
           context,
         );
       }
-      _downloadBtnCtlr.reset();
+    } finally {
+      if (mounted) _downloadBtnCtlr.reset();
     }
   }
 

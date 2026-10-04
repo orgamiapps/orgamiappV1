@@ -84,9 +84,7 @@ class AttendanceModel {
       eventId: data['eventId']?.toString() ?? '',
       customerUid: data['customerUid']?.toString() ?? '',
       attendanceDateTime: checkedIn ?? DateTime.now(),
-      answers: data['answers'] is Iterable
-          ? List<String>.from(data['answers'])
-          : const [],
+      answers: displayAnswers(data['answers']),
       isAnonymous: data['isAnonymous'] ?? false,
       realName: data['realName'],
       entryTimestamp: data['entryTimestamp'] != null
@@ -113,6 +111,34 @@ class AttendanceModel {
       overrideReason: data['overrideReason']?.toString(),
       offlineReconciled: data['offlineReconciled'] == true,
     );
+  }
+
+  /// History supports V3 registration records alongside legacy door strings.
+  static List<String> displayAnswers(dynamic values) {
+    if (values is! Iterable) return [];
+    final answers = <String>[];
+    for (final value in values) {
+      if (value is String) {
+        answers.add(value);
+      } else if (value is Map && value.containsKey('answer')) {
+        final title =
+            (value['prompt'] ??
+                    value['questionTitle'] ??
+                    value['questionId'] ??
+                    'Event question')
+                .toString();
+        final answer = value['answer'];
+        final text = answer is bool
+            ? (answer ? 'Yes' : 'No')
+            : answer is List
+            ? answer.whereType<String>().join(', ')
+            : answer is String || answer is num
+            ? answer.toString()
+            : '';
+        answers.add('$title--ans--$text');
+      }
+    }
+    return answers;
   }
 
   Map<String, dynamic> toJson() {

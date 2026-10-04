@@ -1,4 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
+import 'package:cryptography/cryptography.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import 'package:attendus/Utils/app_constants.dart';
 import 'package:attendus/Utils/logger.dart';
@@ -10,6 +14,15 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 class FirebaseGoogleAuthHelper extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  static Future<void>? _googleInitialization;
+  Future<UserCredential> _nativeGoogle() async {
+    final google = GoogleSignIn.instance;
+    await (_googleInitialization ??= google.initialize());
+    final account = await google.authenticate();
+    return _auth.signInWithCredential(
+      GoogleAuthProvider.credential(idToken: account.authentication.idToken),
+    );
+  }
 
   static bool lastGoogleCancelled = false;
   static bool lastGoogleRedirectStarted = false;
@@ -42,14 +55,12 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
           ? await _auth
                 .signInWithPopup(provider)
                 .timeout(const Duration(seconds: 45))
-          : await _auth
-                .signInWithProvider(provider)
-                .timeout(const Duration(seconds: 60));
+          : await _nativeGoogle().timeout(const Duration(seconds: 60));
 
       final user = credential.user;
       if (user == null) {
         lastGoogleErrorMessage =
-            'Google sign-in did not return an account. Please try again.';
+            'Google login did not return an account. Please try again.';
         return null;
       }
 
@@ -59,6 +70,12 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
       );
       notifyListeners();
       return profileData;
+    } on GoogleSignInException catch (error) {
+      lastGoogleCancelled = error.code == GoogleSignInExceptionCode.canceled;
+      if (!lastGoogleCancelled) {
+        lastGoogleErrorMessage = 'Google login could not finish. Please retry.';
+      }
+      return null;
     } on FirebaseAuthException catch (error) {
       if (_isAuthCancellation(error)) {
         lastGoogleCancelled = true;
@@ -73,7 +90,7 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
       );
       return null;
     } on TimeoutException catch (error) {
-      lastGoogleErrorMessage = 'Google sign-in timed out. Please try again.';
+      lastGoogleErrorMessage = 'Google login timed out. Please try again.';
       Logger.error('Google sign-in timed out', error);
       return null;
     } catch (error) {
@@ -136,20 +153,56 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
       (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS);
 
+  Future<void> revokeAppleAccessForDeletion() async {
+    final user = _auth.currentUser;
+    if (user == null ||
+        !user.providerData.any(
+          (provider) => provider.providerId == 'apple.com',
+        )) {
+      return;
+    }
+    final nonce = base64UrlEncode(
+      List<int>.generate(32, (_) => Random.secure().nextInt(256)),
+    );
+    final digest = (await Sha256().hash(
+      utf8.encode(nonce),
+    )).bytes.map((value) => value.toRadixString(16).padLeft(2, '0')).join();
+    final webOptions =
+        kIsWeb || defaultTargetPlatform == TargetPlatform.android;
+    final credential = await SignInWithApple.getAppleIDCredential(
+      scopes: [],
+      nonce: digest,
+      webAuthenticationOptions: webOptions
+          ? WebAuthenticationOptions(
+              clientId: AppConstants.appleServiceId,
+              redirectUri: Uri.parse(AppConstants.appleRedirectUrl),
+            )
+          : null,
+    );
+    await user.reauthenticateWithCredential(
+      OAuthProvider(
+        'apple.com',
+      ).credential(idToken: credential.identityToken, rawNonce: nonce),
+    );
+    await _auth.revokeTokenWithAuthorizationCode(credential.authorizationCode);
+  }
+
   Future<Map<String, dynamic>?> loginWithApple() async {
     lastAppleCancelled = false;
     lastAppleErrorMessage = null;
 
     if (!AppConstants.enableAppleSignIn) {
-      lastAppleErrorMessage = 'Apple sign-in is not available yet.';
+      lastAppleErrorMessage = 'Apple login is not available yet.';
       Logger.warning('Apple sign-in is disabled via feature flag');
       return null;
     }
 
-    if (AppConstants.appleServiceId.isEmpty ||
-        AppConstants.appleRedirectUrl.isEmpty) {
-      lastAppleErrorMessage =
-          'Apple sign-in is not configured for this release.';
+    final needsWebOptions =
+        kIsWeb || defaultTargetPlatform == TargetPlatform.android;
+    if (needsWebOptions &&
+        (AppConstants.appleServiceId.isEmpty ||
+            AppConstants.appleRedirectUrl.isEmpty)) {
+      lastAppleErrorMessage = 'Apple login is not configured for this release.';
       Logger.warning(
         'Apple sign-in requested without ATTENDUS_APPLE_SERVICE_ID and ATTENDUS_APPLE_REDIRECT_URL',
       );
@@ -159,21 +212,30 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
     try {
       if (!await SignInWithApple.isAvailable()) {
         lastAppleErrorMessage =
-            'Apple sign-in is not available on this device or browser.';
+            'Apple login is not available on this device or browser.';
         Logger.warning('Apple Sign-In is not available on this device');
         return null;
       }
 
+      final nonce = base64UrlEncode(
+        List<int>.generate(32, (_) => Random.secure().nextInt(256)),
+      );
+      final nonceHash = (await Sha256().hash(
+        utf8.encode(nonce),
+      )).bytes.map((value) => value.toRadixString(16).padLeft(2, '0')).join();
       final appleCredential =
           await SignInWithApple.getAppleIDCredential(
             scopes: [
               AppleIDAuthorizationScopes.email,
               AppleIDAuthorizationScopes.fullName,
             ],
-            webAuthenticationOptions: WebAuthenticationOptions(
-              clientId: AppConstants.appleServiceId,
-              redirectUri: Uri.parse(AppConstants.appleRedirectUrl),
-            ),
+            nonce: nonceHash,
+            webAuthenticationOptions: needsWebOptions
+                ? WebAuthenticationOptions(
+                    clientId: AppConstants.appleServiceId,
+                    redirectUri: Uri.parse(AppConstants.appleRedirectUrl),
+                  )
+                : null,
           ).timeout(
             const Duration(seconds: 45),
             onTimeout: () {
@@ -183,6 +245,7 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
 
       final oauthCredential = OAuthProvider('apple.com').credential(
         idToken: appleCredential.identityToken,
+        rawNonce: nonce,
         accessToken: appleCredential.authorizationCode,
       );
 
@@ -192,7 +255,7 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
       final user = credential.user;
       if (user == null) {
         lastAppleErrorMessage =
-            'Apple sign-in did not return an account. Please try again.';
+            'Apple login did not return an account. Please try again.';
         return null;
       }
 
@@ -213,7 +276,7 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
       }
 
       lastAppleErrorMessage =
-          'Apple sign-in could not be completed. Please try again.';
+          'Apple login could not be completed. Please try again.';
       Logger.error('Apple sign-in auth exception: $error', error);
       return null;
     } on FirebaseAuthException catch (error) {
@@ -230,12 +293,12 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
       );
       return null;
     } on TimeoutException catch (error) {
-      lastAppleErrorMessage = 'Apple sign-in timed out. Please try again.';
+      lastAppleErrorMessage = 'Apple login timed out. Please try again.';
       Logger.error('Apple sign-in timeout', error);
       return null;
     } catch (error) {
       lastAppleErrorMessage =
-          'Apple sign-in could not be completed. Please try again.';
+          'Apple login could not be completed. Please try again.';
       Logger.error('Apple sign-in error: $error', error);
       return null;
     }
@@ -382,56 +445,56 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
   static String _googleAuthErrorMessage(FirebaseAuthException error) {
     switch (error.code.toLowerCase()) {
       case 'unauthorized-domain':
-        return 'This domain is not authorized for Google sign-in.';
+        return 'This domain is not authorized for Google login.';
       case 'popup-blocked':
-        return 'The Google sign-in popup was blocked. Allow popups and try again.';
+        return 'The Google login popup was blocked. Allow popups and try again.';
       case 'operation-not-allowed':
-        return 'Google sign-in is not enabled for this Firebase project.';
+        return 'Google login is not enabled for this Firebase project.';
       case 'account-exists-with-different-credential':
-        return 'An account already exists with this email using a different sign-in method.';
+        return 'An account already exists with this email using a different login method.';
       case 'network-request-failed':
-        return 'Network error during Google sign-in. Check your connection and try again.';
+        return 'Network error during Google login. Check your connection and try again.';
       case 'invalid-api-key':
       case 'app-not-authorized':
       case 'invalid-credential':
-        return 'Google sign-in is not configured correctly for this app.';
+        return 'Google login is not configured correctly for this app.';
       default:
         final message = error.message?.trim();
         if (message != null && message.isNotEmpty) {
-          return 'Google sign-in failed: $message';
+          return 'Google login failed: $message';
         }
-        return 'Google sign-in could not be completed. Please try again.';
+        return 'Google login could not be completed. Please try again.';
     }
   }
 
   static String _appleAuthErrorMessage(FirebaseAuthException error) {
     switch (error.code.toLowerCase()) {
       case 'operation-not-allowed':
-        return 'Apple sign-in is not enabled for this Firebase project.';
+        return 'Apple login is not enabled for this Firebase project.';
       case 'unauthorized-domain':
-        return 'This domain is not authorized for Apple sign-in.';
+        return 'This domain is not authorized for Apple login.';
       case 'account-exists-with-different-credential':
-        return 'An account already exists with this email using a different sign-in method.';
+        return 'An account already exists with this email using a different login method.';
       default:
         final message = error.message?.trim();
         if (message != null && message.isNotEmpty) {
-          return 'Apple sign-in failed: $message';
+          return 'Apple login failed: $message';
         }
-        return 'Apple sign-in could not be completed. Please try again.';
+        return 'Apple login could not be completed. Please try again.';
     }
   }
 
   static String _googleUnknownErrorMessage(Object error) {
     final message = error.toString().toLowerCase();
     if (message.contains('unauthorized-domain')) {
-      return 'This domain is not authorized for Google sign-in.';
+      return 'This domain is not authorized for Google login.';
     }
     if (message.contains('popup') && message.contains('blocked')) {
-      return 'The Google sign-in popup was blocked. Allow popups and try again.';
+      return 'The Google login popup was blocked. Allow popups and try again.';
     }
     if (message.contains('operation-not-allowed')) {
-      return 'Google sign-in is not enabled for this Firebase project.';
+      return 'Google login is not enabled for this Firebase project.';
     }
-    return 'Google sign-in could not be completed. Please try again.';
+    return 'Google login could not be completed. Please try again.';
   }
 }

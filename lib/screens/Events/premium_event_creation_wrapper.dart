@@ -1,5 +1,3 @@
-import 'package:attendus/screens/Events/create_event_screen.dart';
-import 'package:attendus/screens/Events/edit_event_screen.dart';
 import 'package:attendus/screens/Events/event_creation_wizard_screen.dart';
 import 'package:attendus/Services/event_wizard_service.dart';
 import 'package:attendus/models/event_model.dart';
@@ -83,8 +81,8 @@ class PremiumEventCreationWrapper extends StatelessWidget {
   }
 }
 
-/// Fail-closed rollout gate for the additive event-creation experience.
-/// Missing, invalid, or unavailable configuration always preserves V1.
+/// Canonical server-authorized persistence for every event entry point.
+/// Presentation rollout configuration never selects a direct Firestore writer.
 class EventCreationExperienceGate extends StatefulWidget {
   const EventCreationExperienceGate({
     super.key,
@@ -93,6 +91,8 @@ class EventCreationExperienceGate extends StatefulWidget {
     this.preselectedOrganizationId,
     this.forceOrganizationEvent = false,
     this.event,
+    this.service,
+    this.editDraftLoader,
   });
 
   final DateTime? selectedDateTime;
@@ -100,6 +100,8 @@ class EventCreationExperienceGate extends StatefulWidget {
   final String? preselectedOrganizationId;
   final bool forceOrganizationEvent;
   final EventModel? event;
+  final EventWizardRepository? service;
+  final Future<EventWizardDraft> Function(String eventId)? editDraftLoader;
 
   @override
   State<EventCreationExperienceGate> createState() =>
@@ -108,79 +110,80 @@ class EventCreationExperienceGate extends StatefulWidget {
 
 class _EventCreationExperienceGateState
     extends State<EventCreationExperienceGate> {
-  late final Future<int> _version;
-  EventWizardService? _service;
+  EventWizardRepository? _service;
   Future<EventWizardDraft>? _editDraft;
-
+  Object? _initializationError;
   @override
   void initState() {
     super.initState();
+    _initialize();
+  }
+
+  void _initialize() {
     try {
-      _service = EventWizardService();
-      _version = _service!.experienceVersion();
-    } catch (_) {
-      _version = Future.value(1);
+      _service = widget.service ?? EventWizardService();
+      _initializationError = null;
+      if (widget.event != null) {
+        final load =
+            widget.editDraftLoader ??
+            (_service as EventWizardService).createEditDraft;
+        _editDraft = load(widget.event!.id);
+        // A retry can fail before the next build attaches FutureBuilder.
+        // Mark the future handled immediately; FutureBuilder still renders its error.
+        _editDraft!.ignore();
+      }
+    } catch (error) {
+      _initializationError = error;
     }
   }
 
+  Widget _unavailable() => Scaffold(
+    appBar: AppBar(title: const Text('Event editor')),
+    body: Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'The event editor is unavailable. Reconnect or sign in again, then retry. Your published event has not changed.',
+            ),
+            TextButton(
+              onPressed: () => setState(_initialize),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
   @override
   Widget build(BuildContext context) {
-    if (_service == null) {
-      return widget.event != null
-          ? EditEventScreen(eventModel: widget.event!)
-          : CreateEventScreen(
-              selectedDateTime: widget.selectedDateTime,
-              eventDurationHours: widget.eventDurationHours,
-              preselectedOrganizationId: widget.preselectedOrganizationId,
-              forceOrganizationEvent: widget.forceOrganizationEvent,
-            );
-    }
-    return FutureBuilder<int>(
-      future: _version,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-        if (snapshot.data == 2) {
-          if (widget.event != null) {
-            _editDraft ??= _service!.createEditDraft(widget.event!.id);
-            return FutureBuilder<EventWizardDraft>(
-              future: _editDraft,
-              builder: (context, draftSnapshot) {
-                if (!draftSnapshot.hasData) {
-                  if (draftSnapshot.hasError) {
-                    return EditEventScreen(eventModel: widget.event!);
-                  }
-                  return const Scaffold(
-                    body: Center(child: CircularProgressIndicator()),
-                  );
-                }
-                return EventCreationWizardScreen(
-                  event: widget.event,
-                  initialDraft: draftSnapshot.data,
-                );
-              },
+    if (_service == null || _initializationError != null) return _unavailable();
+    if (widget.event != null) {
+      return FutureBuilder<EventWizardDraft>(
+        future: _editDraft,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) return _unavailable();
+          if (!snapshot.hasData) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
             );
           }
           return EventCreationWizardScreen(
-            selectedDateTime: widget.selectedDateTime,
-            eventDurationHours: widget.eventDurationHours,
-            preselectedOrganizationId: widget.preselectedOrganizationId,
-            forceOrganizationEvent: widget.forceOrganizationEvent,
+            event: widget.event,
+            initialDraft: snapshot.data,
+            service: _service,
           );
-        }
-        if (widget.event != null) {
-          return EditEventScreen(eventModel: widget.event!);
-        }
-        return CreateEventScreen(
-          selectedDateTime: widget.selectedDateTime,
-          eventDurationHours: widget.eventDurationHours,
-          preselectedOrganizationId: widget.preselectedOrganizationId,
-          forceOrganizationEvent: widget.forceOrganizationEvent,
-        );
-      },
+        },
+      );
+    }
+    return EventCreationWizardScreen(
+      selectedDateTime: widget.selectedDateTime,
+      eventDurationHours: widget.eventDurationHours,
+      preselectedOrganizationId: widget.preselectedOrganizationId,
+      forceOrganizationEvent: widget.forceOrganizationEvent,
+      service: _service,
     );
   }
 }

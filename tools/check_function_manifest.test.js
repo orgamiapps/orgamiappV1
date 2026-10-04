@@ -24,3 +24,14 @@ test("manifest verifier reports drift and inactive deployments", () => {
   assert.deepEqual(result.sourceOnly, ["beta"]);
   assert.deepEqual(result.inactive, ["legacy:FAILED"]);
 });
+
+test("source inventory matches every runtime Firebase endpoint", () => {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const entry = path.join(__dirname, "../functions/index.js");
+  const runtime = require(entry);
+  const endpoints = Object.keys(runtime).filter((name) => runtime[name].__endpoint);
+  assert.deepEqual([...expectedFunctions(fs.readFileSync(entry, "utf8"))].sort(), endpoints.sort());
+  assert.ok(endpoints.includes("previewEventChangeV1"));
+  assert.ok(endpoints.includes("listMyAdmissionsV1"));
+});

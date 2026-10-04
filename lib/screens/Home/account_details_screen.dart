@@ -7,6 +7,7 @@ import 'package:attendus/Utils/app_app_bar_view.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
+import 'dart:async';
 import 'dart:convert';
 import 'package:attendus/firebase/firebase_storage_helper.dart';
 import 'package:attendus/screens/Authentication/forgot_password_screen.dart';
@@ -14,7 +15,6 @@ import 'package:attendus/Utils/full_screen_image_viewer.dart';
 import 'package:attendus/Utils/cached_image.dart';
 import 'package:attendus/Services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:attendus/firebase/firebase_google_auth_helper.dart';
 
 class AccountDetailsScreen extends StatefulWidget {
   const AccountDetailsScreen({super.key});
@@ -91,10 +91,25 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
   bool _hasAutoUpdated = false;
 
   late TabController _tabController;
+  String? _ownerUid;
+  StreamSubscription<User?>? _authSubscription;
+  bool _accountChanged = false;
+  bool get _sameAccount =>
+      mounted &&
+      !_accountChanged &&
+      _ownerUid != null &&
+      FirebaseAuth.instance.currentUser?.uid == _ownerUid &&
+      CustomerController.logeInCustomer?.uid == _ownerUid;
 
   @override
   void initState() {
     super.initState();
+    _ownerUid = FirebaseAuth.instance.currentUser?.uid;
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (mounted && user?.uid != _ownerUid) {
+        setState(() => _accountChanged = true);
+      }
+    });
     // Tabs removed; keep controller only if referenced elsewhere
     _tabController = TabController(length: 1, vsync: this);
     _loadUserData();
@@ -106,6 +121,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _tabController.dispose();
     _nameController.dispose();
     _emailController.dispose();
@@ -144,6 +160,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
   }
 
   Future<void> _loadUserData() async {
+    if (!_sameAccount) return;
     if (CustomerController.logeInCustomer != null) {
       final customer = CustomerController.logeInCustomer!;
       _nameController.text = customer.name;
@@ -154,11 +171,13 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
         final firestoreHelper = FirebaseFirestoreHelper();
         final newUsername = await firestoreHelper
             .generateUsernameForExistingUser(customer.name);
+        if (!_sameAccount) return;
         customer.username = newUsername;
         await firestoreHelper.updateUsername(
           userId: customer.uid,
           newUsername: newUsername,
         );
+        if (!_sameAccount) return;
         CustomerController.logeInCustomer = customer;
       }
 
@@ -203,6 +222,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
             .collection('settings')
             .doc('notifications')
             .get();
+        if (!_sameAccount) return;
         if (settingsDoc.exists) {
           final prefs = settingsDoc.data()!;
           _notifyEventReminders = (prefs['eventReminders'] ?? true) == true;
@@ -214,6 +234,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
               .collection(CustomerModel.firebaseKey)
               .doc(customer.uid)
               .get();
+          if (!_sameAccount) return;
           final data = customerDoc.data();
           if (data != null && data['notificationPreferences'] is Map) {
             final prefs = Map<String, dynamic>.from(
@@ -231,6 +252,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
   }
 
   Future<void> _saveAccountDetails() async {
+    if (!_sameAccount) return;
     if (!_formKey.currentState!.validate()) {
       _btnCtlr.reset();
       return;
@@ -285,7 +307,9 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
 
       // Keep profile data and canonical notification settings in one atomic
       // write so the UI cannot report success after only one side is saved.
-      final Map<String, dynamic> updateData = CustomerModel.getMap(customer);
+      final Map<String, dynamic> updateData = CustomerModel.getProfileUpdateMap(
+        customer,
+      );
       final firestore = FirebaseFirestore.instance;
       final batch = firestore.batch();
       batch.update(
@@ -306,6 +330,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
         SetOptions(merge: true),
       );
       await batch.commit();
+      if (!_sameAccount) return;
 
       _btnCtlr.success();
       // Haptic + snackbar style feedback
@@ -343,6 +368,16 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_accountChanged) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Account details')),
+        body: const Center(
+          child: Text(
+            'Your account changed. Reopen account details to continue.',
+          ),
+        ),
+      );
+    }
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
@@ -397,6 +432,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
 
   /// Automatically enhance profile with Google/Apple account data
   Future<void> _autoEnhanceProfile() async {
+    if (!_sameAccount) return;
     if (_hasAutoUpdated) return;
 
     try {
@@ -413,6 +449,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
 
   /// Comprehensive profile update that tries multiple strategies
   Future<void> _performComprehensiveProfileUpdate() async {
+    if (!_sameAccount) return;
     final customer = CustomerController.logeInCustomer;
     if (customer == null) return;
 
@@ -431,12 +468,8 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
     }
 
     // Strategy 1: Try to get fresh data by re-authenticating with the social provider
-    bool success = await _tryFreshSocialAuthentication();
-
-    if (!success) {
-      // Strategy 2: Try to enhance from existing Firebase Auth data
-      success = await _tryUpdateFromFirebaseAuth();
-    }
+    bool success = await _tryUpdateFromFirebaseAuth();
+    if (!_sameAccount) return;
 
     if (!success) {
       // Strategy 3: Try to force refresh Firebase Auth token and retry
@@ -468,60 +501,9 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
     return false;
   }
 
-  /// Strategy 1: Fresh social authentication
-  Future<bool> _tryFreshSocialAuthentication() async {
-    try {
-      debugPrint('🔄 Trying fresh social authentication...');
-
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) return false;
-
-      // Check which social provider they used
-      final hasGoogle = currentUser.providerData.any(
-        (p) => p.providerId == 'google.com',
-      );
-      final hasApple = currentUser.providerData.any(
-        (p) => p.providerId == 'apple.com',
-      );
-
-      debugPrint('Has Google provider: $hasGoogle');
-      debugPrint('Has Apple provider: $hasApple');
-
-      if (hasGoogle) {
-        debugPrint('🔄 Performing fresh Google authentication...');
-        final helper = FirebaseGoogleAuthHelper();
-        final profileData = await helper.loginWithGoogle();
-
-        if (profileData != null) {
-          debugPrint('✅ Got fresh Google data');
-          await AuthService().handleSocialLoginSuccessWithProfileData(
-            profileData,
-          );
-          return true;
-        }
-      } else if (hasApple) {
-        debugPrint('🔄 Performing fresh Apple authentication...');
-        final helper = FirebaseGoogleAuthHelper();
-        final profileData = await helper.loginWithApple();
-
-        if (profileData != null) {
-          debugPrint('✅ Got fresh Apple data');
-          await AuthService().handleSocialLoginSuccessWithProfileData(
-            profileData,
-          );
-          return true;
-        }
-      }
-
-      return false;
-    } catch (e) {
-      debugPrint('❌ Fresh social authentication failed: $e');
-      return false;
-    }
-  }
-
   /// Strategy 2: Update from existing Firebase Auth data
   Future<bool> _tryUpdateFromFirebaseAuth() async {
+    if (!_sameAccount) return false;
     try {
       debugPrint('🔄 Trying update from Firebase Auth...');
       return await AuthService().updateCurrentUserProfileFromAuth();
@@ -533,6 +515,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
 
   /// Strategy 3: Force token refresh and retry
   Future<bool> _tryForceTokenRefreshAndUpdate() async {
+    if (!_sameAccount) return false;
     try {
       debugPrint('🔄 Forcing token refresh...');
 
@@ -541,6 +524,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
 
       // Force refresh the token to get latest user info
       await currentUser.reload();
+      if (!_sameAccount) return false;
       final refreshedUser = FirebaseAuth.instance.currentUser;
 
       if (refreshedUser != null) {
@@ -1332,15 +1316,17 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
 
   // New: photo actions
   Future<void> _changeProfilePhoto() async {
+    if (!_sameAccount) return;
     final user = CustomerController.logeInCustomer;
     if (user == null) return;
     final file = await FirebaseStorageHelper.pickImageFromGallery();
-    if (file == null) return;
+    if (file == null || !_sameAccount) return;
 
     final url = await FirebaseStorageHelper.uploadProfilePicture(
       user.uid,
       file,
     );
+    if (!_sameAccount) return;
     if (url == null) {
       ShowToast().showNormalToast(msg: 'Failed to upload photo');
       return;
@@ -1350,6 +1336,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
         .collection(CustomerModel.firebaseKey)
         .doc(user.uid)
         .update({'profilePictureUrl': url});
+    if (!_sameAccount) return;
 
     setState(() {
       CustomerController.logeInCustomer = CustomerController.logeInCustomer!
@@ -1359,14 +1346,17 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
   }
 
   Future<void> _removeProfilePhoto() async {
+    if (!_sameAccount) return;
     final user = CustomerController.logeInCustomer;
     if (user == null) return;
     await FirebaseStorageHelper.deleteProfilePicture(user.uid);
+    if (!_sameAccount) return;
 
     await FirebaseFirestore.instance
         .collection(CustomerModel.firebaseKey)
         .doc(user.uid)
         .update({'profilePictureUrl': FieldValue.delete()});
+    if (!_sameAccount) return;
 
     setState(() {
       CustomerController.logeInCustomer = CustomerController.logeInCustomer!

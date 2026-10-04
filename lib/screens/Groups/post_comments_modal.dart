@@ -1,8 +1,9 @@
+import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/Services/community_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
-import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 
 /// Generic comments modal for all post types (photos, announcements, polls, events)
@@ -29,8 +30,10 @@ class _PostCommentsModalState extends State<PostCommentsModal> {
   final ScrollController _scrollController = ScrollController();
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseFirestoreHelper _firestoreHelper = FirebaseFirestoreHelper();
-  final User? _currentUser = FirebaseAuth.instance.currentUser;
+  User? get _currentUser => FirebaseAuth.instance.currentUser;
 
+  String? _pendingCommentId;
+  String? _pendingCommentText;
   bool _isSubmitting = false;
   final FocusNode _focusNode = FocusNode();
 
@@ -67,24 +70,22 @@ class _PostCommentsModalState extends State<PostCommentsModal> {
     });
 
     try {
-      final currentUserData = CustomerController.logeInCustomer;
-      final userName =
-          currentUserData?.name ?? currentUserData?.username ?? 'Anonymous';
-      final userPhotoUrl = currentUserData?.profilePictureUrl;
-
-      await _commentsCollection.add({
-        'userId': _currentUser.uid,
-        'userName': userName,
-        'userPhotoUrl': userPhotoUrl,
+      if (_pendingCommentText != text) {
+        _pendingCommentId = CommunityService.newId();
+        _pendingCommentText = text;
+      }
+      await CommunityService().mutate('addComment', {
+        'organizationId': widget.organizationId,
+        if (widget.postType == 'event')
+          'eventId': widget.postId
+        else
+          'postId': widget.postId,
+        'commentId': _pendingCommentId,
         'comment': text,
-        'createdAt': FieldValue.serverTimestamp(),
-        'likes': [],
       });
-
-      // Update comment count on the post
-      await _postCollection.doc(widget.postId).update({
-        'commentCount': FieldValue.increment(1),
-      });
+      if (!mounted) return;
+      _pendingCommentId = null;
+      _pendingCommentText = null;
 
       _commentController.clear();
       _focusNode.unfocus();
@@ -121,11 +122,13 @@ class _PostCommentsModalState extends State<PostCommentsModal> {
 
   Future<void> _deleteComment(String commentId) async {
     try {
-      await _commentsCollection.doc(commentId).delete();
-
-      // Update comment count
-      await _postCollection.doc(widget.postId).update({
-        'commentCount': FieldValue.increment(-1),
+      await CommunityService().mutate('deleteComment', {
+        'organizationId': widget.organizationId,
+        if (widget.postType == 'event')
+          'eventId': widget.postId
+        else
+          'postId': widget.postId,
+        'commentId': commentId,
       });
 
       if (mounted) {
@@ -151,17 +154,17 @@ class _PostCommentsModalState extends State<PostCommentsModal> {
   Future<void> _toggleLike(String commentId, List<String> currentLikes) async {
     if (_currentUser == null) return;
 
-    final isLiked = currentLikes.contains(_currentUser.uid);
-    final updatedLikes = List<String>.from(currentLikes);
-
-    if (isLiked) {
-      updatedLikes.remove(_currentUser.uid);
-    } else {
-      updatedLikes.add(_currentUser.uid);
-    }
-
+    final isLiked = currentLikes.contains(_currentUser!.uid);
     try {
-      await _commentsCollection.doc(commentId).update({'likes': updatedLikes});
+      await CommunityService().mutate('setLike', {
+        'organizationId': widget.organizationId,
+        if (widget.postType == 'event')
+          'eventId': widget.postId
+        else
+          'postId': widget.postId,
+        'commentId': commentId,
+        'liked': !isLiked,
+      });
     } catch (e) {
       debugPrint('Error toggling like: $e');
     }
@@ -313,7 +316,7 @@ class _PostCommentsModalState extends State<PostCommentsModal> {
                     final likes = List<String>.from(data['likes'] ?? []);
                     final isLiked =
                         _currentUser != null &&
-                        likes.contains(_currentUser.uid);
+                        likes.contains(_currentUser!.uid);
                     final isOwn = userId == _currentUser?.uid;
 
                     return _CommentItem(

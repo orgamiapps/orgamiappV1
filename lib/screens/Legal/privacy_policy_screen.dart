@@ -91,6 +91,14 @@ class PrivacyPolicyScreen extends StatelessWidget {
               'policy does not promise unsupported fixed periods. Account '
               'deletion is processed by an auditable server job covering the '
               'account and associated application records. Some transaction '
+              'and non-identifying attendance evidence may remain. Attendance '
+              'stamps preserve the event, recorded check-in and check-out, '
+              'verification method and correction history. Recorded names and '
+              'registration contact details are held separately with restricted, '
+              'audited access and are removed on actual account deletion. Any '
+              'exception requires a documented legal basis, purpose and reviewed '
+              'retention period. Closing an account is distinct from deleting '
+              'personal data and does not replace the deletion option. Transaction '
               'references may be anonymized or retained where legally '
               'required.',
         ),

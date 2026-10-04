@@ -35,7 +35,11 @@ class NotificationModel {
       eventTitle: data['eventTitle'],
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       isRead: data['isRead'] ?? false,
-      data: data['data'],
+      data:
+          data['data'] ??
+          (data['conversationId'] is String
+              ? {'conversationId': data['conversationId']}
+              : null),
     );
   }
 

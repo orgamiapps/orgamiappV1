@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:attendus/Services/calendar_events_repository.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
@@ -30,6 +30,10 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   // Data
   List<EventModel> _allEvents = [];
+  final _eventsRepository = CalendarEventsRepository();
+  StreamSubscription<User?>? _authSubscription;
+  String? _loadedUid;
+  int _loadRevision = 0;
   List<EventModel> _filteredEvents = [];
 
   // Search removed per request
@@ -55,6 +59,17 @@ class _CalendarScreenState extends State<CalendarScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initializeAnimations();
+    _loadedUid = FirebaseAuth.instance.currentUser?.uid;
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (!mounted || user?.uid == _loadedUid) return;
+      _loadedUid = user?.uid;
+      _loadRevision++;
+      setState(() {
+        _allEvents = [];
+        _filteredEvents = [];
+      });
+      _loadData();
+    });
     _loadData();
     _startTimeUpdates();
     _startDataRefresh();
@@ -120,75 +135,26 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   Future<void> _loadData() async {
     if (!mounted) return;
+    final revision = ++_loadRevision;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
     setState(() => _isLoading = true);
-
+    bool current() =>
+        mounted &&
+        revision == _loadRevision &&
+        FirebaseAuth.instance.currentUser?.uid == uid;
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        return;
-      }
-
-      // Load ALL events without filters to avoid permission issues
-      try {
-        // Try simplest query first - no ordering, no filters
-        final eventsSnapshot = await FirebaseFirestore.instance
-            .collection('Events')
-            .get();
-
-        _allEvents = [];
-        for (var doc in eventsSnapshot.docs) {
-          try {
-            final event = EventModel.fromJson(doc);
-            // Add all events regardless of status to show past events too
-            _allEvents.add(event);
-          } catch (e) {
-            // Skip malformed events and continue loading others
-          }
-        }
-
-        // Sort events by date
-        _allEvents.sort(
-          (a, b) => a.selectedDateTime.compareTo(b.selectedDateTime),
-        );
-      } catch (e) {
-        // Try to load user's own events at least
-        try {
-          final userEventsSnapshot = await FirebaseFirestore.instance
-              .collection('Events')
-              .where('customerUid', isEqualTo: user.uid)
-              .get();
-
-          _allEvents = userEventsSnapshot.docs
-              .map((doc) {
-                try {
-                  return EventModel.fromJson(doc);
-                } catch (e) {
-                  return null;
-                }
-              })
-              .where((event) => event != null)
-              .cast<EventModel>()
-              .toList();
-
-          _allEvents.sort(
-            (a, b) => a.selectedDateTime.compareTo(b.selectedDateTime),
-          );
-        } catch (userEventsError) {
-          _allEvents = [];
-        }
-      }
-
-      // No additional per-user filters required; calendar always shows all events
-
+      final events = await _eventsRepository.load();
+      if (!current()) return;
+      _allEvents = events;
       _applyFilter();
-    } catch (e) {
-      if (mounted) {
-        ShowToast().showNormalToast(msg: 'Error loading data: $e');
+    } catch (error) {
+      if (current()) {
+        ShowToast().showNormalToast(
+          msg: 'Could not load calendar events. Reconnect and retry.',
+        );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (current()) setState(() => _isLoading = false);
     }
   }
 
@@ -316,6 +282,8 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
+    _loadRevision++;
     WidgetsBinding.instance.removeObserver(this);
     _monthAnimationController.dispose();
     _dayViewAnimationController.dispose();

@@ -121,7 +121,9 @@ function normalizeCheckInPolicy(raw, registrationMode) {
   const defaultEligibility = registrationMode === "paid_ticket" ? "ticket_required" :
     registrationMode === "free_ticket" ? "registered_only" : "open";
   return {
-    version: 2,
+    version: data.version >= 3 ? 3 : 2,
+    smartArrival: require("../attendance/arrival-core").arrivalPolicy(data),
+    openingMode: require("../attendance/arrival-core").arrivalPolicy(data).openingMode,
     profile: enumValue(data.profile, CHECK_IN_PROFILES, "hybrid"),
     eligibility: enumValue(data.eligibility, CHECK_IN_ELIGIBILITY, defaultEligibility),
     opensBeforeMinutes: boundedInteger(data.opensBeforeMinutes, 0, 1440, 60),
@@ -251,6 +253,13 @@ function validatePublishable(form, {paidEnabled = false} = {}) {
   }
   if (form.registration.mode === "paid_ticket" && form.registration.priceUsd < 0.5) {
     errors.push({stage: "registration", field: "priceUsd", message: "Paid tickets must cost at least $0.50."});
+  }
+  if (form.experience.checkInPolicy.smartArrival?.enabled) {
+    try {
+      require("../attendance/arrival-core").validateBoundary({locationType: form.locationType, location: form.location, checkInPolicy: form.experience.checkInPolicy});
+    } catch (_) {
+      errors.push({stage: "experience", field: "smartArrival", message: "Confirm a 50–500 meter Smart Arrival boundary for an in-person event with self check-in."});
+    }
   }
   return errors;
 }

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:attendus/Utils/event_discovery_visibility.dart';
 
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/models/event_model.dart';
@@ -116,6 +117,7 @@ class PublicEventsRepository implements PublicEventsDataSource {
     for (final document in snapshot.docs.take(maximumDocuments)) {
       try {
         final data = Map<String, dynamic>.from(document.data());
+        if (!isDiscoverableEventData(data)) continue;
         data['id'] = document.id;
         events.add(EventModel.fromJson(data));
       } catch (error, stackTrace) {

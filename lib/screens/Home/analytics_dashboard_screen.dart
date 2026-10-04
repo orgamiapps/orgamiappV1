@@ -1,4 +1,6 @@
-import 'dart:io';
+import 'dart:async';
+import 'dart:typed_data';
+import 'package:attendus/Services/artifact_download_service.dart';
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -10,8 +12,6 @@ import 'package:attendus/screens/Events/event_analytics_screen.dart';
 import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/dimensions.dart';
 import 'package:attendus/Utils/toast.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 import 'package:attendus/Utils/app_app_bar_view.dart';
@@ -29,6 +29,13 @@ class AnalyticsDashboardScreen extends StatefulWidget {
 class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  String? _ownerUid;
+  StreamSubscription<User?>? _authSubscription;
+  bool _accountChanged = false;
+  bool get _accountCurrent =>
+      mounted &&
+      !_accountChanged &&
+      FirebaseAuth.instance.currentUser?.uid == _ownerUid;
   String _selectedDateFilter = 'all'; // 'all', 'week', 'month', 'year'
   List<EventModel> _userEvents = [];
   AIInsights? _globalAIInsights;
@@ -41,6 +48,12 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
   @override
   void initState() {
     super.initState();
+    _ownerUid = FirebaseAuth.instance.currentUser?.uid;
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (mounted && user?.uid != _ownerUid) {
+        setState(() => _accountChanged = true);
+      }
+    });
     _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(() {
       if (_tabController.index == 1 &&
@@ -60,7 +73,9 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
   // Load cached analytics for instant display
   Future<void> _loadCachedAnalytics() async {
     try {
+      if (!mounted || !_accountCurrent) return;
       final prefs = await SharedPreferences.getInstance();
+      if (!mounted || !_accountCurrent) return;
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null) {
         final cacheKey = 'user_analytics_${currentUser.uid}';
@@ -73,6 +88,8 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
           );
           final now = DateTime.now();
           if (now.difference(cacheTime).inMinutes < 5) {
+            if (!mounted || !_accountCurrent) return;
+            if (!mounted || !_accountCurrent) return;
             setState(() {
               _cachedAnalytics = Map<String, dynamic>.from(cached['data']);
               _hasCachedData = true;
@@ -88,7 +105,9 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
   // Cache analytics data for instant display on next load
   Future<void> _cacheAnalytics(Map<String, dynamic> analytics) async {
     try {
+      if (!mounted || !_accountCurrent) return;
       final prefs = await SharedPreferences.getInstance();
+      if (!mounted || !_accountCurrent) return;
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null) {
         final cacheKey = 'user_analytics_${currentUser.uid}';
@@ -120,6 +139,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
         return EventModel.fromJson(doc);
       }).toList();
 
+      if (!mounted || !_accountCurrent) return;
       setState(() {
         _userEvents = events;
       });
@@ -130,6 +150,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _tabController.dispose();
     super.dispose();
   }
@@ -139,6 +160,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
       await _loadUserEventsIfNeeded();
     }
 
+    if (!mounted || !_accountCurrent) return;
     setState(() {
       _isLoadingAI = true;
     });
@@ -147,11 +169,13 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
       final aiHelper = AIAnalyticsHelper();
       final insights = await aiHelper.generateGlobalAIInsights(_userEvents);
 
+      if (!mounted || !_accountCurrent) return;
       setState(() {
         _globalAIInsights = insights;
         _isLoadingAI = false;
       });
     } catch (e) {
+      if (!mounted || !_accountCurrent) return;
       setState(() {
         _isLoadingAI = false;
       });
@@ -161,6 +185,14 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_accountChanged) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Analytics')),
+        body: const Center(
+          child: Text('Your account changed. Reopen analytics to continue.'),
+        ),
+      );
+    }
     final currentUser = FirebaseAuth.instance.currentUser;
 
     if (currentUser == null) {
@@ -183,6 +215,9 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
           .doc(currentUser.uid)
           .snapshots(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _buildErrorView(snapshot.error.toString());
+        }
         // Show cached data immediately if available
         if (!snapshot.hasData && _hasCachedData && _cachedAnalytics != null) {
           return _buildDashboard(_cachedAnalytics!, isFromCache: true);
@@ -709,6 +744,8 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
       ),
       selected: isSelected,
       onSelected: (selected) {
+        if (!mounted || !_accountCurrent) return;
+        if (!mounted || !_accountCurrent) return;
         setState(() {
           _selectedDateFilter = value;
         });
@@ -1055,7 +1092,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
             ),
             const SizedBox(height: Dimensions.spaceSizedDefault),
             Text(
-              'Generating AI insights...',
+              'Summarizing recorded activity...',
               style: TextStyle(
                 fontSize: Dimensions.fontSizeLarge,
                 color: AppThemeColor.dullFontColor,
@@ -1087,7 +1124,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
             ),
             const SizedBox(height: Dimensions.spaceSizeSmall),
             Text(
-              'Get AI-powered recommendations\nto improve your events',
+              'Review recorded activity and ideas\nfor future event experiments',
               style: TextStyle(
                 fontSize: Dimensions.fontSizeLarge,
                 color: AppThemeColor.dullFontColor,
@@ -1119,7 +1156,10 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
               icon: Icons.tips_and_updates,
               title: 'Recommendations',
               content: _globalAIInsights!.strategyRecommendations!
-                  .map((rec) => '• ${rec['recommendation'] ?? ''}')
+                  .map(
+                    (rec) =>
+                        '• ${rec['description'] ?? rec['recommendation'] ?? ''}',
+                  )
                   .join('\n'),
               color: const Color(0xFF4FC3F7),
             ),
@@ -1130,7 +1170,10 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
               icon: Icons.warning_amber_rounded,
               title: 'Unusual Patterns',
               content: _globalAIInsights!.anomalies!
-                  .map((anomaly) => '• ${anomaly['description'] ?? ''}')
+                  .map(
+                    (anomaly) =>
+                        '• ${anomaly['description'] ?? '${anomaly['title']}: ${anomaly['attendees']} recorded attendees (${anomaly['type']} outlier)'}',
+                  )
                   .join('\n'),
               color: const Color(0xFFF5576C),
             ),
@@ -1517,6 +1560,7 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
   }
 
   Future<void> _exportAnalytics(Map<String, dynamic> analytics) async {
+    final origin = artifactShareOrigin(context);
     try {
       // Create a formatted text version of analytics
       final buffer = StringBuffer();
@@ -1544,21 +1588,13 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen>
         buffer.writeln('');
       }
 
-      // Save to temp file and share
-      final directory = await getTemporaryDirectory();
-      final file = File('${directory.path}/analytics_export.txt');
-      await file.writeAsString(buffer.toString());
-
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(file.path)],
-          subject: 'Analytics Dashboard Export',
-        ),
+      final outcome = await downloadArtifact(
+        Uint8List.fromList(utf8.encode(buffer.toString())),
+        'analytics_export.txt',
+        'text/plain',
+        sharePositionOrigin: origin,
       );
-
-      if (mounted) {
-        ShowToast().showNormalToast(msg: 'Analytics exported successfully');
-      }
+      if (mounted) ShowToast().showNormalToast(msg: outcome.message);
     } catch (e) {
       debugPrint('Error exporting analytics: $e');
       if (mounted) {

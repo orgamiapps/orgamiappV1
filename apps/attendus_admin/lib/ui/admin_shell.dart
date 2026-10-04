@@ -319,8 +319,8 @@ class _AdminShellState extends State<AdminShell> {
         confirmed: true,
       );
       if (context.mounted) {
-        final data = result['data'] as Map?;
-        final reset = data?['resetLink'];
+        final data = requireApiObject(result['data']);
+        final reset = data['resetLink'];
         await showDialog<void>(
           context: context,
           builder: (_) => AlertDialog(

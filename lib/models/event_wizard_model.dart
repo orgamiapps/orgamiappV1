@@ -344,7 +344,8 @@ class EventWizardDraft {
     bool forcePrivate = false,
   }) {
     final now = DateTime.now();
-    final rawStart = selectedDateTime ?? now.add(const Duration(hours: 1));
+    final rawStart = (selectedDateTime ?? now.add(const Duration(hours: 1)))
+        .toLocal();
     final start = DateTime(
       rawStart.year,
       rawStart.month,
@@ -414,9 +415,10 @@ class EventWizardDraft {
       form['recurrence'] as Map? ?? {},
     );
     final start =
-        DateTime.tryParse(form['startAt']?.toString() ?? '') ?? DateTime.now();
+        DateTime.tryParse(form['startAt']?.toString() ?? '')?.toLocal() ??
+        DateTime.now();
     final end =
-        DateTime.tryParse(form['endAt']?.toString() ?? '') ??
+        DateTime.tryParse(form['endAt']?.toString() ?? '')?.toLocal() ??
         start.add(const Duration(hours: 1));
     return EventWizardDraft(
       draftId: json['id']?.toString() ?? json['draftId']?.toString(),
@@ -466,10 +468,10 @@ class EventWizardDraft {
       waitlistEnabled: registration['waitlistEnabled'] != false,
       registrationOpensAt: DateTime.tryParse(
         registration['opensAt']?.toString() ?? '',
-      ),
+      )?.toLocal(),
       registrationClosesAt: DateTime.tryParse(
         registration['closesAt']?.toString() ?? '',
-      ),
+      )?.toLocal(),
       priceUsd: (registration['priceUsd'] as num?)?.toDouble() ?? 0,
       refundTerms: registration['refundTerms']?.toString() ?? '',
       questions: (form['questions'] as List? ?? [])
@@ -535,8 +537,10 @@ class EventWizardDraft {
     'title': title.trim(),
     'description': description.trim(),
     'imageUrl': imageUrl.trim(),
-    'startAt': startAt.toIso8601String(),
-    'endAt': endAt.toIso8601String(),
+    // Pickers use device-local instants. An offset-free local ISO string is
+    // reinterpreted in the server's timezone; transport an explicit UTC instant.
+    'startAt': startAt.toUtc().toIso8601String(),
+    'endAt': endAt.toUtc().toIso8601String(),
     'eventTimeZone': eventTimeZone,
     'locationType': locationType,
     'location': location.trim(),
@@ -559,8 +563,8 @@ class EventWizardDraft {
       'capacity': capacity,
       'approvalMode': _enumName(approvalMode),
       'waitlistEnabled': waitlistEnabled,
-      'opensAt': registrationOpensAt?.toIso8601String(),
-      'closesAt': registrationClosesAt?.toIso8601String(),
+      'opensAt': registrationOpensAt?.toUtc().toIso8601String(),
+      'closesAt': registrationClosesAt?.toUtc().toIso8601String(),
       'priceUsd': priceUsd,
       'refundTerms': refundTerms.trim(),
     },

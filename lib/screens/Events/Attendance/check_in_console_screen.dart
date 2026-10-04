@@ -1,6 +1,6 @@
+import 'package:attendus/Services/public_profile_service.dart';
+import 'package:attendus/widgets/event_roster.dart';
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -9,8 +9,6 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:attendus/Services/attendance_check_in_service.dart';
 import 'package:attendus/models/check_in_session.dart';
 import 'package:attendus/models/event_model.dart';
@@ -33,20 +31,24 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
   VenueCredential? _venueCredential;
   bool _busy = false;
   bool _online = true;
+  String _controlStatus = 'scheduled';
   int _pendingScans = 0;
+  int _rejectedScans = 0;
   bool _offlineReady = false;
+  Map<String, dynamic> _kitStatus = {};
   late List<String> _staffIds;
-  Map<String, Map<String, dynamic>> _registrationDetails = const {};
 
+  bool _serverManager = false;
+  String? _capabilityUid;
   bool get _isOwner =>
-      FirebaseAuth.instance.currentUser?.uid == widget.event.customerUid;
+      _serverManager &&
+      _capabilityUid == FirebaseAuth.instance.currentUser?.uid;
 
   @override
   void initState() {
     super.initState();
     _staffIds = List<String>.from(widget.event.checkInStaff);
     _loadSession();
-    _loadRegistrationDetails();
     _refreshTimer = Timer.periodic(const Duration(seconds: 25), (_) {
       _refreshOperationalState();
     });
@@ -59,7 +61,9 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
   }
 
   Future<void> _loadSession() async {
+    unawaited(_refreshStaffNames().catchError((Object _) {}));
     try {
+      await _refreshControl();
       final session = await _service.findActiveSession(widget.event.id);
       if (!mounted) return;
       setState(() => _session = session);
@@ -71,48 +75,6 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
       _showError(error);
     }
     await _refreshConnectivity();
-  }
-
-  Future<void> _loadRegistrationDetails() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || user.isAnonymous) return;
-    try {
-      final response =
-          await FirebaseFunctions.instanceFor(region: 'us-central1')
-              .httpsCallable('getOrganizerEventRegistrationsV1')
-              .call<Map<String, dynamic>>({'eventId': widget.event.id});
-      final rows = (response.data['registrations'] as List? ?? const [])
-          .whereType<Map>()
-          .map((row) => row.cast<String, dynamic>());
-      if (mounted) {
-        setState(
-          () => _registrationDetails = {
-            for (final row in rows) row['id'].toString(): row,
-          },
-        );
-      }
-    } on FirebaseFunctionsException catch (error) {
-      if (error.code != 'permission-denied') _showError(error);
-    }
-  }
-
-  Future<void> _exportRegistrationContacts() async {
-    await _run(() async {
-      final response =
-          await FirebaseFunctions.instanceFor(region: 'us-central1')
-              .httpsCallable('exportOrganizerEventRegistrationsV1')
-              .call<Map<String, dynamic>>({'eventId': widget.event.id});
-      final bytes = base64Decode(response.data['base64'].toString());
-      final directory = await getTemporaryDirectory();
-      final file = File('${directory.path}/${response.data['filename']}');
-      await file.writeAsBytes(bytes, flush: true);
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(file.path, mimeType: 'text/csv')],
-          subject: '${widget.event.title} registrations',
-        ),
-      );
-    });
   }
 
   Future<void> _decideRegistration(
@@ -127,7 +89,6 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
         'registrationId': registrationId,
         'decision': decision,
       });
-      await _loadRegistrationDetails();
       if (!mounted) return;
       final resultLabel = switch (decision) {
         'approve' => 'approved',
@@ -141,20 +102,25 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
   }
 
   Future<void> _refreshOperationalState() async {
+    await _refreshControl();
     await _refreshConnectivity();
     if (_session != null) await _refreshCredential(silent: true);
   }
 
   Future<void> _refreshConnectivity() async {
+    final kitStatus = await _service.offlineKitStatus(widget.event.id);
+    if (mounted) setState(() => _kitStatus = kitStatus);
     final dynamic result = await Connectivity().checkConnectivity();
     final isOffline = result is List
         ? result.every((item) => item == ConnectivityResult.none)
         : result == ConnectivityResult.none;
     final pending = await _service.pendingCount();
+    final rejected = await _service.rejectedScans();
     if (!mounted) return;
     setState(() {
       _online = !isOffline;
       _pendingScans = pending;
+      _rejectedScans = rejected.length;
     });
   }
 
@@ -226,16 +192,99 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
     await _run(() async {
       final result = await _service.syncPending();
       if (!mounted) return;
-      setState(() => _pendingScans = result.remaining);
+      setState(() {
+        _pendingScans = result.remaining;
+        _rejectedScans = result.rejected;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             'Synced ${result.synced} scan${result.synced == 1 ? '' : 's'}; '
-            '${result.remaining} remaining.',
+            '${result.remaining} pending; ${result.rejected} need review.',
           ),
         ),
       );
     });
+  }
+
+  Future<void> _refreshControl() async {
+    try {
+      final response =
+          await FirebaseFunctions.instanceFor(region: 'us-central1')
+              .httpsCallable('getAttendanceControl')
+              .call({'eventId': widget.event.id});
+      if (mounted) {
+        setState(() => _controlStatus = response.data['status'].toString());
+      }
+    } catch (_) {
+      /* Keep the last known control state while disconnected. */
+    }
+  }
+
+  Future<void> _setControl(String status) => _run(() async {
+    await FirebaseFunctions.instanceFor(region: 'us-central1')
+        .httpsCallable('setAttendanceControl')
+        .call({'eventId': widget.event.id, 'status': status});
+    if (mounted) setState(() => _controlStatus = status);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            status == 'paused'
+                ? 'Check-in paused. New arrivals will be rejected until resumed.'
+                : 'Check-in resumed for its scheduled window.',
+          ),
+        ),
+      );
+    }
+  });
+
+  Future<void> _reviewRejected() async {
+    final rejected = await _service.rejectedScans();
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Offline scans requiring review'),
+        content: SizedBox(
+          width: 480,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              for (final scan in rejected.where(
+                (scan) => scan['eventId'] == widget.event.id,
+              ))
+                ListTile(
+                  trailing: TextButton(
+                    onPressed: () async {
+                      final key = scan['idempotencyKey']?.toString();
+                      if (key == null) return;
+                      await _service.acknowledgeRejectedScans(
+                        idempotencyKey: key,
+                      );
+                      if (context.mounted) Navigator.pop(context);
+                      await _refreshConnectivity();
+                    },
+                    child: const Text('Acknowledge'),
+                  ),
+                  title: Text(
+                    scan['rejectionMessage']?.toString() ?? 'Rejected scan',
+                  ),
+                  subtitle: Text(
+                    'Event: ${scan['eventId']} • Observed: ${scan['observedAt']}',
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Keep for review'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _prepareOfflineKit(
@@ -342,6 +391,26 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
                   padding: const EdgeInsets.all(16),
                   children: [
                     _buildStatusCard(attendance, registrations),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        TextButton(
+                          onPressed: _busy ? null : () => _setControl('paused'),
+                          child: const Text('Pause check-in'),
+                        ),
+                        TextButton(
+                          onPressed: _busy ? null : () => _setControl('open'),
+                          child: const Text('Resume check-in'),
+                        ),
+                        if (_rejectedScans > 0)
+                          TextButton(
+                            onPressed: _reviewRejected,
+                            child: Text(
+                              'Review $_rejectedScans rejected scans',
+                            ),
+                          ),
+                      ],
+                    ),
                     const SizedBox(height: 16),
                     if (_session == null)
                       _buildClosedCard()
@@ -375,13 +444,6 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
           doc.data()['checkedInAt'] ?? doc.data()['attendanceDateTime'];
       return now.difference(_date(value)).inSeconds <= 60;
     }).length;
-    final attendedIds = attendance
-        .map((doc) => doc.data()['customerUid']?.toString())
-        .whereType<String>()
-        .toSet();
-    final noShows = registrations.where((doc) {
-      return !attendedIds.contains(doc.data()['customerUid']?.toString());
-    }).length;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -401,7 +463,13 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
                         ),
                       ),
                       Text(
-                        _session == null ? 'Check-in closed' : 'Check-in live',
+                        _controlStatus == 'paused'
+                            ? 'Check-in paused'
+                            : _controlStatus == 'closed'
+                            ? 'Check-in closed'
+                            : _session == null
+                            ? 'Check-in awaiting opening'
+                            : 'Check-in live',
                         style: TextStyle(
                           color: _session == null
                               ? Colors.grey
@@ -432,28 +500,21 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
               ],
             ),
             const SizedBox(height: 18),
+            Text(
+              'Offline kit: ${_kitStatus['preparedAt'] ?? 'Not downloaded'}\nLast successful reconciliation: ${_kitStatus['lastSync'] ?? 'Not recorded'}',
+            ),
             Row(
               children: [
-                Expanded(
-                  child: _Metric(
-                    label: 'Checked in',
-                    value: '${attendance.length}',
-                  ),
-                ),
                 Expanded(
                   child: _Metric(
                     label: 'Arrivals/min',
                     value: '$arrivalsLastMinute',
                   ),
                 ),
-                Expanded(
-                  child: _Metric(
-                    label: 'RSVP',
-                    value: '${registrations.length}',
+                const Expanded(
+                  child: Text(
+                    'Confirmed, pending, waitlisted and attendance totals appear in the complete roster below.',
                   ),
-                ),
-                Expanded(
-                  child: _Metric(label: 'No-show', value: '$noShows'),
                 ),
               ],
             ),
@@ -493,8 +554,8 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
           ),
           const SizedBox(height: 6),
           const Text(
-            'Starting a session activates venue credentials, personal passes, '
-            'the roster, and the live activity feed.',
+            'Start venue credentials, staff scanning, and the live activity feed. '
+            'Event passes are available before check-in opens.',
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
@@ -622,96 +683,15 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
     List<QueryDocumentSnapshot<Map<String, dynamic>>> registrations,
     List<QueryDocumentSnapshot<Map<String, dynamic>>> attendance,
   ) {
-    final attended = attendance
-        .map((entry) => entry.data()['customerUid']?.toString())
-        .whereType<String>()
-        .toSet();
-    return Card(
-      child: ExpansionTile(
-        initiallyExpanded: true,
-        title: const Text(
-          'Roster',
-          style: TextStyle(fontWeight: FontWeight.w800),
-        ),
-        subtitle: const Text(
-          'Search and check in anyone who needs assistance.',
-        ),
-        trailing: IconButton(
-          tooltip: 'Export registration contacts (audited)',
-          onPressed: _busy ? null : _exportRegistrationContacts,
-          icon: const Icon(Icons.download_outlined),
-        ),
-        children: [
-          if (registrations.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(20),
-              child: Text(
-                'No registrations yet. Staff guest check-in remains available.',
-              ),
-            )
-          else
-            ...registrations.take(200).map((doc) {
-              final data = doc.data();
-              final uid = data['customerUid']?.toString() ?? '';
-              final name =
-                  data['realName']?.toString() ??
-                  data['userName']?.toString() ??
-                  'Attendee';
-              final checkedIn = attended.contains(uid);
-              final detail = _registrationDetails[doc.id];
-              final contact = detail?['email']?.toString();
-              final delivery = detail?['deliveryStatus']?.toString();
-              final status = detail?['status']?.toString() ?? 'confirmed';
-              return ListTile(
-                leading: CircleAvatar(
-                  child: Text(name.isEmpty ? '?' : name[0].toUpperCase()),
-                ),
-                title: Text(name),
-                subtitle: Text(
-                  [
-                    checkedIn
-                        ? 'Already checked in'
-                        : status.replaceAll('_', ' '),
-                    if (contact?.isNotEmpty == true) contact!,
-                    if (delivery != null && delivery != 'not_applicable')
-                      'Confirmation: ${delivery.replaceAll('_', ' ')}',
-                  ].join(' · '),
-                ),
-                trailing: status == 'pending'
-                    ? PopupMenuButton<String>(
-                        tooltip: 'Decide registration',
-                        enabled: !_busy,
-                        onSelected: (decision) =>
-                            _decideRegistration(doc.id, decision),
-                        itemBuilder: (_) => const [
-                          PopupMenuItem(
-                            value: 'approve',
-                            child: Text('Approve'),
-                          ),
-                          PopupMenuItem(
-                            value: 'decline',
-                            child: Text('Decline'),
-                          ),
-                        ],
-                      )
-                    : status == 'waitlisted'
-                    ? FilledButton.tonal(
-                        onPressed: _busy
-                            ? null
-                            : () => _decideRegistration(doc.id, 'promote'),
-                        child: const Text('Offer place'),
-                      )
-                    : checkedIn
-                    ? const Icon(Icons.check_circle, color: Colors.green)
-                    : FilledButton.tonal(
-                        onPressed: _session == null || status != 'confirmed'
-                            ? null
-                            : () => _checkInRoster(uid: uid, name: name),
-                        child: const Text('Check in'),
-                      ),
-              );
-            }),
-        ],
+    return EventRoster(
+      eventId: widget.event.id,
+      canCheckIn: _session != null && !_busy,
+      onDecision: _decideRegistration,
+      onCheckIn: (row) => _checkInRoster(
+        uid: row['uid']?.toString() ?? '',
+        name: row['name']?.toString() ?? 'Attendee',
+        registrationId: row['registrationId']?.toString(),
+        ticketId: row['ticketId']?.toString(),
       ),
     );
   }
@@ -775,19 +755,42 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
     ),
   );
 
+  Future<T?> _showDialogWithCleanup<T>({
+    required WidgetBuilder builder,
+    required VoidCallback cleanup,
+  }) async {
+    final route = DialogRoute<T>(context: context, builder: builder);
+    try {
+      return await Navigator.of(context, rootNavigator: true).push(route);
+    } finally {
+      // push() resolves at pop; fields still exist during the reverse transition.
+      unawaited(route.completed.then((_) => cleanup()));
+    }
+  }
+
   Future<List<String>?> _collectAnswers(String title) async {
     final snapshot = await FirebaseFirestore.instance
         .collection('Events')
         .doc(widget.event.id)
         .collection('EventQuestions')
         .get();
-    final questions = snapshot.docs;
+    // Legacy questions omitted timing and were collected at the door.
+    final questions = snapshot.docs
+        .where((doc) => (doc.data()['timing'] ?? 'check_in') == 'check_in')
+        .toList();
+    String prompt(Map<String, dynamic> data) {
+      final current = data['prompt']?.toString().trim();
+      return current?.isNotEmpty == true
+          ? current!
+          : (data['questionTitle'] ?? 'Event question').toString();
+    }
+
     if (questions.isEmpty) return const [];
     if (!mounted) return null;
     final controllers = {
       for (final doc in questions) doc.id: TextEditingController(),
     };
-    final answers = await showDialog<List<String>>(
+    final route = DialogRoute<List<String>>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(title),
@@ -803,7 +806,7 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
                   controller: controllers[doc.id],
                   decoration: InputDecoration(
                     labelText:
-                        '${data['questionTitle']}${data['required'] == true ? ' *' : ''}',
+                        '${prompt(data)}${data['required'] == true ? ' *' : ''}',
                     border: const OutlineInputBorder(),
                   ),
                 ),
@@ -829,7 +832,7 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
                 questions
                     .map(
                       (doc) =>
-                          '${doc.data()['questionTitle']}--ans--${controllers[doc.id]!.text.trim()}',
+                          '${prompt(doc.data())}--ans--${controllers[doc.id]!.text.trim()}',
                     )
                     .toList(),
               );
@@ -839,15 +842,26 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
         ],
       ),
     );
-    for (final controller in controllers.values) {
-      controller.dispose();
+    try {
+      return await Navigator.of(context, rootNavigator: true).push(route);
+    } finally {
+      // Popping resolves push() before the reverse transition removes the
+      // TextFields. Keep their controllers alive until the route is removed.
+      unawaited(
+        route.completed.then((_) {
+          for (final controller in controllers.values) {
+            controller.dispose();
+          }
+        }),
+      );
     }
-    return answers;
   }
 
   Future<void> _checkInRoster({
     required String uid,
     required String name,
+    String? registrationId,
+    String? ticketId,
   }) async {
     final session = _session;
     if (session == null) return;
@@ -861,6 +875,8 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
           'type': 'staff_roster',
           'attendeeId': uid,
           'displayName': name,
+          'registrationId': ?registrationId,
+          'ticketId': ?ticketId,
         },
         answers: answers,
         allowOfflineQueue: true,
@@ -875,8 +891,11 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
     if (session == null) return;
     final name = TextEditingController();
     final reason = TextEditingController();
-    final values = await showDialog<List<String>>(
-      context: context,
+    final values = await _showDialogWithCleanup<List<String>>(
+      cleanup: () {
+        name.dispose();
+        reason.dispose();
+      },
       builder: (context) => AlertDialog(
         title: const Text('Staff-assisted guest'),
         content: Column(
@@ -922,8 +941,6 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
         ],
       ),
     );
-    name.dispose();
-    reason.dispose();
     if (values == null) return;
     final answers = await _collectAnswers('Guest questions');
     if (answers == null) return;
@@ -974,8 +991,8 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
 
   Future<void> _void(String attendanceId) async {
     final controller = TextEditingController();
-    final reason = await showDialog<String>(
-      context: context,
+    final reason = await _showDialogWithCleanup<String>(
+      cleanup: controller.dispose,
       builder: (context) => AlertDialog(
         title: const Text('Void attendance entry'),
         content: TextField(
@@ -1001,17 +1018,39 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
         ],
       ),
     );
-    controller.dispose();
     if (reason == null) return;
     await _run(
       () => _service.voidAttendance(attendanceId: attendanceId, reason: reason),
     );
   }
 
+  final Map<String, String> _staffNames = {};
+  Future<void> _refreshStaffNames() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final result = await FirebaseFunctions.instance
+        .httpsCallable('getEventCapabilitiesV1')
+        .call({'eventId': widget.event.id})
+        .timeout(const Duration(seconds: 15));
+    if (!mounted || FirebaseAuth.instance.currentUser?.uid != uid) return;
+    setState(() {
+      _capabilityUid = uid;
+      _serverManager = result.data['permissions']['manageEvent'] == true;
+    });
+    for (final person in result.data['staff'] as List) {
+      _staffNames[person['uid']] = person['name'];
+    }
+  }
+
   Future<void> _manageStaff() async {
+    try {
+      await _refreshStaffNames();
+    } catch (_) {
+      _showError('Staff names are unavailable. Retry to refresh them.');
+    }
+    if (!mounted) return;
     final controller = TextEditingController();
-    await showDialog<void>(
-      context: context,
+    await _showDialogWithCleanup<void>(
+      cleanup: controller.dispose,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Event-day staff access'),
@@ -1036,7 +1075,8 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
                 ..._staffIds.map(
                   (uid) => ListTile(
                     dense: true,
-                    title: Text(uid),
+                    title: Text(_staffNames[uid] ?? 'Unavailable account'),
+                    subtitle: const Text('Door staff · Check-in access'),
                     trailing: IconButton(
                       tooltip: 'Remove access',
                       onPressed: () async {
@@ -1058,25 +1098,46 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
             ),
             FilledButton.icon(
               onPressed: () async {
+                final actor = FirebaseAuth.instance.currentUser?.uid;
                 final input = controller.text.trim();
-                if (input.isEmpty) return;
-                var uid = input;
-                if (input.contains('@')) {
-                  final match = await FirebaseFirestore.instance
-                      .collection('Customers')
-                      .where('email', isEqualTo: input.toLowerCase())
-                      .limit(1)
-                      .get();
-                  if (match.docs.isEmpty) {
-                    _showError('No Attendus account uses that email.');
+                if (input.isEmpty || !_isOwner || actor == null) return;
+                try {
+                  var uid = input;
+                  if (input.contains('@')) {
+                    final profile = await PublicProfileService()
+                        .lookupEventStaffAccount(
+                          eventId: widget.event.id,
+                          email: input,
+                        );
+                    if (!mounted ||
+                        !dialogContext.mounted ||
+                        FirebaseAuth.instance.currentUser?.uid != actor) {
+                      return;
+                    }
+                    if (profile == null) {
+                      _showError(
+                        'No eligible verified Attendus account was found.',
+                      );
+                      return;
+                    }
+                    uid = profile.uid;
+                  }
+                  if (!_isOwner ||
+                      FirebaseAuth.instance.currentUser?.uid != actor) {
                     return;
                   }
-                  uid = match.docs.first.id;
+                  final next = {..._staffIds, uid}.toList();
+                  await _saveStaff(next);
+                  if (!mounted ||
+                      !dialogContext.mounted ||
+                      FirebaseAuth.instance.currentUser?.uid != actor) {
+                    return;
+                  }
+                  controller.clear();
+                  setDialogState(() {});
+                } catch (error) {
+                  if (mounted) _showError(error);
                 }
-                final next = {..._staffIds, uid}.toList();
-                await _saveStaff(next);
-                controller.clear();
-                setDialogState(() {});
               },
               icon: const Icon(Icons.add),
               label: const Text('Add staff'),
@@ -1085,14 +1146,14 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
         ),
       ),
     );
-    controller.dispose();
   }
 
   Future<void> _saveStaff(List<String> staff) async {
-    await FirebaseFirestore.instance
-        .collection('Events')
-        .doc(widget.event.id)
-        .update({'checkInStaff': staff});
+    await FirebaseFunctions.instance
+        .httpsCallable('setEventStaffV1')
+        .call({'eventId': widget.event.id, 'staff': staff})
+        .timeout(const Duration(seconds: 15));
+    await _refreshStaffNames();
     if (mounted) setState(() => _staffIds = staff);
   }
 }

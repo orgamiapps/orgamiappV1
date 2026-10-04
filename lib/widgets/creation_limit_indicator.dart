@@ -28,6 +28,14 @@ class CreationLimitIndicator extends StatelessWidget {
         final limitService = CreationLimitService();
         final subscriptionService = SubscriptionService();
 
+        if (type == CreationType.event &&
+            subscriptionService.hasUnlimitedEvents()) {
+          return const Chip(
+            avatar: Icon(Icons.all_inclusive),
+            label: Text('Unlimited events'),
+          );
+        }
+
         if (subscriptionService.hasPremium) {
           return _buildPremiumBadge(context);
         }

@@ -1,3 +1,4 @@
+import 'package:attendus/Services/public_profile_service.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/models/event_model.dart';
@@ -43,44 +44,8 @@ class OptimizedFirestoreHelper {
     }
   }
 
-  /// Get user with caching and timeout
-  static Future<CustomerModel?> getOptimizedUser(String userId) async {
-    final cacheKey = 'user_$userId';
-
-    // Check cache first
-    if (_isValidCache(cacheKey)) {
-      Logger.debug(
-        'Returning cached user data (hits: $_cacheHits, misses: $_cacheMisses)',
-      );
-      return _cache[cacheKey] as CustomerModel?;
-    }
-
-    // Enforce cache size limit before adding new entries
-    _enforceCacheSizeLimit();
-
-    try {
-      final docSnapshot = await _firestore
-          .collection('Customers')
-          .doc(userId)
-          .get()
-          .timeout(const Duration(seconds: 5));
-
-      if (docSnapshot.exists) {
-        final userData = CustomerModel.fromFirestore(docSnapshot);
-
-        // Cache the result
-        _cache[cacheKey] = userData;
-        _cacheTimestamps[cacheKey] = DateTime.now();
-
-        return userData;
-      }
-
-      return null;
-    } catch (e) {
-      Logger.error('Error getting user: $e');
-      return null;
-    }
-  }
+  static Future<CustomerModel?> getOptimizedUser(String userId) =>
+      PublicProfileService().getCustomer(userId);
 
   /// Search events with debouncing and limits
   static Future<List<EventModel>> searchOptimizedEvents(String query) async {
@@ -121,6 +86,7 @@ class OptimizedFirestoreHelper {
       }
 
       // Cache the results
+      _enforceCacheSizeLimit();
       _cache[cacheKey] = events;
       _cacheTimestamps[cacheKey] = DateTime.now();
 
@@ -131,58 +97,8 @@ class OptimizedFirestoreHelper {
     }
   }
 
-  /// Search users with optimization
-  static Future<List<CustomerModel>> searchOptimizedUsers(String query) async {
-    if (query.trim().isEmpty) return [];
-
-    final cacheKey = 'search_users_${query.toLowerCase()}';
-
-    // Check cache first
-    if (_isValidCache(cacheKey)) {
-      Logger.debug('Returning cached user search results');
-      return _cache[cacheKey] as List<CustomerModel>;
-    }
-
-    try {
-      // Search by username first (more efficient)
-      final snapshot = await _firestore
-          .collection('Customers')
-          .where('isDiscoverable', isEqualTo: true)
-          .limit(30)
-          .get()
-          .timeout(const Duration(seconds: 5));
-
-      List<CustomerModel> users = [];
-      final queryLower = query.toLowerCase();
-
-      for (var doc in snapshot.docs) {
-        try {
-          final user = CustomerModel.fromFirestore(doc);
-
-          // Simple text search on name and username
-          if (user.name.toLowerCase().contains(queryLower) ||
-              (user.username?.toLowerCase().contains(queryLower) ?? false)) {
-            users.add(user);
-          }
-
-          // Limit results to prevent performance issues
-          if (users.length >= 20) break;
-        } catch (e) {
-          Logger.error('Error parsing user search result: $e');
-          continue;
-        }
-      }
-
-      // Cache the results
-      _cache[cacheKey] = users;
-      _cacheTimestamps[cacheKey] = DateTime.now();
-
-      return users;
-    } catch (e) {
-      Logger.error('Error searching users: $e');
-      return [];
-    }
-  }
+  static Future<List<CustomerModel>> searchOptimizedUsers(String query) =>
+      PublicProfileService().search(query);
 
   /// Check if cached data is still valid
   static bool _isValidCache(String key) {

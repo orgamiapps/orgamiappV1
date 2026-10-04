@@ -4,7 +4,9 @@ param(
   [string]$ProjectId = "",
   [string]$MapsKeyDisplayName = "",
   [switch]$SkipClean,
-  [switch]$Deploy
+  [switch]$Deploy,
+  [string]$QualificationRunId = "",
+  [string]$ExpectedPriorRelease = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -53,28 +55,46 @@ function Invoke-Checked {
   }
 }
 
+if ($Deploy) {
+  if ($Environment -ne "production" -or $SkipClean -or
+      $QualificationRunId -notmatch '^[1-9][0-9]*$' -or
+      $ExpectedPriorRelease -notmatch '^sites/orgami-66nxok/versions/[A-Za-z0-9_-]+$') {
+    throw "Deployment requires production, an immutable successful QualificationRunId, and the captured ExpectedPriorRelease Hosting version. SkipClean is a build-only option."
+  }
+  # The guard downloads the qualified immutable artifact by GitHub artifact ID,
+  # verifies its SHA-256 and frozen source, and checks both live predecessors.
+  # This branch intentionally returns before any Flutter build or key lookup.
+  Invoke-Checked {
+    node tools/web_release_pipeline.js promote `
+      --qualification-run $QualificationRunId `
+      --expected-prior-release $ExpectedPriorRelease `
+      --output build/web-promotion-local
+  } "Qualified exact-artifact web promotion"
+  return
+}
+
 if (-not $SkipClean) {
   Invoke-Checked { flutter clean } "Flutter clean"
 }
-Invoke-Checked { flutter pub get } "Flutter dependency restore"
+Invoke-Checked { flutter pub get --enforce-lockfile } "Flutter dependency restore"
 
 $keyResource = (& gcloud services api-keys list `
   --project=$ProjectId `
   --filter="displayName='$MapsKeyDisplayName'" `
   --format="value(name)").Trim()
-if (-not $keyResource) {
+if ($LASTEXITCODE -ne 0 -or -not $keyResource -or $keyResource -match '[\r\n]') {
   throw "The dedicated Maps web key was not found."
 }
 $mapsKey = (& gcloud services api-keys get-key-string $keyResource `
   --format="value(keyString)").Trim()
-if (-not $mapsKey) {
+if ($LASTEXITCODE -ne 0 -or -not $mapsKey -or $mapsKey -match '[\r\n]') {
   throw "The dedicated Maps web key value was unavailable."
 }
 $appCheckKey = (& gcloud recaptcha keys list `
   --project=$ProjectId `
   --filter="displayName='Attendus App Check Web'" `
   --format="value(name.basename())").Trim()
-if (-not $appCheckKey) {
+if ($LASTEXITCODE -ne 0 -or -not $appCheckKey -or $appCheckKey -match '[\r\n]') {
   throw "The Attendus App Check Web reCAPTCHA Enterprise key was not found."
 }
 $env:GOOGLE_MAPS_WEB_API_KEY = $mapsKey
@@ -162,6 +182,10 @@ foreach ($requiredFile in $requiredBuildFiles) {
   }
 }
 
+if ($Environment -eq "production") {
+  Invoke-Checked { node tools/prepare_mobile_associations.js build/web } "Mobile link association preparation"
+}
+
 Copy-Item -LiteralPath web/flutter_service_worker_retirement.js `
   -Destination build/web/flutter_service_worker.js -Force
 Invoke-Checked {
@@ -175,18 +199,4 @@ Invoke-Checked {
 } "Release asset validation"
 Invoke-Checked { dart run tools/check_web_bundle_size.dart } "Bundle budget"
 
-if ($Deploy) {
-  $firebaseCli = Join-Path $projectRoot "functions\node_modules\.bin\firebase.cmd"
-  if (-not (Test-Path -LiteralPath $firebaseCli)) {
-    throw "Project-local Firebase CLI is unavailable at $firebaseCli."
-  }
-  Invoke-Checked {
-    & $firebaseCli deploy --project $ProjectId --only hosting --non-interactive
-  } "Firebase Hosting deployment"
-  $validationUrls = $environmentConfig.ValidationUrls
-  Invoke-Checked {
-    dart run tools/check_deferred_web_chunks.dart $validationUrls
-  } "Production release validation"
-}
-
-Write-Output "Attendus $Environment web release pipeline completed."
+Write-Output "Attendus $Environment local build completed. This build is not a qualified deployment artifact; use the candidate workflow for release."

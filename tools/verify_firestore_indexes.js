@@ -78,6 +78,7 @@ function inspect(manifest, remoteIndexes, remoteFields) {
   const missing = [];
   const pending = [];
   const terminal = [];
+  const unexpectedFields = [];
   for (const key of expected.composites.keys()) {
     const index = remoteComposites.get(key);
     if (!index) missing.push(`composite:${key}`);
@@ -97,6 +98,9 @@ function inspect(manifest, remoteIndexes, remoteFields) {
     for (const index of expectedField.indexes) {
       if (!remoteFieldIndexes.has(index)) missing.push(`field-index:${key}|${index}`);
     }
+    for (const index of remoteFieldIndexes) {
+      if (!expectedField.indexes.has(index)) unexpectedFields.push(`field-index:${key}|${index}`);
+    }
     for (const index of field.indexConfig?.indexes || []) {
       if (index.state === "CREATING") pending.push(`field-index:${key}`);
       else if (index.state && index.state !== "READY") {
@@ -107,8 +111,12 @@ function inspect(manifest, remoteIndexes, remoteFields) {
       if (field.ttlConfig?.state === "CREATING") pending.push(`ttl:${key}`);
       else terminal.push(`ttl:${key} (${field.ttlConfig?.state || "MISSING"})`);
     }
+    if (!expectedField.ttl && field.ttlConfig?.state && field.ttlConfig.state !== "DISABLED") {
+      unexpectedFields.push(`ttl:${key} (${field.ttlConfig.state})`);
+    }
   }
   const extra = [
+    ...unexpectedFields,
     ...[...remoteComposites.keys()].filter((key) => !expected.composites.has(key))
         .map((key) => `composite:${key}`),
     ...[...remoteOverrides.keys()].filter((key) => !expected.fields.has(key))

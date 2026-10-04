@@ -13,13 +13,14 @@ const {
   fetchWithTimeout,
   uniqueId,
   waitFor,
+  emulatorOrigin,
 } = require("./emulator-test-helpers");
 
 const projectId = process.env.GCLOUD_PROJECT;
 assert.equal(projectId, "demo-attendus-admin");
 const backfillAnalyticsApi =
-  `http://127.0.0.1:5001/${projectId}/us-central1/backfillUserAnalyticsV2`;
-const authApi = "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1";
+  `${emulatorOrigin("FIREBASE_FUNCTIONS_EMULATOR_HOST")}/${projectId}/us-central1/backfillUserAnalyticsV2`;
+const authApi = `${emulatorOrigin("FIREBASE_AUTH_EMULATOR_HOST")}/identitytoolkit.googleapis.com/v1`;
 
 async function auth(method, body) {
   const response = await fetchWithTimeout(

@@ -1,100 +1,13 @@
-name: Deploy and Verify Firestore Indexes
-
-on:
-  workflow_call:
-    inputs:
-      project_id:
-        description: Firebase project ID or "both"
-        required: true
-        type: string
-  workflow_dispatch:
-    inputs:
-      project_id:
-        description: Firebase project to repair
-        required: true
-        default: both
-        type: choice
-        options:
-          - both
-          - attendus-staging
-          - orgami-66nxok
-
+name: Index changes require the qualified web release
+'on':
+  workflow_dispatch: null
 permissions:
   contents: read
-  id-token: write
-
-concurrency:
-  group: firestore-indexes
-  cancel-in-progress: false
-
-env:
-  FIREBASE_TOOLS_VERSION: 15.25.1
-  NODE_VERSION: 22
-  WIF_PROVIDER: projects/951311475019/locations/global/workloadIdentityPools/github-pool/providers/github-provider
-  DEPLOYER_SERVICE_ACCOUNT: sa-deployer@orgami-66nxok.iam.gserviceaccount.com
-
 jobs:
-  staging:
-    if: >-
-      inputs.project_id == 'both' ||
-      inputs.project_id == 'attendus-staging'
+  release-instructions:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
-      - uses: google-github-actions/auth@v3
-        with:
-          project_id: attendus-staging
-          workload_identity_provider: ${{ env.WIF_PROVIDER }}
-          service_account: ${{ env.DEPLOYER_SERVICE_ACCOUNT }}
-      - uses: google-github-actions/setup-gcloud@v3
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - run: npm install --global firebase-tools@${FIREBASE_TOOLS_VERSION}
-      - run: npm ci
-        working-directory: functions
-      - name: Deploy staging index manifest
-        run: >-
-          firebase deploy --only firestore:indexes
-          --project attendus-staging --non-interactive
-      - name: Wait for staging indexes and reject drift
-        run: node tools/verify_firestore_indexes.js attendus-staging 1800
-      - name: Exercise staging collection-group queries
-        run: >-
-          node functions/tools/canary-firestore-query-contracts.js
-          --project attendus-staging
+    - run: 'echo ''Use Freeze web candidates and deploy staging, then 24-hour qualification and explicit production
+        promotion. Standalone promotion is disabled.''
 
-  production:
-    needs: staging
-    if: >-
-      always() &&
-      (needs.staging.result == 'success' || needs.staging.result == 'skipped') &&
-      (inputs.project_id == 'both' || inputs.project_id == 'orgami-66nxok') &&
-      (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@v4
-      - uses: google-github-actions/auth@v3
-        with:
-          project_id: orgami-66nxok
-          workload_identity_provider: ${{ env.WIF_PROVIDER }}
-          service_account: ${{ env.DEPLOYER_SERVICE_ACCOUNT }}
-      - uses: google-github-actions/setup-gcloud@v3
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - run: npm install --global firebase-tools@${FIREBASE_TOOLS_VERSION}
-      - run: npm ci
-        working-directory: functions
-      - name: Deploy production index manifest
-        run: >-
-          firebase deploy --only firestore:indexes
-          --project orgami-66nxok --non-interactive
-      - name: Wait for production indexes and reject drift
-        run: node tools/verify_firestore_indexes.js orgami-66nxok 1800
-      - name: Exercise production collection-group queries
-        run: >-
-          node functions/tools/canary-firestore-query-contracts.js
-          --project orgami-66nxok
+        exit 1'

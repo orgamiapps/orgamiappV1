@@ -16,6 +16,8 @@ class QuizResponseModel {
   final int timeToAnswer; // milliseconds taken to answer
 
   // Scoring
+  final int? serverTotalPoints;
+  final bool scoringAvailable;
   final bool isCorrect;
   final int pointsEarned;
   final double? similarityScore; // for short answer questions
@@ -33,6 +35,8 @@ class QuizResponseModel {
     required this.answer,
     required this.submittedAt,
     required this.timeToAnswer,
+    this.serverTotalPoints,
+    this.scoringAvailable = true,
     required this.isCorrect,
     required this.pointsEarned,
     this.similarityScore,
@@ -51,6 +55,8 @@ class QuizResponseModel {
       submittedAt:
           (data['submittedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       timeToAnswer: data['timeToAnswer'] ?? 0,
+      serverTotalPoints: (data['totalPoints'] as num?)?.toInt(),
+      scoringAvailable: data['isCorrect'] is bool,
       isCorrect: data['isCorrect'] ?? false,
       pointsEarned: data['pointsEarned'] ?? 0,
       similarityScore: (data['similarityScore'] as num?)?.toDouble(),
@@ -98,6 +104,8 @@ class QuizResponseModel {
     int? questionTimeLimit,
   }) {
     return QuizResponseModel(
+      scoringAvailable: scoringAvailable,
+      serverTotalPoints: serverTotalPoints,
       id: id ?? this.id,
       quizId: quizId ?? this.quizId,
       questionId: questionId ?? this.questionId,
@@ -154,7 +162,7 @@ class QuizResponseModel {
     return 0; // No bonus
   }
 
-  int get totalPoints => pointsEarned + speedBonusPoints;
+  int get totalPoints => serverTotalPoints ?? pointsEarned + speedBonusPoints;
 
   // Factory method for creating a response
   factory QuizResponseModel.create({

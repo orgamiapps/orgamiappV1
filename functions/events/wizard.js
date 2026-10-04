@@ -1,4 +1,5 @@
 "use strict";
+const {publicOrigin} = require("../public-web/origin");
 
 const crypto = require("node:crypto");
 const logger = require("firebase-functions/logger");
@@ -50,31 +51,36 @@ function requireRevision(value, fallback = 0) {
   return parsed;
 }
 
-async function groupAccess(db, uid, organizationId) {
+async function groupAccess(db, uid, organizationId, transaction = null) {
+  const read = (ref) => transaction ? transaction.get(ref) : ref.get();
+  if ((await read(db.collection("account_deletion_jobs").doc(uid))).exists) return {allowed: false, isAdmin: false, organization: null};
   if (!organizationId) return {allowed: true, isAdmin: false, organization: null};
   const [organizationSnapshot, memberSnapshot] = await Promise.all([
-    db.collection("Organizations").doc(organizationId).get(),
-    db.collection("Organizations").doc(organizationId).collection("Members").doc(uid).get(),
+    read(db.collection("Organizations").doc(organizationId)),
+    read(db.collection("Organizations").doc(organizationId).collection("Members").doc(uid)),
   ]);
   if (!organizationSnapshot.exists) return {allowed: false, isAdmin: false, organization: null};
   const organization = organizationSnapshot.data() || {};
   if (organization.createdBy === uid) return {allowed: true, isAdmin: true, organization};
   const member = memberSnapshot.data() || {};
-  const approved = String(member.status || "approved").toLowerCase() === "approved";
+  const approved = memberSnapshot.exists && String(member.status || "").toLowerCase() === "approved";
   const role = String(member.role || "").toLowerCase();
   const isAdmin = ["owner", "admin"].includes(role);
   return {allowed: approved && (organization.allowMemberEventCreation !== false || isAdmin),
-    isAdmin, organization};
+    isAdmin: approved && isAdmin, organization};
 }
 
-async function tierForUser(db, uid) {
-  const subscription = await db.collection("subscriptions").doc(uid).get();
+function tierFromSubscription(subscription) {
   const data = subscription.data() || {};
   if (data.isActive === true || String(data.status || "").toLowerCase() === "active") {
     const tier = String(data.tier || data.subscriptionTier || "").toLowerCase();
     if (tier === "premium" || tier === "basic") return tier;
   }
   return "free";
+}
+
+async function tierForUser(db, uid) {
+  return tierFromSubscription(await db.collection("subscriptions").doc(uid).get());
 }
 
 async function paidCheckoutEnabled(db) {
@@ -121,11 +127,7 @@ async function promoteDraftMedia(admin, {uid, draftId, imageUrl, eventIds}) {
 }
 
 async function canManageEvent(db, uid, event) {
-  if (event.customerUid === uid || (Array.isArray(event.coHosts) && event.coHosts.includes(uid))) {
-    return true;
-  }
-  if (!event.organizationId) return false;
-  return (await groupAccess(db, uid, event.organizationId)).isAdmin;
+  return (await require("./access").capabilities(db, uid, event)).manageEvent;
 }
 
 function eventDocument(admin, form, context) {
@@ -168,6 +170,7 @@ function eventDocument(admin, form, context) {
     getLocation: form.locationType === "in_person",
     eventDuration: Math.max(1, Math.ceil(durationMinutes / 60)),
     eventDurationMinutes: durationMinutes,
+    launchScheduleNeedsReview: false,
     categories: [],
     primaryDiscoveryCategoryId: form.primaryDiscoveryCategoryId,
     discoveryCategoryIds: form.discoveryCategoryIds,
@@ -178,6 +181,7 @@ function eventDocument(admin, form, context) {
     maxTickets: registration.capacity || 0,
     ticketPrice: registration.mode === "paid_ticket" ? registration.priceUsd : 0,
     issuedTickets: context.preserved?.issuedTickets || 0,
+    ...(!context.preserved ? {confirmedRegistrationCount: 0} : {}),
     reservedTickets: context.preserved?.reservedTickets || 0,
     paidTicketCount: context.preserved?.paidTicketCount || 0,
     grossRevenue: context.preserved?.grossRevenue || 0,
@@ -199,7 +203,7 @@ function eventDocument(admin, form, context) {
       accessibilityOptions: form.experience.accessibilityOptions,
       accessibilityDetails: form.experience.accessibilityDetails,
       thingsToBring: form.experience.thingsToBring,
-      publicContact: form.experience.publicContact,
+      publicContact: require("./public-contact-privacy").publishedContact(form.experience.publicContact),
     },
     reminderPolicy: {preset: form.reminderPreset,
       offsetsMinutes: form.reminderPreset === "24h_1h" ? [1440, 60] :
@@ -239,6 +243,7 @@ function createSaveEventDraft(admin) {
       if (snapshot.exists) {
         const current = snapshot.data();
         if (current.ownerUid !== uid) throw new HttpsError("permission-denied", "Draft access denied.");
+        if (current.publishedAt) throw new HttpsError("failed-precondition", "Create an edit draft for the published event.");
         if (Number(current.revision || 0) !== expectedRevision) {
           throw new HttpsError("aborted", "This draft changed elsewhere. Your local copy was preserved.",
               {serverRevision: Number(current.revision || 0)});
@@ -247,6 +252,19 @@ function createSaveEventDraft(admin) {
       } else {
         if (incomingId && expectedRevision !== 0) throw new HttpsError("not-found", "Draft not found.");
         revision = 1;
+      }
+      if (!(await groupAccess(db, uid, form.organizationId, transaction)).allowed) throw new HttpsError("permission-denied", "Organization access denied.");
+      const sourceEventId = request.data?.sourceEventId || null;
+      const sourceSeriesId = request.data?.sourceSeriesId || null;
+      if (snapshot.exists && (snapshot.get("mode") !== mode || (snapshot.get("sourceEventId") || null) !== sourceEventId || (snapshot.get("sourceSeriesId") || null) !== sourceSeriesId)) {
+        throw new HttpsError("permission-denied", "A draft cannot be retargeted. Create a new authorized draft.");
+      }
+      if (mode === "edit") {
+        if (!sourceEventId) throw new HttpsError("invalid-argument", "An edit source is required.");
+        const source = await transaction.get(db.collection("Events").doc(requireIdentifier(sourceEventId, "source event")));
+        if (!source.exists || !(await require("./access").capabilities(db, uid, source.data(), transaction)).manageEvent || (source.get("seriesId") || null) !== sourceSeriesId) {
+          throw new HttpsError("permission-denied", "Source event access denied.");
+        }
       }
       transaction.set(draftRef, {
         id: draftRef.id, ownerUid: uid, organizationId: form.organizationId, mode,
@@ -430,23 +448,72 @@ function createDeleteEventTemplate(admin) {
   });
 }
 
+function publicationCounter(value) {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new HttpsError("failed-precondition", "Your event usage requires review before publishing.");
+  }
+  return value;
+}
+
 async function consumePublicationAllowance(transaction, db, uid, tier, customerSnapshot) {
+  const entitlement = await transaction.get(db.collection("account_entitlements").doc(uid));
+  const subscriptionRef = db.collection("subscriptions").doc(uid);
+  const subscriptionSnapshot = await transaction.get(subscriptionRef);
+  if (tierFromSubscription(subscriptionSnapshot) !== tier) {
+    throw new HttpsError("aborted", "Your subscription changed. Review the event and retry publication.");
+  }
+  if (entitlement.get("unlimitedEventCreation") === true) return;
   if (tier === "premium") return;
   if (tier === "basic") {
-    const subscriptionRef = db.collection("subscriptions").doc(uid);
-    const subscriptionSnapshot = await transaction.get(subscriptionRef);
-    if (Number(subscriptionSnapshot.get("eventsCreatedThisMonth") || 0) >= 5) {
+    const created = publicationCounter(subscriptionSnapshot.get("eventsCreatedThisMonth"));
+    if (created >= 5) {
       throw new HttpsError("resource-exhausted", "Your monthly event limit has been reached.");
     }
-    transaction.update(subscriptionRef, {eventsCreatedThisMonth:
-      Number(subscriptionSnapshot.get("eventsCreatedThisMonth") || 0) + 1});
+    transaction.update(subscriptionRef, {eventsCreatedThisMonth: created + 1});
     return;
   }
-  const created = Number(customerSnapshot.data()?.eventsCreated || 0);
+  // The organizer identity was loaded before this transaction. Read its usage
+  // again here so concurrent draft publications contend on the current counter.
+  const currentCustomer = await transaction.get(customerSnapshot.ref);
+  const created = publicationCounter(currentCustomer.data()?.eventsCreated);
   if (created >= 5) {
     throw new HttpsError("resource-exhausted", "Your event creation limit has been reached.");
   }
   transaction.set(customerSnapshot.ref, {eventsCreated: created + 1}, {merge: true});
+}
+
+function changeFingerprint(draft) {
+  return crypto.createHash("sha256").update(JSON.stringify(normalizeDraftForm(draft.formData))).digest("hex");
+}
+
+function createPreviewEventChange(admin) {
+  const db = admin.firestore();
+  return onCall(CALL_OPTIONS, async (request) => {
+    const uid = requireOrganizer(request);
+    const draftId = requireIdentifier(request.data?.draftId, "draft ID");
+    const draft = await db.collection("EventDrafts").doc(draftId).get();
+    if (!draft.exists || draft.get("ownerUid") !== uid || draft.get("mode") !== "edit" || draft.get("revision") !== request.data.expectedDraftRevision) throw new HttpsError("aborted", "Save the current edit before previewing.");
+    const source = await db.collection("Events").doc(draft.get("sourceEventId")).get();
+    const scope = request.data.recurrenceScope || "this_occurrence";
+    if (!["this_occurrence", "this_and_future", "entire_series"].includes(scope)) throw new HttpsError("invalid-argument", "Invalid recurrence scope.");
+    let targets = [source];
+    if (scope !== "this_occurrence" && source.get("seriesId")) {
+      const series = await db.collection("Events").where("seriesId", "==", source.get("seriesId")).limit(101).get();
+      if (series.size > 100) throw new HttpsError("failed-precondition", "This series exceeds the supported atomic change scope.");
+      targets = series.docs.filter((event) => scope === "entire_series" || timestampDate(event.get("selectedDateTime")) >= timestampDate(source.get("selectedDateTime")));
+    }
+    let count = 0;
+    for (const target of targets) {
+      if (!target.exists || !(await require("./access").capabilities(db, uid, target.data())).manageEvent) throw new HttpsError("permission-denied", "Source event access denied.");
+      const snapshots = await Promise.all(["RegisterAttendance", "Tickets"].map((name) => require("./roster").allDocuments(db.collection(name).where("eventId", "==", target.id))));
+      const rows = require("./roster").buildRoster(...snapshots.map((list) => list.map((doc) => ({id: doc.id, ...doc.data()}))), []);
+      count += new Set(rows.filter((row) => ["confirmed", "pending", "waitlisted"].includes(row.status)).map((row) => row.guestId || row.uid).filter(Boolean)).size;
+    }
+    const preview = db.collection("EventChangePreviews").doc();
+    await preview.create({actorUid: uid, eventId: source.id, draftId, draftRevision: draft.get("revision"), fingerprint: changeFingerprint(draft.data()), scope, count,
+      targets: targets.map((event) => ({eventId: event.id, revision: Number(event.get("eventRevision") || 0)})), expiresAt: new Date(Date.now() + 10 * 60000)});
+    return {previewToken: preview.id, count, occurrences: targets.length};
+  });
 }
 
 function createPublishEventDraft(admin) {
@@ -463,6 +530,17 @@ function createPublishEventDraft(admin) {
     if (Number(draftSnapshot.get("revision") || 0) !== expectedDraftRevision) {
       throw new HttpsError("aborted", "The draft changed before publication.");
     }
+    const publicationFingerprint = crypto.createHash("sha256").update(JSON.stringify([expectedDraftRevision, request.data?.recurrenceScope || "this_occurrence", request.data?.changeReason || "", request.data?.changePreviewToken || null])).digest("hex");
+    async function replay(transaction, snapshot) {
+      if (!snapshot.get("publishedAt")) return null;
+      if (snapshot.get("publicationFingerprint") !== publicationFingerprint || !snapshot.get("publicationResult")) throw new HttpsError("already-exists", "This draft was already published with different inputs.");
+      for (const id of snapshot.get("publishedEventIds") || []) {
+        const event = await transaction.get(db.collection("Events").doc(id));
+        if (!(await require("./access").capabilities(db, uid, event.data(), transaction)).manageEvent) throw new HttpsError("permission-denied", "Event access is required.");
+      }
+      return snapshot.get("publicationResult");
+    }
+    if (draftSnapshot.get("publishedAt")) return db.runTransaction(async (transaction) => replay(transaction, await transaction.get(draftRef)));
     const draft = draftSnapshot.data();
     const form = normalizeDraftForm(draft.formData);
     const [access, tier, paidEnabled, identity] = await Promise.all([
@@ -491,6 +569,11 @@ function createPublishEventDraft(admin) {
     const start = timestampDate(form.startAt);
     const durationMs = end - start;
     const isEdit = draft.mode === "edit" && draft.sourceEventId;
+    const changeReason = String(request.data?.changeReason || "").trim().slice(0, 1000);
+    const changePreviewToken = request.data?.changePreviewToken;
+    if (changePreviewToken && (!/^[A-Za-z0-9_-]+$/.test(changePreviewToken) || changeReason.length < 5)) {
+      throw new HttpsError("invalid-argument", "Explain the change and review affected attendees.");
+    }
     const recurrenceScope = ["this_occurrence", "this_and_future", "entire_series"]
         .includes(request.data?.recurrenceScope) ? request.data.recurrenceScope : "this_occurrence";
     const seriesId = form.recurrence.enabled ? (draft.sourceSeriesId || db.collection("EventSeries").doc().id) : null;
@@ -502,7 +585,8 @@ function createPublishEventDraft(admin) {
       if (!sourceSnapshot.exists) throw new HttpsError("not-found", "Event not found.");
       const sourceStart = timestampDate(sourceSnapshot.get("selectedDateTime"));
       const seriesSnapshot = await db.collection("Events").where("seriesId", "==", draft.sourceSeriesId)
-          .limit(52).get();
+          .limit(101).get();
+      if (seriesSnapshot.size > 100) throw new HttpsError("failed-precondition", "This series exceeds the supported atomic change scope.");
       editTargets = seriesSnapshot.docs.filter((document) => recurrenceScope === "entire_series" ||
         timestampDate(document.get("selectedDateTime")) >= sourceStart)
           .sort((left, right) => timestampDate(left.get("selectedDateTime")) -
@@ -516,28 +600,45 @@ function createPublishEventDraft(admin) {
     const existingQuestionSnapshots = isEdit ? await Promise.all(eventIds.map((eventId) =>
       db.collection("Events").doc(eventId).collection("EventQuestions").get())) : [];
     const createdAt = admin.firestore.Timestamp.now();
-    await db.runTransaction(async (transaction) => {
+    const publicationResult = {status, eventId: eventIds[0], eventIds, seriesId, occurrenceCount: eventIds.length};
+    const replayed = await db.runTransaction(async (transaction) => {
       const freshDraft = await transaction.get(draftRef);
       if (!freshDraft.exists || freshDraft.get("ownerUid") !== uid ||
           Number(freshDraft.get("revision") || 0) !== expectedDraftRevision) {
         throw new HttpsError("aborted", "The draft changed before publication.");
       }
+      const previous = await replay(transaction, freshDraft);
+      if (previous) return previous;
       let existingEvents = [];
       if (isEdit) {
         existingEvents = await Promise.all(eventIds.map((eventId) =>
           transaction.get(db.collection("Events").doc(eventId))));
-        const existingSnapshot = existingEvents.find((snapshot) => snapshot.id === draft.sourceEventId);
-        if (!existingSnapshot?.exists ||
-            existingEvents.some((snapshot) => !snapshot.exists ||
-              (snapshot.get("customerUid") !== uid && !access.isAdmin &&
-               !(snapshot.get("coHosts") || []).includes(uid)))) {
-          throw new HttpsError("permission-denied", "Event access denied.");
+        if (changePreviewToken) {
+          const preview = await transaction.get(db.collection("EventChangePreviews").doc(changePreviewToken));
+          const targets = preview.get("targets") || [];
+          if (!preview.exists || preview.get("draftId") !== draftId || preview.get("draftRevision") !== expectedDraftRevision || preview.get("fingerprint") !== changeFingerprint(draft) || preview.get("actorUid") !== uid || preview.get("eventId") !== draft.sourceEventId ||
+              preview.get("scope") !== recurrenceScope || preview.get("expiresAt").toMillis() < Date.now() ||
+              targets.length !== existingEvents.length || existingEvents.some((event) =>
+                !targets.some((target) => target.eventId === event.id && target.revision === Number(event.get("eventRevision") || 0)))) {
+            throw new HttpsError("aborted", "The event changed. Review affected attendees again.");
+          }
         }
+        const existingSnapshot = existingEvents.find((snapshot) => snapshot.id === draft.sourceEventId);
+        if (!existingSnapshot?.exists) throw new HttpsError("not-found", "Source event not found.");
+        for (const source of existingEvents) {
+          if (!source.exists || !(await require("./access").capabilities(db, uid, source.data(), transaction)).manageEvent ||
+              (source.get("seriesId") || null) !== (draft.sourceSeriesId || null)) throw new HttpsError("permission-denied", "Source event access denied.");
+        }
+        if (!(await groupAccess(db, uid, form.organizationId, transaction)).allowed) throw new HttpsError("permission-denied", "Destination organization access denied.");
+        const previous = existingSnapshot.data();
+        const material = timestampDate(previous.selectedDateTime)?.getTime() !== start.getTime() || require("./schedule").schedule(previous).end?.getTime() !== end.getTime() || previous.eventTimeZone !== form.eventTimeZone || previous.location !== form.location;
+        if (material && (!changePreviewToken || changeReason.length < 5)) throw new HttpsError("failed-precondition", "Update the app, save the edit and review affected attendees before changing the schedule or location.");
         const expectedEventRevision = requireRevision(draft.sourceEventRevision);
         if (Number(existingSnapshot.get("eventRevision") || 0) !== expectedEventRevision) {
           throw new HttpsError("aborted", "The published event changed elsewhere.");
         }
       } else {
+        if (!(await groupAccess(db, uid, form.organizationId, transaction)).allowed) throw new HttpsError("permission-denied", "Publication access denied.");
         await consumePublicationAllowance(transaction, db, uid, tier, identity.snapshot);
       }
       if (seriesId) {
@@ -571,6 +672,15 @@ function createPublishEventDraft(admin) {
           eventRevision, preserved});
         const eventRef = db.collection("Events").doc(eventId);
         transaction.set(eventRef, document, {merge: isEdit});
+        if (isEdit && (require("./schedule").instant(existingDocument.selectedDateTime)?.getTime() !== occurrenceStart.getTime() ||
+            existingDocument.eventDurationMinutes !== document.eventDurationMinutes ||
+            existingDocument.eventTimeZone !== document.eventTimeZone || existingDocument.location !== document.location)) {
+          transaction.create(db.collection("EventAnnouncements").doc(`reschedule_${eventId}_${eventRevision}`), {
+            eventId, actorUid: uid, audience: "active", title: `Event updated: ${document.title}`,
+            body: `${changeReason || "The organizer changed the event schedule or location."} Review the updated details at ${publicOrigin()}/event/${eventId}`,
+            templateId: "event_rescheduled", eventSnapshot: require("./lifecycle-snapshot").lifecycleSnapshot(document), status: "queued", createdAt,
+          });
+        }
         if (isEdit) {
           const retained = new Set(form.questions.map((question) => question.id));
           for (const questionDocument of existingQuestionSnapshots[index].docs) {
@@ -581,10 +691,11 @@ function createPublishEventDraft(admin) {
           transaction.set(eventRef.collection("EventQuestions").doc(question.id), question);
         }
       }
-      transaction.update(draftRef, {archived: true, publishedAt: createdAt,
+      transaction.update(draftRef, {archived: true, publishedAt: createdAt, publicationFingerprint, publicationResult,
         publishedEventIds: eventIds, publishedSeriesId: seriesId,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()});
     });
+    if (replayed) return replayed;
     logger.info("Event wizard draft published", {draftId, uid, eventCount: eventIds.length,
       seriesId, mode: draft.mode, status});
     try {
@@ -609,14 +720,10 @@ function createDecideEventRegistration(admin) {
     }
     const eventRef = db.collection("Events").doc(eventId);
     const registrationRef = db.collection("RegisterAttendance").doc(registrationId);
-    const authorizationSnapshot = await eventRef.get();
-    if (!authorizationSnapshot.exists) throw new HttpsError("not-found", "Event not found.");
-    const authorizationEvent = authorizationSnapshot.data();
-    const access = await groupAccess(db, uid, authorizationEvent.organizationId || null);
-    if (authorizationEvent.customerUid !== uid && !access.isAdmin &&
-        !(authorizationEvent.coHosts || []).includes(uid)) {
-      throw new HttpsError("permission-denied", "Event access denied.");
-    }
+    const requestKey = String(request.data?.idempotencyKey || `${registrationId}:${decision}`);
+    if (!/^[A-Za-z0-9._:-]{1,180}$/.test(requestKey)) throw new HttpsError("invalid-argument", "Invalid decision request key.");
+    const fingerprint = crypto.createHash("sha256").update(JSON.stringify([eventId, registrationId, decision])).digest("hex");
+    const decisionRef = db.collection("RegistrationDecisions").doc(crypto.createHash("sha256").update(`${uid}:${eventId}:${requestKey}`).digest("hex"));
     let resultStatus;
     let ticketId = null;
     const rawManageToken = crypto.randomBytes(32).toString("base64url");
@@ -624,17 +731,23 @@ function createDecideEventRegistration(admin) {
       const [eventSnapshot, registrationSnapshot] = await Promise.all([
         transaction.get(eventRef), transaction.get(registrationRef),
       ]);
-      if (!eventSnapshot.exists ||
-          (eventSnapshot.get("customerUid") !== uid && !access.isAdmin &&
-           !(eventSnapshot.get("coHosts") || []).includes(uid))) {
+      if (!eventSnapshot.exists || !(await require("./access").capabilities(db, uid, eventSnapshot.data(), transaction)).manageEvent) {
         throw new HttpsError("permission-denied", "Event access denied.");
       }
+      const prior = await transaction.get(decisionRef);
+      if (prior.exists) {
+        if (prior.get("fingerprint") !== fingerprint) throw new HttpsError("already-exists", "A request key cannot be reused with a different decision.");
+        resultStatus = prior.get("status"); ticketId = prior.get("ticketId"); return;
+      }
+      require("./capacity").assertDecidable(eventSnapshot.data());
       const expectedStatus = decision === "promote" ? "waitlisted" : "pending";
       if (!registrationSnapshot.exists || registrationSnapshot.get("eventId") !== eventId ||
           registrationSnapshot.get("status") !== expectedStatus) {
         throw new HttpsError("failed-precondition", "Registration status changed before this decision.");
       }
       const registration = registrationSnapshot.data();
+      const subjectUid = registration.customerUid || registration.userId;
+      if (subjectUid && (await transaction.get(db.collection("account_deletion_jobs").doc(subjectUid))).exists) throw new HttpsError("failed-precondition", "The attendee is being deleted.");
       const guestId = registration.guestId || null;
       const guestRef = guestId ? db.collection("GuestAttendees").doc(guestId) : null;
       const guestSnapshot = guestRef ? await transaction.get(guestRef) : null;
@@ -645,21 +758,19 @@ function createDecideEventRegistration(admin) {
         resultStatus = "declined";
       } else {
         const policy = eventSnapshot.get("registrationPolicy") || {};
-        const capacity = Number(policy.capacity || 0);
-        const confirmed = Number(eventSnapshot.get("confirmedRegistrationCount") || 0);
-        const full = capacity > 0 && confirmed >= capacity;
-        if (decision === "promote" && full) {
+        const {full} = require("./capacity").capacityState(eventSnapshot.data());
+        if (full && (decision === "promote" || policy.waitlistEnabled === false)) {
           throw new HttpsError("resource-exhausted", "Capacity is still full.");
         }
         resultStatus = full && policy.waitlistEnabled !== false ? "waitlisted" : "confirmed";
         if (resultStatus === "confirmed") {
           transaction.update(eventRef, {confirmedRegistrationCount:
             admin.firestore.FieldValue.increment(1)});
-          if (policy.mode === "free_ticket") {
+          if (policy.mode === "free_ticket" || (!policy.mode && eventSnapshot.get("ticketsEnabled") && Number(eventSnapshot.get("ticketPrice") || 0) === 0)) {
             ticketId = `free_${crypto.createHash("sha256")
                 .update(`${eventId}\0${registrationId}`).digest("hex").slice(0, 48)}`;
             transaction.create(db.collection("Tickets").doc(ticketId), {
-              id: ticketId, eventId, eventTitle: String(eventSnapshot.get("title") || "Event"),
+              id: ticketId, eventId, registrationId, eventTitle: String(eventSnapshot.get("title") || "Event"),
               eventImageUrl: String(eventSnapshot.get("imageUrl") || ""),
               eventLocation: String(eventSnapshot.get("location") || ""),
               eventDateTime: eventSnapshot.get("selectedDateTime"),
@@ -675,10 +786,11 @@ function createDecideEventRegistration(admin) {
           }
         }
       }
+      transaction.create(decisionRef, {actorUid: uid, eventId, registrationId, fingerprint, status: resultStatus, ticketId, createdAt: admin.firestore.FieldValue.serverTimestamp()});
       transaction.update(registrationRef, {status: resultStatus, decisionByUid: uid,
         decidedAt: admin.firestore.FieldValue.serverTimestamp(), ticketId});
       if (guestSnapshot?.exists) {
-        const messageId = `${resultStatus}_${registrationId}_${Date.now()}`;
+        const messageId = `decision_${decisionRef.id}`;
         const manageRef = db.collection("GuestManageTokens")
             .doc(crypto.createHash("sha256").update(rawManageToken).digest("hex"));
         transaction.create(manageRef, {guestId, registrationId,
@@ -695,9 +807,13 @@ function createDecideEventRegistration(admin) {
             firstName: guestSnapshot.get("greetingName") || "there",
             eventTitle: String(eventSnapshot.get("title") || "Event"),
             eventStart: eventSnapshot.get("selectedDateTime"),
+            eventDurationMinutes: eventSnapshot.get("eventDurationMinutes") || null,
+            eventDuration: eventSnapshot.get("eventDuration") || null,
+            eventTimeZone: eventSnapshot.get("eventTimeZone") || "UTC",
+            eventRevision: eventSnapshot.get("eventRevision") || 0,
             eventLocation: String(eventSnapshot.get("location") || ""),
             kind: (eventSnapshot.get("registrationPolicy") || {}).mode || "rsvp",
-            manageUrl: `https://attendus.app/manage/${rawManageToken}`,
+            manageUrl: `${publicOrigin()}/manage/${rawManageToken}`,
           }, createdAt: admin.firestore.FieldValue.serverTimestamp(), nextAttemptAt: new Date(),
         });
       }
@@ -717,12 +833,15 @@ function createEventWizardFunctions(admin) {
     listEventTemplatesV1: createListEventTemplates(admin),
     saveEventTemplateV1: createSaveEventTemplate(admin),
     deleteEventTemplateV1: createDeleteEventTemplate(admin),
+    previewEventChangeV1: createPreviewEventChange(admin),
     publishEventDraftV1: createPublishEventDraft(admin),
     decideEventRegistrationV1: createDecideEventRegistration(admin),
   };
 }
 
 module.exports = {
+  consumePublicationAllowance,
+  tierFromSubscription,
   createEventWizardFunctions,
   eventDocument,
   groupAccess,

@@ -101,7 +101,7 @@ class _FeatureGrid extends StatelessWidget {
       _Feature(
         icon: Icons.qr_code_scanner,
         title: 'Track attendance',
-        description: 'Fast check-in with QR/NFC and live capacity tracking.',
+        description: 'Fast check-in with QR codes and live capacity tracking.',
       ),
       _Feature(
         icon: Icons.insights,

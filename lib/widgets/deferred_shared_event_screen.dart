@@ -6,11 +6,15 @@ import 'package:flutter/material.dart';
 class DeferredSharedEventScreen extends StatelessWidget {
   final String eventId;
   final String? initialAction;
+  final String? registrationId;
+  final String? ticketId;
 
   const DeferredSharedEventScreen({
     super.key,
     required this.eventId,
     this.initialAction,
+    this.registrationId,
+    this.ticketId,
   });
 
   @override
@@ -22,6 +26,8 @@ class DeferredSharedEventScreen extends StatelessWidget {
       builder: () => shared_event.SharedEventScreen(
         eventId: eventId,
         initialAction: initialAction,
+        registrationId: registrationId,
+        ticketId: ticketId,
       ),
     );
   }

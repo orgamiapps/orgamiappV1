@@ -71,9 +71,9 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Sign in to message'), findsOneWidget);
+    expect(find.text('Log in to message'), findsOneWidget);
     expect(find.text('Create account'), findsOneWidget);
-    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Log in'), findsOneWidget);
     expect(find.text('Not now'), findsOneWidget);
   });
 

@@ -30,6 +30,20 @@ function asDate(value) {
   return Number.isFinite(date.getTime()) ? date : null;
 }
 
+function attendeeRetentionRate(documents) {
+  const attendedEvents = new Map();
+  for (const document of documents) {
+    const uid = document.get("customerUid") || document.get("userId");
+    const eventId = document.get("eventId");
+    if (!uid || !eventId || ["manual", "pre-registered"].includes(uid) ||
+        document.get("voided") === true || document.get("status") === "voided") continue;
+    if (!attendedEvents.has(uid)) attendedEvents.set(uid, new Set());
+    attendedEvents.get(uid).add(eventId);
+  }
+  const repeat = [...attendedEvents.values()].filter((events) => events.size > 1).length;
+  return attendedEvents.size ? repeat / attendedEvents.size * 100 : 0;
+}
+
 async function requestUserAnalyticsRecompute(
     adminSdk,
     userId,
@@ -129,20 +143,7 @@ async function buildUserAnalytics(adminSdk, userId) {
           .get();
       attendanceDocuments.push(...snapshot.docs);
     }
-    const attendanceCounts = {};
-    for (const document of attendanceDocuments) {
-      const attendeeId = document.get("customerUid");
-      if (attendeeId && attendeeId !== "manual") {
-        attendanceCounts[attendeeId] =
-          (attendanceCounts[attendeeId] || 0) + 1;
-      }
-    }
-    const totalUniqueAttendees = Object.keys(attendanceCounts).length;
-    const repeatAttendeeCount = Object.values(attendanceCounts)
-        .filter((count) => count > 1)
-        .length;
-    retentionRate = totalUniqueAttendees > 0 ?
-      (repeatAttendeeCount / totalUniqueAttendees) * 100 : 0;
+    retentionRate = attendeeRetentionRate(attendanceDocuments);
   } catch (error) {
     logger.error("Error calculating user analytics retention", {
       userId: normalizedId,
@@ -280,6 +281,7 @@ function createProcessUserAnalyticsRecompute(adminSdk) {
 }
 
 module.exports = {
+  attendeeRetentionRate,
   MAX_PROCESSING_ATTEMPTS,
   RECOMPUTE_COLLECTION,
   buildUserAnalytics,

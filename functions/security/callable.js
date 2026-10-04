@@ -115,19 +115,23 @@ function idempotencyDocumentId(operation, uid, key) {
   return crypto.createHash("sha256").update(`${operation}:${uid}:${key}`).digest("hex");
 }
 
-async function reserveIdempotencyKey(db, {operation, uid, key}) {
+async function reserveIdempotencyKey(db, {operation, uid, key, fingerprint}) {
   const ref = db.collection("admin_idempotency")
       .doc(idempotencyDocumentId(operation, uid, key));
   return db.runTransaction(async (transaction) => {
     const snap = await transaction.get(ref);
     if (snap.exists) {
       const data = snap.data() || {};
+      if (fingerprint && data.fingerprint !== fingerprint) {
+        throw new HttpsError("failed-precondition", "This request key belongs to a different or unverified payload; review the original operation.");
+      }
       if (data.status === "completed") return {ref, result: data.result || {}};
       throw new HttpsError("aborted", "This operation is already in progress.");
     }
     transaction.create(ref, {
       operation,
       actorUid: uid,
+      ...(fingerprint ? {fingerprint} : {}),
       status: "in_progress",
       createdAt: new Date(),
     });

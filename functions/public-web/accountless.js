@@ -1,4 +1,5 @@
 "use strict";
+const {requireActiveAccounts, readGuestRegistration} = require("../account/mutation-guard");
 
 const crypto = require("node:crypto");
 const {GoogleAuth} = require("google-auth-library");
@@ -11,7 +12,7 @@ const {registrationAnswers} = require("../events/question-answers");
 const CONTACT_HMAC_KEY = defineSecret("GUEST_CONTACT_HMAC_KEY");
 const CONTACT_KMS_KEY_NAME = defineSecret("GUEST_CONTACT_KMS_KEY_NAME");
 const STRIPE_SECRET_KEY = defineSecret("STRIPE_SECRET_KEY");
-const PUBLIC_ORIGIN = "https://attendus.app";
+const {publicOrigin} = require("./origin");
 const MANAGE_TOKEN_HOURS = 72;
 const RATE_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT = 8;
@@ -128,12 +129,14 @@ function eventStart(event) {
 }
 
 function validateEvent(event, now = new Date()) {
+  if (event?.launchScheduleNeedsReview === true) throw new HttpsError("failed-precondition", "The organizer must confirm the event schedule before registration or check-in.");
   const status = String(event?.status || "").toLowerCase();
   const start = eventStart(event || {});
   if (!event || event.private === true || !["active", "scheduled"].includes(status)) {
     throw new HttpsError("not-found", "Event not found.");
   }
-  if (Number.isNaN(start.getTime()) || start <= now) {
+  const end = require("../events/schedule").schedule(event || {}).end || start;
+  if (Number.isNaN(start.getTime()) || end <= now) {
     throw new HttpsError("failed-precondition", "This event has ended.");
   }
 }
@@ -206,8 +209,10 @@ function queueConfirmation(transaction, db, admin, {registrationId, guestId, eve
     channel: "email", status: "pending", attempts: 0,
     registrationId, guestId, eventId, encryptedEmail, maskedEmail: masked,
     payload: {firstName: greetingName, eventTitle: String(event.title || "Event").slice(0, 300),
-      eventStart: event.selectedDateTime, eventLocation: String(event.location || ""), kind,
-      manageUrl: `${PUBLIC_ORIGIN}/manage/${manageToken}`},
+      eventStart: event.selectedDateTime, eventLocation: String(event.location || ""),
+      eventDurationMinutes: event.eventDurationMinutes || null, eventDuration: event.eventDuration || null,
+      eventTimeZone: event.eventTimeZone || "UTC", eventRevision: event.eventRevision || 0, kind,
+      manageUrl: `${publicOrigin()}/manage/${manageToken}`},
     createdAt: admin.firestore.FieldValue.serverTimestamp(), nextAttemptAt: new Date()},
   {merge: true});
 }
@@ -241,18 +246,25 @@ function createStartPublicRegistrationV2(admin) {
       const existing = existingClaim.data();
       const duplicateManage = manageTokenData(admin, existing.guestId,
           existing.registrationId, "email_proof_only");
-      await Promise.all([
-        db.collection("GuestManageTokens").doc(duplicateManage.id).set(duplicateManage.document),
-        db.collection("OutboundMessages").doc(`resend_${crypto.randomUUID()}`).set({
+      await db.runTransaction(async (transaction) => {
+        const claim = await transaction.get(claimRef);
+        if (!claim.exists || claim.get("guestId") !== existing.guestId || claim.get("registrationId") !== existing.registrationId) {
+          throw new HttpsError("not-found", "Registration not found.");
+        }
+        await readGuestRegistration(db, transaction, {registrationId: existing.registrationId, guestId: existing.guestId, eventId, actorUid: caller.uid});
+        transaction.set(db.collection("GuestManageTokens").doc(duplicateManage.id), duplicateManage.document);
+        transaction.set(db.collection("OutboundMessages").doc(`resend_${crypto.randomUUID()}`), {
         templateId: "guest_registration_confirmation", channel: "email",
         status: "pending", attempts: 0, registrationId: existing.registrationId,
         guestId: existing.guestId, eventId, encryptedEmail, maskedEmail: maskedEmail(email),
         payload: {firstName: greetingName, eventTitle: String(event.title || "Event"), duplicate: true,
           eventStart: event.selectedDateTime, eventLocation: String(event.location || ""),
-          kind, manageUrl: `${PUBLIC_ORIGIN}/manage/${duplicateManage.raw}`},
+      eventDurationMinutes: event.eventDurationMinutes || null, eventDuration: event.eventDuration || null,
+      eventTimeZone: event.eventTimeZone || "UTC", eventRevision: event.eventRevision || 0,
+          kind, manageUrl: `${publicOrigin()}/manage/${duplicateManage.raw}`},
         createdAt: admin.firestore.FieldValue.serverTimestamp(), nextAttemptAt: new Date(),
-        }),
-      ]);
+        });
+      });
       return {status: "confirmation_pending", kind};
     }
 
@@ -269,10 +281,7 @@ function createStartPublicRegistrationV2(admin) {
     const retentionAt = new Date(eventStart(event).getTime() + retentionMonths * 31 * 86400000);
 
     if (kind === "paid_ticket") {
-      const maximum = Number(event.maxTickets || 0);
-      const issued = Number(event.issuedTickets || 0);
-      const reserved = Math.max(0, Number(event.reservedTickets || 0));
-      if (!Number.isSafeInteger(maximum) || maximum <= 0 || issued + reserved >= maximum) {
+      if (require("../events/capacity").ticketCapacityState(event).full) {
         throw new HttpsError("resource-exhausted", "No tickets are available.");
       }
       const amount = Math.round(Number(event.ticketPrice) * 100);
@@ -282,13 +291,14 @@ function createStartPublicRegistrationV2(admin) {
       const reservationId = `reservation_${digest(eventId, guestId)}`;
       const reservationRef = db.collection("TicketReservations").doc(reservationId);
       await db.runTransaction(async (transaction) => {
-        const [freshEvent, claim] = await Promise.all([
+        const [freshEvent, claim, deleting] = await Promise.all([
           transaction.get(eventRef), transaction.get(claimRef),
+          transaction.get(db.collection("account_deletion_jobs").doc(caller.uid)),
         ]);
+        if (deleting.exists) throw new HttpsError("failed-precondition", "Account deletion is in progress.");
         if (claim.exists) throw new HttpsError("already-exists", "Registration already exists.");
         const current = freshEvent.data(); validateEvent(current); validateRegistrationWindow(current);
-        if (Number(current.issuedTickets || 0) + Number(current.reservedTickets || 0) >=
-            Number(current.maxTickets || 0)) throw new HttpsError("resource-exhausted", "No tickets are available.");
+        if (require("../events/capacity").ticketCapacityState(current).full) throw new HttpsError("resource-exhausted", "No tickets are available.");
         transaction.create(guestRef, {id: guestId, ownerUid: caller.uid, fullName, greetingName,
           emailHash: hash, emailHashVersion: 1, encryptedEmail, maskedEmail: maskedEmail(email),
           verificationStatus: "pending",
@@ -334,30 +344,40 @@ function createStartPublicRegistrationV2(admin) {
         });
         throw new HttpsError("internal", "Unable to start secure checkout.");
       }
-      await Promise.all([
-        reservationRef.update({status: "payment_pending", paymentIntentId: intent.id,
-          clientSecret: intent.client_secret, updatedAt: now}),
-        db.collection("TicketPayments").doc(intent.id).set({id: intent.id,
+      await db.runTransaction(async (transaction) => {
+        const [reservation, guest, flow] = await Promise.all([transaction.get(reservationRef), transaction.get(guestRef), transaction.get(flowRef)]);
+        await requireActiveAccounts(db, transaction, caller.uid, guest.get("ownerUid"), guest.get("claimedByUid"), reservation.get("customerUid"));
+        if (!reservation.exists || !guest.exists || !flow.exists || reservation.get("status") !== "reserved" ||
+            reservation.get("guestId") !== guest.id || reservation.get("customerUid") !== caller.uid || flow.get("ownerUid") !== caller.uid) {
+          throw new HttpsError("failed-precondition", "Checkout is no longer available.");
+        }
+        transaction.update(reservationRef, {status: "payment_pending", paymentIntentId: intent.id,
+          clientSecret: intent.client_secret, updatedAt: now});
+        transaction.set(db.collection("TicketPayments").doc(intent.id), {id: intent.id,
           paymentIntentId: intent.id, reservationId, eventId, customerUid: caller.uid, guestId,
           identityType: caller.isAnonymous ? "guest" : "account", customerName: fullName,
           encryptedEmail,
-          amount: amount / 100, amountCents: amount, currency: "usd", status: "pending", createdAt: now}),
-      ]);
+          amount: amount / 100, amountCents: amount, currency: "usd", status: "pending", createdAt: now});
+      });
       return {status: "payment_pending", kind, flowId, clientSecret: intent.client_secret,
         amount, currency: "usd", claimToken: manage.raw,
-        manageUrl: `${PUBLIC_ORIGIN}/manage/${manage.raw}`};
+        manageUrl: `${publicOrigin()}/manage/${manage.raw}`};
     }
 
     let ticketId = null;
     let generatedTicketCode = null;
     await db.runTransaction(async (transaction) => {
-      const [freshEvent, claim] = await Promise.all([
+      const [freshEvent, claim, deleting] = await Promise.all([
         transaction.get(eventRef), transaction.get(claimRef),
+        transaction.get(db.collection("account_deletion_jobs").doc(caller.uid)),
       ]);
+      if (deleting.exists) throw new HttpsError("failed-precondition", "Account deletion is in progress.");
       if (claim.exists) throw new HttpsError("already-exists", "Registration already exists.");
       const current = freshEvent.data(); validateEvent(current); validateRegistrationWindow(current);
-      if (kind === "free_ticket" && Number(current.issuedTickets || 0) +
-          Number(current.reservedTickets || 0) >= Number(current.maxTickets || 0)) {
+      if (current.registrationPolicy?.approvalMode === "manual") throw new HttpsError("failed-precondition", "Update the app to request organizer approval.");
+      const totals = kind === "free_ticket" ? require("../events/capacity").ticketCapacityState(current) :
+        (current.confirmedRegistrationCount !== null && current.confirmedRegistrationCount !== undefined) ? require("../events/capacity").capacityState(current) : null;
+      if (totals?.full) {
         throw new HttpsError("resource-exhausted", "No tickets are available.");
       }
       transaction.create(guestRef, {id: guestId, ownerUid: caller.uid, fullName, greetingName,
@@ -369,7 +389,9 @@ function createStartPublicRegistrationV2(admin) {
       transaction.create(manageRef, manage.document);
       transaction.create(flowRef, {id: flowId, eventId, guestId, registrationId,
         ownerUid: caller.uid, kind, status: "confirmed", createdAt: now});
-      transaction.create(registrationRef, {id: registrationId, eventId, userName: fullName,
+      const countUpdate = require("../events/capacity").confirmedDelta(current, 1);
+      if (Object.keys(countUpdate).length) transaction.update(eventRef, countUpdate);
+      transaction.create(registrationRef, {id: registrationId, eventId, ticketId: kind === "free_ticket" ? `free_${digest(eventId, guestId)}` : null, userName: fullName,
         realName: fullName, customerUid: caller.uid, guestId,
         identityType: caller.isAnonymous ? "guest" : "account",
         emailRef: guestRef.path, attendanceDateTime: now,
@@ -378,7 +400,7 @@ function createStartPublicRegistrationV2(admin) {
       if (kind === "free_ticket") {
         ticketId = `free_${digest(eventId, guestId)}`;
         generatedTicketCode = ticketCode();
-        transaction.create(db.collection("Tickets").doc(ticketId), {id: ticketId, eventId,
+        transaction.create(db.collection("Tickets").doc(ticketId), {id: ticketId, eventId, registrationId,
           eventTitle: String(event.title || "Event"), eventImageUrl: String(event.imageUrl || ""),
           eventLocation: String(event.location || ""), eventDateTime: event.selectedDateTime,
           customerUid: caller.uid, guestId,
@@ -393,7 +415,7 @@ function createStartPublicRegistrationV2(admin) {
     });
     return {status: "confirmed", kind, flowId, registrationId, ticketId,
       ticketCode: generatedTicketCode, ticketQrSvg: await ticketQrSvg(generatedTicketCode),
-      claimToken: manage.raw, manageUrl: `${PUBLIC_ORIGIN}/manage/${manage.raw}`,
+      claimToken: manage.raw, manageUrl: `${publicOrigin()}/manage/${manage.raw}`,
       deliveryStatus: "pending"};
   });
 }
@@ -403,16 +425,66 @@ function createGetPublicRegistrationStatusV2(admin) {
   return onCall({region: "us-central1", enforceAppCheck: process.env.FUNCTIONS_EMULATOR !== "true",
     maxInstances: 30}, async (req) => {
     const caller = requireCaller(req);
-    const flowId = requireId(req.data?.flowId, "registration flow");
-    const snapshot = await db.collection("PublicRegistrationFlows").doc(flowId).get();
-    if (!snapshot.exists || snapshot.get("ownerUid") !== caller.uid) {
-      throw new HttpsError("not-found", "Registration not found.");
+    if (Boolean(req.data?.flowId) === Boolean(req.data?.eventId)) {
+      throw new HttpsError("invalid-argument", "Supply either a registration flow or event.");
     }
-    const flow = snapshot.data();
-    const ticket = flow.ticketId ? await db.collection("Tickets").doc(flow.ticketId).get() : null;
-    const code = ticket?.exists ? ticket.get("ticketCode") : null;
-    return {status: flow.status, kind: flow.kind, registrationId: flow.registrationId,
-      ticketId: flow.ticketId || null, ticketCode: code, ticketQrSvg: await ticketQrSvg(code)};
+    let flow = null;
+    let registration = null;
+    if (req.data.flowId) {
+      const snapshot = await db.collection("PublicRegistrationFlows")
+          .doc(requireId(req.data.flowId, "registration flow")).get();
+      if (!snapshot.exists || snapshot.get("ownerUid") !== caller.uid) {
+        throw new HttpsError("not-found", "Registration not found.");
+      }
+      flow = snapshot.data();
+      if (flow.status === "confirmation_pending") return {status: "confirmation_pending", kind: flow.kind};
+      if (flow.registrationId) registration = await db.collection("RegisterAttendance").doc(flow.registrationId).get();
+    } else {
+      const eventId = requireId(req.data.eventId, "event ID");
+      const event = await db.collection("Events").doc(eventId).get();
+      const sources = await Promise.all(["RegisterAttendance", "Tickets"].map(async (collection) => {
+        const snapshots = await Promise.all(["customerUid", "userId"].map((field) =>
+          db.collection(collection).where("eventId", "==", eventId).where(field, "==", caller.uid).get()));
+        return [...new Map(snapshots.flatMap((snapshot) => snapshot.docs).map((doc) => [doc.id, {...doc.data(), id: doc.id}])).values()]
+            .filter((row) => (row.customerUid || row.userId) === caller.uid);
+      }));
+      const available = event.exists && require("../attendance/arrival-core").activeEvent(event.data());
+      const admissions = require("../events/roster").buildRoster(...sources, [], [], event.data() || {})
+          .map((row) => ({id: row.id, registrationId: row.registrationId, ticketId: row.ticketId,
+            status: available ? row.status : "cancelled",
+            ticketCode: available && row.status === "confirmed" ? row.ticketCode : null})).sort((a, b) => a.id.localeCompare(b.id));
+      if (!admissions.length) return {status: "none", admissions: []};
+      const requested = req.data.registrationId || req.data.ticketId;
+      const selected = requested ? admissions.find((row) => req.data.registrationId ? row.registrationId === req.data.registrationId : row.ticketId === req.data.ticketId) :
+        admissions.length === 1 ? admissions[0] : null;
+      if (requested && !selected) throw new HttpsError("not-found", "Admission not found.");
+      return {status: selected?.status || (admissions.some((row) => row.status === "confirmed") ? "confirmed" : admissions[0].status),
+        eventStatus: event.get("status") || "unavailable", kind: selected?.ticketId ? "ticket" : "rsvp",
+        registrationId: selected?.registrationId || null, ticketId: selected?.ticketId || null,
+        ticketCode: selected?.ticketCode || null, ticketQrSvg: await ticketQrSvg(selected?.ticketCode), admissions};
+    }
+    if (!registration?.exists || (registration.get("customerUid") || registration.get("userId")) !== caller.uid) {
+      return {status: "none"};
+    }
+    const record = registration.data();
+    let ticket = null;
+    if (record.ticketId || flow?.ticketId) {
+      ticket = await db.collection("Tickets").doc(record.ticketId || flow.ticketId).get();
+    } else {
+      const tickets = await db.collection("Tickets").where("eventId", "==", record.eventId)
+          .where("registrationId", "==", registration.id).get();
+      if (tickets.size === 1) ticket = tickets.docs[0];
+    }
+    const currentEvent = await db.collection("Events").doc(record.eventId).get();
+    const eventStatus = currentEvent.get("status") || "unavailable";
+    const eventAvailable = currentEvent.exists && require("../attendance/arrival-core").activeEvent(currentEvent.data());
+    const active = require("../attendance/arrival-core").confirmedRegistration(record) && eventAvailable;
+    const ownedTicket = active && ticket?.exists && ticket.get("eventId") === record.eventId && (ticket.get("customerUid") || ticket.get("userId")) === caller.uid &&
+      require("../attendance/arrival-core").validTicket(ticket.data(), currentEvent.data() || {});
+    const code = ownedTicket ? ticket.get("ticketCode") : null;
+    return {status: eventAvailable ? record.status || "confirmed" : "cancelled", eventStatus, kind: flow?.kind || (ownedTicket ? "free_ticket" : "rsvp"),
+      registrationId: registration.id, ticketId: ownedTicket ? ticket.id : null,
+      ticketCode: code, ticketQrSvg: await ticketQrSvg(code)};
   });
 }
 
@@ -424,7 +496,8 @@ function createCancelPublicRegistrationV1(admin) {
     const registrationId = requireId(req.data?.registrationId, "registration");
     const ref = db.collection("RegisterAttendance").doc(registrationId);
     return db.runTransaction(async (transaction) => {
-      const registration = await transaction.get(ref);
+      const [registration, deleting] = await Promise.all([transaction.get(ref), transaction.get(db.collection("account_deletion_jobs").doc(caller.uid))]);
+      if (deleting.exists) throw new HttpsError("failed-precondition", "Account deletion is in progress.");
       if (!registration.exists || registration.get("customerUid") !== caller.uid) {
         throw new HttpsError("not-found", "Registration not found.");
       }
@@ -433,22 +506,16 @@ function createCancelPublicRegistrationV1(admin) {
       const eventRef = db.collection("Events").doc(data.eventId);
       const event = await transaction.get(eventRef);
       validateEvent(event.data());
-      const guestRef = db.collection("GuestAttendees").doc(data.guestId);
-      const guest = await transaction.get(guestRef);
-      const ticketQuery = await db.collection("Tickets").where("eventId", "==", data.eventId)
-          .where("customerUid", "==", caller.uid).limit(2).get();
-      const activeTicket = ticketQuery.docs.find((doc) => doc.get("revoked") !== true);
-      if (activeTicket?.get("isPaid") === true) {
-        throw new HttpsError("failed-precondition", "Paid ticket refunds require organizer support.");
-      }
+      const guest = data.guestId ? await transaction.get(db.collection("GuestAttendees").doc(data.guestId)) : null;
+      const {activeTickets, eventUpdate, previouslyConfirmed} = await require("../events/admission-cancellation").cancellationAdmissions(db, transaction, registration, event);
       transaction.update(ref, {status: "cancelled",
         cancelledAt: admin.firestore.FieldValue.serverTimestamp()});
-      if (activeTicket) {
+      for (const activeTicket of activeTickets) {
         transaction.update(activeTicket.ref, {revoked: true, revokedReason: "guest_cancelled",
           revokedAt: admin.firestore.FieldValue.serverTimestamp()});
-        transaction.update(eventRef, {issuedTickets: admin.firestore.FieldValue.increment(-1)});
       }
-      if (guest.exists && guest.get("encryptedEmail")) {
+      transaction.update(eventRef, eventUpdate);
+      if (guest?.exists && guest.get("encryptedEmail")) {
         const messageRef = db.collection("OutboundMessages")
             .doc(`cancellation_${registrationId}`);
         transaction.set(messageRef, {id: messageRef.id,
@@ -457,8 +524,11 @@ function createCancelPublicRegistrationV1(admin) {
           status: "pending", attempts: 0, registrationId, guestId: guest.id,
           eventId: event.id, encryptedEmail: guest.get("encryptedEmail"),
           maskedEmail: guest.get("maskedEmail"), payload: {
+            calendarPreviouslyConfirmed: previouslyConfirmed === true,
             firstName: guest.get("greetingName"), eventTitle: event.get("title"),
-            eventStart: event.get("selectedDateTime"), eventLocation: event.get("location"),
+            eventStart: event.get("selectedDateTime"), eventLocation: event.get("location") || "",
+            eventDurationMinutes: event.get("eventDurationMinutes") || null, eventDuration: event.get("eventDuration") || null,
+            eventTimeZone: event.get("eventTimeZone") || "UTC", eventRevision: event.get("eventRevision") || 0,
           }, createdAt: admin.firestore.FieldValue.serverTimestamp(), nextAttemptAt: new Date()});
       }
       return {status: "cancelled"};
@@ -467,12 +537,7 @@ function createCancelPublicRegistrationV1(admin) {
 }
 
 async function organizerAuthorized(db, uid, event) {
-  if (event.customerUid === uid || (event.coHosts || []).includes(uid)) return true;
-  if (!event.organizationId) return false;
-  const member = await db.collection("Organizations").doc(event.organizationId)
-      .collection("Members").doc(uid).get();
-  return member.exists && member.get("status") === "approved" &&
-    ["admin", "owner"].includes(String(member.get("role") || "").toLowerCase());
+  return (await require("../events/access").capabilities(db, uid, event)).manageEvent;
 }
 
 function createGetOrganizerEventRegistrationsV1(admin) {
@@ -485,8 +550,7 @@ function createGetOrganizerEventRegistrationsV1(admin) {
     if (!eventSnapshot.exists || !await organizerAuthorized(db, caller.uid, eventSnapshot.data())) {
       throw new HttpsError("permission-denied", "Event organizer access is required.");
     }
-    const registrations = await db.collection("RegisterAttendance").where("eventId", "==", eventId)
-        .limit(500).get();
+    const registrations = {docs: await require("../events/roster").allDocuments(db.collection("RegisterAttendance").where("eventId", "==", eventId))};
     const guestIds = registrations.docs.map((doc) => doc.get("guestId")).filter(Boolean);
     const guests = guestIds.length ? await db.getAll(...guestIds.map((id) =>
       db.collection("GuestAttendees").doc(id))) : [];
@@ -508,7 +572,9 @@ function createGetOrganizerEventRegistrationsV1(admin) {
 }
 
 function csvCell(value) {
-  return `"${String(value ?? "").replaceAll("\"", "\"\"")}"`;
+  const text = String(value ?? "");
+  const safe = /^[\s]*[=+@-]/.test(text) ? `'${text}` : text;
+  return `"${safe.replaceAll("\"", "\"\"")}"`;
 }
 
 function createExportOrganizerEventRegistrationsV1(admin) {
@@ -521,8 +587,7 @@ function createExportOrganizerEventRegistrationsV1(admin) {
     if (!event.exists || !await organizerAuthorized(db, caller.uid, event.data())) {
       throw new HttpsError("permission-denied", "Event organizer access is required.");
     }
-    const registrations = await db.collection("RegisterAttendance").where("eventId", "==", eventId)
-        .limit(500).get();
+    const registrations = {docs: await require("../events/roster").allDocuments(db.collection("RegisterAttendance").where("eventId", "==", eventId))};
     const rows = [["Name", "Email", "Status", "Identity"]];
     for (const document of registrations.docs) {
       const data = document.data();
@@ -566,23 +631,36 @@ function createResendPublicRegistrationConfirmationV1(admin) {
     secrets: [CONTACT_KMS_KEY_NAME], maxInstances: 20}, async (req) => {
     const caller = requireCaller(req);
     const registrationId = requireId(req.data?.registrationId, "registration");
-    requireIdempotencyKey(req.data?.idempotencyKey);
+    const idempotencyKey = requireIdempotencyKey(req.data?.idempotencyKey);
     await enforceRateLimit(db, caller.uid, "resend_confirmation");
     const {registration, guest, event} = await ownedRegistration(db, caller.uid, registrationId);
     const manage = manageTokenData(admin, guest.id, registration.id, caller.uid);
-    const messageRef = db.collection("OutboundMessages").doc(`resend_${crypto.randomUUID()}`);
-    await Promise.all([
-      db.collection("GuestManageTokens").doc(manage.id).set(manage.document),
-      messageRef.set({templateId: "guest_registration_confirmation",
+    const messageRef = db.collection("OutboundMessages").doc(`resend_${digest(caller.uid, registrationId, idempotencyKey)}`);
+    await db.runTransaction(async (transaction) => {
+      const fresh = await readGuestRegistration(db, transaction, {registrationId, guestId: guest.id, eventId: event.id, actorUid: caller.uid, requireOwnership: true});
+      const previous = await transaction.get(messageRef);
+      const currentEvent = await transaction.get(event.ref);
+      if (!currentEvent.exists) throw new HttpsError("not-found", "Event not found.");
+      if (previous.exists) return;
+      const status = fresh.registration.get("status");
+      const cancelled = currentEvent.get("cancelled") || ["cancelled", "canceled"].includes(currentEvent.get("status")) ||
+        fresh.registration.get("cancelled") || fresh.registration.get("revoked") || ["cancelled", "canceled", "revoked", "refunded"].includes(status);
+      const templateId = cancelled ? "guest_registration_cancelled" : status === "declined" ? "guest_registration_declined" :
+        status === "waitlisted" ? "guest_registration_waitlisted" : require("../attendance/arrival-core").confirmedRegistration(fresh.registration.data()) ?
+          "guest_registration_confirmation" : "guest_registration_pending";
+      transaction.set(db.collection("GuestManageTokens").doc(manage.id), manage.document);
+      transaction.create(messageRef, {templateId,
         channel: "email", status: "pending",
         attempts: 0, registrationId, guestId: guest.id, eventId: event.id,
-        encryptedEmail: guest.get("encryptedEmail"), maskedEmail: guest.get("maskedEmail"),
-        payload: {firstName: guest.get("greetingName"), eventTitle: event.get("title"),
-          eventStart: event.get("selectedDateTime"), eventLocation: event.get("location"),
-          kind: registration.get("registrationSource")?.includes("ticket") ? "ticket" : "rsvp",
-          manageUrl: `${PUBLIC_ORIGIN}/manage/${manage.raw}`},
-        createdAt: admin.firestore.FieldValue.serverTimestamp(), nextAttemptAt: new Date()}),
-    ]);
+        encryptedEmail: fresh.guest.get("encryptedEmail"), maskedEmail: fresh.guest.get("maskedEmail") || null,
+        payload: {firstName: fresh.guest.get("greetingName") || "there", eventTitle: currentEvent.get("title") || "Event",
+          eventStart: currentEvent.get("selectedDateTime") || null, eventLocation: currentEvent.get("location") || "",
+            eventDurationMinutes: currentEvent.get("eventDurationMinutes") || null, eventDuration: currentEvent.get("eventDuration") || null,
+            eventTimeZone: currentEvent.get("eventTimeZone") || "UTC", eventRevision: currentEvent.get("eventRevision") || 0,
+          kind: fresh.registration.get("ticketId") || currentEvent.get("ticketsEnabled") ? "ticket" : "rsvp",
+          manageUrl: `${publicOrigin()}/manage/${manage.raw}`},
+        createdAt: admin.firestore.FieldValue.serverTimestamp(), nextAttemptAt: new Date()});
+    });
     return {status: "pending", maskedEmail: guest.get("maskedEmail")};
   });
 }
@@ -603,10 +681,10 @@ function createUpdatePublicRegistrationEmailV1(admin) {
     const encrypted = await encryptEmail(email);
     await enforceRateLimit(db, caller.uid, "update_email");
     const {registration, guest, event} = await ownedRegistration(db, caller.uid, registrationId);
-    const oldClaim = db.collection("GuestEventEmailClaims")
-        .doc(digest(event.id, guest.get("emailHash")));
     const newClaim = db.collection("GuestEventEmailClaims").doc(digest(event.id, newHash));
     await db.runTransaction(async (transaction) => {
+      const fresh = await readGuestRegistration(db, transaction, {registrationId, guestId: guest.id, eventId: event.id, actorUid: caller.uid, requireOwnership: true});
+      const freshOldClaim = db.collection("GuestEventEmailClaims").doc(digest(event.id, fresh.guest.get("emailHash")));
       const collision = await transaction.get(newClaim);
       if (collision.exists && collision.get("guestId") !== guest.id) {
         throw new HttpsError("already-exists", "A registration already uses that email.");
@@ -614,7 +692,7 @@ function createUpdatePublicRegistrationEmailV1(admin) {
       transaction.set(newClaim, {eventId: event.id, guestId: guest.id, registrationId,
         emailHash: newHash, status: registration.get("status") || "confirmed",
         updatedAt: admin.firestore.FieldValue.serverTimestamp()});
-      if (oldClaim.id !== newClaim.id) transaction.delete(oldClaim);
+      if (freshOldClaim.id !== newClaim.id) transaction.delete(freshOldClaim);
       transaction.update(guest.ref, {emailHash: newHash,
         encryptedEmail: encrypted, maskedEmail: maskedEmail(email),
         verificationStatus: "pending", verifiedAt: null,
@@ -640,27 +718,43 @@ function createClaimPublicRegistrationV1(admin) {
     }
     const guest = await db.collection("GuestAttendees").doc(registration.get("guestId")).get();
     const tokenRef = db.collection("GuestManageTokens").doc(digest(claimToken));
-    const tickets = await db.collection("Tickets").where("eventId", "==", registration.get("eventId"))
-        .where("guestId", "==", guest.id).limit(2).get();
-    const name = String(guest.get("fullName") || "Attendee").slice(0, 160);
     await db.runTransaction(async (transaction) => {
       const token = await transaction.get(tokenRef);
-      if (!guest.exists || !token.exists || token.get("registrationId") !== registrationId ||
+      const fresh = await readGuestRegistration(db, transaction, {registrationId, guestId: guest.id, actorUid: caller.uid});
+      await requireActiveAccounts(db, transaction, token.get("ownerUid"), token.get("claimedByUid"));
+      const linkedTickets = await transaction.get(db.collection("Tickets").where("guestId", "==", fresh.guest.id));
+      for (const ticket of linkedTickets.docs) {
+        if (ticket.get("eventId") !== fresh.registration.get("eventId") || ticket.get("registrationId") !== registrationId) {
+          throw new HttpsError("failed-precondition", "Admission linkage requires review.");
+        }
+        await requireActiveAccounts(db, transaction, ticket.get("customerUid"), ticket.get("userId"));
+      }
+      if (fresh.guest.get("claimedByUid") && fresh.guest.get("claimedByUid") !== caller.uid) {
+        throw new HttpsError("permission-denied", "This registration is already linked to an account.");
+      }
+      if (token.get("status") === "claimed" && token.get("claimedByUid") === caller.uid &&
+          token.get("registrationId") === registrationId && token.get("guestId") === guest.id &&
+          fresh.registration.get("customerUid") === caller.uid && fresh.guest.get("ownerUid") === caller.uid &&
+          fresh.guest.get("claimedByUid") === caller.uid) return;
+      if (!fresh.guest.exists || !token.exists || token.get("registrationId") !== registrationId ||
           token.get("guestId") !== guest.id || !["active", "exchanged"].includes(token.get("status")) ||
-          token.get("expiresAt")?.toDate?.() <= new Date()) {
+          (!token.get("expiresAt")?.toDate?.() || token.get("expiresAt").toDate() <= new Date())) {
         throw new HttpsError("permission-denied", "This registration claim is invalid or expired.");
       }
-      transaction.set(db.collection("Customers").doc(caller.uid), {uid: caller.uid, name,
+      const profileRef = db.collection("Customers").doc(caller.uid);
+      const profile = await transaction.get(profileRef);
+      if (!profile.exists) transaction.create(profileRef, {uid: caller.uid, name: String(fresh.guest.get("fullName") || "Attendee").slice(0, 160),
         email: String(req.auth.token.email || "").toLowerCase(),
         username: `attendee_${caller.uid.slice(0, 12).toLowerCase()}`, isDiscoverable: false,
+        eventsCreated: 0, groupsCreated: 0,
         accountSource: "guest_registration_upgrade", profileCompletionRequired: true,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()}, {merge: true});
+        createdAt: admin.firestore.FieldValue.serverTimestamp()});
       transaction.update(guest.ref, {ownerUid: caller.uid, claimedByUid: caller.uid,
         claimedAt: admin.firestore.FieldValue.serverTimestamp()});
       transaction.update(registration.ref, {customerUid: caller.uid,
         identityType: "account", isAnonymous: false,
         claimCompletedAt: admin.firestore.FieldValue.serverTimestamp()});
-      for (const ticket of tickets.docs) transaction.update(ticket.ref, {
+      for (const ticket of linkedTickets.docs) transaction.update(ticket.ref, {
         customerUid: caller.uid, identityType: "account",
         claimCompletedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -677,51 +771,41 @@ function createFollowPublicEventOrganizerV1(admin) {
     maxInstances: 20}, async (req) => {
     const caller = requireCaller(req, {full: true});
     const eventId = requireId(req.data?.eventId, "event ID");
-    const event = await db.collection("Events").doc(eventId).get();
-    if (!event.exists || event.get("private") === true) {
-      throw new HttpsError("not-found", "Event not found.");
-    }
-    const organizationId = String(event.get("organizationId") || "");
-    const now = admin.firestore.FieldValue.serverTimestamp();
-    if (organizationId) {
-      await db.collection("Organizations").doc(organizationId).collection("Followers")
-          .doc(caller.uid).set({userId: caller.uid, organizationId, createdAt: now});
-      return {status: "following", type: "organization"};
-    }
-    const organizerUid = String(event.get("customerUid") || "");
-    if (!organizerUid) throw new HttpsError("failed-precondition", "Organizer is unavailable.");
-    const batch = db.batch();
-    batch.set(db.collection("Customers").doc(organizerUid).collection("followers")
-        .doc(caller.uid), {userId: caller.uid, organizerUid, createdAt: now});
-    batch.set(db.collection("Customers").doc(caller.uid).collection("following")
-        .doc(organizerUid), {userId: organizerUid, followerUid: caller.uid, createdAt: now});
-    await batch.commit();
-    return {status: "following", type: "organizer"};
+    return db.runTransaction(async (transaction) => {
+      const event = await transaction.get(db.collection("Events").doc(eventId));
+      if (!event.exists || event.get("private") === true) throw new HttpsError("not-found", "Event not found.");
+      const organizerUid = String(event.get("customerUid") || "");
+      const organizationId = String(event.get("organizationId") || "");
+      const organization = organizationId ? await transaction.get(db.collection("Organizations").doc(organizationId)) : null;
+      await requireActiveAccounts(db, transaction, caller.uid, organizerUid, organization?.get("createdBy"));
+      const now = admin.firestore.FieldValue.serverTimestamp();
+      if (organizationId) {
+        if (!organization.exists) throw new HttpsError("not-found", "Organizer is unavailable.");
+        transaction.set(organization.ref.collection("Followers").doc(caller.uid), {userId: caller.uid, organizationId, createdAt: now});
+        return {status: "following", type: "organization"};
+      }
+      if (!organizerUid) throw new HttpsError("failed-precondition", "Organizer is unavailable.");
+      transaction.set(db.collection("Customers").doc(organizerUid).collection("followers")
+          .doc(caller.uid), {userId: caller.uid, organizerUid, createdAt: now});
+      transaction.set(db.collection("Customers").doc(caller.uid).collection("following")
+          .doc(organizerUid), {userId: organizerUid, followerUid: caller.uid, createdAt: now});
+      return {status: "following", type: "organizer"};
+    });
   });
 }
 
 function createAnonymizeExpiredGuestContacts(admin) {
-  const db = admin.firestore();
   return onSchedule({region: "us-central1", schedule: "every day 03:15",
-    timeZone: "UTC", timeoutSeconds: 240}, async () => {
-    const snapshot = await db.collection("GuestAttendees")
-        .where("retentionAt", "<=", new Date()).limit(200).get();
-    let anonymized = 0;
-    for (const document of snapshot.docs) {
-      if (document.get("claimedByUid") || document.get("anonymizedAt")) continue;
-      await document.ref.update({fullName: "Former attendee", greetingName: null,
-        encryptedEmail: null, maskedEmail: "Expired", emailHash: null,
-        verificationStatus: "expired", anonymizedAt: admin.firestore.FieldValue.serverTimestamp()});
-      anonymized += 1;
-    }
-    return {scanned: snapshot.size, anonymized};
-  });
+    timeZone: "UTC", timeoutSeconds: 240}, () =>
+    require("./guest-retention").anonymizeExpiredGuestContacts(admin));
 }
-
 module.exports = {
   CONTACT_HMAC_KEY,
   CONTACT_KMS_KEY_NAME,
   STRIPE_SECRET_KEY,
+  requireCaller,
+  csvCell,
+  organizerAuthorized,
   createCancelPublicRegistrationV1,
   createAnonymizeExpiredGuestContacts,
   createClaimPublicRegistrationV1,

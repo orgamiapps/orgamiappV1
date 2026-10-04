@@ -40,7 +40,7 @@ class AccountAccessService {
     AccountFeature.groups ||
     AccountFeature.createGroup ||
     AccountFeature.joinGroup => 'Join the Attendus community',
-    AccountFeature.messages => 'Sign in to message',
+    AccountFeature.messages => 'Log in to message',
     AccountFeature.profile ||
     AccountFeature.attendeeProfiles => 'Profiles require an account',
     AccountFeature.notifications => 'Keep up with your activity',
@@ -48,7 +48,7 @@ class AccountAccessService {
     AccountFeature.registration ||
     AccountFeature.tickets => 'Save this event to your account',
     AccountFeature.analytics => 'Unlock event analytics',
-    _ => 'Sign in to continue',
+    _ => 'Log in to continue',
   };
 
   static String message(AccountFeature feature) => switch (feature) {
@@ -61,23 +61,23 @@ class AccountAccessService {
     AccountFeature.joinGroup =>
       'Create an account to join this group and participate.',
     AccountFeature.messages =>
-      'Sign in to start conversations with people in Attendus.',
+      'Log in to start conversations with people in Attendus.',
     AccountFeature.profile =>
       'Create an account to manage your profile, activity, tickets, and badges.',
     AccountFeature.attendeeProfiles =>
-      'Sign in to view attendee profiles and connect with people.',
+      'Log in to view attendee profiles and connect with people.',
     AccountFeature.account =>
-      'Sign in to access settings, subscriptions, and account tools.',
+      'Log in to access settings, subscriptions, and account tools.',
     AccountFeature.notifications =>
-      'Sign in to receive and manage personalized notifications.',
+      'Log in to receive and manage personalized notifications.',
     AccountFeature.registration || AccountFeature.tickets =>
       'Create an account to register, purchase tickets, and keep them available across devices.',
-    AccountFeature.comments => 'Sign in to join the event conversation.',
-    AccountFeature.favorites => 'Sign in to save events to your favorites.',
-    AccountFeature.feedback => 'Sign in to submit and manage event feedback.',
+    AccountFeature.comments => 'Log in to join the event conversation.',
+    AccountFeature.favorites => 'Log in to save events to your favorites.',
+    AccountFeature.feedback => 'Log in to submit and manage event feedback.',
     AccountFeature.accessRequest =>
-      'Sign in to request access to this private event.',
+      'Log in to request access to this private event.',
     AccountFeature.analytics =>
-      'Sign in to view attendance analytics and insights.',
+      'Log in to view attendance analytics and insights.',
   };
 }

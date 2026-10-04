@@ -18,16 +18,33 @@ class BlockedUsersScreen extends StatefulWidget {
 class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
   final _auth = FirebaseAuth.instance;
   final _firestore = FirebaseFirestore.instance;
+  StreamSubscription<User?>? _authSubscription;
+  int _revision = 0;
   bool _loading = true;
   List<_BlockedUser> _blocked = [];
 
   @override
   void initState() {
     super.initState();
+    _authSubscription = _auth.authStateChanges().listen((_) {
+      if (!mounted) return;
+      setState(() {
+        _blocked = [];
+        _loading = true;
+      });
+      _loadBlocked();
+    });
     _loadBlocked();
   }
 
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
+
   Future<void> _loadBlocked() async {
+    final revision = ++_revision;
     final uid = _auth.currentUser?.uid;
     if (uid == null) {
       setState(() {
@@ -42,26 +59,29 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
           .collection('blocks')
           .get();
       final items = <_BlockedUser>[];
+      final profiles = await FirebaseFirestoreHelper().getUsersByIds(
+        userIds: snap.docs.map((doc) => doc.id).toList(),
+      );
+      final byId = {for (final profile in profiles) profile.uid: profile};
       for (final d in snap.docs) {
-        final targetId = d.id;
-        final userDoc = await _firestore
-            .collection('Customers')
-            .doc(targetId)
-            .get();
-        final data = userDoc.data() ?? {};
+        final profile = byId[d.id];
         items.add(
           _BlockedUser(
-            uid: targetId,
-            name: (data['name'] ?? 'User') as String,
-            profilePictureUrl: data['profilePictureUrl'] as String?,
+            uid: d.id,
+            name: profile?.name ?? 'Unavailable account',
+            profilePictureUrl: profile?.profilePictureUrl,
           ),
         );
+      }
+      if (!mounted || revision != _revision || uid != _auth.currentUser?.uid) {
+        return;
       }
       setState(() {
         _blocked = items;
         _loading = false;
       });
     } catch (_) {
+      if (!mounted || revision != _revision) return;
       setState(() {
         _loading = false;
       });
@@ -75,7 +95,7 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
       blockerId: uid,
       blockedUserId: blockedUserId,
     );
-    if (mounted) {
+    if (mounted && _auth.currentUser?.uid == uid) {
       setState(() {
         _blocked.removeWhere((e) => e.uid == blockedUserId);
       });

@@ -1,3 +1,4 @@
+const {publicOrigin} = require("./public-web/origin");
 /**
  * Import function triggers from their respective submodules:
  *
@@ -53,6 +54,7 @@ const {
 } = require("./communications/delivery");
 const {createEventWizardFunctions} = require("./events/wizard");
 const {createStartPublicRegistrationV3} = require("./events/registration-v3");
+const {createLaunchOperations} = require("./events/launch-operations");
 
 const GOOGLE_PLACES_API_KEY = defineSecret("GOOGLE_PLACES_API_KEY");
 const placesRateWindows = new Map();
@@ -226,7 +228,7 @@ exports.placesAutocomplete = onCall(
         const bias = req.data?.locationBias;
         const lat = Number(bias?.latitude);
         const lng = Number(bias?.longitude);
-        if (bias !== undefined && (!Number.isFinite(lat) || !Number.isFinite(lng) ||
+        if (bias !== undefined && (typeof bias?.latitude !== "number" || typeof bias?.longitude !== "number" || !Number.isFinite(lat) || !Number.isFinite(lng) ||
           lat < -90 || lat > 90 || lng < -180 || lng > 180)) {
           throw new HttpsError("invalid-argument", "Invalid location bias.");
         }
@@ -375,7 +377,7 @@ exports.reverseGeocode = onCall(
       await requirePlacesCaller(req, {allowAnonymous: useCase === "discoveryCity"});
       const latitude = Number(req.data?.latitude);
       const longitude = Number(req.data?.longitude);
-      if (!Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+      if (typeof req.data?.latitude !== "number" || typeof req.data?.longitude !== "number" || !Number.isFinite(latitude) || !Number.isFinite(longitude) ||
         latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
         throw new HttpsError("invalid-argument", "Valid coordinates are required.");
       }
@@ -505,6 +507,13 @@ exports.dispatchPendingPush = onDocumentCreated("pendingPushNotifications/{docId
     const token = data.fcmToken;
     const title = data.title || "Attendus";
     const body = data.body || "New notification";
+    const isolation = await require("./communications/qualification-isolation").interceptQualification(admin.firestore(), {
+      actorUid: data.senderId, recipientUid: data.receiverId, conversationId: data.conversationId, eventId: data.eventId,
+    }, `pending:${snap.id}`, {title, body, type: data.type || "message", conversationId: data.conversationId || null});
+    if (isolation.mode !== "normal") {
+      await snap.ref.set({status: `qualification_${isolation.mode}`, updatedAt: admin.firestore.FieldValue.serverTimestamp()}, {merge: true});
+      return;
+    }
     if (!token || typeof token !== "string" || token.length < 10) {
       logger.warn("No valid fcmToken, removing pending push", {id: snap.id});
       await snap.ref.delete();
@@ -519,6 +528,7 @@ exports.dispatchPendingPush = onDocumentCreated("pendingPushNotifications/{docId
         conversationId: String(data.conversationId || ""),
         senderId: String(data.senderId || ""),
         receiverId: String(data.receiverId || ""),
+        recipientUid: String(data.receiverId || ""),
       },
       android: {
         priority: "high",
@@ -529,6 +539,10 @@ exports.dispatchPendingPush = onDocumentCreated("pendingPushNotifications/{docId
       },
     };
 
+    if (!await require("./notifications/push-tokens").canDeliverPush(admin.firestore(), data.receiverId, token)) {
+      await snap.ref.delete();
+      return;
+    }
     const id = await admin.messaging().send(message);
     logger.info("Push sent", {fcmMessageId: id, to: data.receiverId});
 
@@ -548,955 +562,34 @@ exports.dispatchPendingPush = onDocumentCreated("pendingPushNotifications/{docId
  * - Apple Wallet: Generates a PKPass file and returns a download URL
  * - Google Wallet: Creates a JWT Save URL for Google Pay
  */
-exports.generateUserBadgePass = onCall({region: "us-central1"}, async (req) => {
-  try {
-    const {uid, platform} = req.data || {};
-    if (!uid || !platform) {
-      throw new Error("INVALID_ARGUMENT: { uid, platform } required");
-    }
-
-    // Get user data from Firestore
-    const userData = await getUserData(uid);
-    if (!userData) {
-      throw new Error("USER_NOT_FOUND: Unable to find user data");
-    }
-
-    let url;
-    if (platform === "apple") {
-      url = await generateApplePassUrl(uid, userData);
-    } else if (platform === "google") {
-      url = await generateGoogleSaveUrl(uid, userData);
-    } else {
-      throw new Error("INVALID_ARGUMENT: platform must be 'apple' or 'google'");
-    }
-
-    logger.info("Generated wallet link", {uid, platform});
-    return {url};
-  } catch (err) {
-    logger.error("generateUserBadgePass failed", err);
-    throw new Error(`INTERNAL: Failed to generate wallet pass link: ${err.message}`);
+exports.generateUserBadgePass = onCall({region: "us-central1",
+  enforceAppCheck: process.env.FUNCTIONS_EMULATOR !== "true",
+  secrets: [require("./attendance/arrival").SIGNING_KEY],
+}, async (req) => {
+  const attendance = require("./attendance/v2");
+  const uid = attendance.requireFullAccount(req);
+  if (req.data?.uid && req.data.uid !== uid) {
+    throw new HttpsError("permission-denied", "You can only request your own pass.");
   }
+  await attendance.enforceRateLimit(admin.firestore(), uid, "attendance_pass_issue");
+  const arrival = require("./attendance/arrival");
+  const pass = await arrival.issuePass(admin.firestore(), uid, {kind: "identity"}, {fullAccount: true});
+  const response = await arrival.passResponse(admin.firestore(), pass);
+  const url = req.data?.platform === "apple" ? response.appleWalletUrl : response.googleWalletUrl;
+  if (!url) throw new HttpsError("failed-precondition", "Wallet delivery is not configured.");
+  return {url};
 });
-
-// ---- Helper function to get user data ----
-async function getUserData(uid) {
-  try {
-    const db = admin.firestore();
-
-    // Get user badge data
-    const badgeDoc = await db.collection("UserBadges").doc(uid).get();
-    if (!badgeDoc.exists) {
-      return null;
-    }
-
-    return badgeDoc.data();
-  } catch (error) {
-    logger.error("Error getting user data:", error);
-    return null;
-  }
-}
-
-// ---- Apple Wallet (PKPass) Implementation ----
-// Generates a PKPass file and uploads it to Firebase Storage
-const archiver = require("archiver");
-const {randomUUID} = require("node:crypto");
-
-async function generateApplePassUrl(uid, userData) {
-  try {
-    const bucket = admin.storage().bucket();
-    const passId = randomUUID();
-    const fileName = `passes/${passId}.pkpass`;
-
-    // Create pass.json content
-    const passData = {
-      formatVersion: 1,
-      passTypeIdentifier: "pass.com.attendus.badge",
-      serialNumber: uid,
-      teamIdentifier: "ATTENDUS",
-      organizationName: "Attendus",
-      description: "Attendus Member Badge",
-      logoText: "Attendus",
-      foregroundColor: "rgb(255, 255, 255)",
-      backgroundColor: "rgb(70, 144, 226)",
-      generic: {
-        primaryFields: [
-          {
-            key: "level",
-            label: "Badge Level",
-            value: userData.badgeLevel || "Member",
-          },
-        ],
-        secondaryFields: [
-          {
-            key: "name",
-            label: "Name",
-            value: userData.userName || "Attendus Member",
-          },
-          {
-            key: "member-since",
-            label: "Member Since",
-            value: userData.memberSince ? new Date(userData.memberSince.toDate()).getFullYear().toString() : "2024",
-          },
-        ],
-        auxiliaryFields: [
-          {
-            key: "events-created",
-            label: "Events Created",
-            value: userData.eventsCreated?.toString() || "0",
-          },
-          {
-            key: "events-attended",
-            label: "Events Attended",
-            value: userData.eventsAttended?.toString() || "0",
-          },
-        ],
-      },
-      barcodes: [
-        {
-          message: userData.badgeQrData || `attendus-badge-${uid}`,
-          format: "PKBarcodeFormatQR",
-          messageEncoding: "iso-8859-1",
-        },
-      ],
-    };
-
-    // Create a zip archive for the pass
-    const archive = archiver("zip", {zlib: {level: 9}});
-    const file = bucket.file(fileName);
-    const stream = file.createWriteStream({
-      metadata: {
-        contentType: "application/vnd.apple.pkpass",
-        cacheControl: "public, max-age=3600",
-      },
-    });
-
-    archive.pipe(stream);
-
-    // Add pass.json to the archive
-    archive.append(JSON.stringify(passData, null, 2), {name: "pass.json"});
-
-    // Add a simple manifest.json (for basic pass structure)
-    const manifest = {
-      "pass.json": "placeholder-checksum",
-    };
-    archive.append(JSON.stringify(manifest), {name: "manifest.json"});
-
-    // Finalize the archive
-    await archive.finalize();
-
-    // Wait for upload to complete
-    await new Promise((resolve, reject) => {
-      stream.on("error", reject);
-      stream.on("finish", resolve);
-    });
-
-    // Generate a signed URL for the pass
-    const [url] = await file.getSignedUrl({
-      action: "read",
-      expires: Date.now() + 3600000, // 1 hour
-    });
-
-    return url;
-  } catch (error) {
-    logger.error("Error generating Apple pass:", error);
-    // Return a fallback URL that will show a helpful error message
-    return `data:text/plain,Error generating Apple Wallet pass. Please try again later.`;
-  }
-}
-
-// ---- Google Wallet Implementation ----
-// Creates a proper Google Wallet generic pass using the Google Wallet API
-const jwt = require("jsonwebtoken");
-const {GoogleAuth} = require("google-auth-library");
-
-async function generateGoogleSaveUrl(uid, userData) {
-  try {
-    // First, let's create the generic pass class and object
-    await createGoogleWalletClass();
-
-    // Create object ID using a clean format
-    const objectId = `attendus-badge-${uid}`.replace(/[^a-zA-Z0-9-_.~]/g, "");
-    const issuerId = process.env.GOOGLE_WALLET_ISSUER_ID || "3388000000022295094";
-    const classId = `${issuerId}.attendus_member_badge_class`;
-    const fullObjectId = `${issuerId}.${objectId}`;
-
-    // Create the generic object for this specific user
-    await createGoogleWalletObject(fullObjectId, classId, userData);
-
-    // Create JWT for Save to Google Pay
-    const iat = Math.floor(Date.now() / 1000);
-    const exp = iat + 3600; // 1 hour expiry
-
-    const payload = {
-      iss: process.env.GOOGLE_CLIENT_EMAIL || admin.credential.cert().client_email,
-      aud: "google",
-      typ: "savetowallet",
-      iat: iat,
-      exp: exp,
-      payload: {
-        genericObjects: [
-          {
-            id: fullObjectId,
-          },
-        ],
-      },
-    };
-
-    // Get the private key from service account
-    const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n") ||
-                      admin.credential.cert().private_key;
-
-    if (!privateKey) {
-      throw new Error("Google Wallet private key not configured");
-    }
-
-    const token = jwt.sign(payload, privateKey, {
-      algorithm: "RS256",
-      header: {
-        typ: "JWT",
-        alg: "RS256",
-      },
-    });
-
-    const saveUrl = `https://pay.google.com/gp/v/save/${token}`;
-    logger.info("Generated Google Wallet save URL", {uid, saveUrl: saveUrl.substring(0, 100) + "..."});
-
-    return saveUrl;
-  } catch (error) {
-    logger.error("Error generating Google Wallet pass:", error);
-    // Fallback to a more helpful error message
-    return `data:text/plain,Google Wallet integration requires additional setup. Please contact support for assistance.`;
-  }
-}
-
-// Create Google Wallet generic pass class
-async function createGoogleWalletClass() {
-  try {
-    const issuerId = process.env.GOOGLE_WALLET_ISSUER_ID || "3388000000022295094";
-    const classId = `${issuerId}.attendus_member_badge_class`;
-
-    // Initialize Google Auth
-    const auth = new GoogleAuth({
-      scopes: ["https://www.googleapis.com/auth/wallet_object.issuer"],
-    });
-
-    const authClient = await auth.getClient();
-    const {google} = require("googleapis");
-
-    const walletobjects = google.walletobjects({
-      version: "v1",
-      auth: authClient,
-    });
-
-    const genericClass = {
-      id: classId,
-      classTemplateInfo: {
-        cardTemplateOverride: {
-          cardRowTemplateInfos: [
-            {
-              oneItem: {
-                item: {
-                  firstValue: {
-                    fields: [
-                      {
-                        fieldPath: "object.textModulesData[\"scan_instruction\"]",
-                      },
-                    ],
-                  },
-                },
-              },
-            },
-            {
-              twoItems: {
-                startItem: {
-                  firstValue: {
-                    fields: [
-                      {
-                        fieldPath: "object.textModulesData[\"level\"]",
-                      },
-                    ],
-                  },
-                },
-                endItem: {
-                  firstValue: {
-                    fields: [
-                      {
-                        fieldPath: "object.textModulesData[\"validity\"]",
-                      },
-                    ],
-                  },
-                },
-              },
-            },
-            {
-              oneItem: {
-                item: {
-                  firstValue: {
-                    fields: [
-                      {
-                        fieldPath: "object.textModulesData[\"member_info\"]",
-                      },
-                    ],
-                  },
-                },
-              },
-            },
-            {
-              oneItem: {
-                item: {
-                  firstValue: {
-                    fields: [
-                      {
-                        fieldPath: "object.textModulesData[\"stats\"]",
-                      },
-                    ],
-                  },
-                },
-              },
-            },
-          ],
-        },
-      },
-    };
-
-    // Try to create the class (it's okay if it already exists)
-    try {
-      await walletobjects.genericclass.insert({
-        resource: genericClass,
-      });
-      logger.info("Google Wallet class created successfully");
-    } catch (error) {
-      if (error.code === 409) {
-        logger.info("Google Wallet class already exists");
-      } else {
-        throw error;
-      }
-    }
-  } catch (error) {
-    logger.error("Error creating Google Wallet class:", error);
-    // Don't throw here, let the main function handle it
-  }
-}
-
-// Create Google Wallet generic object for specific user
-async function createGoogleWalletObject(objectId, classId, userData) {
-  try {
-    const auth = new GoogleAuth({
-      scopes: ["https://www.googleapis.com/auth/wallet_object.issuer"],
-    });
-
-    const authClient = await auth.getClient();
-    const {google} = require("googleapis");
-
-    const walletobjects = google.walletobjects({
-      version: "v1",
-      auth: authClient,
-    });
-
-    const badgeLevel = userData.badgeLevel || "Member";
-    const userName = userData.userName || "Attendus Member";
-    const eventsCreated = userData.eventsCreated || 0;
-    const eventsAttended = userData.eventsAttended || 0;
-    const memberSince = userData.memberSince ? new Date(userData.memberSince.toDate()).getFullYear() : 2024;
-
-    const genericObject = {
-      id: objectId,
-      classId: classId,
-      logo: {
-        sourceUri: {
-          uri: "https://firebasestorage.googleapis.com/v0/b/orgami-66nxok.appspot.com/o/app_assets%2FinAppLogo.png?alt=media",
-        },
-      },
-      cardTitle: {
-        defaultValue: {
-          language: "en-US",
-          value: "Attendus",
-        },
-      },
-      header: {
-        defaultValue: {
-          language: "en-US",
-          value: "EVENT BADGE",
-        },
-      },
-      subheader: {
-        defaultValue: {
-          language: "en-US",
-          value: userName,
-        },
-      },
-      // Use silver gradient colors to match the professional badge
-      hexBackgroundColor: "#C0C0C0",
-      textModulesData: [
-        {
-          id: "scan_instruction",
-          header: "SCAN TO ACTIVATE",
-          body: "Valid for all your tickets",
-        },
-        {
-          id: "level",
-          header: "Badge Level",
-          body: badgeLevel,
-        },
-        {
-          id: "member_info",
-          header: "Member Details",
-          body: `${userName} • Since ${memberSince}`,
-        },
-        {
-          id: "stats",
-          header: "Activity Stats",
-          body: `${eventsCreated} Events Created • ${eventsAttended} Attended`,
-        },
-        {
-          id: "validity",
-          header: "Valid",
-          body: memberSince.toString(),
-        },
-      ],
-      linksModuleData: {
-        uris: [
-          {
-            uri: "https://attendus.app",
-            description: "Attendus App",
-            id: "app_link",
-          },
-        ],
-      },
-      barcode: {
-        type: "QR_CODE",
-        value: userData.badgeQrData || `attendus://user/${userData.uid || "unknown"}`,
-        alternateText: `Attendus Member: ${userName}`,
-        renderEncoding: "UTF_8",
-      },
-      heroImage: {
-        sourceUri: {
-          uri: "https://firebasestorage.googleapis.com/v0/b/orgami-66nxok.appspot.com/o/app_assets%2FinAppLogo.png?alt=media",
-        },
-        contentDescription: {
-          defaultValue: {
-            language: "en-US",
-            value: "Attendus Professional Badge",
-          },
-        },
-      },
-    };
-
-    // Try to create the object, or update if it exists
-    try {
-      await walletobjects.genericobject.insert({
-        resource: genericObject,
-      });
-      logger.info("Google Wallet object created successfully");
-    } catch (error) {
-      if (error.code === 409) {
-        // Object exists, try to update it
-        await walletobjects.genericobject.update({
-          resourceId: objectId,
-          resource: genericObject,
-        });
-        logger.info("Google Wallet object updated successfully");
-      } else {
-        throw error;
-      }
-    }
-  } catch (error) {
-    logger.error("Error creating Google Wallet object:", error);
-    throw error;
-  }
-}
 
 /**
  * Aggregate attendance data when a new attendance record is created
  * Updates event_analytics collection with aggregated data
  */
-exports.aggregateAttendanceData = onDocumentCreated("Attendance/{docId}",
-    async (event) => {
-      try {
-        const attendanceData = event.data.data();
-        const eventId = attendanceData.eventId;
-        if (typeof eventId !== "string" || eventId.trim().length === 0) {
-          logger.warn("Skipping malformed attendance without an eventId", {
-            attendanceId: event.params.docId,
-          });
-          return {skipped: true, reason: "missing_event_id"};
-        }
-
-        const customerUid = attendanceData.customerUid || attendanceData.userId;
-        const rawAttendanceTime = attendanceData.attendanceDateTime ||
-          attendanceData.checkedInAt || attendanceData.createdAt;
-        const parsedAttendanceTime = rawAttendanceTime?.toDate ?
-          rawAttendanceTime.toDate() : new Date(rawAttendanceTime || Date.now());
-        const attendanceDateTime = Number.isNaN(parsedAttendanceTime.getTime()) ?
-          new Date() : parsedAttendanceTime;
-
-        logger.info("Processing attendance for event:", eventId);
-
-        // Get hour bucket for hourlySignIns (e.g., '10:00')
-        const hour = attendanceDateTime.getHours();
-        const hourStr = hour.toString().padStart(2, "0");
-        const hourBucket = `${hourStr}:00`;
-
-        const db = admin.firestore();
-        let isRepeatAttendee = false;
-        if (customerUid && customerUid !== "manual" &&
-            customerUid !== "pre-registered") {
-          try {
-            const eventDocument = await db.collection("Events").doc(eventId).get();
-            const eventOwnerUid = eventDocument.get("customerUid") ||
-              eventDocument.get("ownerId") || eventDocument.get("createdBy");
-            if (eventOwnerUid) {
-              const hostEvents = await db.collection("Events")
-                  .where("customerUid", "==", eventOwnerUid)
-                  .get();
-              const previousEventIds = hostEvents.docs
-                  .map((document) => document.id)
-                  .filter((id) => id !== eventId);
-              for (let offset = 0; offset < previousEventIds.length;
-                offset += 30) {
-                const eventIds = previousEventIds.slice(offset, offset + 30);
-                const priorAttendance = await db.collection("Attendance")
-                    .where("customerUid", "==", customerUid)
-                    .where("eventId", "in", eventIds)
-                    .limit(1)
-                    .get();
-                if (!priorAttendance.empty) {
-                  isRepeatAttendee = true;
-                  break;
-                }
-              }
-            }
-          } catch (repeatError) {
-            logger.warn("Repeat-attendee calculation was skipped", {
-              eventId,
-              code: repeatError.code || "unknown",
-            });
-          }
-        }
-
-        const preRegisteredQuery = await db.collection("Attendance")
-            .where("eventId", "==", eventId)
-            .where("customerUid", "==", "pre-registered")
-            .get();
-        const preRegisteredCount = preRegisteredQuery.size;
-
-        // Use a transaction to ensure concurrent sign-ins cannot lose counts.
-        await db.runTransaction(async (transaction) => {
-          const analyticsRef = db.collection("event_analytics").doc(eventId);
-          const analyticsDoc = await transaction.get(analyticsRef);
-
-          // Get current analytics data or initialize if doesn't exist
-          const analyticsData = analyticsDoc.exists ? analyticsDoc.data() : {
-            totalAttendees: 0,
-            hourlySignIns: {},
-            repeatAttendees: 0,
-            dropoutRate: 0,
-            lastUpdated: admin.firestore.Timestamp.now(),
-          };
-
-          analyticsData.totalAttendees =
-            Number(analyticsData.totalAttendees || 0) + 1;
-          analyticsData.hourlySignIns = analyticsData.hourlySignIns || {};
-
-          // Update hourly sign-ins
-          if (!analyticsData.hourlySignIns[hourBucket]) {
-            analyticsData.hourlySignIns[hourBucket] = 0;
-          }
-          analyticsData.hourlySignIns[hourBucket] += 1;
-
-          if (isRepeatAttendee) {
-            analyticsData.repeatAttendees =
-              Number(analyticsData.repeatAttendees || 0) + 1;
-          }
-
-          // Calculate dropout rate
-          if (preRegisteredCount > 0) {
-            analyticsData.dropoutRate = Math.max(0, ((preRegisteredCount -
-              analyticsData.totalAttendees) / preRegisteredCount) * 100);
-          } else {
-            analyticsData.dropoutRate = 0;
-          }
-
-          // Update lastUpdated timestamp
-          analyticsData.lastUpdated = admin.firestore.Timestamp.now();
-
-          // Write the updated analytics data
-          transaction.set(analyticsRef, analyticsData, {merge: true});
-
-          logger.info("Successfully updated analytics for event:", eventId);
-        });
-
-        logger.info("Attendance aggregation completed for event:", eventId);
-      } catch (error) {
-        logger.error("Error in aggregateAttendanceData function:", error);
-        throw error;
-      }
-    });
-
 /**
  * Trigger AI insights generation when analytics data is updated
  * This function runs when event_analytics documents are updated
  */
-exports.triggerAIInsights = onDocumentUpdated("event_analytics/{docId}",
-    async (event) => {
-      try {
-        const eventId = event.params.docId;
-        const beforeData = event.data.before.data();
-        const afterData = event.data.after.data();
-
-        logger.info("Checking if AI insights should be generated for event:", eventId);
-
-        // Only trigger if there's significant new data
-        const beforeAttendees = (beforeData && beforeData.totalAttendees) || 0;
-        const afterAttendees = (afterData && afterData.totalAttendees) || 0;
-
-        if (afterAttendees > beforeAttendees && afterAttendees >= 5) {
-          logger.info("Generating AI insights for event:", eventId);
-
-          // Trigger AI insights generation
-          await generateAIInsights(eventId);
-        } else {
-          logger.info("Insufficient new data for AI insights generation");
-        }
-      } catch (error) {
-        logger.error("Error in triggerAIInsights function:", error);
-        throw error;
-      }
-    });
-
-/**
- * Generate AI insights for an event
- */
-async function generateAIInsights(eventId) {
-  try {
-    const db = admin.firestore();
-
-    // Get analytics data
-    const analyticsDoc = await db.collection("event_analytics").doc(eventId).get();
-    if (!analyticsDoc.exists) {
-      logger.info("No analytics data found for event:", eventId);
-      return;
-    }
-
-    const analyticsData = analyticsDoc.data();
-
-    // Get comments for sentiment analysis
-    const commentsQuery = await db.collection("Comments")
-        .where("eventId", "==", eventId)
-        .get();
-
-    const comments = commentsQuery.docs.map((doc) => doc.data());
-
-    // Perform AI analysis
-    const peakHoursAnalysis = analyzePeakHours(analyticsData.hourlySignIns || {});
-    const sentimentAnalysis = analyzeSentiment(comments);
-    const optimizations = generateOptimizations(analyticsData, peakHoursAnalysis, sentimentAnalysis);
-    const dropoutAnalysis = analyzeDropoutPatterns(analyticsData);
-    const repeatAttendeeAnalysis = analyzeRepeatAttendees(analyticsData);
-
-    // Save AI insights
-    const aiInsights = {
-      peakHoursAnalysis,
-      sentimentAnalysis,
-      optimizationPredictions: optimizations,
-      dropoutAnalysis,
-      repeatAttendeeAnalysis,
-      lastUpdated: admin.firestore.Timestamp.now(),
-    };
-
-    await db.collection("ai_insights").doc(eventId).set(aiInsights);
-    logger.info("AI insights generated and saved for event:", eventId);
-  } catch (error) {
-    logger.error("Error generating AI insights:", error);
-    throw error;
-  }
-}
-
-/**
- * Analyze peak hours from hourly sign-ins data
- */
-function analyzePeakHours(hourlySignIns) {
-  if (!hourlySignIns || Object.keys(hourlySignIns).length === 0) {
-    return {
-      peakHour: null,
-      peakCount: 0,
-      recommendation: "Insufficient data for peak hour analysis",
-      confidence: 0.0,
-    };
-  }
-
-  const sortedHours = Object.entries(hourlySignIns)
-      .sort((a, b) => a[0].localeCompare(b[0]));
-
-  let peakHour = "";
-  let peakCount = 0;
-  let totalSignIns = 0;
-
-  for (const [hour, count] of sortedHours) {
-    const countNum = parseInt(count);
-    totalSignIns += countNum;
-    if (countNum > peakCount) {
-      peakCount = countNum;
-      peakHour = hour;
-    }
-  }
-
-  const confidence = totalSignIns > 0 ? peakCount / totalSignIns : 0.0;
-
-  let recommendation = "";
-  if (peakHour) {
-    const hour = parseInt(peakHour.split(":")[0]);
-    if (hour >= 9 && hour <= 11) {
-      recommendation = "Morning events (9-11 AM) show highest engagement. Consider scheduling future events during this time.";
-    } else if (hour >= 12 && hour <= 14) {
-      recommendation = "Lunch time (12-2 PM) is your peak period. Lunch-and-learn events could be highly successful.";
-    } else if (hour >= 17 && hour <= 19) {
-      recommendation = "Evening hours (5-7 PM) are most popular. After-work events align well with attendee preferences.";
-    } else {
-      recommendation = `Peak attendance at ${peakHour}. Consider this timing for future events.`;
-    }
-  }
-
-  return {
-    peakHour,
-    peakCount,
-    recommendation,
-    confidence,
-    totalSignIns,
-    hourlyDistribution: hourlySignIns,
-  };
-}
-
-/**
- * Analyze sentiment from comments
- */
-function analyzeSentiment(comments) {
-  if (!comments || comments.length === 0) {
-    return {
-      positiveRatio: 0.0,
-      negativeRatio: 0.0,
-      neutralRatio: 1.0,
-      overallSentiment: "neutral",
-      recommendation: "No comments available for sentiment analysis",
-      confidence: 0.0,
-    };
-  }
-
-  const positiveKeywords = [
-    "great", "awesome", "amazing", "excellent", "fantastic", "wonderful",
-    "good", "nice", "love", "enjoy", "happy", "satisfied", "impressed",
-    "outstanding", "brilliant", "perfect", "best", "favorite", "recommend",
-  ];
-
-  const negativeKeywords = [
-    "bad", "terrible", "awful", "horrible", "disappointing", "poor",
-    "worst", "hate", "dislike", "boring", "waste", "useless", "frustrated",
-    "angry", "annoyed", "confused", "difficult", "problem", "issue",
-  ];
-
-  let positiveCount = 0;
-  let negativeCount = 0;
-  let neutralCount = 0;
-
-  for (const comment of comments) {
-    const text = (comment.text || "").toLowerCase();
-    if (!text) continue;
-
-    let positiveScore = 0;
-    let negativeScore = 0;
-
-    for (const keyword of positiveKeywords) {
-      if (text.includes(keyword)) positiveScore++;
-    }
-
-    for (const keyword of negativeKeywords) {
-      if (text.includes(keyword)) negativeScore++;
-    }
-
-    if (positiveScore > negativeScore) {
-      positiveCount++;
-    } else if (negativeScore > positiveScore) {
-      negativeCount++;
-    } else {
-      neutralCount++;
-    }
-  }
-
-  const total = positiveCount + negativeCount + neutralCount;
-  const positiveRatio = total > 0 ? positiveCount / total : 0.0;
-  const negativeRatio = total > 0 ? negativeCount / total : 0.0;
-  const neutralRatio = total > 0 ? neutralCount / total : 0.0;
-
-  let overallSentiment = "neutral";
-  if (positiveRatio > 0.6) {
-    overallSentiment = "positive";
-  } else if (negativeRatio > 0.6) {
-    overallSentiment = "negative";
-  }
-
-  let recommendation = "";
-  if (overallSentiment === "positive") {
-    recommendation = "Excellent feedback! Attendees are highly satisfied. Consider expanding similar event formats.";
-  } else if (overallSentiment === "negative") {
-    recommendation = "Address attendee concerns. Consider gathering more detailed feedback to improve future events.";
-  } else {
-    recommendation = "Mixed feedback received. Consider implementing feedback surveys to better understand attendee needs.";
-  }
-
-  return {
-    positiveRatio,
-    negativeRatio,
-    neutralRatio,
-    overallSentiment,
-    recommendation,
-    confidence: total > 0 ? 0.8 : 0.0,
-    totalComments: total,
-    positiveCount,
-    negativeCount,
-    neutralCount,
-  };
-}
-
-/**
- * Generate optimization predictions
- */
-function generateOptimizations(analyticsData, peakHoursAnalysis, sentimentAnalysis) {
-  const optimizations = [];
-
-  const totalAttendees = analyticsData.totalAttendees || 0;
-  const dropoutRate = analyticsData.dropoutRate || 0.0;
-  const repeatAttendees = analyticsData.repeatAttendees || 0;
-
-  // Peak hours optimization
-  if (peakHoursAnalysis.peakHour) {
-    const hour = parseInt(peakHoursAnalysis.peakHour.split(":")[0]);
-
-    if (hour >= 9 && hour <= 11) {
-      optimizations.push({
-        type: "timing",
-        title: "Optimize Event Timing",
-        description: "Shift events to morning hours (9-11 AM) for +35% attendance",
-        impact: "High",
-        confidence: peakHoursAnalysis.confidence || 0.0,
-        implementation: "Schedule future events during peak morning hours",
-      });
-    } else if (hour >= 17 && hour <= 19) {
-      optimizations.push({
-        type: "timing",
-        title: "Evening Event Strategy",
-        description: "Leverage evening peak (5-7 PM) for +25% attendance",
-        impact: "Medium",
-        confidence: peakHoursAnalysis.confidence || 0.0,
-        implementation: "Focus on after-work events and networking sessions",
-      });
-    }
-  }
-
-  // Weekend optimization
-  if (totalAttendees > 0) {
-    optimizations.push({
-      type: "scheduling",
-      title: "Weekend Events",
-      description: "Shift to weekends for +40% attendance potential",
-      impact: "High",
-      confidence: 0.7,
-      implementation: "Schedule events on Saturdays or Sundays",
-    });
-  }
-
-  // Dropout rate optimization
-  if (dropoutRate > 20) {
-    optimizations.push({
-      type: "engagement",
-      title: "Reduce Dropout Rate",
-      description: "Implement reminder system to reduce dropout by 30%",
-      impact: "Medium",
-      confidence: 0.8,
-      implementation: "Send email and in-app reminders 24h and 1h before events",
-    });
-  }
-
-  // Repeat attendee optimization
-  if (repeatAttendees > 0 && totalAttendees > 0) {
-    const repeatRate = (repeatAttendees / totalAttendees) * 100;
-    if (repeatRate < 30) {
-      optimizations.push({
-        type: "retention",
-        title: "Increase Repeat Attendance",
-        description: "Implement loyalty program for +50% repeat attendance",
-        impact: "High",
-        confidence: 0.6,
-        implementation: "Create member benefits and early access programs",
-      });
-    }
-  }
-
-  // Sentiment-based optimizations
-  if (sentimentAnalysis.overallSentiment === "negative") {
-    optimizations.push({
-      type: "feedback",
-      title: "Improve Event Quality",
-      description: "Address feedback to improve satisfaction by 40%",
-      impact: "High",
-      confidence: 0.9,
-      implementation: "Conduct post-event surveys and implement feedback",
-    });
-  }
-
-  return optimizations;
-}
-
-/**
- * Analyze dropout patterns
- */
-function analyzeDropoutPatterns(analyticsData) {
-  const dropoutRate = analyticsData.dropoutRate || 0.0;
-  const totalAttendees = analyticsData.totalAttendees || 0;
-
-  let recommendation = "";
-  if (dropoutRate > 50) {
-    recommendation = "High dropout rate detected. Consider improving event marketing and reminder systems.";
-  } else if (dropoutRate > 25) {
-    recommendation = "Moderate dropout rate. Implement better engagement strategies.";
-  } else {
-    recommendation = "Low dropout rate. Your event planning is effective!";
-  }
-
-  return {
-    dropoutRate,
-    recommendation,
-    severity: dropoutRate > 50 ? "High" : dropoutRate > 25 ? "Medium" : "Low",
-    totalAttendees,
-    confidence: 0.8,
-  };
-}
-
-/**
- * Analyze repeat attendee patterns
- */
-function analyzeRepeatAttendees(analyticsData) {
-  const repeatAttendees = analyticsData.repeatAttendees || 0;
-  const totalAttendees = analyticsData.totalAttendees || 0;
-
-  const repeatRate = totalAttendees > 0 ? (repeatAttendees / totalAttendees) * 100 : 0.0;
-
-  let recommendation = "";
-  if (repeatRate > 50) {
-    recommendation = "Excellent repeat attendance! Your events have strong community building.";
-  } else if (repeatRate > 25) {
-    recommendation = "Good repeat attendance. Consider loyalty programs to increase retention.";
-  } else {
-    recommendation = "Low repeat attendance. Focus on building community and improving event quality.";
-  }
-
-  return {
-    repeatRate,
-    repeatAttendees,
-    totalAttendees,
-    recommendation,
-    confidence: 0.8,
-  };
-}
+exports.triggerAIInsights = require("./analytics/insights").createTriggerAIInsights(admin);
+exports.triggerAIInsightsV2 = require("./analytics/insights").createTriggerAIInsightsV2(admin);
 
 /**
  * Aggregate user analytics when event_analytics changes
@@ -1830,10 +923,11 @@ exports.deleteUserAccount = onCall({region: "us-central1"}, async (request) => {
  */
 exports.sendNewEventNotifications = onDocumentCreated("Events/{eventId}", async (event) => {
   try {
-    const eventData = event.data.data();
+    const currentEvent = await event.data.ref.get();
+    const eventData = currentEvent.data();
     const eventId = event.data.id;
 
-    if (!eventData) {
+    if (!currentEvent.exists || !["active", "scheduled"].includes(eventData?.status)) {
       return;
     }
 
@@ -1847,7 +941,7 @@ exports.sendNewEventNotifications = onDocumentCreated("Events/{eventId}", async 
     }
 
     // Continue with location-based notifications if location is provided
-    if (!eventData.eventLocation) {
+    if (!require("./notifications/legacy-delivery").canNotifyNearby(eventData)) {
       return;
     }
 
@@ -1896,7 +990,7 @@ exports.sendNewEventNotifications = onDocumentCreated("Events/{eventId}", async 
             body: `"${eventData.eventTitle || "Event"}" is happening near you!`,
             eventId: eventId,
             eventTitle: eventData.eventTitle || "Event",
-          }, db);
+          }, db, `new-event:${eventId}`, {path: currentEvent.ref.path, fields: {private: false, status: eventData.status}});
         }
       }
     }
@@ -1949,7 +1043,7 @@ exports.sendTicketUpdateNotifications = onDocumentCreated("Tickets/{ticketId}", 
         body: `You've successfully registered for "${ticketData.eventTitle || "Event"}"`,
         eventId: eventId,
         eventTitle: ticketData.eventTitle || "Event",
-      }, db);
+      }, db, `ticket-created:${ticketId}`);
     }
   } catch (error) {
     logger.error("Error sending ticket update notification:", error);
@@ -1969,6 +1063,9 @@ exports.sendEventUpdateNotifications = onDocumentUpdated("Events/{eventId}", asy
     if (!beforeData || !afterData) {
       return;
     }
+    if (beforeData.status === "pending_approval" && ["scheduled", "active"].includes(afterData.status)) {
+      await exports.sendNewEventNotifications.run({data: event.data.after, params: event.params, id: event.id});
+    }
 
     // Check if important fields have changed
     const beforeLocation = beforeData.location || beforeData.eventLocation;
@@ -1981,216 +1078,44 @@ exports.sendEventUpdateNotifications = onDocumentUpdated("Events/{eventId}", asy
     const hasDateTimeChanged = beforeDateTime?.toDate().getTime() !==
       afterDateTime?.toDate().getTime();
     const hasTitleChanged = beforeTitle !== afterTitle;
+    const hasScheduleChanged = beforeData.eventDurationMinutes !== afterData.eventDurationMinutes || beforeData.eventTimeZone !== afterData.eventTimeZone;
 
-    if (!hasLocationChanged && !hasDateTimeChanged && !hasTitleChanged) {
+    if (!hasLocationChanged && !hasDateTimeChanged && !hasTitleChanged && !hasScheduleChanged) {
       return; // No important changes
     }
 
-    logger.info(`Sending event update notifications for event ${eventId}`);
-
     const db = admin.firestore();
-
-    // Get all users who have tickets for this event
-    const ticketsSnapshot = await db.collection("Tickets")
-        .where("eventId", "==", eventId)
-        .get();
-
-    for (const ticketDoc of ticketsSnapshot.docs) {
-      const ticketData = ticketDoc.data();
-      const userId = ticketData.customerUid;
-
-      // Check user's notification settings
-      const settingsDoc = await db.collection("users")
-          .doc(userId)
-          .collection("settings")
-          .doc("notifications")
-          .get();
-
-      // respect user toggle for event changes (fallback to true)
-      const settings = settingsDoc.exists ? settingsDoc.data() : {};
-      const shouldSendEventChange = settings.eventChanges !== false;
-      if (!shouldSendEventChange) continue;
-
-      let updateMessage = "Event details have been updated";
-      if (hasLocationChanged) {
-        updateMessage = "Event location has changed";
-      } else if (hasDateTimeChanged) {
-        updateMessage = "Event date/time has changed";
-      } else if (hasTitleChanged) {
-        updateMessage = "Event title has been updated";
-      }
-
-      await sendNotificationToUser(userId, {
-        type: "event_changes",
-        title: "Event Updated",
-        body: `${updateMessage}: "${afterTitle || "Event"}"`,
-        eventId: eventId,
-        eventTitle: afterTitle || "Event",
-      }, db);
-    }
-
-    logger.info(`Sent event update notifications for event ${eventId}`);
+    const revisionJob = db.collection("EventAnnouncements").doc(`reschedule_${eventId}_${afterData.eventRevision || 0}`);
+    const legacyId = require("./events/roster").key(`${eventId}:${event.id}`);
+    await db.runTransaction(async (transaction) => {
+      const job = db.collection("EventAnnouncements").doc(`legacy_change_${legacyId}`);
+      const [modern, previous] = await Promise.all([transaction.get(revisionJob), transaction.get(job)]);
+      if ((modern.exists && beforeData.eventRevision !== afterData.eventRevision) || previous.exists) return;
+      transaction.create(job, {
+        eventId, actorUid: afterData.customerUid, audience: "active",
+        title: `Event updated: ${afterTitle || "Event"}`,
+        body: `The organizer updated the event. Review the current details at ${publicOrigin()}/event/${eventId}`,
+        templateId: hasLocationChanged || hasDateTimeChanged || hasScheduleChanged ? "event_rescheduled" : "event_announcement",
+        eventSnapshot: require("./events/lifecycle-snapshot").lifecycleSnapshot(afterData),
+        status: "queued", createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
   } catch (error) {
     logger.error("Error sending event update notifications:", error);
   }
 });
 
 // Organizer feedback received (notify event creator)
-exports.notifyOrganizerOnFeedback = onDocumentCreated("event_feedback/{docId}", async (event) => {
-  try {
-    const feedback = event.data.data();
-    const eventId = feedback.eventId;
-    const db = admin.firestore();
-
-    const eventDoc = await db.collection("Events").doc(eventId).get();
-    if (!eventDoc.exists) return;
-    const eventData = eventDoc.data();
-    const creatorId = eventData.customerUid || eventData.createdBy;
-    if (!creatorId) return;
-
-    // respect organizerFeedback toggle
-    const settingsDoc = await db.collection("users").doc(creatorId).collection("settings").doc("notifications").get();
-    const settings = settingsDoc.exists ? settingsDoc.data() : {};
-    if (settings.organizerFeedback === false) return;
-
-    await sendNotificationToUser(creatorId, {
-      type: "organizer_feedback",
-      title: "New feedback received",
-      body: `Your event "${eventData.title || eventData.eventTitle || "Event"}" received new feedback`,
-      eventId: eventId,
-      eventTitle: eventData.title || eventData.eventTitle || "Event",
-    }, db);
-  } catch (error) {
-    logger.error("Error notifying organizer on feedback:", error);
-  }
-});
-
-// Organization: notify admins on new join request
-exports.notifyOrgAdminsOnJoinRequest = onDocumentCreated("Organizations/{orgId}/JoinRequests/{userId}", async (event) => {
-  try {
-    const orgId = event.params.orgId;
-    const db = admin.firestore();
-    // Find admin members
-    const membersSnap = await db.collection("Organizations").doc(orgId).collection("Members")
-        .where("role", "in", ["Admin", "Owner"]).get();
-    for (const m of membersSnap.docs) {
-      const adminId = m.id;
-      const settingsDoc = await db.collection("users").doc(adminId).collection("settings").doc("notifications").get();
-      const settings = settingsDoc.exists ? settingsDoc.data() : {};
-      if (settings.organizationUpdates === false) continue;
-      await sendNotificationToUser(adminId, {
-        type: "org_update",
-        title: "New join request",
-        body: "A user requested to join your organization",
-        data: {organizationId: orgId},
-      }, db);
-    }
-  } catch (error) {
-    logger.error("Error notifying org admins on join request:", error);
-  }
-});
-
-// Organization: notify requester on approval/decline and members on role changes
-exports.notifyOrgMembershipChanges = onDocumentWritten("Organizations/{orgId}/Members/{userId}", async (event) => {
-  try {
-    const orgId = event.params.orgId;
-    const userId = event.params.userId;
-    const db = admin.firestore();
-
-    const afterExists = event.data.after.exists;
-    const beforeData = event.data.before.exists ? event.data.before.data() : null;
-    const afterData = afterExists ? event.data.after.data() : null;
-
-    // Get organization name for better notification messages
-    let orgName = "the group";
-    try {
-      const orgDoc = await db.collection("Organizations").doc(orgId).get();
-      if (orgDoc.exists) {
-        orgName = orgDoc.data().name || "the group";
-      }
-    } catch (e) {
-      logger.warn("Could not fetch org name:", e);
-    }
-
-    // NEW MEMBER APPROVAL: When a member document is created with approved status
-    // This happens when an admin approves a join request
-    if (afterExists && !beforeData && afterData.status === "approved") {
-      const settingsDoc = await db.collection("users").doc(userId).collection("settings").doc("notifications").get();
-      const settings = settingsDoc.exists ? settingsDoc.data() : {};
-      if (settings.organizationUpdates !== false) {
-        await sendNotificationToUser(userId, {
-          type: "org_update",
-          title: "Join Request Approved! 🎉",
-          body: `Your request to join ${orgName} has been approved`,
-          data: {organizationId: orgId, organizationName: orgName},
-        }, db);
-      }
-    }
-
-    // EXISTING MEMBER STATUS UPDATE: If status changed on an existing member
-    if (afterExists && beforeData && beforeData.status !== afterData.status) {
-      const settingsDoc = await db.collection("users").doc(userId).collection("settings").doc("notifications").get();
-      const settings = settingsDoc.exists ? settingsDoc.data() : {};
-      if (settings.organizationUpdates !== false) {
-        const approved = afterData.status === "approved";
-        await sendNotificationToUser(userId, {
-          type: "org_update",
-          title: approved ? "Join request approved" : "Join request updated",
-          body: approved ? `You have been approved to join ${orgName}` : `Your status in ${orgName} is now ${afterData.status}`,
-          data: {organizationId: orgId, organizationName: orgName},
-        }, db);
-      }
-    }
-
-    // ROLE CHANGE: If role changes, notify the user
-    if (afterExists && beforeData && beforeData.role !== afterData.role) {
-      const settingsDoc = await db.collection("users").doc(userId).collection("settings").doc("notifications").get();
-      const settings = settingsDoc.exists ? settingsDoc.data() : {};
-      if (settings.organizationUpdates !== false) {
-        await sendNotificationToUser(userId, {
-          type: "org_update",
-          title: "Role Changed",
-          body: `Your role in ${orgName} is now ${afterData.role}`,
-          data: {organizationId: orgId, organizationName: orgName},
-        }, db);
-      }
-    }
-  } catch (error) {
-    logger.error("Error notifying org membership changes:", error);
-  }
-});
+const communityNotifications = require("./community/notifications").createCommunityNotifications(admin);
+exports.notifyOrganizerOnFeedback = communityNotifications.notifyOrganizerOnFeedback;
+exports.notifyOrgAdminsOnJoinRequest = communityNotifications.notifyOrgAdminsOnJoinRequest;
+exports.notifyOrgMembershipChanges = communityNotifications.notifyOrgMembershipChanges;
+exports.notifyOrgJoinRequestDecision = communityNotifications.notifyOrgJoinRequestDecision;
 
 // Messaging: mentions-only notifications (basic @username detection)
-exports.sendMentionNotifications = onDocumentCreated("Messages/{messageId}", async (event) => {
-  try {
-    const msg = event.data.data();
-    const db = admin.firestore();
-    const content = (msg.content || "").toString();
-    const receiverId = msg.receiverId;
-    const senderId = msg.senderId;
-    if (!content.includes("@")) return;
-
-    // Very basic: if content contains receiver's @username, notify as mention
-    const receiverDoc = await db.collection("Customers").doc(receiverId).get();
-    if (!receiverDoc.exists) return;
-    const username = receiverDoc.data().username;
-    if (!username || !content.includes(`@${username}`)) return;
-
-    const settingsDoc = await db.collection("users").doc(receiverId).collection("settings").doc("notifications").get();
-    const settings = settingsDoc.exists ? settingsDoc.data() : {};
-    if (settings.messageMentions === false) return;
-
-    const conversationId = `${Math.min(senderId, receiverId)}_${Math.max(senderId, receiverId)}`;
-    await sendNotificationToUser(receiverId, {
-      type: "message_mention",
-      title: "You were mentioned",
-      body: content.length > 50 ? content.substring(0, 50) + "..." : content,
-      data: {conversationId},
-    }, db);
-  } catch (error) {
-    logger.error("Error sending mention notifications:", error);
-  }
-});
+// Kept during rollout so older deployments do not require destructive deletion.
+// Message and mention delivery now share the deduplicated recipient pipeline.
+exports.sendMentionNotifications = onDocumentCreated("Messages/{messageId}", async () => {});
 
 /**
  * Helper function to notify group members of new event
@@ -2257,7 +1182,10 @@ async function notifyGroupMembersOfNewEvent(organizationId, eventId, eventData, 
           organizationId: organizationId,
           organizationName: orgName,
         },
-      }, db);
+      }, db, `group-event:${eventId}`, [
+        {path: memberDoc.ref.path, fields: {status: "approved"}},
+        {path: `Events/${eventId}`, fields: {organizationId, status: eventData.status}},
+      ]);
 
       logger.info(`Notified member ${memberId} about new group event`);
     }
@@ -2285,80 +1213,10 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 /**
  * Helper function to send notification to user
  */
-async function sendNotificationToUser(userId, notificationData, db) {
-  try {
-    // Always save to user's notifications collection first (even if no FCM token)
-    const notificationRef = await db.collection("users")
-        .doc(userId)
-        .collection("notifications")
-        .add({
-          title: notificationData.title,
-          body: notificationData.body,
-          type: notificationData.type,
-          eventId: notificationData.eventId || null,
-          eventTitle: notificationData.eventTitle || null,
-          createdAt: admin.firestore.Timestamp.now(),
-          isRead: false,
-          data: notificationData.data || {},
-        });
-
-    logger.info(`Saved notification ${notificationRef.id} for user ${userId}`);
-
-    // Get user's FCM token
-    const userDoc = await db.collection("users").doc(userId).get();
-    if (!userDoc.exists) {
-      logger.warn(`User ${userId} not found, notification saved but push not sent`);
-      return;
-    }
-
-    const userData = userDoc.data();
-    const fcmToken = userData.fcmToken;
-
-    if (!fcmToken) {
-      logger.warn(`No FCM token for user ${userId}, notification saved but push not sent`);
-      return;
-    }
-
-    // Send push notification
-    const messaging = admin.messaging();
-    const message = {
-      token: fcmToken,
-      notification: {
-        title: notificationData.title,
-        body: notificationData.body,
-      },
-      data: {
-        type: notificationData.type,
-        eventId: notificationData.eventId || "",
-        eventTitle: notificationData.eventTitle || "",
-        conversationId: (notificationData.data && notificationData.data.conversationId) ? notificationData.data.conversationId : "",
-        organizationId: (notificationData.data && notificationData.data.organizationId) ? notificationData.data.organizationId : "",
-        notificationId: notificationRef.id,
-        click_action: "FLUTTER_NOTIFICATION_CLICK",
-      },
-      android: {
-        notification: {
-          channelId: "orgami_channel",
-          priority: "high",
-          defaultSound: true,
-          defaultVibrateTimings: true,
-        },
-      },
-      apns: {
-        payload: {
-          aps: {
-            sound: "default",
-            badge: 1,
-          },
-        },
-      },
-    };
-
-    await messaging.send(message);
-    logger.info(`Sent push notification to user ${userId}`);
-  } catch (error) {
-    logger.error(`Error sending notification to user ${userId}:`, error);
-  }
+const sendLegacyNotification = require("./notifications/legacy-delivery").createLegacyNotificationSender(admin);
+async function sendNotificationToUser(userId, notificationData, db, sourceKey, condition = null) {
+  return sendLegacyNotification(userId, notificationData, db,
+      sourceKey || JSON.stringify([notificationData.type, notificationData.eventId || "", notificationData.title, notificationData.body, notificationData.data || {}]), condition);
 }
 
 /**
@@ -2462,251 +1320,47 @@ exports.sendPostEventFeedbackNotifications = onSchedule({
 /**
  * Cloud Function to aggregate feedback data when new feedback is submitted
  */
-exports.aggregateFeedbackData = onDocumentCreated("event_feedback/{docId}",
-    async (event) => {
-      try {
-        const feedbackData = event.data.data();
-        const eventId = feedbackData.eventId;
-        const rating = feedbackData.rating;
-        const isAnonymous = feedbackData.isAnonymous;
-
-        logger.info("Processing feedback for event:", eventId);
-
-        // Use a transaction to ensure atomic updates
-        const db = admin.firestore();
-        await db.runTransaction(async (transaction) => {
-          const analyticsRef = db.collection("event_analytics").doc(eventId);
-          const analyticsDoc = await transaction.get(analyticsRef);
-
-          // Get current analytics data or initialize if doesn't exist
-          const analyticsData = analyticsDoc.exists ? analyticsDoc.data() : {
-            totalAttendees: 0,
-            hourlySignIns: {},
-            repeatAttendees: 0,
-            dropoutRate: 0,
-            lastUpdated: admin.firestore.Timestamp.now(),
-          };
-
-          // Initialize feedback analytics if doesn't exist
-          if (!analyticsData.feedbackAnalytics) {
-            analyticsData.feedbackAnalytics = {
-              averageRating: 0,
-              totalRatings: 0,
-              ratingDistribution: {},
-              sentiment: "neutral",
-              commentSummaries: [],
-              anonymousCount: 0,
-              namedCount: 0,
-            };
-          }
-
-          const feedbackAnalytics = analyticsData.feedbackAnalytics;
-
-          // Update rating statistics
-          const totalRatings = feedbackAnalytics.totalRatings + 1;
-          const totalRatingSum = (feedbackAnalytics.averageRating * feedbackAnalytics.totalRatings) + rating;
-          feedbackAnalytics.averageRating = totalRatingSum / totalRatings;
-          feedbackAnalytics.totalRatings = totalRatings;
-
-          // Update rating distribution
-          if (!feedbackAnalytics.ratingDistribution[rating]) {
-            feedbackAnalytics.ratingDistribution[rating] = 0;
-          }
-          feedbackAnalytics.ratingDistribution[rating] += 1;
-
-          // Update anonymous/named counts
-          if (isAnonymous) {
-            feedbackAnalytics.anonymousCount += 1;
-          } else {
-            feedbackAnalytics.namedCount += 1;
-          }
-
-          // Update sentiment based on average rating
-          if (feedbackAnalytics.averageRating >= 4.0) {
-            feedbackAnalytics.sentiment = "positive";
-          } else if (feedbackAnalytics.averageRating >= 3.0) {
-            feedbackAnalytics.sentiment = "neutral";
-          } else {
-            feedbackAnalytics.sentiment = "negative";
-          }
-
-          // Update comment summaries (simplified - in production you might use ML)
-          if (feedbackData.comment) {
-            const commentSummary = feedbackData.comment.length > 100 ?
-                feedbackData.comment.substring(0, 100) + "..." :
-                feedbackData.comment;
-
-            if (feedbackAnalytics.commentSummaries.length < 10) {
-              feedbackAnalytics.commentSummaries.push(commentSummary);
-            }
-          }
-
-          analyticsData.lastUpdated = admin.firestore.Timestamp.now();
-
-          // Update the document
-          transaction.set(analyticsRef, analyticsData, {merge: true});
-
-          logger.info(`Updated feedback analytics for event ${eventId}`);
-        });
-      } catch (error) {
-        logger.error("Error aggregating feedback data:", error);
-      }
-    });
-
 /**
  * Send push notifications for new messages
  * Triggered when a new message is created
  */
-exports.sendMessageNotifications = onDocumentCreated("Messages/{messageId}", async (event) => {
-  try {
-    const messageData = event.data.data();
-    const messageId = event.data.id;
-
-    if (!messageData) {
-      return;
-    }
-
-    const senderId = messageData.senderId;
-    const receiverId = messageData.receiverId;
-    const content = messageData.content;
-
-    logger.info(`Sending message notification for message ${messageId}`);
-
-    const db = admin.firestore();
-
-    // Get sender's info
-    const senderDoc = await db.collection("Customers").doc(senderId).get();
-    if (!senderDoc.exists) {
-      logger.warn(`Sender ${senderId} not found`);
-      return;
-    }
-
-    const senderData = senderDoc.data();
-    const senderName = senderData.name || "Someone";
-
-    // Get receiver's FCM token
-    const receiverDoc = await db.collection("users").doc(receiverId).get();
-    if (!receiverDoc.exists) {
-      logger.warn(`Receiver ${receiverId} not found`);
-      return;
-    }
-
-    const receiverData = receiverDoc.data();
-    const fcmToken = receiverData.fcmToken;
-
-    if (!fcmToken) {
-      logger.warn(`No FCM token for receiver ${receiverId}`);
-      return;
-    }
-
-    // Check receiver's notification settings (new schema in notificationSettings/settings)
-    let shouldSendMessageNotification = true;
-    try {
-      const settingsDocNew = await db.collection("users")
-          .doc(receiverId)
-          .collection("notificationSettings")
-          .doc("settings")
-          .get();
-      if (settingsDocNew.exists) {
-        const s = settingsDocNew.data();
-        if (s && s.messagesAll === false) {
-          shouldSendMessageNotification = false;
-        }
-      }
-    } catch (e) {
-      // Fallback to legacy settings location
-      const settingsDocLegacy = await db.collection("users")
-          .doc(receiverId)
-          .collection("settings")
-          .doc("notifications")
-          .get();
-      if (settingsDocLegacy.exists) {
-        const s = settingsDocLegacy.data();
-        shouldSendMessageNotification = s.messageNotifications !== false;
-      }
-    }
-
-    if (!shouldSendMessageNotification) {
-      logger.info(`User ${receiverId} has disabled message notifications`);
-      return;
-    }
-
-    // Send push notification
-    const messaging = admin.messaging();
-    const message = {
-      token: fcmToken,
-      notification: {
-        title: senderName,
-        body: content.length > 50 ? content.substring(0, 50) + "..." : content,
-      },
-      data: {
-        type: "new_message",
-        senderId: senderId,
-        senderName: senderName,
-        messageId: messageId,
-        conversationId: `${Math.min(senderId, receiverId)}_${Math.max(senderId, receiverId)}`,
-        click_action: "FLUTTER_NOTIFICATION_CLICK",
-      },
-      android: {
-        notification: {
-          channelId: "orgami_channel",
-          priority: "high",
-          defaultSound: true,
-          defaultVibrateTimings: true,
-        },
-      },
-      apns: {
-        payload: {
-          aps: {
-            sound: "default",
-            badge: 1,
-          },
-        },
-      },
-    };
-
-    await messaging.send(message);
-    logger.info(`Sent message notification to user ${receiverId}`);
-
-    // Save to receiver's notifications collection
-    await db.collection("users")
-        .doc(receiverId)
-        .collection("notifications")
-        .add({
-          title: senderName,
-          body: content,
-          type: "new_message",
-          senderId: senderId,
-          senderName: senderName,
-          messageId: messageId,
-          conversationId: `${Math.min(senderId, receiverId)}_${Math.max(senderId, receiverId)}`,
-          createdAt: admin.firestore.Timestamp.now(),
-          isRead: false,
-        });
-  } catch (error) {
-    logger.error("Error sending message notification:", error);
-  }
+exports.sendMessageNotifications = onDocumentCreated({document: "Messages/{messageId}", retry: true}, async (event) => {
+  await require("./messaging/notifications").deliverMessageNotifications(admin.firestore(), admin.messaging(), event);
 });
+
+// These operations require Firebase Auth. App Check remains governed by the
+// existing client rollout; enabling enforcement before web activation blocks users.
+exports.getOrCreateDirectConversationV2 = onCall({region: "us-central1", maxInstances: 20}, (request) =>
+  require("./messaging/service").getOrCreateDirect(admin.firestore(), request));
+exports.sendConversationMessageV2 = onCall({region: "us-central1", maxInstances: 40}, (request) =>
+  require("./messaging/service").sendMessage(admin.firestore(), request));
+exports.markConversationReadV2 = onCall({region: "us-central1", maxInstances: 20}, (request) =>
+  require("./messaging/service").markRead(admin.firestore(), request));
 
 /**
  * Callable function to submit UGC reports (users/messages/comments/events)
  * Body: { type: 'user'|'message'|'comment'|'event', targetUserId?, contentId?, reason?, details? }
  */
-exports.submitUserReport = onCall({region: "us-central1"}, async (request) => {
+exports.submitUserReport = onCall({region: "us-central1", enforceAppCheck: process.env.FUNCTIONS_EMULATOR !== "true"}, async (request) => {
   const uid = request.auth && request.auth.uid;
-  if (!uid) {
-    throw new Error("UNAUTHENTICATED: User must be signed in to report.");
+  if (!uid || request.auth.token?.firebase?.sign_in_provider === "anonymous") {
+    throw new HttpsError("unauthenticated", "Sign in to submit a report.");
   }
 
   const {type, targetUserId, contentId, reason, details} = request.data || {};
-  if (!type) {
-    throw new Error("INVALID_ARGUMENT: 'type' is required");
+  if (!["user", "message", "comment", "event"].includes(type) ||
+      (!targetUserId && !contentId) || String(reason || "").length > 1000 || String(details || "").length > 4000) {
+    throw new HttpsError("invalid-argument", "A valid report subject and bounded reason are required.");
   }
 
   const db = admin.firestore();
+  await require("./public-web/accountless").enforceRateLimit(db, uid, "user_report");
   const doc = {
     type: String(type),
     reporterUserId: uid,
+    reporterUid: uid,
+    targetUid: targetUserId ? String(targetUserId) : null,
+    eventId: type === "event" && contentId ? String(contentId) : null,
     targetUserId: targetUserId ? String(targetUserId) : null,
     contentId: contentId ? String(contentId) : null,
     reason: reason ? String(reason) : null,
@@ -2714,8 +1368,12 @@ exports.submitUserReport = onCall({region: "us-central1"}, async (request) => {
     status: "open",
     createdAt: admin.firestore.Timestamp.now(),
   };
-  await db.collection("reports").add(doc);
-  return {status: "ok"};
+  const report = db.collection("reports").doc();
+  await db.runTransaction(async (transaction) => {
+    await require("./account/mutation-guard").requireActiveAccounts(db, transaction, uid);
+    transaction.create(report, doc);
+  });
+  return {status: "ok", reportId: report.id};
 });
 
 /**
@@ -2864,218 +1522,7 @@ exports.createTicketPaymentIntent = onCall({region: "us-central1"}, async (req) 
  *   dateRange: { start?: string, end?: string }
  * }
  */
-function parseQuerySimple(query) {
-  const queryLower = (String(query) || "").toLowerCase();
-
-  // Extract keywords (remove common words)
-  const commonWords = new Set(["the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "near", "me", "find", "search", "event", "events"]);
-  const keywords = queryLower
-      .split(/[^a-z0-9]+/)
-      .filter((word) => word.length > 2 && !commonWords.has(word))
-      .slice(0, 5);
-
-  // Detect categories based on keywords
-  const categoryMap = {
-    "book": ["book club", "reading"],
-    "read": ["book club", "reading"],
-    "music": ["music", "concert"],
-    "concert": ["music", "concert"],
-    "sport": ["sports"],
-    "fitness": ["sports", "fitness"],
-    "tech": ["tech", "technology"],
-    "technology": ["tech", "technology"],
-    "network": ["networking"],
-    "business": ["networking", "business"],
-    "family": ["family"],
-    "kid": ["family"],
-    "art": ["art"],
-    "paint": ["art"],
-    "food": ["food"],
-    "cook": ["food"],
-    "game": ["gaming"],
-    "gaming": ["gaming"],
-    "education": ["education"],
-    "learn": ["education"],
-    "workshop": ["education"],
-  };
-
-  const categories = [];
-  keywords.forEach((keyword) => {
-    if (categoryMap[keyword]) {
-      categories.push(...categoryMap[keyword]);
-    }
-  });
-
-  // Remove duplicates
-  const uniqueCategories = [...new Set(categories)];
-
-  // Detect location intent
-  const nearMe = /near\s+me|around\s+me|close\s+by|nearby|local/i.test(query);
-
-  // Extract radius if mentioned
-  let radiusKm = nearMe ? 25 : 0;
-  const radiusMatch = query.match(/(\d+)\s*(km|kilometers?|miles?)/i);
-  if (radiusMatch) {
-    const value = parseInt(radiusMatch[1]);
-    radiusKm = radiusMatch[2].toLowerCase().startsWith("m") ? value * 1.6 : value; // Convert miles to km
-  }
-
-  // Basic date parsing
-  const dateRange = {};
-  const now = new Date();
-
-  if (/today/i.test(query)) {
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    dateRange.start = today.toISOString();
-    dateRange.end = new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString();
-  } else if (/tomorrow/i.test(query)) {
-    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-    dateRange.start = tomorrow.toISOString();
-    dateRange.end = new Date(tomorrow.getTime() + 24 * 60 * 60 * 1000).toISOString();
-  } else if (/this\s+week/i.test(query)) {
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
-    const endOfWeek = new Date(startOfWeek.getTime() + 7 * 24 * 60 * 60 * 1000);
-    dateRange.start = startOfWeek.toISOString();
-    dateRange.end = endOfWeek.toISOString();
-  } else if (/weekend/i.test(query)) {
-    const daysUntilSaturday = 6 - now.getDay();
-    const saturday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysUntilSaturday);
-    saturday.setHours(0, 0, 0, 0);
-    const sunday = new Date(saturday.getTime() + 2 * 24 * 60 * 60 * 1000);
-    dateRange.start = saturday.toISOString();
-    dateRange.end = sunday.toISOString();
-  }
-
-  return {
-    categories: uniqueCategories,
-    keywords,
-    nearMe,
-    radiusKm,
-    dateRange,
-  };
-}
-
-function kmDistance(lat1, lon1, lat2, lon2) {
-  const toRad = (v) => v * Math.PI / 180;
-  const R = 6371; // km
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-            Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
-/**
- * Callable function: aiSearchEvents
- * Input: { query: string, lat?: number, lng?: number, limit?: number }
- * Output: { events: Event[], intent: {...} }
- */
-exports.aiSearchEvents = onCall({region: "us-central1", timeoutSeconds: 20, memory: "512MiB"}, async (req) => {
-  const {query, lat, lng, limit} = req.data || {};
-  if (!query || typeof query !== "string") {
-    throw new Error("INVALID_ARGUMENT: 'query' is required");
-  }
-
-  const db = admin.firestore();
-  const intent = parseQuerySimple(query);
-
-  // Build base timeframe: from now-3h to +60 days unless intent.dateRange provided
-  const now = new Date();
-  const start = intent.dateRange?.start ? new Date(intent.dateRange.start) : new Date(now.getTime() - 3 * 60 * 60 * 1000);
-  const end = intent.dateRange?.end ? new Date(intent.dateRange.end) : new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
-
-  // Fetch a reasonable pool of upcoming public events, then filter in memory
-  const q = db.collection("Events")
-      .where("private", "==", false)
-      .where("selectedDateTime", ">=", start)
-      .where("selectedDateTime", "<=", end)
-      .orderBy("selectedDateTime")
-      .limit(Math.min(Number(limit) || 200, 400));
-
-  const snap = await q.get();
-  let events = snap.docs.map((d) => ({id: d.id, ...d.data()}));
-
-  // Category filter
-  const categories = (intent.categories || []).map((c) => String(c).toLowerCase());
-  if (categories.length > 0) {
-    events = events.filter((ev) => {
-      const evCats = Array.isArray(ev.categories) ? ev.categories.map((c) => String(c).toLowerCase()) : [];
-      return evCats.some((c) => categories.includes(c));
-    });
-  }
-
-  // Keyword filter (title/description/location)
-  const keywords = (intent.keywords || []).map((k) => String(k).toLowerCase());
-  if (keywords.length > 0) {
-    events = events.filter((ev) => {
-      const t = String(ev.title || "").toLowerCase();
-      const d = String(ev.description || "").toLowerCase();
-      const l = String(ev.location || "").toLowerCase();
-      return keywords.some((k) => t.includes(k) || d.includes(k) || l.includes(k));
-    });
-  }
-
-  // Location filter
-  const useNearMe = intent.nearMe === true && typeof lat === "number" && typeof lng === "number";
-  const radiusKm = useNearMe ? (intent.radiusKm || 25) : 0;
-  if (useNearMe && radiusKm > 0) {
-    events = events
-        .map((ev) => {
-          const evLat = typeof ev.latitude === "number" ? ev.latitude : null;
-          const evLng = typeof ev.longitude === "number" ? ev.longitude : null;
-          const dist = (evLat !== null && evLng !== null) ? kmDistance(lat, lng, evLat, evLng) : Infinity;
-          return {...ev, _distanceKm: dist};
-        })
-        .filter((ev) => ev._distanceKm <= radiusKm);
-  }
-
-  // Sort: featured first, then by (distance if applicable), then soonest date
-  events.sort((a, b) => {
-    const aFeat = a.isFeatured ? 1 : 0;
-    const bFeat = b.isFeatured ? 1 : 0;
-    if (aFeat !== bFeat) return bFeat - aFeat;
-    if (useNearMe) {
-      const ad = a._distanceKm ?? Infinity;
-      const bd = b._distanceKm ?? Infinity;
-      if (ad !== bd) return ad - bd;
-    }
-    const at = a.selectedDateTime && a.selectedDateTime.toDate ? a.selectedDateTime.toDate().getTime() : new Date(a.selectedDateTime).getTime();
-    const bt = b.selectedDateTime && b.selectedDateTime.toDate ? b.selectedDateTime.toDate().getTime() : new Date(b.selectedDateTime).getTime();
-    return at - bt;
-  });
-
-  // Trim and remove temp fields
-  const maxOut = Math.min(events.length, Number(limit) || 100);
-  const out = events.slice(0, maxOut).map((e) => {
-    const clone = {...e};
-    delete clone._distanceKm;
-    // Normalize Firestore Timestamp fields to ISO strings for client compatibility
-    const normalizeTs = (v) => {
-      try {
-        if (!v) return v;
-        if (v.toDate && typeof v.toDate === "function") return v.toDate().toISOString();
-        const d = new Date(v);
-        if (!isNaN(d.getTime())) return d.toISOString();
-        if (v._seconds !== null && v._seconds !== undefined) {
-          return new Date(v._seconds * 1000 + Math.floor((v._nanoseconds || 0) / 1e6)).toISOString();
-        }
-      } catch (_) {
-        // Keep the original value when a legacy timestamp cannot be parsed.
-      }
-      return v;
-    };
-    clone.selectedDateTime = normalizeTs(clone.selectedDateTime);
-    clone.eventGenerateTime = normalizeTs(clone.eventGenerateTime);
-    clone.featureEndDate = normalizeTs(clone.featureEndDate);
-    return clone;
-  });
-
-  return {events: out, intent};
-});
+exports.aiSearchEvents = require("./discovery/natural-search").createNaturalSearch(admin);
 
 /**
  * Confirm ticket payment and issue the ticket
@@ -3430,53 +1877,6 @@ exports.confirmFeaturePayment = onCall({region: "us-central1"}, async (req) => {
  * Reset Monthly Event Limits for Basic Tier Users
  * Runs on the 1st day of each month at midnight UTC
  */
-exports.resetMonthlyEventLimits = onSchedule({
-  schedule: "0 0 1 * *", // First day of each month at midnight UTC
-  timeZone: "UTC",
-  region: "us-central1",
-}, async (_event) => {
-  logger.info("🔄 Starting monthly event limit reset for Basic tier users...");
-
-  try {
-    const db = admin.firestore();
-    const now = admin.firestore.Timestamp.now();
-
-    // Get all Basic tier subscriptions
-    const subscriptionsSnapshot = await db
-        .collection("subscriptions")
-        .where("tier", "==", "basic")
-        .where("status", "==", "active")
-        .get();
-
-    if (subscriptionsSnapshot.empty) {
-      logger.info("No active Basic tier subscriptions found");
-      return null;
-    }
-
-    logger.info(`Found ${subscriptionsSnapshot.docs.length} Basic tier subscriptions to reset`);
-
-    const batch = db.batch();
-    let resetCount = 0;
-
-    subscriptionsSnapshot.forEach((doc) => {
-      batch.update(doc.ref, {
-        eventsCreatedThisMonth: 0,
-        currentMonthStart: now,
-        updatedAt: now,
-      });
-      resetCount++;
-    });
-
-    await batch.commit();
-
-    logger.info(`✅ Successfully reset monthly event limits for ${resetCount} Basic tier users`);
-    return {success: true, count: resetCount, timestamp: now};
-  } catch (error) {
-    logger.error("❌ Error resetting monthly limits:", error);
-    throw error;
-  }
-});
-
 /**
  * Apply Scheduled Plan Changes
  * Runs every 6 hours to check for and apply scheduled tier changes
@@ -3608,13 +2008,19 @@ exports.sendBasicTierUsageReminder = onSchedule({
 
     // Create notifications for users
     for (const doc of subscriptionsSnapshot.docs) {
-      const userId = doc.data().userId;
+      const userId = doc.data().userId || doc.id;
       const eventsUsed = doc.data().eventsCreatedThisMonth;
-      const remaining = 5 - eventsUsed;
+      const remaining = Math.max(0, 5 - eventsUsed);
+      const month = new Date(_event.scheduleTime || now.toDate()).toISOString().slice(0, 7);
+      const deliveryKey = `usage-reminder:${month}`;
 
       try {
-        // Create notification in Firestore
-        await db.collection("notifications").add({
+        const reminderRef = db.collection("notifications").doc(`usage_${require("./events/roster").key(`${userId}:${month}`)}`);
+        await db.runTransaction(async (tx) => {
+          const [existing, deleting] = await Promise.all([tx.get(reminderRef), tx.get(db.collection("account_deletion_jobs").doc(userId))]);
+          if (existing.exists || deleting.exists) return;
+          if ((await require("./communications/qualification-isolation").qualificationDecision(db, {recipientUid: userId}, tx)).mode !== "normal") return;
+          tx.create(reminderRef, {
           userId: userId,
           title: remaining === 0 ? "Monthly Event Limit Reached" : "Event Limit Almost Reached",
           message: remaining === 0 ?
@@ -3628,6 +2034,7 @@ exports.sendBasicTierUsageReminder = onSchedule({
             remaining: remaining,
             upgradeUrl: "/premium-upgrade",
           },
+          });
         });
 
         // Send push notification if user has FCM token
@@ -3641,7 +2048,7 @@ exports.sendBasicTierUsageReminder = onSchedule({
             eventsUsed: eventsUsed,
             remaining: remaining,
           },
-        }, db);
+        }, db, deliveryKey);
 
         reminderCount++;
       } catch (error) {
@@ -3877,9 +2284,41 @@ exports.exportOrganizerEventRegistrationsV1 =
 exports.followPublicEventOrganizerV1 = createFollowPublicEventOrganizerV1(admin);
 exports.deliverOutboundMessageV1 = createDeliverOutboundMessage(admin);
 exports.retryOutboundMessagesV1 = createRetryOutboundMessages(admin);
+exports.resolveOutboundDeliveryUnknownV1 = require("./communications/delivery").createResolveOutboundDeliveryUnknownV1(admin);
 exports.startPublicRegistrationV3 = createStartPublicRegistrationV3(admin);
 
 const eventWizardFunctions = createEventWizardFunctions(admin);
+const launchOperations = createLaunchOperations(admin);
+exports.setEventStaffV1 = launchOperations.setEventStaffV1;
+exports.getEventCapabilitiesV1 = launchOperations.getEventCapabilitiesV1;
+exports.listMyAdmissionsV1 = launchOperations.listMyAdmissionsV1;
+exports.listEventRosterV2 = launchOperations.listEventRosterV2;
+exports.previewEventAnnouncementV1 = launchOperations.previewEventAnnouncementV1;
+exports.sendEventAnnouncementV1 = launchOperations.sendEventAnnouncementV1;
+exports.getEventAnnouncementV1 = launchOperations.getEventAnnouncementV1;
+exports.previewEventCancellationV1 = launchOperations.previewEventCancellationV1;
+exports.cancelEventV1 = launchOperations.cancelEventV1;
+exports.deleteEmptyEventV1 = launchOperations.deleteEmptyEventV1;
+exports.createEventExportV2 = launchOperations.createEventExportV2;
+exports.getEventExportV2 = launchOperations.getEventExportV2;
+exports.refreshRosterEvent = launchOperations.refreshRosterEvent;
+exports.refreshRosterCorrection = launchOperations.refreshRosterCorrection;
+exports.refreshRosterRegisterAttendance = launchOperations.refreshRosterRegisterAttendance;
+exports.refreshRosterAttendance = launchOperations.refreshRosterAttendance;
+exports.refreshRosterTickets = launchOperations.refreshRosterTickets;
+exports.refreshRosterHistoricalAttendance = launchOperations.refreshRosterHistoricalAttendance;
+exports.refreshRosterCustomers = launchOperations.refreshRosterCustomers;
+exports.refreshRosterGuestAttendees = launchOperations.refreshRosterGuestAttendees;
+exports.deliverEventAnnouncement = launchOperations.deliverEventAnnouncement;
+exports.generateEventExport = launchOperations.generateEventExport;
+exports.retryEventOperations = launchOperations.retryEventOperations;
+const attendanceHistory = require("./account/attendance-history").createAttendanceHistory(admin);
+exports.archiveRecordedAttendance = attendanceHistory.archiveRecordedAttendance;
+exports.getAttendanceHistoryV1 = attendanceHistory.getAttendanceHistoryV1;
+exports.getAttendanceHistoryIdentityV1 = attendanceHistory.getAttendanceHistoryIdentityV1;
+exports.correctAttendanceHistoryV1 = attendanceHistory.correctAttendanceHistoryV1;
+exports.resumeAccountDeletion = require("./account/deletion").createResumeAccountDeletion();
+exports.previewEventChangeV1 = eventWizardFunctions.previewEventChangeV1;
 exports.saveEventDraftV1 = eventWizardFunctions.saveEventDraftV1;
 exports.listEventDraftsV1 = eventWizardFunctions.listEventDraftsV1;
 exports.archiveEventDraftV1 = eventWizardFunctions.archiveEventDraftV1;
@@ -3924,3 +2363,45 @@ exports.reconcileTicketRemindersV2 =
   scheduledReminderFunctions.reconcileTicketRemindersV2;
 exports.reconcileReminderSettingsV2 =
   scheduledReminderFunctions.reconcileReminderSettingsV2;
+
+// Smart Arrival and session-independent Wallet admission credentials.
+const arrivalFunctions = require("./attendance/arrival").createArrivalFunctions(admin);
+exports.maintainSmartArrivalBoundary = arrivalFunctions.maintainSmartArrivalBoundary;
+exports.getSmartArrivalCandidates = arrivalFunctions.getSmartArrivalCandidates;
+exports.getAttendancePass = arrivalFunctions.getAttendancePass;
+exports.getAttendanceOfflineKit = arrivalFunctions.getAttendanceOfflineKit;
+exports.getAttendanceScanContext = arrivalFunctions.getAttendanceScanContext;
+exports.getAttendanceControl = arrivalFunctions.getAttendanceControl;
+exports.setAttendanceControl = arrivalFunctions.setAttendanceControl;
+const walletFunctions = require("./attendance/wallet").createWalletFunctions(admin);
+exports.attendanceWallet = walletFunctions.attendanceWallet;
+exports.reconcileAttendanceEventPasses = walletFunctions.reconcileAttendanceEventPasses;
+exports.reconcileAttendanceRegistrationPasses = walletFunctions.reconcileAttendanceRegistrationPasses;
+exports.reconcileAttendanceTicketPasses = walletFunctions.reconcileAttendanceTicketPasses;
+exports.reconcileAttendanceAccountPasses = walletFunctions.reconcileAttendanceAccountPasses;
+exports.refreshAttendanceWallets = walletFunctions.refreshAttendanceWallets;
+exports.queueAttendanceWalletDelivery = walletFunctions.queueAttendanceWalletDelivery;
+exports.deliverAttendanceWallets = walletFunctions.deliverAttendanceWallets;
+
+exports.guestAttendanceWeb = require("./attendance/guest-web").createGuestAttendanceWeb(admin);
+
+// Server-authoritative community, quiz, and retry-safe legacy analytics operations.
+const communityOperations = require("./community/operations").createCommunityOperations(admin);
+exports.communityMutationV1 = communityOperations.communityMutationV1;
+const liveQuizFunctions = require("./quiz/service").createLiveQuizFunctions(admin);
+exports.quizMutationV1 = liveQuizFunctions.quizMutationV1;
+exports.quizReadV1 = liveQuizFunctions.quizReadV1;
+const legacyAnalytics = require("./analytics/legacy-operations").createLegacyAnalyticsOperations(admin);
+exports.aggregateAttendanceData = legacyAnalytics.aggregateAttendanceData;
+exports.aggregateFeedbackData = legacyAnalytics.aggregateFeedbackData;
+exports.resetMonthlyEventLimits = legacyAnalytics.resetMonthlyEventLimits;
+const pushTokenOperations = require("./notifications/push-tokens").createPushTokenOperations(admin);
+exports.registerPushTokenV1 = pushTokenOperations.registerPushTokenV1;
+exports.revokePushTokenV1 = pushTokenOperations.revokePushTokenV1;
+
+// Cross-account profile access returns bounded public cards, never raw Customers.
+const publicProfiles = require("./profiles/public-profiles").createPublicProfileOperations(admin);
+exports.getPublicProfilesV1 = publicProfiles.getPublicProfilesV1;
+exports.searchPublicProfilesV1 = publicProfiles.searchPublicProfilesV1;
+exports.checkUsernameAvailabilityV1 = publicProfiles.checkUsernameAvailabilityV1;
+exports.lookupEventStaffAccountV1 = require("./profiles/staff-lookup").createLookupEventStaffAccountV1(admin);

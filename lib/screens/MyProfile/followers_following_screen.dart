@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/Utils/colors.dart';
@@ -37,6 +39,14 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
 
   // Search functionality
   final TextEditingController _searchController = TextEditingController();
+  String? _ownerUid;
+  StreamSubscription<User?>? _authSubscription;
+  bool _accountChanged = false;
+  bool get _currentAccount =>
+      mounted &&
+      !_accountChanged &&
+      FirebaseAuth.instance.currentUser?.uid == _ownerUid;
+
   String _searchQuery = '';
 
   // Follow status tracking
@@ -46,6 +56,12 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
   @override
   void initState() {
     super.initState();
+    _ownerUid = FirebaseAuth.instance.currentUser?.uid;
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (mounted && user?.uid != _ownerUid) {
+        setState(() => _accountChanged = true);
+      }
+    });
     _tabController = TabController(length: 2, vsync: this);
 
     // Set initial tab
@@ -61,6 +77,7 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -106,7 +123,7 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
         userIds: followerIds,
       );
 
-      if (mounted) {
+      if (mounted && _currentAccount) {
         setState(() {
           _followers = followers;
           _filteredFollowers = List.from(followers);
@@ -117,7 +134,7 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
       }
     } catch (e) {
       debugPrint('Error loading followers: $e');
-      if (mounted) {
+      if (mounted && _currentAccount) {
         setState(() {
           _isLoadingFollowers = false;
         });
@@ -135,7 +152,7 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
         userIds: followingIds,
       );
 
-      if (mounted) {
+      if (mounted && _currentAccount) {
         setState(() {
           _following = following;
           _filteredFollowing = List.from(following);
@@ -146,7 +163,7 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
       }
     } catch (e) {
       debugPrint('Error loading following: $e');
-      if (mounted) {
+      if (mounted && _currentAccount) {
         setState(() {
           _isLoadingFollowing = false;
         });
@@ -161,7 +178,7 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
       for (final user in users) {
         if (user.uid != CustomerController.logeInCustomer!.uid) {
           final isFollowing = await FirebaseFirestoreHelper().isFollowingUser(
-            followerId: CustomerController.logeInCustomer!.uid,
+            followerId: _ownerUid!,
             followingId: user.uid,
           );
           setState(() {
@@ -176,6 +193,14 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_accountChanged) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('People')),
+        body: const Center(
+          child: Text('Your account changed. Reopen this screen to continue.'),
+        ),
+      );
+    }
     return AppScaffoldWrapper(
       selectedBottomNavIndex: 3, // Profile tab
       backgroundColor: AppThemeColor.backGroundColor,
@@ -565,6 +590,7 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
   }
 
   Future<void> _toggleFollow(CustomerModel user) async {
+    if (!_currentAccount) return;
     if (CustomerController.logeInCustomer == null) {
       ShowToast().showNormalToast(msg: 'Please log in to follow users');
       return;
@@ -590,16 +616,17 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
       final maxAttempts = 3;
       int attempt = 0;
       while (true) {
+        if (!_currentAccount) return;
         try {
           if (currentStatus) {
             await FirebaseFirestoreHelper().unfollowUser(
-              followerId: CustomerController.logeInCustomer!.uid,
+              followerId: _ownerUid!,
               followingId: user.uid,
             );
             ShowToast().showNormalToast(msg: 'Unfollowed ${user.name}');
           } else {
             await FirebaseFirestoreHelper().followUser(
-              followerId: CustomerController.logeInCustomer!.uid,
+              followerId: _ownerUid!,
               followingId: user.uid,
             );
             ShowToast().showNormalToast(msg: 'Following ${user.name}');
@@ -623,7 +650,8 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
       }
     } catch (e) {
       debugPrint('Error toggling follow status: $e');
-      // Revert the state change on error
+      // Revert only the initiating account
+      if (!_currentAccount) return;
       setState(() {
         _followStatus[user.uid] = currentStatus;
       });
@@ -638,7 +666,7 @@ class _FollowersFollowingScreenState extends State<FollowersFollowingScreen>
         );
       }
     } finally {
-      if (mounted) {
+      if (mounted && _currentAccount) {
         setState(() {
           _updatingFollowIds.remove(user.uid);
         });

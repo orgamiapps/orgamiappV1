@@ -5,7 +5,23 @@
   if (!configNode) return;
   let config;
   try { config = JSON.parse(configNode.textContent || "{}"); } catch (_) { return; }
+  if (config.event?.locationType === "online" && config.event.date) {
+    const visitorZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (visitorZone !== config.event.timeZone) {
+      const details = document.querySelector("dl.details");
+      if (details) {
+        const note = document.createElement("div");
+        const label = document.createElement("dt"); label.textContent = "Your time";
+        const value = document.createElement("dd"); value.textContent = new Intl.DateTimeFormat(undefined, {dateStyle: "full", timeStyle: "long"}).format(new Date(config.event.date));
+        note.append(label, value);
+        details.append(note);
+      }
+    }
+  }
   let firebaseContext;
+  let firebasePending;
+  let registrationInProgress = false;
+  const registrationAttempts = new Map();
   let lastTrigger;
 
   const status = (message) => {
@@ -33,7 +49,17 @@
   }
   async function firebase() {
     if (firebaseContext) return firebaseContext;
-    if (!config.appCheckSiteKey) throw new Error("Secure registration is not configured.");
+    if (firebasePending) return firebasePending;
+    firebasePending = initializeFirebase();
+    try { return await firebasePending; } finally { firebasePending = null; }
+  }
+  async function initializeFirebase() {
+    const local = config.firebase?.projectId === "demo-attendus-admin" &&
+      ["localhost", "127.0.0.1"].includes(location.hostname) &&
+      config.emulators?.host === "127.0.0.1" && config.emulators.authPort === 9190 &&
+      config.emulators.functionsPort === 5101;
+    if (config.emulators && !local) throw new Error("Invalid local registration configuration.");
+    if (!local && !config.appCheckSiteKey) throw new Error("Secure registration is not configured.");
     const version = "11.10.0";
     const [appModule, authModule, functionsModule, appCheckModule] = await Promise.all([
       import(`https://www.gstatic.com/firebasejs/${version}/firebase-app.js`),
@@ -41,15 +67,35 @@
       import(`https://www.gstatic.com/firebasejs/${version}/firebase-functions.js`),
       import(`https://www.gstatic.com/firebasejs/${version}/firebase-app-check.js`),
     ]);
-    const app = appModule.initializeApp(config.firebase, "attendus-public-web");
-    appCheckModule.initializeAppCheck(app, {provider:
-      new appCheckModule.ReCaptchaEnterpriseProvider(config.appCheckSiteKey),
-    isTokenAutoRefreshEnabled: true});
+    const existing = appModule.getApps().find((candidate) => candidate.name === "attendus-public-web");
+    const app = existing || appModule.initializeApp(config.firebase, "attendus-public-web");
     const auth = authModule.getAuth(app);
+    const functions = functionsModule.getFunctions(app, "us-central1");
+    if (local && !existing) {
+      authModule.connectAuthEmulator(auth, "http://127.0.0.1:9190", {disableWarnings: true});
+      functionsModule.connectFunctionsEmulator(functions, "127.0.0.1", 5101);
+    } else if (!local && !existing) {
+      appCheckModule.initializeAppCheck(app, {provider:
+        new appCheckModule.ReCaptchaEnterpriseProvider(config.appCheckSiteKey),
+      isTokenAutoRefreshEnabled: true});
+    }
+    await auth.authStateReady();
     if (!auth.currentUser) await authModule.signInAnonymously(auth);
     firebaseContext = {auth, authModule,
-      functions: functionsModule.getFunctions(app, "us-central1"), functionsModule};
+      functions, functionsModule};
     return firebaseContext;
+  }
+  async function registrationKey(uid, payload) {
+    const canonical = JSON.stringify({...payload, answers: Object.entries(payload.answers || {}).sort()});
+    const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
+    const fingerprint = Array.from(new Uint8Array(bytes), (value) => value.toString(16).padStart(2, "0")).join("");
+    const storageKey = `attendus-registration:${uid}:${fingerprint}`;
+    let key = registrationAttempts.get(storageKey);
+    try { key ||= sessionStorage.getItem(storageKey); } catch (_) { /* Private-mode storage can be unavailable. */ }
+    if (!key) key = idempotencyKey("registration");
+    registrationAttempts.set(storageKey, key);
+    try { sessionStorage.setItem(storageKey, key); } catch (_) { /* Keep the in-memory retry identity. */ }
+    return key;
   }
   async function call(name, data, context) {
     return (await context.functionsModule.httpsCallable(context.functions, name)(data)).data;
@@ -195,15 +241,17 @@
         if (password.length < 8) throw new Error("Use a password of at least 8 characters.");
         const credential = context.authModule.EmailAuthProvider.credential(email, password);
         let linked;
+        let created = false;
         try {
           linked = await context.authModule.linkWithCredential(context.auth.currentUser, credential);
+          created = true;
         } catch (error) {
           if (error.code !== "auth/email-already-in-use" &&
               error.code !== "auth/credential-already-in-use") throw error;
           linked = await context.authModule.signInWithEmailAndPassword(context.auth,
               email, password);
         }
-        await context.authModule.updateProfile(linked.user, {displayName: fullName});
+        if (created) await context.authModule.updateProfile(linked.user, {displayName: fullName});
         if (registrationId) await call("claimPublicRegistrationV1", {registrationId, claimToken}, context);
         dialogStatus(node, "Account created. Your ticket is saved.");
         accountReady();
@@ -212,13 +260,14 @@
   }
   function showConfirmation(node, result, email, fullName, context) {
     const content = node.querySelector(".dialog-content");
-    const pending = result.status === "pending"; const waitlisted = result.status === "waitlisted";
-    const heading = pending ? "Request received" : waitlisted ? "You're on the waitlist" : "You're confirmed";
-    const summary = pending ? "The organizer will review your request. We’re sending a secure status link to your email." : waitlisted ? "The event is currently full. We’ll email you if a place becomes available." : `Your ${result.kind === "rsvp" ? "RSVP" : "ticket"} is ready. We’re sending a secure confirmation to your email.`;
+    const pending = ["pending", "confirmation_pending"].includes(result.status); const waitlisted = result.status === "waitlisted";
+    const heading = result.status === "confirmation_pending" ? "Check your email" : pending ? "Request received" : waitlisted ? "You're on the waitlist" : "You're confirmed";
+    const summary = result.status === "confirmation_pending" ? "Use the secure link in your email to view your registration status." : pending ? "The organizer will review your request. We’re sending a secure status link to your email." : waitlisted ? "The event is currently full. We’ll email you if a place becomes available." : `Your ${result.kind === "rsvp" ? "RSVP" : "ticket"} is ready. We’re sending a secure confirmation to your email.`;
     content.innerHTML = `<div class="confirmation"><div class="success-mark" aria-hidden="true">✓</div><h3>${heading}</h3><p>${summary}</p><p class="delivery-state" role="status">Email delivery: ${result.deliveryStatus === "pending" ? "sending" : result.deliveryStatus || "sending"}</p>${result.ticketId ? `<div class="ticket-reference"><span>Ticket</span><strong>${result.ticketCode || result.ticketId.slice(-10).toUpperCase()}</strong>${result.ticketQrSvg ? `<div class="ticket-qr" role="img" aria-label="QR ticket code ${result.ticketCode}">${result.ticketQrSvg}</div>` : ""}</div>` : ""}<div class="confirmation-actions">${result.manageUrl ? `<a class="secondary-button" href="${result.manageUrl}">Manage registration</a>` : ""}${pending || waitlisted ? "" : `<button class="secondary-button add-calendar" type="button">Add to calendar</button>`}</div><section class="account-upgrade" hidden><h3>Save your registrations</h3><p>Create an optional account to manage tickets and follow organizers.</p><button class="secondary-button google-upgrade" type="button">Continue with Google</button><form class="credential-upgrade"><label>Password <input name="password" type="password" minlength="8" autocomplete="new-password"></label><button class="secondary-button upgrade-contact" type="submit"></button></form><button class="secondary-button follow-organizer" type="button" hidden>Follow organizer</button></section><button class="link-button show-account" type="button">Create an account (optional)</button></div>`;
     content.querySelector(".add-calendar")?.addEventListener("click", () => {
       const event = config.event || {}; const start = new Date(event.date);
-      const end = new Date(start.getTime() + 2 * 3600000);
+      const end = new Date(event.end);
+      if (!event.end || !Number.isFinite(end.getTime())) { dialogStatus(node, "The organizer needs to confirm the event end time.", true); return; }
       const compact = (date) => date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
       location.href = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title || "Event")}&dates=${compact(start)}/${compact(end)}&location=${encodeURIComponent(event.location || "")}`;
     });
@@ -233,6 +282,11 @@
     status(pending ? "Registration request submitted." : waitlisted ? "Added to waitlist." : "Registration confirmed.");
   }
   async function perform(eventId, action) {
+    if (config.ticketState === "paid_ticket" && !config.paidTicketCheckoutEnabled) {
+      const unavailable = dialog("Paid checkout is temporarily unavailable");
+      dialogStatus(unavailable, "Please contact the organizer for other ways to attend.");
+      return;
+    }
     const context = await firebase();
     const node = dialog(action === "rsvp" ? "Confirm your RSVP" : "Get your ticket", "registration-dialog");
     const form = registrationForm(node, action, context);
@@ -248,8 +302,12 @@
         try {
           const callable = config.ticketState === "paid_ticket" ?
             "startPublicRegistrationV2" : "startPublicRegistrationV3";
-          const result = await call(callable, {eventId, fullName, email,
-            answers: answersFrom(form), idempotencyKey: idempotencyKey("registration")}, context);
+          const uid = context.auth.currentUser?.uid;
+          const payload = {eventId, fullName, email, answers: answersFrom(form)};
+          const key = await registrationKey(uid, payload);
+          if (!uid || context.auth.currentUser?.uid !== uid) throw new Error("Account changed. Review and submit again.");
+          const result = await call(callable, {...payload, idempotencyKey: key}, context);
+          if (context.auth.currentUser?.uid !== uid) throw new Error("Account changed. Reload your registration.");
           if (result.status === "confirmation_pending") {
             showConfirmation(node, result, email, fullName, context); resolve(); return;
           }
@@ -266,11 +324,14 @@
   for (const trigger of document.querySelectorAll("[data-public-action]")) {
     trigger.addEventListener("click", async (event) => {
       if (!config.inlineRegistrationEnabled || !config.accountlessRegistrationEnabled) return;
-      event.preventDefault(); lastTrigger = trigger; config.eventId = trigger.dataset.eventId;
+      event.preventDefault();
+      if (registrationInProgress || document.querySelector("dialog[open]")) return;
+      registrationInProgress = true;
+      lastTrigger = trigger; config.eventId = trigger.dataset.eventId;
       trigger.setAttribute("aria-busy", "true"); status("Preparing secure registration.");
       try { await perform(trigger.dataset.eventId, trigger.dataset.publicAction); }
       catch (error) { if (error.message !== "Registration cancelled.") status(error.message); }
-      finally { trigger.removeAttribute("aria-busy"); }
+      finally { registrationInProgress = false; trigger.removeAttribute("aria-busy"); }
     });
   }
 })();

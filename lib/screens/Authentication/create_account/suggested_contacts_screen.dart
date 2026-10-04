@@ -1,8 +1,9 @@
+import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/models/customer_model.dart';
-import 'package:attendus/controller/customer_controller.dart';
 
 class SuggestedContactsScreen extends StatefulWidget {
   const SuggestedContactsScreen({super.key});
@@ -14,15 +15,37 @@ class SuggestedContactsScreen extends StatefulWidget {
 
 class _SuggestedContactsScreenState extends State<SuggestedContactsScreen> {
   final TextEditingController _searchController = TextEditingController();
+  String? _ownerUid;
+  StreamSubscription<User?>? _authSubscription;
+  bool _accountChanged = false;
+  bool get _currentAccount =>
+      mounted &&
+      !_accountChanged &&
+      FirebaseAuth.instance.currentUser?.uid == _ownerUid;
+
   List<CustomerModel> _users = [];
   List<CustomerModel> _filtered = [];
   bool _isLoading = true;
   final Map<String, bool> _followStatus = {};
+  final Set<String> _pendingFollows = {};
 
   @override
   void initState() {
     super.initState();
+    _ownerUid = FirebaseAuth.instance.currentUser?.uid;
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (mounted && user?.uid != _ownerUid) {
+        setState(() => _accountChanged = true);
+      }
+    });
     _loadSuggestions();
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSuggestions() async {
@@ -33,28 +56,38 @@ class _SuggestedContactsScreenState extends State<SuggestedContactsScreen> {
       final users = await FirebaseFirestoreHelper().searchUsers(
         searchQuery: '',
       );
-      final currentId = CustomerController.logeInCustomer?.uid;
+      if (!_currentAccount) return;
+      final currentId = _ownerUid;
       _users = users
           .where((u) => u.uid != currentId && (u.isDiscoverable))
           .toList();
       _filtered = List.from(_users);
       await _loadFollowStatuses(_filtered);
+    } catch (_) {
+      if (mounted && _currentAccount) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not load people. Reopen to retry.'),
+          ),
+        );
+      }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted && _currentAccount) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _loadFollowStatuses(List<CustomerModel> users) async {
-    final myId = CustomerController.logeInCustomer?.uid;
+    final myId = _ownerUid;
     if (myId == null) return;
     for (final user in users) {
       final isFollowing = await FirebaseFirestoreHelper().isFollowingUser(
         followerId: myId,
         followingId: user.uid,
       );
+      if (!_currentAccount) return;
       _followStatus[user.uid] = isFollowing;
     }
-    if (mounted) setState(() {});
+    if (mounted && _currentAccount) setState(() {});
   }
 
   void _onSearchChanged(String q) {
@@ -73,26 +106,52 @@ class _SuggestedContactsScreenState extends State<SuggestedContactsScreen> {
   }
 
   Future<void> _toggleFollow(CustomerModel user) async {
-    final my = CustomerController.logeInCustomer;
-    if (my == null) return;
-    final isFollowing = _followStatus[user.uid] ?? false;
-    if (isFollowing) {
-      await FirebaseFirestoreHelper().unfollowUser(
-        followerId: my.uid,
-        followingId: user.uid,
-      );
-    } else {
-      await FirebaseFirestoreHelper().followUser(
-        followerId: my.uid,
-        followingId: user.uid,
-      );
+    if (!_currentAccount ||
+        _ownerUid == null ||
+        _pendingFollows.contains(user.uid)) {
+      return;
     }
-    _followStatus[user.uid] = !isFollowing;
-    if (mounted) setState(() {});
+    final myId = _ownerUid!;
+    setState(() => _pendingFollows.add(user.uid));
+    final isFollowing = _followStatus[user.uid] ?? false;
+    try {
+      if (isFollowing) {
+        await FirebaseFirestoreHelper().unfollowUser(
+          followerId: myId,
+          followingId: user.uid,
+        );
+      } else {
+        await FirebaseFirestoreHelper().followUser(
+          followerId: myId,
+          followingId: user.uid,
+        );
+      }
+      if (!_currentAccount) return;
+      _followStatus[user.uid] = !isFollowing;
+      if (mounted && _currentAccount) setState(() {});
+    } catch (_) {
+      if (mounted && _currentAccount) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not update your follow. Please retry.'),
+          ),
+        );
+      }
+    } finally {
+      if (_currentAccount) setState(() => _pendingFollows.remove(user.uid));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_accountChanged) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('People')),
+        body: const Center(
+          child: Text('Your account changed. Reopen this screen to continue.'),
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(title: const Text('People You May Know')),
       body: Column(
@@ -136,7 +195,9 @@ class _SuggestedContactsScreenState extends State<SuggestedContactsScreen> {
                             ? Text('@${user.username}')
                             : null,
                         trailing: TextButton(
-                          onPressed: () => _toggleFollow(user),
+                          onPressed: _pendingFollows.contains(user.uid)
+                              ? null
+                              : () => _toggleFollow(user),
                           style: TextButton.styleFrom(
                             backgroundColor: isFollowing
                                 ? Colors.grey.shade200

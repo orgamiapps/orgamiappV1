@@ -1,4 +1,8 @@
+import 'package:attendus/Services/discovery_history_coordinator.dart';
+import 'package:attendus/models/discovery_route_state.dart';
 import 'dart:async';
+import 'package:attendus/screens/MyProfile/my_profile_screen.dart';
+import 'package:attendus/screens/MyProfile/my_registrations_screen.dart';
 
 import 'package:attendus/Services/account_access_service.dart';
 import 'package:attendus/Services/discovery_location_service.dart';
@@ -9,12 +13,11 @@ import 'package:attendus/Utils/router.dart';
 import 'package:attendus/models/discovery_marketplace.dart';
 import 'package:attendus/models/discovery_category.dart';
 import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
-import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/screens/Home/notifications_screen.dart';
 import 'package:attendus/widgets/account_required_sheet.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
+import 'package:attendus/widgets/attendus_scaffold.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
 int resolveActiveDiscoveryExperience(
@@ -36,6 +39,80 @@ class DiscoveryMarketplaceView extends StatefulWidget {
 }
 
 class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
+  DiscoveryHistoryCoordinator? _history;
+  final _discoveryScroll = ScrollController(keepScrollOffset: false);
+  final Map<String, (DiscoveryHomeResult?, DiscoverySearchResult?)>
+  _routeResults = {};
+
+  DiscoveryRouteState _routeSnapshot() => DiscoveryRouteState({
+    'q': _searchController.text,
+    'date': _datePreset ?? '',
+    'free': _freeOnly ? '1' : '',
+    'online': _onlineOnly ? '1' : '',
+    'browse': _browseAll ? '1' : '',
+    'category': _selectedCategoryId ?? '',
+    if (_location != null) ...{
+      'lat': _location!.latitude.toString(),
+      'lng': _location!.longitude.toString(),
+      'city': _location!.city,
+      'region': _location!.regionCode,
+      'nationwide': _location!.nationwide ? '1' : '',
+    },
+  });
+
+  Future<void> _restoreRoute(DiscoveryRouteState route) async {
+    if (!mounted) return;
+    _debounce?.cancel();
+    _requestGeneration++;
+    setState(() {
+      _searchController.text = route['q'] ?? '';
+      _datePreset = route['date'];
+      _freeOnly = route.enabled('free');
+      _onlineOnly = route.enabled('online');
+      _browseAll = route.enabled('browse');
+      _selectedCategoryId = route['category'];
+      if (route['lat'] != null || route.enabled('nationwide')) {
+        _location = DiscoveryLocation(
+          latitude: double.tryParse(route['lat'] ?? '') ?? 0,
+          longitude: double.tryParse(route['lng'] ?? '') ?? 0,
+          city: route['city'] ?? 'Selected area',
+          regionCode: route['region'] ?? '',
+          source: 'shared_link',
+          nationwide: route.enabled('nationwide'),
+        );
+      }
+      _location ??= const DiscoveryLocation(
+        latitude: 0,
+        longitude: 0,
+        city: 'United States',
+        regionCode: 'US',
+        source: 'shared_link',
+        nationwide: true,
+      );
+    });
+    final cached = _routeResults[route.uri.toString()];
+    if (cached != null) {
+      setState(() {
+        _home = cached.$1;
+        _search = cached.$2;
+        _loading = false;
+        _error = null;
+      });
+      return;
+    }
+    if (_searchMode) {
+      await _runSearch();
+    } else {
+      await _loadHome();
+    }
+  }
+
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    _history?.schedule();
+  }
+
   final _marketplace = DiscoveryMarketplaceService();
   final _locations = DiscoveryLocationService();
   final _searchController = TextEditingController();
@@ -57,11 +134,59 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
   bool _categoryModuleRecorded = false;
   bool _browseAll = false;
   bool _loadingMore = false;
+  Widget _shortcuts() => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+    child: Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        ActionChip(
+          avatar: const Icon(Icons.confirmation_number_outlined, size: 18),
+          label: const Text('Registrations and tickets'),
+          onPressed: () => _openShortcut(
+            const MyRegistrationsScreen(),
+            AccountFeature.tickets,
+          ),
+        ),
+        ActionChip(
+          avatar: const Icon(Icons.bookmark_outline, size: 18),
+          label: const Text('Saved events'),
+          onPressed: () => _openShortcut(
+            const MyProfileScreen(initialTab: 3),
+            AccountFeature.favorites,
+          ),
+        ),
+        ActionChip(
+          avatar: const Icon(Icons.event_note_outlined, size: 18),
+          label: const Text('Organizer workspace'),
+          onPressed: () => _openShortcut(
+            const MyProfileScreen(initialTab: 1),
+            AccountFeature.createEvent,
+          ),
+        ),
+      ],
+    ),
+  );
+  void _openShortcut(Widget screen, AccountFeature feature) {
+    if (AccountAccessService.isGuest && feature != AccountFeature.tickets) {
+      showAccountRequiredSheet(context: context, feature: feature);
+      return;
+    }
+    RouterClass.nextScreenNormal(context, screen);
+  }
 
   int get _activeExperienceVersion => resolveActiveDiscoveryExperience(
     widget.experienceVersion,
     _home?.schemaVersion,
   );
+
+  // The shared shell keeps notification access visible at every breakpoint.
+  // Retain the page action when Discover is used outside that shell.
+  bool get _showNotificationButton =>
+      context
+          .findAncestorWidgetOfExactType<AttendUsScaffold>()
+          ?.onNotificationsPressed ==
+      null;
 
   bool get _searchMode =>
       _searchController.text.trim().isNotEmpty ||
@@ -78,7 +203,8 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
       },
     );
     if (_activeExperienceVersion == 2 &&
-        _searchController.text.trim().isEmpty) {
+        _searchController.text.trim().isEmpty &&
+        !_browseAll) {
       await _loadHome();
     } else {
       await _runSearch();
@@ -93,6 +219,8 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
 
   @override
   void dispose() {
+    _history?.dispose();
+    _discoveryScroll.dispose();
     _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
@@ -102,13 +230,26 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
     _interests = await _locations.loadInterests();
     final cached = await _locations.load();
     if (!mounted) return;
-    if (cached == null) {
+    _location = cached;
+    _history = DiscoveryHistoryCoordinator(
+      snapshot: _routeSnapshot,
+      restore: _restoreRoute,
+      scrollController: () => _discoveryScroll,
+      isActive: () => mounted && (ModalRoute.of(context)?.isCurrent ?? false),
+    );
+    _discoveryScroll.addListener(() => _history?.scheduleScroll());
+    await _history!.initialize();
+    if (_home != null || _search != null) return;
+    if (_location == null) {
       setState(() => _loading = false);
       await _showLocationOnboarding();
       return;
     }
-    _location = cached;
-    await _loadHome();
+    if (_searchMode) {
+      await _runSearch();
+    } else {
+      await _loadHome();
+    }
   }
 
   Future<void> _showLocationOnboarding() async {
@@ -244,6 +385,7 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
           dimensions: {'experienceVersion': '2'},
         );
       }
+      _routeResults[_routeSnapshot().uri.toString()] = (_home, _search);
       final result = _home!;
       ProductFunnelService().record(
         'discovery_view',
@@ -373,6 +515,7 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
         _search = result;
         _loading = false;
       });
+      _routeResults[_routeSnapshot().uri.toString()] = (_home, _search);
       ProductFunnelService().record(
         result.events.isEmpty
             ? 'discovery_search_no_result'
@@ -432,6 +575,7 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
         );
         _loadingMore = false;
       });
+      _routeResults[_routeSnapshot().uri.toString()] = (_home, _search);
       ProductFunnelService().record(
         'discovery_search_page_loaded',
         dimensions: {
@@ -503,10 +647,11 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
         'category': item.event.categories.firstOrNull ?? 'uncategorized',
       },
     );
-    RouterClass.nextScreenNormal(
+    _history?.flush();
+    _history?.saveScroll();
+    Navigator.of(
       context,
-      SingleEventScreen(eventModel: item.event),
-    );
+    ).pushNamed('/app/event/${Uri.encodeComponent(item.event.id)}');
   }
 
   void _createEvent() {
@@ -532,6 +677,7 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
       onRefresh: _searchMode ? _runSearch : _loadHome,
       child: CustomScrollView(
         key: const PageStorageKey('discovery-marketplace'),
+        controller: _discoveryScroll,
         slivers: [
           SliverToBoxAdapter(
             child: Padding(
@@ -549,27 +695,28 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
                           ),
                         ),
                       ),
-                      IconButton(
-                        tooltip: 'Notifications',
-                        constraints: const BoxConstraints(
-                          minWidth: 44,
-                          minHeight: 44,
+                      if (_showNotificationButton)
+                        IconButton(
+                          tooltip: 'Notifications',
+                          constraints: const BoxConstraints(
+                            minWidth: 44,
+                            minHeight: 44,
+                          ),
+                          onPressed: () {
+                            if (AccountAccessService.isGuest) {
+                              showAccountRequiredSheet(
+                                context: context,
+                                feature: AccountFeature.notifications,
+                              );
+                            } else {
+                              RouterClass.nextScreenNormal(
+                                context,
+                                const NotificationsScreen(),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.notifications_none),
                         ),
-                        onPressed: () {
-                          if (AccountAccessService.isGuest) {
-                            showAccountRequiredSheet(
-                              context: context,
-                              feature: AccountFeature.notifications,
-                            );
-                          } else {
-                            RouterClass.nextScreenNormal(
-                              context,
-                              const NotificationsScreen(),
-                            );
-                          }
-                        },
-                        icon: const Icon(Icons.notifications_none),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -656,6 +803,7 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
               ),
             ),
           ),
+          SliverToBoxAdapter(child: _shortcuts()),
           if (_loading)
             const SliverFillRemaining(
               hasScrollBody: false,
@@ -678,8 +826,10 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
       onRefresh: _searchMode ? _runSearch : _loadHome,
       child: CustomScrollView(
         key: const PageStorageKey('discovery-marketplace-v2'),
+        controller: _discoveryScroll,
         slivers: [
           SliverToBoxAdapter(child: _v2Header(context)),
+          SliverToBoxAdapter(child: _shortcuts()),
           if (_loading && _home == null)
             const SliverToBoxAdapter(child: _DiscoverySkeleton())
           else if (_error != null && _home == null)
@@ -715,24 +865,28 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
                 onPressed: _chooseCity,
               ),
               const Spacer(),
-              IconButton(
-                tooltip: 'Notifications',
-                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-                onPressed: () {
-                  if (AccountAccessService.isGuest) {
-                    showAccountRequiredSheet(
-                      context: context,
-                      feature: AccountFeature.notifications,
-                    );
-                  } else {
-                    RouterClass.nextScreenNormal(
-                      context,
-                      const NotificationsScreen(),
-                    );
-                  }
-                },
-                icon: const Icon(Icons.notifications_none),
-              ),
+              if (_showNotificationButton)
+                IconButton(
+                  tooltip: 'Notifications',
+                  constraints: const BoxConstraints(
+                    minWidth: 44,
+                    minHeight: 44,
+                  ),
+                  onPressed: () {
+                    if (AccountAccessService.isGuest) {
+                      showAccountRequiredSheet(
+                        context: context,
+                        feature: AccountFeature.notifications,
+                      );
+                    } else {
+                      RouterClass.nextScreenNormal(
+                        context,
+                        const NotificationsScreen(),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.notifications_none),
+                ),
             ],
           ),
           if (_home?.cacheState == 'stale') ...[
@@ -1104,16 +1258,17 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
     final event = item.event;
     final category = DiscoveryCategory.fromId(event.primaryDiscoveryCategoryId);
     final remaining = event.maxTickets > 0
-        ? event.maxTickets - event.issuedTickets
+        ? event.maxTickets -
+              (event.ticketsEnabled
+                  ? event.issuedTickets
+                  : event.confirmedRegistrationCount)
         : null;
     return AttendUsEventSummaryCard(
       title: event.title,
       imageUrl: event.imageUrl,
       imageAspectRatio: 3 / 2,
       fallbackIcon: category?.icon,
-      dateLabel: DateFormat(
-        'EEE, MMM d · h:mm a',
-      ).format(event.selectedDateTime.toLocal()),
+      dateLabel: event.schedule.cardLabel,
       locationLabel: event.locationType == 'online'
           ? 'Online'
           : (event.locationName?.isNotEmpty == true
@@ -1132,7 +1287,7 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
                 : null)
           : remaining <= 0
           ? 'Sold out'
-          : '$remaining tickets left',
+          : '$remaining ${event.ticketsEnabled ? 'tickets' : 'spots'} remaining',
       statusLabel: event.isFeatured ? 'Featured' : null,
       isSaved: _savedIds.contains(event.id),
       onSave: () => _toggleSave(item),
@@ -1296,15 +1451,16 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
   Widget _eventCard(DiscoveryEvent item, String section, int index) {
     final event = item.event;
     final remaining = event.maxTickets > 0
-        ? event.maxTickets - event.issuedTickets
+        ? event.maxTickets -
+              (event.ticketsEnabled
+                  ? event.issuedTickets
+                  : event.confirmedRegistrationCount)
         : null;
     return AttendUsEventSummaryCard(
       title: event.title,
       subtitle: event.description,
       imageUrl: event.imageUrl,
-      dateLabel: DateFormat(
-        'EEE, MMM d · h:mm a',
-      ).format(event.selectedDateTime.toLocal()),
+      dateLabel: event.schedule.cardLabel,
       locationLabel: event.locationType == 'online'
           ? 'Online'
           : (event.city.isNotEmpty ? event.city : event.location),
@@ -1319,7 +1475,7 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
           ? null
           : remaining <= 0
           ? 'Sold out'
-          : '$remaining tickets left',
+          : '$remaining ${event.ticketsEnabled ? 'tickets' : 'spots'} remaining',
       statusLabel: event.isFeatured ? 'Featured' : null,
       isSaved: _savedIds.contains(event.id),
       onSave: () => _toggleSave(item),

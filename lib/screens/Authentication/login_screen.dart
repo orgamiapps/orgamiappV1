@@ -93,7 +93,7 @@ class _LoginScreenState extends State<LoginScreen> {
         case 'ERROR_OPERATION_NOT_ALLOWED':
         case 'operation-not-allowed':
           ShowToast().showNormalToast(
-            msg: 'Email and password sign-in is not enabled.',
+            msg: 'Email and password login is not enabled.',
           );
           break;
         default:
@@ -128,14 +128,14 @@ class _LoginScreenState extends State<LoginScreen> {
         ShowToast().showNormalToast(
           msg:
               FirebaseGoogleAuthHelper.lastGoogleErrorMessage ??
-              'Google sign-in failed.',
+              'Google login failed.',
         );
       }
     } catch (e) {
       ShowToast().showNormalToast(
         msg:
             FirebaseGoogleAuthHelper.lastGoogleErrorMessage ??
-            'Google sign-in failed.',
+            'Google login failed.',
       );
     } finally {
       if (mounted) setState(() => _socialSigningIn = false);
@@ -160,14 +160,14 @@ class _LoginScreenState extends State<LoginScreen> {
         ShowToast().showNormalToast(
           msg:
               FirebaseGoogleAuthHelper.lastAppleErrorMessage ??
-              'Apple sign-in failed.',
+              'Apple login failed.',
         );
       }
     } catch (e) {
       ShowToast().showNormalToast(
         msg:
             FirebaseGoogleAuthHelper.lastAppleErrorMessage ??
-            'Apple sign-in failed.',
+            'Apple login failed.',
       );
     } finally {
       if (mounted) setState(() => _socialSigningIn = false);
@@ -179,7 +179,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return AttendUsAuthLayout(
       title: 'Welcome back',
       subtitle:
-          'Sign in to discover events, manage attendance, and check in securely.',
+          'Log in to discover events, manage attendance, and check in securely.',
       leading: const AttendUsBackButton(),
       footer: TextButton(
         onPressed: () =>
@@ -264,7 +264,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     color: Theme.of(context).colorScheme.primary,
                     onPressed: _submitLogin,
                     child: const Text(
-                      'Sign in',
+                      'Log in',
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w700,

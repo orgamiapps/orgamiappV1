@@ -1,0 +1,3971 @@
+{
+  "generatedAt": "2026-09-27T19:59:20.676986+00:00",
+  "head": "8c40edcf77d7ae269c38294e5bbd8931da1fb3bb",
+  "status": "local_unqualified_checkpoint",
+  "files": [
+    {
+      "path": ".cursor/environment.json",
+      "sha256": "47ef399c99375a8e6deea4886cdf0dbb3d38648536b91fc8647336c449d17552"
+    },
+    {
+      "path": ".firebase/hosting.YnVpbGQvd2Vi.cache",
+      "sha256": "a1687b3a0f8014e2672a5045be52d3ac36e8a3e99dc31d0a321f3d86eb72b5af"
+    },
+    {
+      "path": ".firebaserc",
+      "sha256": "f6dc6409c6a4f7cdfb4efc18d5befff52d7694dc2d58c823c04bab9a358f26b0"
+    },
+    {
+      "path": ".gitattributes",
+      "sha256": "1a1dbe176bc233b499d35a57db7513f2941c99ab9759f177830c9149be99005b"
+    },
+    {
+      "path": ".github/workflows/attendus-admin-windows.yml",
+      "sha256": "c45157db5a0e531dc400e4c8a2d50ee02b280e6cf3abefc1753b2bfe8b4e1e2b"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "63e049ce785c0ca1a6a080a42f44a561c35b067263c399d3b87b39ca8a76806a"
+    },
+    {
+      "path": ".github/workflows/deploy-firestore-indexes.yml",
+      "sha256": "3e2f870d015d89c0abd747aedb7cdf3f275b3850c3776e90bb2276cc0376bb75"
+    },
+    {
+      "path": ".github/workflows/deploy-functions.yml",
+      "sha256": "956c4c89b709129cf8579e2c2f8c4dd0413344712b42a56fabc86a671c9f51f8"
+    },
+    {
+      "path": ".github/workflows/firebase-hosting-merge.yml",
+      "sha256": "53bd95563e84dc0af4ae7028af0b801b3dd5c22e14d913350fa927f30e5957e5"
+    },
+    {
+      "path": ".github/workflows/firebase-hosting-pull-request.yml",
+      "sha256": "9e5646c64f2f4eb73f2192ba2c6342453164c4f2ce2ef08ed1d7ea7cd9a63493"
+    },
+    {
+      "path": ".github/workflows/native-release.yml",
+      "sha256": "a6139c76eaf6a0716146e4d84ddf4866d9125e1b77fb14c901b2ac961d656d95"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "3805c0f3785e1969b0c92760344c1c9df3c322851eca2162e7ff0c6df87fb8d9"
+    },
+    {
+      "path": ".metadata",
+      "sha256": "a265baae2e09d6cf7da89d8cdd7ed353da31ded3aee3ced204c75f2711eba95c"
+    },
+    {
+      "path": ".vscode/settings.json",
+      "sha256": "23968a68b015ae9614af049d160c402b3c0b220d03cdfd9ec3e6e0185db3c259"
+    },
+    {
+      "path": "ABOUT_TAB_COMPONENT_STRUCTURE.md",
+      "sha256": "5b7a80f779b174a5ec3b4e95edf85226517a3740e3af4cb1b71d20c726a56b63"
+    },
+    {
+      "path": "ABOUT_TAB_FIXES_QUICK_REFERENCE.md",
+      "sha256": "2daaa13c153e9682725a7485d126cae80583440a95154c29239cfab264805c80"
+    },
+    {
+      "path": "ACCOUNT_BACK_BUTTON_FIX.md",
+      "sha256": "ee1037011c07bc0a8e8db0e4e10fc691388e8c1def59e8a4f5b19fb3b898e966"
+    },
+    {
+      "path": "AI_SEARCH_IMPLEMENTATION_SUMMARY.md",
+      "sha256": "ec61a04c2fc7c84939b23140d303d26dea862d547a0f1e0993d7bd03e24489e5"
+    },
+    {
+      "path": "ANALYTICS_DASHBOARD_FIX_COMPLETE.md",
+      "sha256": "5c001773d72efde5e878d6472a965609998381d184ba276115994db4dffe3c3c"
+    },
+    {
+      "path": "ANALYTICS_DASHBOARD_TESTING_GUIDE.md",
+      "sha256": "68b64578a1af4286ad9cf4c03f9dcf1ee849d3ce5adb7fa0e27702c3f4e7b4a1"
+    },
+    {
+      "path": "ANALYTICS_DEPLOY_QUICK_START.md",
+      "sha256": "eb867a1356f2de0580e27445ee68373e8ea756936f86bd2a922c8085d8f3c2e9"
+    },
+    {
+      "path": "ANALYTICS_OPTIMIZATION_COMPLETE.md",
+      "sha256": "618a6cd3079a7ed53bf887675a50bd9cfc50743994ffc9e76c75e3e0816c70fe"
+    },
+    {
+      "path": "ANALYTICS_PERFORMANCE_OPTIMIZATION_GUIDE.md",
+      "sha256": "23dd9ce88f00a99350295acc4913f4c86377f60fe89561334d533ba96b27a38b"
+    },
+    {
+      "path": "ANALYZER_FIX_GUIDE.md",
+      "sha256": "ef62ff09ad8a3e80328f3f3e06130e917de6f7215ec31fe0abfa9712cac52e0d"
+    },
+    {
+      "path": "ANDROID_BUILD_FIX_SUMMARY.md",
+      "sha256": "378596c5d6eab12c1cc06dd367130c7a07f58cbe542794b41be7eb551a12ace2"
+    },
+    {
+      "path": "ANDROID_STUDIO_INDEXING_FIX.md",
+      "sha256": "b9f8fe3145ff090807d88e92ecba20d683bfd7724d5a112522ab01b768883b10"
+    },
+    {
+      "path": "APP_FIXES_APPLIED.md",
+      "sha256": "dae7c7c17941a42b68596146463a07b27afb3f94f5c748a93e54db563e9c6345"
+    },
+    {
+      "path": "APP_FREEZE_FIX.md",
+      "sha256": "46dc419abaec8ce12db8c2f335ebac6a19c93126db94a7f86332c17d6020f322"
+    },
+    {
+      "path": "APP_LOADING_OPTIMIZATION_SUMMARY.md",
+      "sha256": "2672d26c3294840a11eb7d4d65af6261dad770bcdd0d3e87e403239a9f66382b"
+    },
+    {
+      "path": "APP_PERFORMANCE_FIX_COMPLETE.md",
+      "sha256": "936c250f555ae751d15df3d7c37173449d2895a74de01f1235efde35f113b76a"
+    },
+    {
+      "path": "APP_STARTUP_OPTIMIZATION_SUMMARY.md",
+      "sha256": "ed1a1583dd3acf6f691e6068eeb07357aa09a47f390ece94f585aabed2cb5167"
+    },
+    {
+      "path": "APP_STARTUP_PERFORMANCE_FIX.md",
+      "sha256": "b1e4451f3c3b2cfb1c4b6f825cceafab2a93f3842d2b4c0732be9b4f95fcc726"
+    },
+    {
+      "path": "AUTO_SAVE_BUTTON_FEATURE.md",
+      "sha256": "25033ff1a2313a41c223024a42ba13d565b96b4baed1257ddaeaf11119c78c14"
+    },
+    {
+      "path": "BADGE_SYSTEM_README.md",
+      "sha256": "ff31c5e329379583c136a2ff758c94dfd0298aca1b05139bbc6650bb4a5cc2c8"
+    },
+    {
+      "path": "BOTTOM_NAVIGATION_GUIDE.md",
+      "sha256": "90dc96b06b86cd35f86d17206dce5496d0793e58301a2011c05879af6a5a5087"
+    },
+    {
+      "path": "BUILD_ISSUE_RESOLUTION.md",
+      "sha256": "df29e63735d52c63ece7cee63bca3018ac2ee2df5b3c2aace098413b8c7d9f8a"
+    },
+    {
+      "path": "BUILD_ISSUE_RESOLUTION_FINAL.md",
+      "sha256": "e7c0b57e8fe9c069b381b355b19453b192709f6c4a65f56082740fcd1ef92f46"
+    },
+    {
+      "path": "CAMERA_FIX_COMPLETE.md",
+      "sha256": "9f820f90edeae9764675b1ff6df77f445092fd416d8eeb0428f77fb41b78a809"
+    },
+    {
+      "path": "CLEAN_TICKET_DESIGN_UPDATE.md",
+      "sha256": "902c5bd470de3d043a8dd369db256d321ddb079a20bbfb2e08fd093bee2e62b7"
+    },
+    {
+      "path": "COMPLETE_IMPLEMENTATION_SCRIPT.md",
+      "sha256": "2add55ddc8deeb39e1c236f7f10957d1265a7c4127cbe10cb7f0ab5a99ed1504"
+    },
+    {
+      "path": "COMPREHENSIVE_PERFORMANCE_OPTIMIZATION.md",
+      "sha256": "a7e544b49a65343f9e2eed7e61db3c545290c65316542a0b1833863163783950"
+    },
+    {
+      "path": "CREATION_LIMITS_IMPLEMENTATION.md",
+      "sha256": "0b622cec67257459752a914063bee35a118f29dbf9424a35a0d50e2058d6d048"
+    },
+    {
+      "path": "CREATION_LIMITS_QUICK_START.md",
+      "sha256": "74da96c52d79aef0b0e32bfd5699e4fb291c226bf8fac18933f01bf0d34780e1"
+    },
+    {
+      "path": "CRITICAL_PERFORMANCE_OPTIMIZATION_APPLIED.md",
+      "sha256": "3ba46a401f6af5a49e1b3f12a93515be3d87cb56ec4072dad5da75876f1ccab4"
+    },
+    {
+      "path": "CUSTOM_DOMAIN_SETUP_GUIDE.md",
+      "sha256": "1e5f50b6474aab2172381fc9a0e5c89b8f3ca9652a8c1ad9030c4f6185a12d51"
+    },
+    {
+      "path": "DART_COMPILER_FIX_SUMMARY.md",
+      "sha256": "c6651b275b05f77825d8015fc98ca1e54675c45ab07e862b32d2d8a764ef3432"
+    },
+    {
+      "path": "DART_FIX_RESOLVED.md",
+      "sha256": "67120539486e31b0593d2a3e6b974bc5eb9cfac4f515baa5e0bd063e5edf8031"
+    },
+    {
+      "path": "DEPLOYMENT_GUIDE_TWO_TIER.md",
+      "sha256": "8b6bba8855c506ca796c288332d9301f76e3e71b1d090901f067578d5fa895d1"
+    },
+    {
+      "path": "DEPLOY_JOIN_APPROVAL_NOTIFICATIONS.sh",
+      "sha256": "3090128b6905b3cd0fe317ae33b50f4c578ed52be327366b8d7b427bf1812254"
+    },
+    {
+      "path": "DWELL_TIME_TRACKING.md",
+      "sha256": "136761f709d280744ec3e77a1585905b5f4eadeb604d40fff39302d89d1e5c71"
+    },
+    {
+      "path": "DYNAMIC_TICKET_SYSTEM.md",
+      "sha256": "423616b73643c05f8e41f3681853aef3e8157a1571a90e95320da6a743fe3fe8"
+    },
+    {
+      "path": "EDIT_EVENT_BUTTON_STYLE_UPDATE.md",
+      "sha256": "8d14cbc69069072c8607c12fc2ab539c9c0b3f3022ed86b3ad0420d4b3f5557e"
+    },
+    {
+      "path": "EDIT_EVENT_OPTIONAL_IMAGE_FIX.md",
+      "sha256": "39d9390a98700f8fece70cfa689c93b094a2a7ab81750daf06399ec2a994a20a"
+    },
+    {
+      "path": "EDIT_EVENT_SAVE_BUTTON_FIX.md",
+      "sha256": "7262902852b7339f1effc10485ebef8d2bfdb2845b0fb3ff07b93952feec92a8"
+    },
+    {
+      "path": "EDIT_EVENT_SAVE_FIX.md",
+      "sha256": "77f166dc24f4e6bee77064250a2dc9286851e3d3fee287f59c7bc0641f6241b3"
+    },
+    {
+      "path": "EMULATOR_PERFORMANCE_FIX.md",
+      "sha256": "f52adc467af04865fd4bc09ce02e0e73f75209ec51c01e7f4d4972be6006f4f0"
+    },
+    {
+      "path": "EMULATOR_STARTUP_FIX.md",
+      "sha256": "b51316b5adbeab9d74d67c0230d4b3612eaf60f9dcaa2b5e1aae1fdc10f4a451"
+    },
+    {
+      "path": "ENABLE_ANONYMOUS_AUTH_INSTRUCTIONS.md",
+      "sha256": "4ba620e4f80d3417bef9e4decbbd3c2da6861b30e328cb03780700d601466490"
+    },
+    {
+      "path": "ENROLLMENT_PERSISTENCE_FIX.md",
+      "sha256": "bb390fa2e4ded98385a776b04ea246f5482e024371eaeec018ace02919063869"
+    },
+    {
+      "path": "EVENT_EDIT_BUTTON_RELOCATION.md",
+      "sha256": "365ef8cdfc3de91d57725225f029da1e7b1f395a04f460d252f68fd7b5008fbb"
+    },
+    {
+      "path": "EVENT_FLYER_SHARING_FEATURE.md",
+      "sha256": "581d3cce87ea973381a235b93db89f3df1c637303a67e11aada4646fe8e607c9"
+    },
+    {
+      "path": "FACE_ENROLLMENT_AUTH_FIX.md",
+      "sha256": "ac126586d3d7491868fcc44af8be53a7a7cc74db4cc8977effc5395d3458cb41"
+    },
+    {
+      "path": "FACE_ENROLLMENT_COMPLETE_SOLUTION.md",
+      "sha256": "b46c2af6c1e1a80602820bec0f47b69444b74df5845f817ef03037ff8d6e3283"
+    },
+    {
+      "path": "FACE_ENROLLMENT_WORKING_SOLUTION.md",
+      "sha256": "1693ec62ba636b1eb43bfa50fee0b6254cd972a149ef25ec8b1dff0c0392a152"
+    },
+    {
+      "path": "FACIAL_ENROLLMENT_FINAL_FIX.md",
+      "sha256": "65482aa738936e82572d64e1bd3c86205abbb3416c0fed377d8fc576e5e6a399"
+    },
+    {
+      "path": "FACIAL_ENROLLMENT_FIX_COMPLETE.md",
+      "sha256": "d885699eac0066d71f10e671ae653e7cfae2acb40b6472e4fac13d0503590aa3"
+    },
+    {
+      "path": "FACIAL_RECOGNITION_COMPLETE_SOLUTION.md",
+      "sha256": "fe42f7ecbe9780caebbf1f188f58c9ae6e5b3bc52fc014bc7a255c86d3ccdabe"
+    },
+    {
+      "path": "FACIAL_RECOGNITION_ENROLLMENT_FIX.md",
+      "sha256": "be7615e2b8464f8f7aa13f5393359583a2b1cae657174cb4b9a5fce11b0ed783"
+    },
+    {
+      "path": "FACIAL_RECOGNITION_FINAL_WORKING_SOLUTION.md",
+      "sha256": "8b4e39f1310bc0448278c2f7942d6e0c739c7dc30c605b9595e145e8b9c3c98c"
+    },
+    {
+      "path": "FACIAL_RECOGNITION_FIX_SUMMARY.md",
+      "sha256": "8664d7e5d29ba15e401b3b5bcfaac09dea8478c4e5212a15253fb1874246b1dc"
+    },
+    {
+      "path": "FACIAL_RECOGNITION_FIX_TESTING_GUIDE.md",
+      "sha256": "afda6b4ce0f11e287f30ffaf4cc09cf2fd9ccd4f1b3eeff80c303ed7b21ec8b4"
+    },
+    {
+      "path": "FACIAL_RECOGNITION_MONITORING_GUIDE.md",
+      "sha256": "a61b3b3d358d75cf9e31f82fc5cb3fab9f4506673d9c29def7aadcebb51ee05f"
+    },
+    {
+      "path": "FINAL_IMPLEMENTATION_TASKS.md",
+      "sha256": "4ad80c1bb4703a72cb24c0dd594c429c558553e200f993044fc8e97cb35c0684"
+    },
+    {
+      "path": "FINAL_UPDATE_SUMMARY.md",
+      "sha256": "82018e0c9fe5a98c4dcf0d37b43d6321ce437ea6bb5c73209ef63494708a5fed"
+    },
+    {
+      "path": "FIREBASE_INDEX_SETUP.md",
+      "sha256": "1b7d0805de8f02078d66b280b5d5d052e0025da805b24c8208cfb69a1ee69caf"
+    },
+    {
+      "path": "FIRESTORE_RULES_DEPLOYMENT.md",
+      "sha256": "7062123c71023d3181a34a2ea371a45c7b0f5a362713dbfc0d205fb60f80d92e"
+    },
+    {
+      "path": "FIRESTORE_SECURITY_RULES.md",
+      "sha256": "ca6b786833ac4638ce23c0defa5834b5013185a662a7e2238b722dcc119c8411"
+    },
+    {
+      "path": "FIXES_COMPLETED.md",
+      "sha256": "243e87c44f1c9b790864316d1edb14becc2ac03efb6f40591038888b09eaab1b"
+    },
+    {
+      "path": "FIXES_SUMMARY.md",
+      "sha256": "4887ed56bf988df3178458c3a3b85abb7352c6b7c2a3b942469405d5286f0230"
+    },
+    {
+      "path": "FIX_GUEST_MODE_NOW.md",
+      "sha256": "d2135352ac9b5a64cba2f6870f67bec3de4b7606c71904700d7cbf49b0ab67eb"
+    },
+    {
+      "path": "FIX_VERIFICATION_REPORT.md",
+      "sha256": "168f9fcdaeddf81416a592c8815aa535e1e844777e4d8a94d529b2f96b047a25"
+    },
+    {
+      "path": "GEOFENCE_FACIAL_RECOGNITION_FIX.md",
+      "sha256": "b7ecf63e1a4cceaef79d0b44d0b9e7808577203899b2c02e849927d366703897"
+    },
+    {
+      "path": "GLOBAL_EVENTS_MAP_FEATURE.md",
+      "sha256": "6578e29c055994cf8e137573a805f1eb110eb27487b9f685b1a4addecdd59523"
+    },
+    {
+      "path": "GOOGLE_ACCOUNT_PICKER_UPDATE.md",
+      "sha256": "3f72d247807b88ca27650456e664fc0fd7f400615f80044af1657ad4431b592d"
+    },
+    {
+      "path": "GOOGLE_APPLE_SIGNIN_FIX.md",
+      "sha256": "400f62d3b3f6a2c960f35cb22d6c91aeebaa6df6be19e5c9ad0ad66841dea920"
+    },
+    {
+      "path": "GOOGLE_SIGNIN_DEBUG_FIX.md",
+      "sha256": "c26490a93ce7c6eaf5a0be922bc10de8af1aa6982a2c983dedc5f354652cb479"
+    },
+    {
+      "path": "GOOGLE_SIGNIN_SIGNOUT_FIX.md",
+      "sha256": "0404fd4e92e6df80d207344e8ceb148b1ef894ea99ff9b256ccd3a9a5df8f670"
+    },
+    {
+      "path": "GOOGLE_WALLET_SETUP_GUIDE.md",
+      "sha256": "84301061ea4822124644faa78d6c67465de7fbd82e084620c874717bbbf4a485"
+    },
+    {
+      "path": "GROUP_ABOUT_TAB_SCROLL_FIXES.md",
+      "sha256": "79ed00fb2f151332375b9c31deb9baa06a906bc2acbd0b050723b9c271eac485"
+    },
+    {
+      "path": "GROUP_BANNER_REMOVAL_FIX.md",
+      "sha256": "8aee04d7090bcae01b02be7d2aa61610e914cd1a323e8385577cd322c768fbe5"
+    },
+    {
+      "path": "GROUP_FEED_ENHANCEMENTS.md",
+      "sha256": "aac03f9a08471a4229afe8d511739a0886e6d08ccff5cbcc0f7f6f18310032c1"
+    },
+    {
+      "path": "GROUP_FEED_SCROLL_FIX.md",
+      "sha256": "fad2db1e490c0feb91296407a4211d479c6b5ae93bb1d0016ee3123f0b2c4633"
+    },
+    {
+      "path": "GROUP_JOIN_APPROVAL_NOTIFICATIONS.md",
+      "sha256": "e3baea2f7f3e6f5463bd0905b4058e707f5344d9e12fb9a7c5d6083915a73ecb"
+    },
+    {
+      "path": "GROUP_PHOTO_COMMENTS_IMPLEMENTATION.md",
+      "sha256": "52295c84f94544e2626a9fdbb68581235be6cf4daa0a2e6ad699ad15139ac528"
+    },
+    {
+      "path": "GROUP_PROFILE_ABOUT_TAB_REFINEMENT.md",
+      "sha256": "47792c1cd64323af68118162d5bb9e590d84448a6348a2b38ad58d34f47d8e4f"
+    },
+    {
+      "path": "GROUP_SCREEN_REDESIGN.md",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "GUEST_FACIAL_RECOGNITION_IMPLEMENTATION.md",
+      "sha256": "2ade16489ebe0dc3c77f27d96b2a28f27cbe312910d9c34995867cc19172a512"
+    },
+    {
+      "path": "GUEST_FACIAL_RECOGNITION_QUICK_REFERENCE.md",
+      "sha256": "a4e476080d704e71c9d9961dfa30604c15fd3a8a0ce4bc8564443bf3da8ec477"
+    },
+    {
+      "path": "GUEST_MODE_DEPLOYMENT_CHECKLIST.md",
+      "sha256": "917de29fdf0d2254d7940cb88f78c3e3d6b8afe579880d0c98ca656960d1da90"
+    },
+    {
+      "path": "GUEST_MODE_FIREBASE_FIX.md",
+      "sha256": "cbd4769ee4e2c191d768913a67bf98565e0b97aee557bd9b0ecee6bae2c4b3b3"
+    },
+    {
+      "path": "GUEST_MODE_FIX_QUICK_START.md",
+      "sha256": "1c5636026f026d301ac497849296bd48dc56ec6db6d2ec17069abb9e1ad11914"
+    },
+    {
+      "path": "GUEST_MODE_IMPLEMENTATION_SUMMARY.md",
+      "sha256": "f0a5729d6efe09f00d73f9fa369eb160346c0f9dfa7a0467113bdc34a600ec8c"
+    },
+    {
+      "path": "GUEST_MODE_QUICK_REFERENCE.md",
+      "sha256": "9faaf2ad0161aed48e78093238fb8d2cb013acdd3ba7dec84e70c351a0475503"
+    },
+    {
+      "path": "HYPERMODERN_TICKETS_IMPLEMENTATION.md",
+      "sha256": "aabbeb9a9c5b809f6eb5175d5707c54037c7a4c14b8b3d8338156bd0b46c1921"
+    },
+    {
+      "path": "IMPLEMENTATION_COMPLETE.md",
+      "sha256": "be01d5f4b097179a49cdf35e3726f26935a5b1e2fb020f6b26ab837a476f107e"
+    },
+    {
+      "path": "IMPLEMENTATION_COMPLETE_SUMMARY.md",
+      "sha256": "9c13fb6bc4802897b8e3de339ac240d61ec1b899acd19d835ea4e85a98bc9e1f"
+    },
+    {
+      "path": "IMPLEMENTATION_EXAMPLES.md",
+      "sha256": "06aa1dcfee2d6687f0e82c1309c6b8993b031afb44dfdebfd7030166d1daeeb3"
+    },
+    {
+      "path": "IMPLEMENTATION_SUMMARY.md",
+      "sha256": "9a9b6565bfca0b0f0de3adc26ebf110a543570bc1f0eea84fcb11b1cfb693cd4"
+    },
+    {
+      "path": "IMPLEMENTATION_SUMMARY_CREATION_LIMITS.md",
+      "sha256": "91b5ce313d40901d69c4a53d4916daddaa9c4a5153428925776eb04dcfd4414e"
+    },
+    {
+      "path": "IOS_APP_STORE_CRITICAL_COMPLIANCE_ISSUE.md",
+      "sha256": "0e34f98523e7322086d1256ff319152804a5c93928b396b6e648d15eea4a7901"
+    },
+    {
+      "path": "IOS_APP_STORE_SUBMISSION_CHECKLIST.md",
+      "sha256": "6798b66d9e58535c46e6e3e793c27733ec53b392bac6a76c66ae5068b0a74eec"
+    },
+    {
+      "path": "IOS_COMPLIANCE_IMPLEMENTATION_SUMMARY.md",
+      "sha256": "e8c0c05adab3deb58c2327d37505f9eac39a0829f3089deb6559d37cac82d676"
+    },
+    {
+      "path": "IOS_TESTING_GUIDE.md",
+      "sha256": "341c33370cda0b2bc312384df450c103cf5df19640661a290fa3d39adde7423e"
+    },
+    {
+      "path": "JOIN_APPROVAL_NOTIFICATION_SUMMARY.md",
+      "sha256": "11db8dc8a537bee2eaef067c65440cf29398c70c5997fa00b907246f38c17a6a"
+    },
+    {
+      "path": "LIVE_QUIZ_COMPLETE_IMPLEMENTATION_SUMMARY.md",
+      "sha256": "4bd7f8f29273e892dd3cca85635438f23777ac48b013e67d85c95457d9c2eaea"
+    },
+    {
+      "path": "LIVE_QUIZ_EARLY_JOIN_UPDATE.md",
+      "sha256": "e1fd9c8c7b7bdad9bd65adfbca6b05eaf8f0afee2290b5ccbafc84133018f31e"
+    },
+    {
+      "path": "LIVE_QUIZ_FINAL_LEADERBOARD_FEATURE.md",
+      "sha256": "06539059dad9c69e2cfa5d16f90ab0b65db4741026d787b6ef694f4ff70af6d4"
+    },
+    {
+      "path": "LIVE_QUIZ_MULTI_USER_FIX.md",
+      "sha256": "5bf20010b686c116f5b6be73fe3fc88dbeff1824586a21e4030e7c2eb2d9aa75"
+    },
+    {
+      "path": "LIVE_QUIZ_NAVIGATION_FIX.md",
+      "sha256": "ad859f60c91b812258be02a25d5795c18f31ab5cc44081380a2a72c949d5b1a1"
+    },
+    {
+      "path": "LIVE_QUIZ_OPTIMIZATION_COMPLETE.md",
+      "sha256": "ca7a10844f1cfb54a93ba789481dacbc72515dc63122d1123aaa1b6a51275ffd"
+    },
+    {
+      "path": "LIVE_QUIZ_QUICK_START.md",
+      "sha256": "d503ab547d3b6f13ca72ba88d548051d92e57a643dc9cbfa2f5b73d83c02eaab"
+    },
+    {
+      "path": "LIVE_QUIZ_RESTART_BUG_FIX.md",
+      "sha256": "9e4dd5f32184f9cc459c901d756a801404f8a7147e3e4544a7ac074fc46b033a"
+    },
+    {
+      "path": "LIVE_QUIZ_WAITING_LOBBY_COMPLETE_SUMMARY.md",
+      "sha256": "27e9220f5ff01b559f0fa74f2a8337cbe96b2a45d135769dcf588a3c8b1f994e"
+    },
+    {
+      "path": "LIVE_QUIZ_WAITING_LOBBY_EMPTY_NAME_FIX.md",
+      "sha256": "dd5cfaabf56195b4e829d01e23d7a7c492092464443f3e1bb3ec056d512305cf"
+    },
+    {
+      "path": "LIVE_QUIZ_WAITING_LOBBY_IMPLEMENTATION.md",
+      "sha256": "001f4444fb6a1e495ea261d0245c7c9775d4f0c0a7df1f92082372fc8907f2bb"
+    },
+    {
+      "path": "LIVE_QUIZ_WAITING_LOBBY_QUICK_START.md",
+      "sha256": "49f776f14bbc9f309bd75b248a61cc39d729645d6e0cc26223f136de580f78ba"
+    },
+    {
+      "path": "LIVE_QUIZ_WAITING_LOBBY_VISUAL_GUIDE.md",
+      "sha256": "2840b969eb8517d02728a76f9b09610c165c9bae72e487cf2014dc3ceac57ae5"
+    },
+    {
+      "path": "LOCATION_FACIAL_COMPLETE_FIX.md",
+      "sha256": "d6dc1a116f2765d713b249cb24f29855d9b92d61d3bea19dc016b54ab5e9fdf9"
+    },
+    {
+      "path": "LOCATION_FACIAL_SIGNIN_FEATURE.md",
+      "sha256": "c4c9a6ecc7068f7d275d2b2c4e280d28c3fe80e8aaedb5fbacc93318daa2ce35"
+    },
+    {
+      "path": "LOCATION_FACIAL_SIGNIN_FIX.md",
+      "sha256": "2f25a340c50f6bf4c111557b3e43b196df454555b41ab73e8991b1e1e5049943"
+    },
+    {
+      "path": "LOCATION_FACIAL_SIGNIN_IMPLEMENTATION_SUMMARY.md",
+      "sha256": "26fb5d06143b3cc04de77a5d87b835ebf0c9db95aad4e3070efa36223862c317"
+    },
+    {
+      "path": "LOCATION_FACIAL_SIGNIN_QUICK_START.md",
+      "sha256": "b3363390cda9b8167f5557239e2a9792b88a5d517cab0035aa2bd78efcef9618"
+    },
+    {
+      "path": "LOCATION_FACIAL_SIGNIN_VISUAL_GUIDE.md",
+      "sha256": "b885f352ff4d9d2ad1ff75aa770da580a05cede728c3d3346afaa85fbb116f8c"
+    },
+    {
+      "path": "LOCATION_PICKER_DISTANCE_FILTER_UPDATE.md",
+      "sha256": "80d6999abe0b396cafa8b81771ecba5c6d2dccac819e54fdfd3b2cb9705d5444"
+    },
+    {
+      "path": "LOCATION_PICKER_VISUAL_GUIDE.md",
+      "sha256": "4db4a2f599777fdec0d2cf0e0f20c4b1dfb6b2e677235cdf3f8eaa5d9262ace2"
+    },
+    {
+      "path": "LOGIN_FREEZE_FIX.md",
+      "sha256": "e818f62b1cd6dafa0d6d5c2d4df1521eb716daee8db072b460d85f38bde8f6f6"
+    },
+    {
+      "path": "LOGIN_OPTIMIZATION_SUMMARY.md",
+      "sha256": "33bea5f0b6b542009c84e7ef2ea3b63994a29a0bac4643d290552eb9f5c06637"
+    },
+    {
+      "path": "LOGO_UPDATE_SUMMARY.md",
+      "sha256": "8f549f64c83310c531e52d685d29bc4d66821acf4a59602eb6a54f93621afd02"
+    },
+    {
+      "path": "MANAGE_GROUPS_FEATURE_SUMMARY.md",
+      "sha256": "a299f76e6c2f656237c27e4fdb93b3a9493018fffac9e8fce98f52dbd545ae6b"
+    },
+    {
+      "path": "MANAGE_QUIZ_BUTTON_IMPLEMENTATION.md",
+      "sha256": "169a19ad3c1f2b3eed93f4af0b5a71166fd21f3ee95cbd9cb3c3dc85216982e4"
+    },
+    {
+      "path": "MANAGE_SUBSCRIPTION_VISUAL_GUIDE.md",
+      "sha256": "11a5f1b2acdeed47b0abe819dcc06de7105cb15c46cb2092b440902fa7f501a6"
+    },
+    {
+      "path": "MANUAL_LOGO_REPLACEMENT.md",
+      "sha256": "e45cd91d4346364b9f43aaca0abe66da7250995817a772296a73d056a2602b79"
+    },
+    {
+      "path": "MESSAGING_README.md",
+      "sha256": "3027c16da22522384ac4428fcd2e8ee8ee274a667edabca29c2b5733bc18eb02"
+    },
+    {
+      "path": "MODERN_SIGN_IN_FLOW_IMPLEMENTATION.md",
+      "sha256": "a258bce434014b707a03193dc8202a332d18ad4a00a929f404887357cc3cfe53"
+    },
+    {
+      "path": "MY_PROFILE_ALL_EVENTS_FIX_COMPLETE.md",
+      "sha256": "1bb44693f854de137a8adaccf63fab5400716346a2d361deb75e16531c2bc6d0"
+    },
+    {
+      "path": "MY_PROFILE_CRITICAL_FIX.md",
+      "sha256": "d02b53b5366115f53483fee4eb560c326c07c56397ead66217bb8b4847e332f4"
+    },
+    {
+      "path": "MY_PROFILE_EVENTS_DIAGNOSTIC.md",
+      "sha256": "a3929467e0cd6d25e1e68a96a4ae36ef727064f0a9c860b69310ee1a6614cdca"
+    },
+    {
+      "path": "MY_PROFILE_EVENTS_FIX.md",
+      "sha256": "b56d41c2b32bc89782ef95a7de28680df38bca29178fb3ed4f39814497807458"
+    },
+    {
+      "path": "MY_PROFILE_EVENTS_FIX_SUMMARY.md",
+      "sha256": "8b3bc6ba19e4448d6ab10aead7a61ff914894217645edf61ec2dbba9a06abeee"
+    },
+    {
+      "path": "MY_PROFILE_EVENTS_TESTING_GUIDE.md",
+      "sha256": "d289e815691074ca03b1ae9defcef4c443a3f5ee4d643f28a103bacc08822a30"
+    },
+    {
+      "path": "MY_PROFILE_FIX_SUMMARY.md",
+      "sha256": "e55d98f4e6d584e38f7bfe153fbca927c5fbecfcec0c5d693c11e7693a415920"
+    },
+    {
+      "path": "MY_TICKETS_COMPACT_VIEW_UPDATE.md",
+      "sha256": "1f50a934561b65d9a3d4807aea8d5220387bd0786e99d3914d238964a251e934"
+    },
+    {
+      "path": "MY_TICKETS_MODERNIZATION_SUMMARY.md",
+      "sha256": "8bcce9ab15e4b705f4a5d0974d01b327722b9bef4f0693fe99a66b1c1970ef20"
+    },
+    {
+      "path": "MY_TICKETS_SCROLLABLE_UPDATE.md",
+      "sha256": "566ef96c620e7360d450620e6ad10689e1dbfbbe7a963318343c6e84dc511fbf"
+    },
+    {
+      "path": "NAVIGATION_AND_AUTH_FIXES.md",
+      "sha256": "b43b8de342e9a42c715ce68ba172e7c8c95db55e775a89e1316329aa44f5d86a"
+    },
+    {
+      "path": "NAVIGATION_BAR_FIX_SUMMARY.md",
+      "sha256": "401e3bff5c89317584e8c7629e07ac6ceb18ea04b2e4dac401bc458f284dae02"
+    },
+    {
+      "path": "NAVIGATION_STATE_RESTORATION_GUIDE.md",
+      "sha256": "b922803f068b0bac8ec052603e1e87505c06d45d8e6bdffcf6ac3ef4e2cdee5a"
+    },
+    {
+      "path": "NFC_BADGE_IMPLEMENTATION_GUIDE.md",
+      "sha256": "6f3e0afb8eb2fae1678b59aa300bc9286de022719ef80c7c702f827fea8b78ef"
+    },
+    {
+      "path": "NOTIFICATIONS_README.md",
+      "sha256": "e2f5fb66858f59e1311aed5c493c7d7b59beb1e4f89c4ae481d90ace4e5727ea"
+    },
+    {
+      "path": "NOTIFICATION_SYSTEM_UPDATE.md",
+      "sha256": "81dc4c296d7ffe800aa53fe51c63ad76c1330cba7651b81e0cd13997f4b1d883"
+    },
+    {
+      "path": "ONNX_AI_SEARCH_README.md",
+      "sha256": "9a67190eab45cbef9532f758e99680d87b643c15cd1a2f2f7bd0e12c55b383d8"
+    },
+    {
+      "path": "ON_DEVICE_AI_README.md",
+      "sha256": "7d4567c3a8ba5826cb0f6f39ff79ba6172281782d4abe7c8bc3deb256441c358"
+    },
+    {
+      "path": "OPTIMIZATION_IMPLEMENTATION_SUMMARY.md",
+      "sha256": "484eb9ba4b85030a3da8cfb6fbbca4a90c01ef97e1f9d6f4f468f41a42b027b9"
+    },
+    {
+      "path": "OPTIMIZATION_QUICK_START.md",
+      "sha256": "d3c69067fb6f0d2da4282bbbffabda77d8e270cdf5e731e095ca06cdd295048c"
+    },
+    {
+      "path": "OPTIONAL_EVENT_IMAGES_IMPLEMENTATION.md",
+      "sha256": "c068f0a7bc95ee31a919c3593691a3dc673a48e7168014d51c1d87ecfcfff924"
+    },
+    {
+      "path": "OPTION_1_IMPLEMENTATION.md",
+      "sha256": "03cd9142feb00407cbfa7b6433a8e4cc8bc591a5df4738b41a299bb6f7e243de"
+    },
+    {
+      "path": "ORGANIZATION_TO_GROUP_RENAME.md",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "PAYMENT_PLACEHOLDER_IMPLEMENTATION.md",
+      "sha256": "b0c037010589dcd1c1f0772fce03ae28894b461f9cdc895e49419eb9d1594003"
+    },
+    {
+      "path": "PERFORMANCE_FIX_INSTRUCTIONS.md",
+      "sha256": "c371efa9d8e1064b5a977443dcadd413a455095d4de72c6104900aa538975beb"
+    },
+    {
+      "path": "PERFORMANCE_FIX_MAIN_THREAD_BLOCKING.md",
+      "sha256": "08ac66055052d4a89a86dc511b0977948c2967e76ecd232338a3bcd82126425a"
+    },
+    {
+      "path": "PERFORMANCE_FIX_SUMMARY.md",
+      "sha256": "eee037dfecc9dd7381620ff120aa5c25654ee887cc5b734975e519bb2fda2ea0"
+    },
+    {
+      "path": "PERFORMANCE_FIX_URGENT.md",
+      "sha256": "94ac56c9f00a2d2dfe0aab06272a6fa64d74e3e3e4be7f69c254a6aee9555099"
+    },
+    {
+      "path": "PERFORMANCE_OPTIMIZATIONS.md",
+      "sha256": "9d55533fd6cbeee0f7e272bc0850bb51f07091a849ab8d3875a18d25c3bb85a1"
+    },
+    {
+      "path": "PERFORMANCE_OPTIMIZATION_SUMMARY.md",
+      "sha256": "cc94f7d787d1e73fb3cce71f6b4badd22067b3602e92b1647d8ebf59efb8f247"
+    },
+    {
+      "path": "PERFORMANCE_QUICK_REFERENCE.md",
+      "sha256": "2535ae9996d94a2d0b9cb46b39347aed7317d853409376ccc2bafbe310ddead0"
+    },
+    {
+      "path": "PERSISTENT_LOGIN_IMPLEMENTATION.md",
+      "sha256": "68c015581492eda21ac43991b7da4758c2d1ef349d9f659446c61a0edb0ab91b"
+    },
+    {
+      "path": "PERSONALIZED_RECOMMENDATIONS.md",
+      "sha256": "a72935e850b2cef7652f3572d269a6b963face7cbbfb22f4982df90fbd651ec3"
+    },
+    {
+      "path": "PHASE_1_UI_UX_AUDIT.md",
+      "sha256": "5c5c88070d399e76899882f9719f97b879eec8ca5b9a99f3e6fcad2282e234b8"
+    },
+    {
+      "path": "PHOTO_COMMENTS_FEATURE_SUMMARY.md",
+      "sha256": "85d2a64731a9c23cc37da00f9a28e26a2084f8e6aab6a6170d76283afe131e5d"
+    },
+    {
+      "path": "PHOTO_COMMENTS_QUICK_START.md",
+      "sha256": "0e072988e716a495403af1b53c3fa230e9dbf8df83720ce0b033cb2320fedb60"
+    },
+    {
+      "path": "PREMIUM_FEATURES_QUICK_START.md",
+      "sha256": "e9751bfc9b82e8375f342ea69d129868feead69461d66471b321d6769a4dbeb4"
+    },
+    {
+      "path": "PREMIUM_FEATURES_SCREEN_IMPLEMENTATION.md",
+      "sha256": "78ca079ac54a2cb6c99582810080c1c2a864505900a274b01310b057c7740522"
+    },
+    {
+      "path": "PREMIUM_FEATURES_VISUAL_GUIDE.md",
+      "sha256": "d55d504f211135b7c148a3da9267c799d4ff1a06b2c3563439de2b4d79ca0581"
+    },
+    {
+      "path": "PREMIUM_SUBSCRIPTION_IMPLEMENTATION.md",
+      "sha256": "2a9fe46ec1a93c608c90fc10585af88876904306bf91aab18c90d82b715aef14"
+    },
+    {
+      "path": "PREMIUM_TICKET_DESIGN_COMPLETE.md",
+      "sha256": "efebe6397611a9cda3d3b5d532dd88d97cd6e278077748af7b91a4c452335dae"
+    },
+    {
+      "path": "PREMIUM_TICKET_QUICK_START.md",
+      "sha256": "f2a1545c646b3d5894e4f43f4b4ea4074a9971ef64e613c70a2a9d1d662ad467"
+    },
+    {
+      "path": "PRIVACY_POLICY_TEMPLATE.md",
+      "sha256": "53ccdf1402993c4bf3784a98d15c20c0c32e701c8987e15070c2c30c048a8a41"
+    },
+    {
+      "path": "PROFILE_EVENTS_ALL_DISPLAY_FIX.md",
+      "sha256": "d2e4d8ce0cc522aa7e131c3530b1b237e52c1a6dc8a32ebd15d2dc5dc5f20e3e"
+    },
+    {
+      "path": "PROFILE_FIX_QUICK_REFERENCE.md",
+      "sha256": "9a5fd8c992e03b6bdae67eff66601e3da45e2be6a16f445c96db19f1adeb92a1"
+    },
+    {
+      "path": "PROFILE_SCREEN_PERFORMANCE_FIX.md",
+      "sha256": "d9b7d4c90f1917c60953940cd11372a7e871a851313b57290fda19d58c6ea70c"
+    },
+    {
+      "path": "QR_CODE_FIXES_SUMMARY.md",
+      "sha256": "821e378962dac66175ce66266b5c441e178ae47ee93d2fa8e1a149ebf755ec7f"
+    },
+    {
+      "path": "QR_CODE_TICKET_SYSTEM.md",
+      "sha256": "197cfcd59e8e2cc7cb1371486ee042ed0115770b67df8d0aff24b2ab036e308a"
+    },
+    {
+      "path": "QUICK_FIX_GUIDE.md",
+      "sha256": "269775a4f96ab54f0a8257be72362663238fa6496167c0cb4fcc239f0e56fe0a"
+    },
+    {
+      "path": "QUICK_START.md",
+      "sha256": "ccd80aa15496d14e33d7d94951b02061844b0a871387bd4e9ae5e5bde0912362"
+    },
+    {
+      "path": "QUICK_START_GUIDE.md",
+      "sha256": "33d89ea1a8cfa9b607dda6b273891ba1ec01cbce188b4d3e8c14a5421ea4d494"
+    },
+    {
+      "path": "QUIZ_RESTART_FEATURE_COMPLETE.md",
+      "sha256": "ad0840c70ef859f1f13311a8fcd0b0551d0f830a6593aaf340f4c491ac83ad61"
+    },
+    {
+      "path": "QUIZ_RESTART_QUICK_START.md",
+      "sha256": "bbb0a32e0e0e249b01c048d09a048e41e3b4954aee0964ff91ce5f7573b8cc31"
+    },
+    {
+      "path": "README.md",
+      "sha256": "c656562f938b6dcb94b8fc0561a383c6e2178dc50ccca3b5048188cbf8ac3eed"
+    },
+    {
+      "path": "README_FACE_ENROLLMENT_FIX.md",
+      "sha256": "2d90946dd1170698c20e1e808c9c5792f2114f6478905ea391d05bc0ecc387b2"
+    },
+    {
+      "path": "README_IOS_COMPLIANCE.md",
+      "sha256": "e173437567e1d438f6e20b8b49e1a9d9e3609625cfa15d7835c1b695dcaaf3d9"
+    },
+    {
+      "path": "REALISTIC_TICKET_DESIGN_UPDATE.md",
+      "sha256": "91ee4a024cc71ab037d4c5bc28a408bb9abd1508e3cb4cc404c555dcfc8c5859"
+    },
+    {
+      "path": "RESPONSIVE_DESIGN_GUIDE.md",
+      "sha256": "476f3294031074ba9d6027c8338b40df1f3cb455f5b82644d4cad2773adf15eb"
+    },
+    {
+      "path": "SIGN_IN_IMPLEMENTATION_COMPLETE.md",
+      "sha256": "97128c906d5c93edf604b552fdd15db5e41452254e72b2580fbff0a411f7adfe"
+    },
+    {
+      "path": "SIGN_IN_QUICK_START.md",
+      "sha256": "7c6b52f0d6ab311569367bf36ed145ac3fdc9416cfc8e5d193ea4dcfb36898da"
+    },
+    {
+      "path": "SIGN_IN_SECURITY_TIER_IMPLEMENTATION.md",
+      "sha256": "979737f8f1b8f094d3fe55ce423c79270ebe16cf9d3431569a71f2dc066f30ab"
+    },
+    {
+      "path": "SIGN_IN_SYSTEM_COMPLETE_SUMMARY.md",
+      "sha256": "04a7b7a172ac3d706784b24c7a8791c294490a0732db50917e07be171bec73ac"
+    },
+    {
+      "path": "STARTUP_PERFORMANCE_FIX.md",
+      "sha256": "0aa076e3073eb875b1e925f632aa230162734c5cf5b52c298561f02ddc8a4992"
+    },
+    {
+      "path": "STARTUP_PERFORMANCE_OPTIMIZATIONS.md",
+      "sha256": "dad00e1a5c3d6392fa487d57674e8241f4a00278e5acd28b3cfac08995d48633"
+    },
+    {
+      "path": "SUBSCRIPTION_BACK_BUTTON_FIX.md",
+      "sha256": "1a1e279f818c234d9a1e214e541cccc4849deb987446f5783cd5c8c0943757bc"
+    },
+    {
+      "path": "SUBSCRIPTION_BUTTON_FIX.md",
+      "sha256": "55160bde5dba42a0b463b534475bae5cfe17c206fd296234b3c086234951e273"
+    },
+    {
+      "path": "SUBSCRIPTION_BUTTON_QUICK_TEST.md",
+      "sha256": "8418940aeb839f9fdd2f5f8adb2af23d4d497b6861c811c753e1af3a8d364c49"
+    },
+    {
+      "path": "SUBSCRIPTION_PLAN_CHANGE_GUIDE.md",
+      "sha256": "dcae85deacff514968ae644fe4d0f690aa5df43e3277d4fc0dcfdc0422faa21d"
+    },
+    {
+      "path": "SUBSCRIPTION_UX_ENHANCEMENTS.md",
+      "sha256": "db4a81b132eb3632e5227cc4330f47be6d7e0d4b358ca79a3bb6ba31e021e382"
+    },
+    {
+      "path": "TABBED_SUBSCRIPTION_UI_GUIDE.md",
+      "sha256": "869e300ce472b7471e94cd33c7781b8fff7b527535372e8d527ee2aa06a3bf42"
+    },
+    {
+      "path": "TESTING_MY_PROFILE_EVENTS.md",
+      "sha256": "a11f9b3ad3fbb835eb9077df0d783322fe6e94169222b404af5ec3321d343ed3"
+    },
+    {
+      "path": "TEST_FACIAL_RECOGNITION_COMPLETE.md",
+      "sha256": "2cc6b34c26f5ba296407a0f65b1007890a12d48511f929f211638854c4656cb2"
+    },
+    {
+      "path": "TICKET_DESIGN_IMPROVEMENTS.md",
+      "sha256": "8db2a7aa36237fc83d050d2617fb62a9e416223e1ee165a0b86d2caa99bb949a"
+    },
+    {
+      "path": "TICKET_DESIGN_VISUAL_GUIDE.md",
+      "sha256": "4f9e79d50e360ebfba15f769205e6e7acd0076d069ed3e482b6c1db043a7603d"
+    },
+    {
+      "path": "TICKET_SCREEN_VERIFICATION.md",
+      "sha256": "5c0bbacacebc13308c2e232e5605f87449cea90790679de7b1c1f315eb26ecba"
+    },
+    {
+      "path": "TICKET_UPDATES_SUMMARY.md",
+      "sha256": "121f20a089ea57a95b203058693e767affcfebc93caa48790a887415feb43072"
+    },
+    {
+      "path": "TWO_TIER_IMPLEMENTATION_SUMMARY.md",
+      "sha256": "f9e30a21fc1674ce34d8e23bb02a12de918bb2e2019b117fee6fedb93e800e79"
+    },
+    {
+      "path": "VM_OBSERVATORY_CONNECTION_FIX.md",
+      "sha256": "2f2af21fd56933b4832d06b12c186186222d7a5a38604387be157a4055bf98e1"
+    },
+    {
+      "path": "analysis_options.yaml",
+      "sha256": "dd9c7bdc91b9f137dfdb9a8fc306ae61fb922c2ca7b98f57ab5a87f8344fcdcb"
+    },
+    {
+      "path": "android/.gitignore",
+      "sha256": "78527b516859f86d71baced2495f76e0c53263e7343d59f4a3565409e3dcd8d0"
+    },
+    {
+      "path": "android/app/build.gradle",
+      "sha256": "e9c23e0ca6f9ab870199462e5fc2b962123890b0c2a8284a57c1e5b75c3e904b"
+    },
+    {
+      "path": "android/app/google-services.json",
+      "sha256": "158f9ffea814b9d11aef9fb954f83ad0e9f6bd709c485029061685527a28267d"
+    },
+    {
+      "path": "android/app/google-services.json.backup",
+      "sha256": "0bce2ac8bc59d0369c27c98323c8b20e50462ed738650598d828cf81e623d430"
+    },
+    {
+      "path": "android/app/src/debug/AndroidManifest.xml",
+      "sha256": "30b0832ed8b92dfbd6ae2abfa939ccf26333d37600056b1572bd4a397a18a74b"
+    },
+    {
+      "path": "android/app/src/main/AndroidManifest.xml",
+      "sha256": "148b2be0d828e0ad891c4fe495b80a3fe3c16e89fee9bc4bf93d344cbe7d7813"
+    },
+    {
+      "path": "android/app/src/main/kotlin/com/stormdeve/orgami/MainActivity.kt",
+      "sha256": "4db5ab6566c26b2c205694c9fabf4c687950b4f7f0c63651963487c50b83859a"
+    },
+    {
+      "path": "android/app/src/main/res/drawable-night-v21/launch_background.xml",
+      "sha256": "f125328acf040ae8b75ef2621f40909e698c46a078885cdfc4e5944d40885aaf"
+    },
+    {
+      "path": "android/app/src/main/res/drawable-night/launch_background.xml",
+      "sha256": "f125328acf040ae8b75ef2621f40909e698c46a078885cdfc4e5944d40885aaf"
+    },
+    {
+      "path": "android/app/src/main/res/drawable-v21/launch_background.xml",
+      "sha256": "f69cfbc29db86c5a39dd928bcf83115d71ed128f7efb190fa93bd456a9eb4f39"
+    },
+    {
+      "path": "android/app/src/main/res/drawable/launch_background.xml",
+      "sha256": "e80046476fc25fb626f417eb092dca86758666b7d25ceb44e8853e524850b72d"
+    },
+    {
+      "path": "android/app/src/main/res/mipmap-hdpi/ic_launcher.png",
+      "sha256": "f24a000489ed85faf3d74e8d18d4e64f193363caceb4253a3958ba7cc45605a4"
+    },
+    {
+      "path": "android/app/src/main/res/mipmap-hdpi/launch_image.png",
+      "sha256": "170a68c04ae8bf765dd70982fc33f4dc61afbd1ad56099a1c5e132dfff98bf2c"
+    },
+    {
+      "path": "android/app/src/main/res/mipmap-mdpi/ic_launcher.png",
+      "sha256": "0247b18a8ba377c8ffaa289d1abb60b7e23b3aa6b8b1459c3a3eadde6f91e27f"
+    },
+    {
+      "path": "android/app/src/main/res/mipmap-mdpi/launch_image.png",
+      "sha256": "88fdf6f9e9be5b80e0f3c9c9fea7747ffaf05a8330b63a90d9f777bb24624d3c"
+    },
+    {
+      "path": "android/app/src/main/res/mipmap-xhdpi/ic_launcher.png",
+      "sha256": "f94b6956d5b98ab672d01ab277d63695f3bd71c7d12d4efed86137248fb019af"
+    },
+    {
+      "path": "android/app/src/main/res/mipmap-xhdpi/launch_image.png",
+      "sha256": "31cffaa61d9a26ebed0f029098f5cecdf4b7a2327e6cc372d6ce424ddf412d42"
+    },
+    {
+      "path": "android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png",
+      "sha256": "f637d73f83c89cb6af44451efe9ca3e62fb43d2068f85e668736e8d05f3d2cf4"
+    },
+    {
+      "path": "android/app/src/main/res/mipmap-xxhdpi/launch_image.png",
+      "sha256": "28ed79fbe71de5f5294993a36202e30ab411451a6b7f0ac49a4c1cee923f76ab"
+    },
+    {
+      "path": "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+      "sha256": "a9a665dd9f0a5d7696e0d02456c2ad5f7415ef953d8c49c916d95eeab7cbf63d"
+    },
+    {
+      "path": "android/app/src/main/res/mipmap-xxxhdpi/launch_image.png",
+      "sha256": "b1fb737d4e05b02d34cbe8b3a9e58702299f91e32186820fa4788af35ecc5ec2"
+    },
+    {
+      "path": "android/app/src/main/res/values-night/styles.xml",
+      "sha256": "8ed217729f1feeaff0d9e52594fc20b0ab30ea31fa8c310506b86605e7754d77"
+    },
+    {
+      "path": "android/app/src/main/res/values/ic_launcher_background.xml",
+      "sha256": "9c7fa363c882f890807d7554332f399f9d8a9d7c8c96af8522cbfde332d52908"
+    },
+    {
+      "path": "android/app/src/main/res/values/ic_launcher_foreground.xml",
+      "sha256": "dbcd40242605cb7899542a8e46fc1f15e87a704f9eaf61a24b55d70f4cc4ccd3"
+    },
+    {
+      "path": "android/app/src/main/res/values/strings.xml",
+      "sha256": "64b6a84bdecf68407f07f39f2f5c48ff3ee556386bc3e19cc0564d36ebf85f8c"
+    },
+    {
+      "path": "android/app/src/main/res/values/styles.xml",
+      "sha256": "fad1d1167645a41fb3cea79fc97fea4e58eb821aa111456d301e45504a4ba287"
+    },
+    {
+      "path": "android/app/src/profile/AndroidManifest.xml",
+      "sha256": "30b0832ed8b92dfbd6ae2abfa939ccf26333d37600056b1572bd4a397a18a74b"
+    },
+    {
+      "path": "android/build.gradle",
+      "sha256": "2eb682866d532b16f1d288c73f593d6e3b90138e7b21bfecd982e1bb76b94bd3"
+    },
+    {
+      "path": "android/build/reports/problems/problems-report.html",
+      "sha256": "e542e54e7adb748185a85b5842da6bd15def83f21ed239c87446a705e69843b2"
+    },
+    {
+      "path": "android/gradle.properties",
+      "sha256": "a7ae06966cbbfb9466074feeea08797b8f0fe7a20b3c43cd4b6365bd0a43f586"
+    },
+    {
+      "path": "android/gradle/wrapper/gradle-wrapper.jar",
+      "sha256": "16caeaf66d57a0d1d2087fef6a97efa62de8da69afa5b908f40db35afc4342da"
+    },
+    {
+      "path": "android/gradle/wrapper/gradle-wrapper.properties",
+      "sha256": "cc8f5de098161b3918f157ad271c4dea78ce1ab79b855f34a6e47cbd8c6cc11c"
+    },
+    {
+      "path": "android/gradlew",
+      "sha256": "ec56c02543666d92d9ac5ae7fcc48f88ce4de0deb8b7f9b39928ca46f68c1b2b"
+    },
+    {
+      "path": "android/gradlew.bat",
+      "sha256": "c13c6e91b9a517783976de213d46398c661ea9e17651376d7301e839eaedcc62"
+    },
+    {
+      "path": "android/settings.gradle",
+      "sha256": "817525fa4e035359fed150e6e9f24625d6312195c4f2ae9df5d23053c42467f6"
+    },
+    {
+      "path": "apps/attendus_admin/.gitignore",
+      "sha256": "1e725ca8cb4e6c2a19dc889d0cebb497d954f091aba3b08d53df20edd0a98cdb"
+    },
+    {
+      "path": "apps/attendus_admin/.metadata",
+      "sha256": "91c4f510c93f76e18aad50fd6f9bfdb94eaa1eab4db3bd0e33fc8abd91ccbe67"
+    },
+    {
+      "path": "apps/attendus_admin/README.md",
+      "sha256": "c9124931ebee62b7944fa4cd0d62199ae259557d0070bace7de087c6b2e3d96d"
+    },
+    {
+      "path": "apps/attendus_admin/analysis_options.yaml",
+      "sha256": "b63207cf529949ec4727b68c23dbb38ce255b6f6f4ae1effcb5c1dcf2852d238"
+    },
+    {
+      "path": "apps/attendus_admin/assets/attendus_logo.png",
+      "sha256": "8c3421225f97dbc5d70d053006c9bc3e9346bea93337ac627cecab5a24901704"
+    },
+    {
+      "path": "apps/attendus_admin/lib/core/permissions.dart",
+      "sha256": "fe14b9c6142589d9b7f72192da9e692d392889beb930a18589392c9f7a33e6ee"
+    },
+    {
+      "path": "apps/attendus_admin/lib/firebase_options.dart",
+      "sha256": "b24c22a1606e0ef781affd2d20f79c16db4c8bf5d2e794024bd639cb7bfa849d"
+    },
+    {
+      "path": "apps/attendus_admin/lib/google_oauth_config.dart",
+      "sha256": "4cb80306b74f83888ec4811ce0d08e3034cb805a514761fa38a7cf5dd8304fbe"
+    },
+    {
+      "path": "apps/attendus_admin/lib/main.dart",
+      "sha256": "c321ef46804d757a4e38d90a4e9ef69f548721ad5cb7f59f154734d6a5adbb7d"
+    },
+    {
+      "path": "apps/attendus_admin/lib/models/api_models.dart",
+      "sha256": "b39e03ede428003ad61dbaa53f159bdcd40660d52a0eec997167e89901e3b136"
+    },
+    {
+      "path": "apps/attendus_admin/lib/services/admin_api_client.dart",
+      "sha256": "13427dc94962a80031451789d7f1f38b503a4881dddba9f2e7a7b4b043880944"
+    },
+    {
+      "path": "apps/attendus_admin/lib/services/session_controller.dart",
+      "sha256": "2a3a82ef5c9ea3679c34f58c20784c401fb6c3c55e6860ce3d2b1a99bcc01cff"
+    },
+    {
+      "path": "apps/attendus_admin/lib/ui/admin_shell.dart",
+      "sha256": "124684fae373278f3ffa7b58019b3db543221e8e89e587b94bfcea1a08ddf49e"
+    },
+    {
+      "path": "apps/attendus_admin/lib/ui/analytics_screen.dart",
+      "sha256": "3ef2191cb7957333bf7554ee1af1fece0502b83bf55554d2ccfbae3f344e3397"
+    },
+    {
+      "path": "apps/attendus_admin/lib/ui/communications_screen.dart",
+      "sha256": "84696905f7e0ab8a046af19374ec34ba7e586a7d81eb22acc960114af32a2b83"
+    },
+    {
+      "path": "apps/attendus_admin/lib/ui/dashboard_screen.dart",
+      "sha256": "ac26d1683840e476cf4b59d0883655429055c17321ccd927fab4eb70b99e84e3"
+    },
+    {
+      "path": "apps/attendus_admin/lib/ui/mutation_dialog.dart",
+      "sha256": "8c77adeecb504e002bb2078e7e890ecc6ba1d0f3fb5dec44961e333c9313e066"
+    },
+    {
+      "path": "apps/attendus_admin/lib/ui/paged_resource_screen.dart",
+      "sha256": "b1999d3606e7b763d65e36120c0c5fbc4e8dc9b78b1df82876d59ea4ef65061a"
+    },
+    {
+      "path": "apps/attendus_admin/lib/ui/settings_screen.dart",
+      "sha256": "15901a2c592201499451b9b9d4714f03fbd6dff92e48454adc1b8f01a0856f81"
+    },
+    {
+      "path": "apps/attendus_admin/lib/ui/sign_in_screen.dart",
+      "sha256": "156359d382329064e43081b78dbabc021550a1fbddfcd3285586ef377935a4c0"
+    },
+    {
+      "path": "apps/attendus_admin/pubspec.lock",
+      "sha256": "a7a02e74f32108ae23c16584cff9cfcd011c9cadbeca4f1138ce4895ead50509"
+    },
+    {
+      "path": "apps/attendus_admin/pubspec.yaml",
+      "sha256": "accc9878daf336ab5d17e09bf7886b59d06578da41326eaef7aadbedc57dad9f"
+    },
+    {
+      "path": "apps/attendus_admin/test/admin_ui_test.dart",
+      "sha256": "5cc277a3a55f1566758f2b876fe695a06207bdbbbabfa44ee3c0e1f084d438b1"
+    },
+    {
+      "path": "apps/attendus_admin/windows/.gitignore",
+      "sha256": "955e3110cb16494ee76e1cd5df47e2c212309eb94a49a123fe87f718de413cb8"
+    },
+    {
+      "path": "apps/attendus_admin/windows/CMakeLists.txt",
+      "sha256": "a611bf524e1cb1378226ccbd1b6a60a0d30f937cc31850b675e4860f616b6230"
+    },
+    {
+      "path": "apps/attendus_admin/windows/flutter/CMakeLists.txt",
+      "sha256": "bd05e3268b2f246bcbafdb778165fe67a7bafdba04eb73599502563a67b8ae7e"
+    },
+    {
+      "path": "apps/attendus_admin/windows/flutter/generated_plugin_registrant.cc",
+      "sha256": "636f3a34118143fe7291ca89fb1493c3c517ce2dfbcd4037179a4dd7fd70a775"
+    },
+    {
+      "path": "apps/attendus_admin/windows/flutter/generated_plugin_registrant.h",
+      "sha256": "dbc11635d7b1ba1887adf40df5b83d634e9c3ab0bee34510c71528bb4d73602a"
+    },
+    {
+      "path": "apps/attendus_admin/windows/flutter/generated_plugins.cmake",
+      "sha256": "afccc84ffbd7747c603ec8e1bcc4f1467d21418142f54d31d1ef2f7a4f57d4b2"
+    },
+    {
+      "path": "apps/attendus_admin/windows/runner/CMakeLists.txt",
+      "sha256": "d765fdd05f63ad099e585a2cced0cbff13ec3229b7de68c8681b2107db850089"
+    },
+    {
+      "path": "apps/attendus_admin/windows/runner/Runner.rc",
+      "sha256": "e5037f5ea8047338a748b84d5b98701345932b3211b49e78abe9daceacc52bfc"
+    },
+    {
+      "path": "apps/attendus_admin/windows/runner/flutter_window.cpp",
+      "sha256": "d615eedc06ae37321e59c2c00c7687d1887dcd97904eb7225fafd8dcb5b83da6"
+    },
+    {
+      "path": "apps/attendus_admin/windows/runner/flutter_window.h",
+      "sha256": "0252b804f5da380c7709cbe1daff2b8d18daf6c49d7e6dd43e5af3c99c19f56c"
+    },
+    {
+      "path": "apps/attendus_admin/windows/runner/main.cpp",
+      "sha256": "6ac2e8a20531101bccf9f8c3b170f0ea2945c806c5190811da2ca7b79688845a"
+    },
+    {
+      "path": "apps/attendus_admin/windows/runner/resource.h",
+      "sha256": "d0e8bf7835468b4b6b1f8f0747f2e8f25c19841f2df2ac60aaa584ddae3aa7c6"
+    },
+    {
+      "path": "apps/attendus_admin/windows/runner/resources/app_icon.ico",
+      "sha256": "c098d3fc85cacff98b8e69811b48e9f0d852fcee278132d794411d978869cbf8"
+    },
+    {
+      "path": "apps/attendus_admin/windows/runner/runner.exe.manifest",
+      "sha256": "639a56233fcd8cbcb8bbefcd93e4680ec2664f32d9acfb3d2ec1d8726a96e090"
+    },
+    {
+      "path": "apps/attendus_admin/windows/runner/utils.cpp",
+      "sha256": "a128b67b9f3c2579e2ecef5b0dde2c33f222a097cdfe5da2a3067c73d1485b39"
+    },
+    {
+      "path": "apps/attendus_admin/windows/runner/utils.h",
+      "sha256": "832e246b6758253f89016fb0374b30791242e97ad950d27fc678b3d9feacfdc4"
+    },
+    {
+      "path": "apps/attendus_admin/windows/runner/win32_window.cpp",
+      "sha256": "4e4f4dcf8e86ea6e097562cb3476039e693449bd8045367538afee579c017511"
+    },
+    {
+      "path": "apps/attendus_admin/windows/runner/win32_window.h",
+      "sha256": "d154cf89ba85f820631a9b5bedacbe64fc5815e428fe6bc5da579ce649f69841"
+    },
+    {
+      "path": "attendus_logo.png",
+      "sha256": "74d2bd0e1d0e9987dce543a8715e6c2fcef6ac3d9c608dbd2f25aac79932796e"
+    },
+    {
+      "path": "attendus_logo_only.png",
+      "sha256": "84d309faecd4e0c6c521c2457978db2e9f97c9d78b29747c0ee471b475dd2037"
+    },
+    {
+      "path": "attendus_logo_withText.png",
+      "sha256": "8c3421225f97dbc5d70d053006c9bc3e9346bea93337ac627cecab5a24901704"
+    },
+    {
+      "path": "deploy_firestore_rules.sh",
+      "sha256": "3facc7ca629ae6a078c4f88c017d66164d982750e454b5484a9479c0000ec199"
+    },
+    {
+      "path": "deploy_guest_mode_fix.sh",
+      "sha256": "7b7691e76f2b15170242a9dfc26ab1ba2339dcd5792eec222b52233b2fffdfbe"
+    },
+    {
+      "path": "deploy_web.sh",
+      "sha256": "273651872bb6e8914b18615a07ef0e166d9c26530bbb223c3f7a6c166e256865"
+    },
+    {
+      "path": "docs/accountless-registration-production.md",
+      "sha256": "92105b7a15e5b63719c51138bfbb3f49abd439ab6b01a481a675fe25cfc808aa"
+    },
+    {
+      "path": "docs/attendance-2.0.md",
+      "sha256": "7fef7a132e1593fd8cff388f5f1d1d2b4e466d2857a614cce627cda6639471c9"
+    },
+    {
+      "path": "docs/attendus-admin-architecture.md",
+      "sha256": "97c4cd51579c532026173d7301a611bbf10e4f2a0463f0f80c9be8471e76af6a"
+    },
+    {
+      "path": "docs/attendus-admin-rollout.md",
+      "sha256": "05d8edfa8b494767084db97c54eb5d863cc1958716f9e56cbf611ff3c40960c8"
+    },
+    {
+      "path": "docs/biometric-retention-runbook.md",
+      "sha256": "b763552344d98db4e4603f274d1e394c0b1f6a2ef60388c7f6804aa4173f5bfb"
+    },
+    {
+      "path": "docs/discovery-v2-rollout.md",
+      "sha256": "ee8f27c8306a4f3ca9ec2a9e90cddf44d46324fb007f90b0fdd3b95fb0e17787"
+    },
+    {
+      "path": "docs/event-creation-wizard.md",
+      "sha256": "c6c02ae2c25a8580c1775e853a3d2dae441c0d55840d5039aa47f67f1049825f"
+    },
+    {
+      "path": "docs/event-lineup-20260926.md",
+      "sha256": "4e58dc23f158a6af96691cc69d3b978518ec9084d8c8cf0702df2a66ca29c150"
+    },
+    {
+      "path": "docs/launch-candidate-manifest-20260927.json",
+      "sha256": "c08988b117a1f634846dd73140a3d0b305f3ff5e1ab2db92dffa4e718acdc3d3"
+    },
+    {
+      "path": "docs/launch-completion-checkpoint-20260927.md",
+      "sha256": "b74251597f9220ddadd471cd29e8361e3da60202e38a22cc50b644a55e27b60c"
+    },
+    {
+      "path": "docs/launch-fixes-20260927.md",
+      "sha256": "a33b53d20fd7ca855395b96a124105afc7cad2b24bf385da91950ab601635cf5"
+    },
+    {
+      "path": "docs/launch-inventory-20260927.json",
+      "sha256": "c3f6c674816ec866347d3c8e541de223f65a0cd8d0969cb3b9c5c1768686e92f"
+    },
+    {
+      "path": "docs/launch-migration-dry-run-20260927.json",
+      "sha256": "dadf4065c545e3b431e0115a631bab1c96b573d949f17a1bd0f33bd89e4cb6f9"
+    },
+    {
+      "path": "docs/launch-migration-dry-run-final-20260927.json",
+      "sha256": "4c560f0b089699243cea0ec87d246f08d92947bf0a875d8b42d1749bd81d3063"
+    },
+    {
+      "path": "docs/maps-configuration.md",
+      "sha256": "1b26c471b7ec6acaf374eb8b15e9788c8307f2417f5955c252b9bfacfb6c8d58"
+    },
+    {
+      "path": "docs/messaging-repair.md",
+      "sha256": "ddb7bbab538eb43ab70c9cd4d1764afea0d18e03bfd49658491fe50a7a3d8c8e"
+    },
+    {
+      "path": "docs/public-web-production.md",
+      "sha256": "68c6bff5b86ac7ebe86b28996a5eff87c8086626b28838e2e0c03824821af618"
+    },
+    {
+      "path": "docs/security/production-baseline-2026-08-01.md",
+      "sha256": "8a9b74f1f1dc451e8f96c3cdb18723779da48be3dee0ed0a651754499a79ddf3"
+    },
+    {
+      "path": "docs/smart-arrival-wallet-rollout.md",
+      "sha256": "f0baaf0b85d73f24c55a78741076b1de18395e2cd6fef98a54aa1ef15b91d190"
+    },
+    {
+      "path": "docs/storage-cors.md",
+      "sha256": "9466a7bfbf89f1b84df56ec3d96bdba7dc63e77b471b4d3fb7540c6b704f814a"
+    },
+    {
+      "path": "firebase.json",
+      "sha256": "b9ea0988ea13071fdc939abf76ae2cbb4c9504ae5b0dafbd6b9a2f6f9ec716be"
+    },
+    {
+      "path": "firebase.test.json",
+      "sha256": "1e1cc191708993e9d02363de734d7d1d2118b3b649109ab28478f75af1335ead"
+    },
+    {
+      "path": "firebase/storage-cors.json",
+      "sha256": "a4f86243c4299886396639dd5117894153299c8373bc39aac8004dd8a050cfe7"
+    },
+    {
+      "path": "firestore-dev.rules",
+      "sha256": "cd8c8b96f1af36d7cd0c041a72cd2c41d39bd76aa357f19eb95949d0c6d1bf70"
+    },
+    {
+      "path": "firestore-production-tier.rules",
+      "sha256": "1d2d5e84c49de4d9d6818464cf6666a6bd68b5c6ba1931d299fb0b7d9002caeb"
+    },
+    {
+      "path": "firestore-production.rules",
+      "sha256": "521850647b63dff918d9a941473b890bba81afce2b90fe79a75760d5f93f126c"
+    },
+    {
+      "path": "firestore.indexes.json",
+      "sha256": "947d2ce182b06d12247edfc4ec8ada8f1204ae63ca900dd0adb44e452cd2093c"
+    },
+    {
+      "path": "firestore.rules",
+      "sha256": "8a42fcff776ffc56f13b5e75890adc9f96d51f9e75e85380625a3c4a92602b77"
+    },
+    {
+      "path": "fix_analyzer_issue.sh",
+      "sha256": "c0201b8f218d89dd047ee5d649182c888fa4cf24c58c31cd702cd4e9f06dfa74"
+    },
+    {
+      "path": "fix_android_studio_indexing.sh",
+      "sha256": "3baacf7017be37ec53c96eddd9472e4167487698c45f386e1d8e3823df75d8b9"
+    },
+    {
+      "path": "functions/.eslintrc.js",
+      "sha256": "e08828d03d75049defc3ddd97e7c35123c7e239ffe0a2473b81bb8611c830ca1"
+    },
+    {
+      "path": "functions/.gitignore",
+      "sha256": "e7c878f1962b5d93d05eb30ef6cb9f15afd803595a5d47208c7d62c10213d3a9"
+    },
+    {
+      "path": "functions/account/attendance-history.js",
+      "sha256": "edaad862794dec623ffbaee3d16b8766c17fde06839c7b68d6b85990a5302cda"
+    },
+    {
+      "path": "functions/account/deletion.js",
+      "sha256": "946106865696ef834b83377d3a6d1a82be172c29aa7862878759eedc05287046"
+    },
+    {
+      "path": "functions/admin/api.js",
+      "sha256": "8dacad2e5ef3f608295c273f577b73bae70469cb7ff449358085cff83070275d"
+    },
+    {
+      "path": "functions/admin/audit.js",
+      "sha256": "f902d77810039401b09116986bd315cffd43153ee187c6f62f2ffc29c9316884"
+    },
+    {
+      "path": "functions/admin/auth.js",
+      "sha256": "9492460a8268258cbb8123d345377d2d4f6ce3f57f1523e82ef2a91ea1707a9a"
+    },
+    {
+      "path": "functions/admin/bootstrap-super-admin.js",
+      "sha256": "5c5792202ca1558704d296ebb59ad01332717bcba2fa900877ef93475d0a3f3e"
+    },
+    {
+      "path": "functions/admin/constants.js",
+      "sha256": "46456e900946bf374ba290925b4846ec848ff86652ae2ff646df4f9516015d19"
+    },
+    {
+      "path": "functions/admin/errors.js",
+      "sha256": "249e4cc674b65c8c661ce4db97bb4020daef42ef3eb4330d953c33988edd3786"
+    },
+    {
+      "path": "functions/admin/idempotency.js",
+      "sha256": "209af1669b566b93af1563f338aa7a340dd1efd126f000c763787f30e5d2061c"
+    },
+    {
+      "path": "functions/admin/metrics.js",
+      "sha256": "a08e4ec16e07833abb58516dcb4d218c98a500ecb7d0ed318ba31add8f3a9f4f"
+    },
+    {
+      "path": "functions/admin/rate-limit.js",
+      "sha256": "f4a1e52442b474b38cd3600aeb3a2e6823ab063349f2b49bb3a001e44f0d4836"
+    },
+    {
+      "path": "functions/admin/rbac.js",
+      "sha256": "6af3e09f91268d37b7f050b75bbf5dc431d979adfc4a2cf58a23c5e2e955162c"
+    },
+    {
+      "path": "functions/admin/subscriptions.js",
+      "sha256": "f1fe19c4f32e76dd382220582878e7969c6c4c4115538dc92f9bd60f8cba6fc7"
+    },
+    {
+      "path": "functions/admin/validation.js",
+      "sha256": "94025f10de94a4ed9a52eb4123d17c1991c1874f5c478fe35e35b447c2fe0e20"
+    },
+    {
+      "path": "functions/analytics/user-analytics.js",
+      "sha256": "17742c81c67678a89c19f77048eb90b21e04050d17b9afa258c52a78af36452e"
+    },
+    {
+      "path": "functions/attendance/arrival-core.js",
+      "sha256": "ecead9ee29c2fdb9ad77be767ca00fb4ea613a0741534017af350e7528d1d1a6"
+    },
+    {
+      "path": "functions/attendance/arrival.js",
+      "sha256": "d26bd91f86bf7e19c969c9602afede04ba391f0bf2aaab701d745aacffbe08f2"
+    },
+    {
+      "path": "functions/attendance/assets/icon.png",
+      "sha256": "c62c5823b1572bdafbb19292cb5c643b7cd71468567b2d3ba7c4849ec992e6c9"
+    },
+    {
+      "path": "functions/attendance/guest-web.js",
+      "sha256": "a744e822525f26f093ad9ed504b3c8936dcdc1728d434368663ad8b5d0f86f13"
+    },
+    {
+      "path": "functions/attendance/v2.js",
+      "sha256": "ad67ce879fd4550ef31efee7859dcfeeffbe94fa380b9f62486f6efff72eb3e9"
+    },
+    {
+      "path": "functions/attendance/wallet.js",
+      "sha256": "b2383fd93f4a7039d7ec29e31667c1f7e4766904e27ab638623b1f3d4d733ba3"
+    },
+    {
+      "path": "functions/biometrics/retention.js",
+      "sha256": "99441206f0fb58ac30eb84330046a647f2eedffc70874837d6fca2955422f90c"
+    },
+    {
+      "path": "functions/communications/delivery.js",
+      "sha256": "7cefa5e0060a1a6c69b5debd87c0310470665d815ac474c2299a67c53f0c90a3"
+    },
+    {
+      "path": "functions/discovery/category-catalog.js",
+      "sha256": "e7010a67af54dde018ff02c6f669dd86798d0d6172e80844fd86794de19253ad"
+    },
+    {
+      "path": "functions/discovery/marketplace.js",
+      "sha256": "00dee4c9df758011700ab7a6c5ba90134ea767ba8f8bfe70c245030909f13534"
+    },
+    {
+      "path": "functions/discovery/notifications.js",
+      "sha256": "a09b4493ff45f43eedb0c41c3a5c8843400dcb563afccc858cd252655112912f"
+    },
+    {
+      "path": "functions/events/access.js",
+      "sha256": "e24e4e5bc26fa9e4b9f366c48d99bffaa619d92f3fc6c3795a0d5c2883f038de"
+    },
+    {
+      "path": "functions/events/capacity.js",
+      "sha256": "f99d19c64258d03c5e0cfe73b14e1af2cdd492120e88cf3d04f18ba885851220"
+    },
+    {
+      "path": "functions/events/jobs.js",
+      "sha256": "03b4b26f96f9a53c1ef661063341d16ec2bb18d5b27622ed0d47e10e3cdd599e"
+    },
+    {
+      "path": "functions/events/launch-operations.js",
+      "sha256": "eef3d1a4b463e7ff1224b389052c41a6add5a29b508cc54279900f899cc8c186"
+    },
+    {
+      "path": "functions/events/migration.js",
+      "sha256": "bc5a218fc38c7e3de71fc7603bb767784adcf01bf6be8eb7b37c536552ef593b"
+    },
+    {
+      "path": "functions/events/question-answers.js",
+      "sha256": "35f70993b6c99b993a5bf52d7a19b5d0c14f6a4d0174127c7c4496d9b494b662"
+    },
+    {
+      "path": "functions/events/registration-v3.js",
+      "sha256": "ffbfe7eb80168ddd36622fbd7347c7546e66a27a0283af60d933d6d3846c3bd6"
+    },
+    {
+      "path": "functions/events/roster.js",
+      "sha256": "82b53510e2330fc4e960a9de453a9a64c3d3abffc18b20880bae0f676b23976d"
+    },
+    {
+      "path": "functions/events/schedule.js",
+      "sha256": "2ce686fbf1199218308f65d3ca2525ee92704db3fd1ea4f71d099a6d646adbcd"
+    },
+    {
+      "path": "functions/events/wizard-core.js",
+      "sha256": "9ea346d2e669187a8b8c3fad2999221bf94b3c49f1e7369c790a658f59b2f58d"
+    },
+    {
+      "path": "functions/events/wizard.js",
+      "sha256": "3e64fc1bc967ff6a0fa934506d14bac43608ef6c9fb3701a39913b51f64c0fdc"
+    },
+    {
+      "path": "functions/firebase-admin-compat.js",
+      "sha256": "c69b8b6ca7aa4836373e807b3e168432262643abace084cfb91717432b1709a6"
+    },
+    {
+      "path": "functions/guest/attendance.js",
+      "sha256": "041df7506f17fbbfeb6633a0db58b9e6b7ae280b598cfd2a2e2bea6da76a6d82"
+    },
+    {
+      "path": "functions/index.js",
+      "sha256": "de1498cb501b4b870e05f2b477d7762e62ed40f00b57a95420b5d244989d1876"
+    },
+    {
+      "path": "functions/messaging/migration.js",
+      "sha256": "5ba05c0decdc6fda4dd303b15326021b544c417ed1213ff6179ad6f65fde4120"
+    },
+    {
+      "path": "functions/messaging/notifications.js",
+      "sha256": "d16a86d57e6fc00bf3137d1561e4a2febfcdf54acca0de7b4e00200f4b37c65c"
+    },
+    {
+      "path": "functions/messaging/service.js",
+      "sha256": "9956bd3e2e8767681f4523db1a4967b8446568f0ec4b369e867c94aa0098578c"
+    },
+    {
+      "path": "functions/notifications/admin-dispatch.js",
+      "sha256": "1e6ad2becaab5fabe4f1a283265a9954113d199bf00a9169ce17dd3214b7661b"
+    },
+    {
+      "path": "functions/notifications/scheduled-reminders.js",
+      "sha256": "840cecff2fee64067409c00a8323a691e4a882ec1ac8b2da5d4e9c2019de4301"
+    },
+    {
+      "path": "functions/package-lock.json",
+      "sha256": "17741eada28cf5d65537093afa1518795ef1430902d6b9403ad4494e5a6b12b1"
+    },
+    {
+      "path": "functions/package.json",
+      "sha256": "056ab2538a3a94df81c5ab429c432ef3ed8f4c6ae7947ee0bd1759e59e9de3ad"
+    },
+    {
+      "path": "functions/places/rate-limit.js",
+      "sha256": "a2ef103d80b434908df9f3b2796510c432193ec3f0525419d7265a66fb04fa70"
+    },
+    {
+      "path": "functions/product/funnel.js",
+      "sha256": "b8acb9de38823b3d5bcbd40260f75a9a2b057af006e6cb8dbb5b0d6281d4fc27"
+    },
+    {
+      "path": "functions/public-web/accountless.js",
+      "sha256": "d0cd1f198cbb2d7b2a85cd369feb1a92bc52687da687858741caa3b73b6eff46"
+    },
+    {
+      "path": "functions/public-web/checkout.js",
+      "sha256": "467d3893cab86ce34af46a1e08bed840e27aba38c80085622a8479e157c03e6c"
+    },
+    {
+      "path": "functions/public-web/renderer.js",
+      "sha256": "2c260cbb980bfa161d16cc3c7b5ae38ce4e163e7c4df57e58b9922f7b439fab7"
+    },
+    {
+      "path": "functions/security/callable.js",
+      "sha256": "c99d6fdcf74681042de472b8931e97d6c2655eb45319fde65a482f8dae43e764"
+    },
+    {
+      "path": "functions/test/account-deletion.test.js",
+      "sha256": "34b3784b0f8bffdc5af5f3beaed4d3d376fe32a19e48e773c40ccbca4d2311bb"
+    },
+    {
+      "path": "functions/test/accountless-registration.test.js",
+      "sha256": "be37f2b4c1a61c33c4b1112e6a0c45a769456bfe55263c4737436ea6cfc193f1"
+    },
+    {
+      "path": "functions/test/admin-emulator.test.js",
+      "sha256": "21dc349ba6f810f94ff5f73df6800a0e67bbbe23a12fbfed9c844d79a73c5053"
+    },
+    {
+      "path": "functions/test/admin-unit.test.js",
+      "sha256": "2b885178413652ff4537850b36eb71bccc3278d8bb19f41113c4d83d1ae81fb3"
+    },
+    {
+      "path": "functions/test/analytics-emulator.test.js",
+      "sha256": "752a3e8543b14ec5811ca29a1d03ef4bbc1ee3205f0893df0c57d2cef7782952"
+    },
+    {
+      "path": "functions/test/arrival-core.test.js",
+      "sha256": "9611afa12b5917843709f7e01c7cce21b42031f1d89b718d648c4bef319a8369"
+    },
+    {
+      "path": "functions/test/arrival-emulator.test.js",
+      "sha256": "19f9855c8cd93e209e23a60611e41d3e267f7f34efe3d39a51567669b40e7425"
+    },
+    {
+      "path": "functions/test/attendance-pass-audit.test.js",
+      "sha256": "a5345633cdd84e20926bc7fc13f31abc1be49a6f97514443089e2cc5bbaec2e4"
+    },
+    {
+      "path": "functions/test/attendance-v2.test.js",
+      "sha256": "2a14587294588ae5903d8212b29a6b10e52e3a112f05d381085955ccfb5048cb"
+    },
+    {
+      "path": "functions/test/attendance-wallet.test.js",
+      "sha256": "f98f55e1950b4c5235afbd2849cfcfd9d59b218cc2dc68f55bf7b8814eb143b1"
+    },
+    {
+      "path": "functions/test/biometric-retention.test.js",
+      "sha256": "16fd17ae0789c224dd41b0a90ce2b67b4dfdaae285a4bab8c8003e1b4f80c393"
+    },
+    {
+      "path": "functions/test/callable-security.test.js",
+      "sha256": "bddde15137c08dcde1e667adfd1341d3298cd7329849932e6de4289ac1315397"
+    },
+    {
+      "path": "functions/test/discovery-categories.test.js",
+      "sha256": "5874b3a59c9b851453da62cfd97ed0d3e2d8ad8d35f42ebd065fc9a356e6db38"
+    },
+    {
+      "path": "functions/test/discovery-marketplace.test.js",
+      "sha256": "88c52ca00574b92638933ae751d516e430dea82a08d07957594b00204c665e21"
+    },
+    {
+      "path": "functions/test/emulator-test-helpers.js",
+      "sha256": "621bb40e4b047fba61ca30d5305c45b768d470584f5dbc33d64b13d4281b070e"
+    },
+    {
+      "path": "functions/test/event-entitlement.test.js",
+      "sha256": "9f6373b767ebf2e302369e94cd77db8b1134057c8af5717fa89abede04da68ce"
+    },
+    {
+      "path": "functions/test/event-schedule.test.js",
+      "sha256": "5b8e4c999e56e9200654550720220aa01fc864f6de513a9fa97012de1b498550"
+    },
+    {
+      "path": "functions/test/event-wizard.test.js",
+      "sha256": "724c4eece5f16181277722fa51e2246cf4aa2c6c51f744e86c6fc5a896c6d4f7"
+    },
+    {
+      "path": "functions/test/firestore-rules.test.js",
+      "sha256": "535f38130e4c0b505d2c775cefebe4fd05d397a7d3bb03638b93a18ecfa25975"
+    },
+    {
+      "path": "functions/test/guest-attendance-web.test.js",
+      "sha256": "98bb81b1e5db07c125a1c6e1ad5a04c45cd4ef7db23827a21d13a1f5afcb258b"
+    },
+    {
+      "path": "functions/test/guest-experience.test.js",
+      "sha256": "d827916da74cff8a535f8e4e43a6efb2844f08210452e0cabf22a76c4b98790c"
+    },
+    {
+      "path": "functions/test/launch-emulator.test.js",
+      "sha256": "9d772d81a8f9c40477c967e1adebddee694ac106d6ff238be7e61ec96a63afef"
+    },
+    {
+      "path": "functions/test/launch-roster.test.js",
+      "sha256": "4e7f8d6e6dd253e4f90a0f85e20f5dc3f3dd97ccc176f101a955555f298bfa64"
+    },
+    {
+      "path": "functions/test/messaging-emulator.test.js",
+      "sha256": "0ff59ab5e68605b7fc250efe5116c84b4f92bae97820c37fbe138dfbd89ea3e8"
+    },
+    {
+      "path": "functions/test/places-rate-limit.test.js",
+      "sha256": "43bc0a8a42247b42b16d2e0cb1a4a8c4d9d24ac299d4854a3ab0ee878c4c5b5d"
+    },
+    {
+      "path": "functions/test/places.test.js",
+      "sha256": "dcf0312c0f73b292e7c71544ad72b7ba26a35c96f06714008f39dc3894b62e1f"
+    },
+    {
+      "path": "functions/test/public-checkout.test.js",
+      "sha256": "6706dbf9d9db2a4d00620cb82fd80a9fa55bd549f04864f07a839cd37efe9de2"
+    },
+    {
+      "path": "functions/test/public-web.test.js",
+      "sha256": "66af34265dfc4beeab3bb044babb8a069c7a9b968f2713808d78f55e141c38f2"
+    },
+    {
+      "path": "functions/test/scheduled-reminders-emulator.test.js",
+      "sha256": "2da3a2045e50a019a23b00c2bf190e7b6c9c1af84ad3a09c0d7abe713cb399a0"
+    },
+    {
+      "path": "functions/test/scheduled-reminders.test.js",
+      "sha256": "7f6079c802e39e81296499b4dab79f9c0af0f1e13850a58e6bde08cf63651540"
+    },
+    {
+      "path": "functions/test/storage-rules.test.js",
+      "sha256": "9435a8dff07eb921f4f71f2d2ab7baa12f44434810229811de9f26f7ad5be023"
+    },
+    {
+      "path": "functions/test/ticket-issuance.test.js",
+      "sha256": "09b6625d96932d14133778fe664f9664946aae58907c11f5611dcca1e3705340"
+    },
+    {
+      "path": "functions/tickets/issuance.js",
+      "sha256": "51ab9b1187daab6d6945206f75d640ba7fae4ee598979d1f9b05ce17de6dfa8b"
+    },
+    {
+      "path": "functions/tools/backfill-discovery-categories.js",
+      "sha256": "55aa8c193404cadbb43a8a4e86a68e5d119728a683c02baf6fd7a16284decab0"
+    },
+    {
+      "path": "functions/tools/backfill-discovery-marketplace.js",
+      "sha256": "c92a34aa9e3daeb8ac3e5ad49aa91d317d9e86c8a6baf989c1b1a70e429cac93"
+    },
+    {
+      "path": "functions/tools/backfill-public-web.js",
+      "sha256": "3d2d616df6952453ab046715ceb945d34596b6771488fb584efca13edf005c8a"
+    },
+    {
+      "path": "functions/tools/biometric-retention.js",
+      "sha256": "658d2370e9857100e20120a718efa4dc1196647ff6b3b1c0835a02b7ab0e9fb9"
+    },
+    {
+      "path": "functions/tools/canary-firestore-query-contracts.js",
+      "sha256": "9b063ed590a66a7f20417824e2b04513f5b22ca19441b53d6f1c4f6f62671793"
+    },
+    {
+      "path": "functions/tools/canary-scheduled-reminders.js",
+      "sha256": "a7cb6ffece6df7864f12117fbc0d42b9ff206aae93354e196ef40fbfa04ba819"
+    },
+    {
+      "path": "functions/tools/canary-user-analytics.js",
+      "sha256": "8a430197b3fc68d14b268dc7b0b803039ecc11b176dbd21b00ac7e66ba8224b9"
+    },
+    {
+      "path": "functions/tools/complete-launch-migration.js",
+      "sha256": "288a4806cd8cf4bb886f70642ac72c18eea90b5a9de0946b06686f7ac0d8f797"
+    },
+    {
+      "path": "functions/tools/invoke-user-analytics-backfill.js",
+      "sha256": "f0b24ffce8c0893b21724fe6b93faa115e8b81705dd42bcebb4213ef598171a2"
+    },
+    {
+      "path": "functions/tools/launch-inventory.js",
+      "sha256": "dfd01983865dd38c1b94f7075b4fc048bbeff948035fa0c01cc61cc046f253f9"
+    },
+    {
+      "path": "functions/tools/messaging-canary.js",
+      "sha256": "e11e4c7d4fe4deb6d0934fc918e858a558cb75e5cfa9faf8c49fc0244c7ebd3d"
+    },
+    {
+      "path": "functions/tools/migrate-attendance-v2.js",
+      "sha256": "57737908eb7f09eb142e58bb7c6f09630a0a2e1abbb4aca60823a13ac82b65d8"
+    },
+    {
+      "path": "functions/tools/migrate-messaging-v2.js",
+      "sha256": "abe6674ff7e7335b5fbe612f0aeaf90a917be46c4cb77e0232843577992a1d41"
+    },
+    {
+      "path": "functions/tools/migrate-saved-events.js",
+      "sha256": "32a85abea0cdc84f88a58f37680bd67b68c852269891ffe20049411f3fa40549"
+    },
+    {
+      "path": "functions/tools/reconcile-scheduled-reminders.js",
+      "sha256": "158a67a3cd7e5eb7fdb7282221f7e595968ad1f94468bfa8a4edb6d04af2730a"
+    },
+    {
+      "path": "functions/tools/run-integration-tests.js",
+      "sha256": "dcc7c5607474871d38ba19bf92d1245ba9845a4cbe882fb022dd09c3c209c2c5"
+    },
+    {
+      "path": "functions/tools/set-attendance-rollout.js",
+      "sha256": "ccc795d4598d58db7a1e45f44f4447d0f2e91ebc596f2588eee3acfa6413368c"
+    },
+    {
+      "path": "functions/tools/set-discovery-rollout.js",
+      "sha256": "407f5265994db5bd03e6407d5d5a7562b91326fc364bcd993402877fbc568f08"
+    },
+    {
+      "path": "functions/tools/set-event-creation-rollout.js",
+      "sha256": "7548dcd3737e7590ec3e4f8ab5986d3903ca9183c6a1a37f1e8d1d8f8811a2c2"
+    },
+    {
+      "path": "functions/tools/set-public-web-rollout.js",
+      "sha256": "fd94a62c6aa90abca9fd793884e81de3bd82df350092c8250d3f535c80459510"
+    },
+    {
+      "path": "functions/tools/validate-discovery-release.js",
+      "sha256": "55155d1dff532611478115932ca234f25dd79812d7c80915bc84856055aafa1e"
+    },
+    {
+      "path": "functions/tools/validate-public-web.js",
+      "sha256": "3a81ed0ebb0aac3090703254c2a981efce1e1ad1e8bed3d716a202a001d28292"
+    },
+    {
+      "path": "hybrid_search.patch",
+      "sha256": "d7f9670ac82c79722c8a2fed7bbe06745449b319eff80f7ecfbad7a159774a89"
+    },
+    {
+      "path": "images/event-lineup-20260926/acoustic.png",
+      "sha256": "81e9075d8ca8bcad3e9ed2e9d6c24312a97dddca4bd0a3686979b73dda832a7b"
+    },
+    {
+      "path": "images/event-lineup-20260926/ai.png",
+      "sha256": "ae6cf4d8917d450577284079e4c9cda5bbfd20cdf6a298d116c082fde6c2f0ec"
+    },
+    {
+      "path": "images/event-lineup-20260926/cleanup.png",
+      "sha256": "1339fc187ec483784e7dafd0a62f73c12608a90ed19c6a92eb58b6318ac3b369"
+    },
+    {
+      "path": "images/event-lineup-20260926/coffee.png",
+      "sha256": "5915f7990a205dfaed0dd5c41e1eb2e6f0c4864255f75196f2be8edd110aea6c"
+    },
+    {
+      "path": "images/event-lineup-20260926/mindfulness.png",
+      "sha256": "80eb68ce24eb4b99c3595fd97044afeb54e70c59c8f0359c0530f19f2671d70f"
+    },
+    {
+      "path": "images/event-lineup-20260926/nature.png",
+      "sha256": "7a10469e429d859be83b4bea868764ead310d7fd686540556818d5fd97e645c5"
+    },
+    {
+      "path": "images/event-lineup-20260926/photo.png",
+      "sha256": "ab44ca113902ec3ad29a0f1a3344adff959ed91217ce71d4120da71377836bcd"
+    },
+    {
+      "path": "images/event-lineup-20260926/picnic.png",
+      "sha256": "60a033edf390dff1600f15e90ca9e8f1670836f5a73d094bf147aa658e02092f"
+    },
+    {
+      "path": "images/event-lineup-20260926/run.png",
+      "sha256": "b6de9f33f34684158a00c4e5d5f8c70f1f0bb312e694b9ef4790b6ac2d06f715"
+    },
+    {
+      "path": "images/event-lineup-20260926/sketch.png",
+      "sha256": "521817370525e6c43f9e628b915628cb55cadaabc1bbc2509a8a097cc3582126"
+    },
+    {
+      "path": "images/fineActive.png",
+      "sha256": "97693a5926e6d72a453e35d93e3030141d99d265dbfde857cc459be26e29b992"
+    },
+    {
+      "path": "images/fineNonActive.png",
+      "sha256": "6ab252b73a7c5d60bd985ec7462cb31046c15fd4ea0521528f5d51912290b7ff"
+    },
+    {
+      "path": "images/goodActive.png",
+      "sha256": "6e2b2609023075531ed87a04e4d8181bcb7c78924d9e10b4a6edc51d74d7fdb3"
+    },
+    {
+      "path": "images/goodNonActive.png",
+      "sha256": "baac06cad845b6efc0e8894d9f903de5b4707d8ce25b80b10085208dbcbd6d40"
+    },
+    {
+      "path": "images/inAppLogo.png",
+      "sha256": "74d2bd0e1d0e9987dce543a8715e6c2fcef6ac3d9c608dbd2f25aac79932796e"
+    },
+    {
+      "path": "images/inAppLogo_backup.png",
+      "sha256": "cbc3a2cd7affa25f6fa002eecd0c5b6a61cbebe00f4b4b4aa51dcd695a0eb361"
+    },
+    {
+      "path": "images/loveActive.png",
+      "sha256": "d86e082bd28f558fe42351b9e27e52b1f695ff809ebfda1ab06386fa2e6074fb"
+    },
+    {
+      "path": "images/loveNonActive.png",
+      "sha256": "3b8ce545c6e673c5019bf539b9430855ba19a10836423391e46e634913baaebc"
+    },
+    {
+      "path": "images/neutralActive.png",
+      "sha256": "196605dcb28414257c2a1212128acfc561f6974b369937637ac8084794464563"
+    },
+    {
+      "path": "images/neutralNonActive.png",
+      "sha256": "d237736e4d60e6c730f157b1da2277a9b8e0f3235d1c195ba031fc6d00d81da8"
+    },
+    {
+      "path": "images/qrCode.png",
+      "sha256": "3390cc96bcce926f3e240372ef3cc097e723c3e448d67f1a028655d760a5b669"
+    },
+    {
+      "path": "images/worstActive.png",
+      "sha256": "71d883240968c0531ed7211b5553f85f10e794dc58e4b16888db247637a12336"
+    },
+    {
+      "path": "images/worstNonActive.png",
+      "sha256": "b8d4e9b67e695abd54bb05d1c2f9ae48fdda6d000961d9b008addfff1d1ccf97"
+    },
+    {
+      "path": "installer/attendus_admin.iss",
+      "sha256": "8428df932c6370719bed15db3e1e36c996e9d08e9be91f4671b84e4ce99203bc"
+    },
+    {
+      "path": "installer/msix/AppxManifest.xml",
+      "sha256": "f8c70ec890fb2b163d40fccf915177c9a73a6fac69035ff5cf990862222dcbd5"
+    },
+    {
+      "path": "ios/.gitignore",
+      "sha256": "37380775aeb2499662b7aca80f4ac4c95ae827c3ba2bfa179aa3e9af4812c623"
+    },
+    {
+      "path": "ios/Flutter/AppFrameworkInfo.plist",
+      "sha256": "4844be22b72d16d6f6013ce5a2240728c730ef1fef9cf43a5c55198b18614802"
+    },
+    {
+      "path": "ios/Flutter/Debug.xcconfig",
+      "sha256": "c6e19d09d837c961a24f3b553db0fa523de5b002a92fef62ecfa4d62056ff451"
+    },
+    {
+      "path": "ios/Flutter/Maps.xcconfig.example",
+      "sha256": "0bba93cc62e0b126761322955a29eb286cb78ea7885754ce1e8e4808d7bdb68e"
+    },
+    {
+      "path": "ios/Flutter/Release.xcconfig",
+      "sha256": "47376f06a0c17bfb2b0872d168a3587af7a2a9a1466b585ba63d936cfa34e3a3"
+    },
+    {
+      "path": "ios/Podfile",
+      "sha256": "27a1e476cccd0bc3e1062031198d82946171ec64d0ba1d8cd83f9e40c586406f"
+    },
+    {
+      "path": "ios/Runner.xcodeproj/project.pbxproj",
+      "sha256": "2f3836c503787356716c33f12c7867ab2db1787d646d7e1f2f7d464720cc4aa3"
+    },
+    {
+      "path": "ios/Runner.xcodeproj/project.xcworkspace/contents.xcworkspacedata",
+      "sha256": "7f3b00b5c3fdb45242d7b87e1e5c4e25d1fa8129a16c94295ecc4e8ea2235c5f"
+    },
+    {
+      "path": "ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist",
+      "sha256": "dfa0f9bb85b95ccba9c6811adadf8cb407fb5d52088e89db83ebc308ec448542"
+    },
+    {
+      "path": "ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings",
+      "sha256": "11b247bc6796892d67c9a821d18604db4dd6a880981b34f38460b9866e6b247f"
+    },
+    {
+      "path": "ios/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme",
+      "sha256": "2dd28b879e66081e28a3324cf2bee7ab2f70be9a3e50e08926b7366dadff7d6e"
+    },
+    {
+      "path": "ios/Runner.xcworkspace/contents.xcworkspacedata",
+      "sha256": "465e6de5660384eb6832e8078920ba6cd5305c445cb29a24a86a2fda4aa6b67e"
+    },
+    {
+      "path": "ios/Runner.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist",
+      "sha256": "dfa0f9bb85b95ccba9c6811adadf8cb407fb5d52088e89db83ebc308ec448542"
+    },
+    {
+      "path": "ios/Runner.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings",
+      "sha256": "11b247bc6796892d67c9a821d18604db4dd6a880981b34f38460b9866e6b247f"
+    },
+    {
+      "path": "ios/Runner/AppDelegate.swift",
+      "sha256": "c7858993cc3cd4271a2286f86f62027912a0bebda0761949438fa1fefc90256c"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Contents.json",
+      "sha256": "9151db5aecea9804c5b1c874c8d5332777d9405c59162befd42d818e024a45ca"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png",
+      "sha256": "80eab7edd55ecf142f8ad244a14ae83ab3c60254bf6ea3a2e7799ac707c92ea3"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@1x.png",
+      "sha256": "486482177cfc9ad2b2b2ab84d26168ceddfb23422f44b7c8026fb24e2b529a2f"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@2x.png",
+      "sha256": "a7efc55d5c87c94eca4b0e5cb9683b9289ac2cc8250fc56b8a6ea0316c51518a"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@3x.png",
+      "sha256": "5f7173ec30a6fce9a8c505aad843a22707d5315c5d55038e60ca0cb810e94be9"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@1x.png",
+      "sha256": "7d4c1a94cf81f2d87539de44f4f6a3845624fcd80a7dddcd4e2e9e6e46681995"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@2x.png",
+      "sha256": "2bbaaeb7c436252b5d9d912bca56f6ca6a3f10cad9c93a74a57ca660e02fd4b9"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@3x.png",
+      "sha256": "a7ebfbe0af5cd47ebb6663e05515ee8172cf6055f2a957f362e1555490c2c956"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@1x.png",
+      "sha256": "a7efc55d5c87c94eca4b0e5cb9683b9289ac2cc8250fc56b8a6ea0316c51518a"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@2x.png",
+      "sha256": "ba1992b0b30a9ce99b24bce610a95d01a4944b82db2f98e999734e16cebc081f"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@3x.png",
+      "sha256": "8e262bb7d518133fa598d61f4fce81bdb39553f06c4be8e57a090a3c37e3dd53"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-60x60@2x.png",
+      "sha256": "8e262bb7d518133fa598d61f4fce81bdb39553f06c4be8e57a090a3c37e3dd53"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-60x60@3x.png",
+      "sha256": "a94fe6a61f67c8163ec72b158e26e3979c4acf5554d3c9810aab53c342785ee6"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@1x.png",
+      "sha256": "eb4fde1db0162da5da6a4ad291d1513721d2ba708a68a301fa651f379d84645f"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@2x.png",
+      "sha256": "9d3ad4061f292dae434804a6bbd69d10fe1f364376ba2f9900e401ef70ace293"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-83.5x83.5@2x.png",
+      "sha256": "a2a51bb12ad33208cb7807fd400384770024453c0363a19304ad8a98a356a65e"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/Contents.json",
+      "sha256": "d0f504eb63e2f357abe8033ba7f256fdeb55658803816fa59169c574f26a5a93"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/LaunchImage.imageset/Contents.json",
+      "sha256": "d0f504eb63e2f357abe8033ba7f256fdeb55658803816fa59169c574f26a5a93"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage.png",
+      "sha256": "88fdf6f9e9be5b80e0f3c9c9fea7747ffaf05a8330b63a90d9f777bb24624d3c"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage.png.bak",
+      "sha256": "93ae7d494fad0fb30cbf3ae746a39c4bc7a0f8bbf87fbb587a3f3c01f3c5ce20"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage@2x.png",
+      "sha256": "31cffaa61d9a26ebed0f029098f5cecdf4b7a2327e6cc372d6ce424ddf412d42"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage@2x.png.bak",
+      "sha256": "93ae7d494fad0fb30cbf3ae746a39c4bc7a0f8bbf87fbb587a3f3c01f3c5ce20"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage@3x.png",
+      "sha256": "28ed79fbe71de5f5294993a36202e30ab411451a6b7f0ac49a4c1cee923f76ab"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage@3x.png.bak",
+      "sha256": "93ae7d494fad0fb30cbf3ae746a39c4bc7a0f8bbf87fbb587a3f3c01f3c5ce20"
+    },
+    {
+      "path": "ios/Runner/Assets.xcassets/LaunchImage.imageset/README.md",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "ios/Runner/Base.lproj/LaunchScreen.storyboard",
+      "sha256": "857e61203b3deafb05766d8fcda898b86a7cb6f3d5e385ecc9926c4d698215e9"
+    },
+    {
+      "path": "ios/Runner/Base.lproj/Main.storyboard",
+      "sha256": "fd367b6c43006d61b730f674970dd48b9f662c8f2264e52ffc1558102a2c9f2d"
+    },
+    {
+      "path": "ios/Runner/GoogleService-Info.plist",
+      "sha256": "ce47a3d716815b367b6cd18d4c0dc7228ef6b572c2da89f0a91c3a03af6b3f0a"
+    },
+    {
+      "path": "ios/Runner/Info.plist",
+      "sha256": "41ce661801b0cbfa9a330d64c4a627664a54bd9b389836eb23457f2a7571edb2"
+    },
+    {
+      "path": "ios/Runner/PrivacyInfo.xcprivacy",
+      "sha256": "28c2f30710bb96c390a467966c5fb83c9b58b728b07a3340f77cbff42a844f74"
+    },
+    {
+      "path": "ios/Runner/Runner-Bridging-Header.h",
+      "sha256": "1a8d11d01d1cc92c650c9c9ed35299240052d4683a15a719a2315ef44185e074"
+    },
+    {
+      "path": "ios/Runner/Runner.entitlements",
+      "sha256": "2b365d93cc684e4ab1c18f8ab877475242ec9bbc2cde8c9234c1303e3c9905ea"
+    },
+    {
+      "path": "ios/RunnerTests/RunnerTests.swift",
+      "sha256": "5e8f4908dacea6f29b2a790e4d38bf5fded69096063f9a27a2f21584d62b30c0"
+    },
+    {
+      "path": "launch_app.sh",
+      "sha256": "5ff12cd3c221065ce7d21c1f4ad0f9bed3a9fdc709615398a95886f22276ae27"
+    },
+    {
+      "path": "lib/Permissions/permissions_helper.dart",
+      "sha256": "5e0e6af4f8db3ad1df7e6ab3b05907dac85ec06859f5a03147fcfa745176c761"
+    },
+    {
+      "path": "lib/Services/account_access_service.dart",
+      "sha256": "71dd031499e232a859a08ba342f81984121a1b49dab94cf03d4754bf63471f58"
+    },
+    {
+      "path": "lib/Services/app_deferred_services.dart",
+      "sha256": "ae5c49e93809f26c6fd0809e67c24f039e9f9405b7790294813d8a7b1a252be2"
+    },
+    {
+      "path": "lib/Services/arrival_route_observer.dart",
+      "sha256": "2fd205ef08853b6ba0f05ce4d65c3c162ed909ac8af84bdb07299b6560a5c6cc"
+    },
+    {
+      "path": "lib/Services/artifact_download_native.dart",
+      "sha256": "046abef95a8ab4643ae3d3f24dc0aaacec8a6d65ebbda1aead87010d894ac725"
+    },
+    {
+      "path": "lib/Services/artifact_download_service.dart",
+      "sha256": "dc21c7217142b22d692378e0c2259a0e34fdd9e1b63325285904978c5dc1e49e"
+    },
+    {
+      "path": "lib/Services/artifact_download_web.dart",
+      "sha256": "e1525d68dd450c6f1f5130897175c54b6e7059d5776a0eefd7253baa7e244ba2"
+    },
+    {
+      "path": "lib/Services/attendance_check_in_service.dart",
+      "sha256": "cb078e02ee95cb340c1037ce9ce68e941f9319312c334c95967e97bdc224493c"
+    },
+    {
+      "path": "lib/Services/auth_service.dart",
+      "sha256": "2d31fa9b75318a3cb393af661a884b1f9e1a6d6a85cc3e93bfa92774f332ccc9"
+    },
+    {
+      "path": "lib/Services/badge_service.dart",
+      "sha256": "3639f72cfdbbef5be3bd4492372bbf14856c1cf7cdad61c9c6ea8cd2975c3457"
+    },
+    {
+      "path": "lib/Services/community_share_service.dart",
+      "sha256": "60ccb35c432e7e462c8fb0a57ef93e0190113f65f5f61ace8fe15f950d706695"
+    },
+    {
+      "path": "lib/Services/creation_limit_service.dart",
+      "sha256": "24892c33472bef14f7d9dea76add555fa18c49f62d351d914e51d04f423d442e"
+    },
+    {
+      "path": "lib/Services/discovery_location_service.dart",
+      "sha256": "6a7287b4677acac32ac0e0f4bd5a9ae98da4826161e10640343c6c6ededb3043"
+    },
+    {
+      "path": "lib/Services/discovery_marketplace_service.dart",
+      "sha256": "a0b2dca6bf50153efbbf2fe56cb80ff3a9031c4d353b69fd00288a02fd94c384"
+    },
+    {
+      "path": "lib/Services/event_creation_entitlement_service.dart",
+      "sha256": "4a8cba060cf701ce09ab86f6eedde18713797a0ed21bf3158c1f93205529d051"
+    },
+    {
+      "path": "lib/Services/event_export_service.dart",
+      "sha256": "7ddfe8b9a2257db684e69abb3910814000131103749361a1085018e97ea408bb"
+    },
+    {
+      "path": "lib/Services/event_flyer_generator.dart",
+      "sha256": "12f34fea0a86f1777053e6ec641b1b98d59dee7e4c58d40a0546e65ff469fe48"
+    },
+    {
+      "path": "lib/Services/event_share_service.dart",
+      "sha256": "7f831da1083a12b2952a74748a48227d2335ed263e8c824494cabc1acd83429e"
+    },
+    {
+      "path": "lib/Services/event_wizard_service.dart",
+      "sha256": "d7c97e806673dccda28b51543d0d5a7537b5ab2484707f93c4f6d9f8bc1d79a0"
+    },
+    {
+      "path": "lib/Services/face_recognition_service.dart",
+      "sha256": "9f1042c7bc9a0d04ea574816086acd4d9ad0027e84d05606ddbbd4867470013f"
+    },
+    {
+      "path": "lib/Services/firebase_initializer.dart",
+      "sha256": "a5d51d1835d44a7566e2c4b58fa91fbc8beecdc96325aa20db7f2eb7b50c85c6"
+    },
+    {
+      "path": "lib/Services/geofence_event_detector.dart",
+      "sha256": "77bd9cd769aa989bcf5beee290798e9e5f76d27135b69d4218d15954712987b5"
+    },
+    {
+      "path": "lib/Services/guest_attendance_service.dart",
+      "sha256": "94c1b76b76325a34a58648090cb3eaf130055b2da466724e5a7e6967f7971a44"
+    },
+    {
+      "path": "lib/Services/guest_mode_service.dart",
+      "sha256": "855cdc46569209d803e7595775d192abf0d5bdc9f6adfbd61d6e132edb18d1ca"
+    },
+    {
+      "path": "lib/Services/live_quiz_service.dart",
+      "sha256": "153f429a72d2a7023465d2146034915923321fd7c825e3816f7b0fd436dff428"
+    },
+    {
+      "path": "lib/Services/messaging_feed.dart",
+      "sha256": "16dc4cbc65ee68d0e64356f4eb768a38ded7a9dcd48e0affbd2b276e27992d82"
+    },
+    {
+      "path": "lib/Services/navigation_state_service.dart",
+      "sha256": "8e44c909e6f52d69f5d3a59f7fcab766490949443b141fa0eede281d8cd33ef3"
+    },
+    {
+      "path": "lib/Services/nfc_badge_service.dart",
+      "sha256": "7ff280cf1290ab005caa910f585959f4ea6f04e5877cfd3eb84c93f65a6fef3f"
+    },
+    {
+      "path": "lib/Services/notification_broadcast_service.dart",
+      "sha256": "d45cd91c6fd21e69a2992ae77439cb629ee7a9dd5736094e7321302cdf4f2653"
+    },
+    {
+      "path": "lib/Services/notification_service.dart",
+      "sha256": "9cd5f21d198dab9af360e0327b939d6bcd27c57ad0c26e87f736c3953e2654a7"
+    },
+    {
+      "path": "lib/Services/on_device_nlp_service.dart",
+      "sha256": "c2e77fb022c928d6b338fdd239f5e4ee69e6b8c4b69f14fa2e529cd2ea433d18"
+    },
+    {
+      "path": "lib/Services/onnx_nlp_service.dart",
+      "sha256": "b94f7fb3b879069e3357901f95a673ac5d7d745ff680215054ef54e764a7ab8e"
+    },
+    {
+      "path": "lib/Services/payment_placeholder_service.dart",
+      "sha256": "bae888e50b9d972cb045e4f6459bc0720b7c02dfef5c440ee2d3bbbe43a17374"
+    },
+    {
+      "path": "lib/Services/payment_service.dart",
+      "sha256": "c185b55c8742d0f0846b35b492c9df599c4db05656b6b1e5dca403534dff50ea"
+    },
+    {
+      "path": "lib/Services/pending_auth_intent_service.dart",
+      "sha256": "5d4b1113b07547be4c6775c90be27996ff2d7fec1212b819d422643203310652"
+    },
+    {
+      "path": "lib/Services/places_service.dart",
+      "sha256": "7a92739be860ee5bf5ae8e7d8e059b32c3953ec38b28a221df59a03fab12105b"
+    },
+    {
+      "path": "lib/Services/product_funnel_service.dart",
+      "sha256": "f5badf4d4b3fe8c3b0cfde280ca94cfcbbf712082f11b60f29e18db73bc8ee54"
+    },
+    {
+      "path": "lib/Services/public_events_repository.dart",
+      "sha256": "3181531f1ab3159e0e9ff87748d704dcdf1fe37787c875490ce433248bd3aedf"
+    },
+    {
+      "path": "lib/Services/public_registration_service.dart",
+      "sha256": "c84f1e15112452f4ade4f4641da3dc3b2f6f06b4a9e134e126162ce1ea050572"
+    },
+    {
+      "path": "lib/Services/smart_arrival_service.dart",
+      "sha256": "2005112fbcb998256a885127f6e2981caa8b4d7e4852bec02922e1ec5b8e18f2"
+    },
+    {
+      "path": "lib/Services/stripe_service.dart",
+      "sha256": "c1e6b4f925646dd1a84b6b3f70638d306b107525643035694c4f27a9f3709f2f"
+    },
+    {
+      "path": "lib/Services/subscription_service.dart",
+      "sha256": "868866cfbd2f0c342983a8b095d1db216bf9d52933b41e239e0aeb61e920b9ad"
+    },
+    {
+      "path": "lib/Services/ticket_issuance_service.dart",
+      "sha256": "4c810adaa03ed7ef3312d5fcd21ef5b8d816844ea255f2c0e30abd50e89e5af2"
+    },
+    {
+      "path": "lib/Services/ticket_payment_service.dart",
+      "sha256": "a2ff4ad959ccb6b48eb43b8c75c93a16385c9d3c7a7f4cdd288f10b8077bc2d2"
+    },
+    {
+      "path": "lib/Services/user_identity_service.dart",
+      "sha256": "f49c869806c359f2541ecbbd2d8c16e9d74ed5452f9ba2b56fe417e1014912d0"
+    },
+    {
+      "path": "lib/StorageHelper/file_storage.dart",
+      "sha256": "827f748bb5d45c34651337e849b719430443bee75ace99f9fb9a3916eefb2868"
+    },
+    {
+      "path": "lib/Utils/app_app_bar_view.dart",
+      "sha256": "ce7fd351c167862b9f770e747e1ae6da13f1206b4bb421d8698f13d841042cf0"
+    },
+    {
+      "path": "lib/Utils/app_buttons.dart",
+      "sha256": "a02c81b1037bb661800c9a0ab4374202f8e4804d4d1ee60051398ab791e8486f"
+    },
+    {
+      "path": "lib/Utils/app_constants.dart",
+      "sha256": "2b28a5c2008e52e09365158d63105768eef3679c7241463ff0a5dd379e0a7179"
+    },
+    {
+      "path": "lib/Utils/app_icons.dart",
+      "sha256": "89706f2ac56ad2841951cd62f962ce452870fd0aec52a7a08684bbb31028b03b"
+    },
+    {
+      "path": "lib/Utils/attendus_theme.dart",
+      "sha256": "1c1a7d65ad4a312110b309cd7a2aab8b2f9e4f52c22ad51e86eac3720e364cf5"
+    },
+    {
+      "path": "lib/Utils/build_optimization.dart",
+      "sha256": "4ae4151f41f9ee4382fe0016ca6137df13a0c1b385e79346bd77350f36dcb80e"
+    },
+    {
+      "path": "lib/Utils/cached_image.dart",
+      "sha256": "2cfde84bb9a140177ea9409dbb98c7ab01401c6715a87bc6dca76d6f25cd315f"
+    },
+    {
+      "path": "lib/Utils/calendar_helper.dart",
+      "sha256": "adc25e17636d1be3f2328d3bd418e8844dbba54809661a6b237df0626a96b5e2"
+    },
+    {
+      "path": "lib/Utils/colors.dart",
+      "sha256": "c41d6855d547809a56ffd980ac03067c9f41687a5ec435fe38178269c7c65c53"
+    },
+    {
+      "path": "lib/Utils/deferred_load_recovery.dart",
+      "sha256": "4340f1efd887f9602683dfc9bc4ab68e28ae3651ef085419f4091469210b611d"
+    },
+    {
+      "path": "lib/Utils/deferred_load_recovery_contract.dart",
+      "sha256": "bd448a0d902c3ca91d38f976004a88bafd0118b72c1b25680b5fad2601812682"
+    },
+    {
+      "path": "lib/Utils/deferred_load_recovery_stub.dart",
+      "sha256": "9847a0b8d5ea4b6b728441a44f8a9e832552aa3e3ac015403a444415870adfb7"
+    },
+    {
+      "path": "lib/Utils/deferred_load_recovery_web.dart",
+      "sha256": "3c06f12b1844a98a2216672c507c7704934edead543bf2b35c6cb9c603209078"
+    },
+    {
+      "path": "lib/Utils/dimensions.dart",
+      "sha256": "c760ce49e9e83351409aac2d3e1c89e7cced5e8e1b99bd414535b7232976e9f1"
+    },
+    {
+      "path": "lib/Utils/emulator_config.dart",
+      "sha256": "a58549185d96cc56ac8d5278a5d18f9477f8289a6736b2184516694036800d7e"
+    },
+    {
+      "path": "lib/Utils/error_boundary.dart",
+      "sha256": "4bc771e46d7d9df1ff1231c5387ccdcc185599f0568d3c1e9d5cd05b00189564"
+    },
+    {
+      "path": "lib/Utils/error_handler.dart",
+      "sha256": "87f2801d26b543cab9b99267a2cc345bf780371410db9fd59e032faac056be89"
+    },
+    {
+      "path": "lib/Utils/firebase_retry_helper.dart",
+      "sha256": "a250e48bb453924a4b046d980bc817f9dd795c5b58eff36275ceba9c2912dc50"
+    },
+    {
+      "path": "lib/Utils/full_screen_image_viewer.dart",
+      "sha256": "c9245e3180ca0b74e9454f8671223fcd3625a17b8af176e803e6cbc700df6c80"
+    },
+    {
+      "path": "lib/Utils/geocoding_compat.dart",
+      "sha256": "8b9e7a56418b51443eb27e4f600002461dd6a6d7d97077c5bf2d9c0181cacab0"
+    },
+    {
+      "path": "lib/Utils/google_maps_bootstrap.dart",
+      "sha256": "27579dade543f6166bcb4af6195ca45ef5a77829c446cb67b0edaf83826b0b84"
+    },
+    {
+      "path": "lib/Utils/google_maps_bootstrap_stub.dart",
+      "sha256": "da729e3c8b4c32e9dbf63570dd7ab9eb3ca2dcf69cf3f5614ba031016955f898"
+    },
+    {
+      "path": "lib/Utils/google_maps_bootstrap_web.dart",
+      "sha256": "4ea8282b2ffbdb0f9f74d9007b50a6db6deec8f826df209e504352cfab85e943"
+    },
+    {
+      "path": "lib/Utils/images.dart",
+      "sha256": "46133aca12d27905bd984371bf5c62db31c201a8b0e766f6ecd4b56051a09da0"
+    },
+    {
+      "path": "lib/Utils/location_helper.dart",
+      "sha256": "0f6358befd4afbdf58b3a195be88c965532d1ba2fd82ca8cb85c05f6ebe056de"
+    },
+    {
+      "path": "lib/Utils/logger.dart",
+      "sha256": "3a2e7a0454c1f206cbff05eb1efc91dac6b8427319670f5721cb90d4573f7b01"
+    },
+    {
+      "path": "lib/Utils/navigation_helper.dart",
+      "sha256": "22088837f8d3fc29dfd326be534ec4ea9d11964e5606866e67965216941645f1"
+    },
+    {
+      "path": "lib/Utils/performance_config.dart",
+      "sha256": "c2669e5c82a190e99971d78f59ea5e1c02bf94839636b6e376351cd714d45d02"
+    },
+    {
+      "path": "lib/Utils/performance_monitor.dart",
+      "sha256": "6ade0d1da37f6eac8f1ad26f7338e4035519f406d8d93cf92f7b596732af919f"
+    },
+    {
+      "path": "lib/Utils/platform_helper.dart",
+      "sha256": "1353b8d6517d707420553b36fc67e260c11a5d689af7b2e4a025aff4ca0f0c26"
+    },
+    {
+      "path": "lib/Utils/profile_diagnostics.dart",
+      "sha256": "965f0d7897ee1fed57d7faadf4cb25df85b6c9ef14bbabc768a83679389a8b41"
+    },
+    {
+      "path": "lib/Utils/qr_debug_helper.dart",
+      "sha256": "2b85b6a7a53df7722dbec1ca37e2825e2755c0dfcd53970d8e22fafdee087187"
+    },
+    {
+      "path": "lib/Utils/responsive_helper.dart",
+      "sha256": "d1ecba568427b41d89bce211f0ae75c747764ba6816d643a4f4c9dd8efbdc9e4"
+    },
+    {
+      "path": "lib/Utils/responsive_test_helper.dart",
+      "sha256": "7b0cc7e1dc67ab963e897833b415cce4b715999caeb143c0f8af97dc96c05ba8"
+    },
+    {
+      "path": "lib/Utils/route_builder.dart",
+      "sha256": "26292590d7e7588dc9a9405f950149a447e3d8967127b0d37c258132ff832947"
+    },
+    {
+      "path": "lib/Utils/route_names.dart",
+      "sha256": "59fa15c68f86d727bc5a9383f8317758b393ee3be0bce98d115948b0fcda6f6f"
+    },
+    {
+      "path": "lib/Utils/router.dart",
+      "sha256": "95151ea0565970dc906f762c6ca6fc6c01cb23d8ef91801703df08a8c09df6a6"
+    },
+    {
+      "path": "lib/Utils/text_fields.dart",
+      "sha256": "516668f6b8fda10f820d59b2d0767fbab1d426cb08a58d8fb216a2048968bd15"
+    },
+    {
+      "path": "lib/Utils/theme_provider.dart",
+      "sha256": "603feb72fe25824734835db0249ebf9619ad33896e14ea8f7544cfe6204f4287"
+    },
+    {
+      "path": "lib/Utils/toast.dart",
+      "sha256": "9e1bbc0f0a875fae94e35cba669af582dd95feded76242b5876c9028e1d17ae0"
+    },
+    {
+      "path": "lib/Utils/web_view_page.dart",
+      "sha256": "099b4c20e50e9fa609a2bcadf47b515bd5943ede726526f5b62a9a19d9c72114"
+    },
+    {
+      "path": "lib/config/safety_flags.dart",
+      "sha256": "20841926f6c5f726aed45948fa270f37e8fc7cfc7248a2139e05271b75aba8c8"
+    },
+    {
+      "path": "lib/controller/customer_controller.dart",
+      "sha256": "af22b7005b6e6770d4b9385bb00f2ca5c655f67cbddbe421a4e8453db7e4e1ee"
+    },
+    {
+      "path": "lib/data/us_cities.dart",
+      "sha256": "9fef5f2983c25ea517ed7d40d6ef1c3947f04dde5eb5d5b8f7710f14671048aa"
+    },
+    {
+      "path": "lib/firebase/ai_analytics_helper.dart",
+      "sha256": "58690dc1e96d16d0477eb91c79c304fe5212be4f4d515e523c513052aeb837b6"
+    },
+    {
+      "path": "lib/firebase/dwell_time_tracker.dart",
+      "sha256": "54dcb7dbc0267a5b90c4811f5bb05ae8d721c1b489e940d1578dfe27034c6345"
+    },
+    {
+      "path": "lib/firebase/engagement_predictor.dart",
+      "sha256": "add814b9532c24f3e15967ae5840dccc3cb0cab539293614c01a42c487163fd6"
+    },
+    {
+      "path": "lib/firebase/event_recommendation_helper.dart",
+      "sha256": "4f3df5607d01a1ed15c2f1e0d21dab7ceffd497ed8a497b9f7e6ba031739a6f8"
+    },
+    {
+      "path": "lib/firebase/firebase_firestore_helper.dart",
+      "sha256": "d08fbc839122be64e426896ac45c3a4f064c8835928d1d27e025a1f2ce312eec"
+    },
+    {
+      "path": "lib/firebase/firebase_google_auth_helper.dart",
+      "sha256": "261d7f60c48b7b4b1e65ef810f77d9a4a5abdb304b8f45214af9fc91f6b72ebd"
+    },
+    {
+      "path": "lib/firebase/firebase_messaging_helper.dart",
+      "sha256": "0554e5e8b5125fa2aed933ffd36a3d7a7445f9c81338560a969e68ceaf397b49"
+    },
+    {
+      "path": "lib/firebase/firebase_storage_helper.dart",
+      "sha256": "ca772afcc161841346c860868517c4ef164c484ae88b443bc65affdb69ed3096"
+    },
+    {
+      "path": "lib/firebase/optimized_firestore_helper.dart",
+      "sha256": "c8135ff12d972e47fde411ac99589e5a7647541b7e6a254a1d691d1b774caef5"
+    },
+    {
+      "path": "lib/firebase/organization_helper.dart",
+      "sha256": "81ae888fee0968d3b986c0df724e8f53a02f299a2da8ea5046e282352bab728d"
+    },
+    {
+      "path": "lib/firebase/recommendation_analytics.dart",
+      "sha256": "36a32daa601fd7ecc022471a2d60768aaf911ae4b352ae8b756bd55d619cdde6"
+    },
+    {
+      "path": "lib/firebase_options.dart",
+      "sha256": "b033d8c7e06110c4b9355b213abce25955612bfd1536fb3fc49ca8573b1b119d"
+    },
+    {
+      "path": "lib/l10n/app_en.arb",
+      "sha256": "23765ec3c5674960d021993f515e6a24a60de4ea242ceefbed3f6cf164ed32d7"
+    },
+    {
+      "path": "lib/l10n/app_localizations.dart",
+      "sha256": "a836cf387af08160d10ee7380b6584b9d3fd80247b44dddbb32b2ec4f02c2b9d"
+    },
+    {
+      "path": "lib/l10n/app_localizations_en.dart",
+      "sha256": "c97ff6eb7871b1e2838a1be9dc03a0db3e62bafb8d328bcefbcd5e2e697cd627"
+    },
+    {
+      "path": "lib/main.dart",
+      "sha256": "cc795fb0828e06a459e598bb67c3ac5b77be772f462e65109f9f5c7f3954b085"
+    },
+    {
+      "path": "lib/models/app_feedback_model.dart",
+      "sha256": "46284f23f91ca84567b032a9e59cd447b7d36adca32192068d74175892dac3f3"
+    },
+    {
+      "path": "lib/models/attendance_model.dart",
+      "sha256": "00197f1c6a2778fd33b4df7dfd490ded3634b7307e873dcad1015369634b0ad1"
+    },
+    {
+      "path": "lib/models/badge_model.dart",
+      "sha256": "9de36a3e8221a71afe52b7b4ddfe2d94463e82d5f1a57889736d03d480fdebbd"
+    },
+    {
+      "path": "lib/models/check_in_policy.dart",
+      "sha256": "2bfd5469df284f5981d347bdc8a0374ea5d7b43bd8445c28b9b7a77ddcf18cac"
+    },
+    {
+      "path": "lib/models/check_in_session.dart",
+      "sha256": "7ed2b14928ed9bc7d0c4ccdee62a40be1ebba890768124009f2e9f2d75583b22"
+    },
+    {
+      "path": "lib/models/comment_model.dart",
+      "sha256": "9ea839b651370a51079886ce9d9f5b67fec1d6d0023382b12743d8296a766abf"
+    },
+    {
+      "path": "lib/models/customer_model.dart",
+      "sha256": "8ba65219e135e41747fe3ab0dd26160571ec3cfab1948fac4a19a3eee8695648"
+    },
+    {
+      "path": "lib/models/discovery_category.dart",
+      "sha256": "3c0717e1b402f49dc4e1b4bd8b1a7427f77444296f27bc6f209f02acbebf15b1"
+    },
+    {
+      "path": "lib/models/discovery_marketplace.dart",
+      "sha256": "e76f05eb455c0d94ed4117c2cdea0e40f4fd44107791429a193b7245ecefe57f"
+    },
+    {
+      "path": "lib/models/event_feedback_model.dart",
+      "sha256": "fa37de8c173a4990dcdcbebb9eaada3ec814ef2fe190f5172c71b473c9251bfa"
+    },
+    {
+      "path": "lib/models/event_model.dart",
+      "sha256": "19a343e7b5681efcc9e36d3e03a17e50b2b97430da1d365370b1558c7c83f5dd"
+    },
+    {
+      "path": "lib/models/event_question_model.dart",
+      "sha256": "ed660c1de8810443b751bb2a9ac4dd4cda8ec31a154433c0c0deb9448d62e93a"
+    },
+    {
+      "path": "lib/models/event_schedule.dart",
+      "sha256": "add39e9206c7b182fa5e64971122db0ef6a610a96410cdfe773ba1b912d47ba1"
+    },
+    {
+      "path": "lib/models/event_wizard_model.dart",
+      "sha256": "03f86f583c3435f777d45c2b06d551b22d12b4602d1e6eb5b824b9c496b73cdf"
+    },
+    {
+      "path": "lib/models/live_quiz_model.dart",
+      "sha256": "805d7994d4aa275f79e5adc25b5a0f7a46e78bc7fe27bccb5fbcb0ae69c49847"
+    },
+    {
+      "path": "lib/models/message_model.dart",
+      "sha256": "41b6e62683ab6face3f0019ddbb375385eae6c5cab2f6071cc8c7b6d0dc6dee6"
+    },
+    {
+      "path": "lib/models/notification_model.dart",
+      "sha256": "bf9d2fe6ab0edadaf50ee25baecb9fa6cd1474049ee1b52c60c2328faa26fece"
+    },
+    {
+      "path": "lib/models/organization_membership_model.dart",
+      "sha256": "cc769f3a67edfb287895c7a39d37f9649ad8084d738027271100a86a1a382a72"
+    },
+    {
+      "path": "lib/models/organization_model.dart",
+      "sha256": "48e7102d6a2497343cde1992979ffcabcf530a409771ed652540e51db2ea19d7"
+    },
+    {
+      "path": "lib/models/payment_model.dart",
+      "sha256": "a3f5aecfb3559823b0875a4b7b51542b67e9c0b5293f8a61bee20e0e174012bf"
+    },
+    {
+      "path": "lib/models/quiz_participant_model.dart",
+      "sha256": "c2aa6f452d38e0017001d84031c76e71d81ce89ff4ea8497e977591925962ae9"
+    },
+    {
+      "path": "lib/models/quiz_question_model.dart",
+      "sha256": "c43bef078a20bf9a604d190c56b8285c459f7fe0535996f472643d1c8209558a"
+    },
+    {
+      "path": "lib/models/quiz_response_model.dart",
+      "sha256": "7b6bce6ee19270d03e786f397e0e6c902625fa97f9581d674671d2f0598cd1f1"
+    },
+    {
+      "path": "lib/models/route_config.dart",
+      "sha256": "8040050722c8f515b065bada9af0134778294ed737bd8788960e93c4b9367f1e"
+    },
+    {
+      "path": "lib/models/subscription_model.dart",
+      "sha256": "7b171b3ed53878496709cc75d0a3f6ab16cacbd3aa2e99d7558df32b96e7b449"
+    },
+    {
+      "path": "lib/models/ticket_model.dart",
+      "sha256": "2e88f420f0f9b326a8e1d00fc73eb908e1d5595fcc87edf6f136d2798b2acd12"
+    },
+    {
+      "path": "lib/models/ticket_payment_model.dart",
+      "sha256": "c64d4b10630d24627976561c9312cf7fcdeb7b3c89d1e38d2335e5866e5d53e4"
+    },
+    {
+      "path": "lib/screens/Authentication/create_account/create_account_data.dart",
+      "sha256": "dfb85c59f0d1071fb82ea0015c18974083423c81d5c550fa28a66849a4dddca1"
+    },
+    {
+      "path": "lib/screens/Authentication/create_account/create_account_screen.dart",
+      "sha256": "58c9fa95b2e6777936d336a0936e7bc2ddfa9ad5fc29f6eae93c9cae9cc2c638"
+    },
+    {
+      "path": "lib/screens/Authentication/create_account/create_account_view_model.dart",
+      "sha256": "5963f353a7309a1856864608f1862435a29de3cc6babf89c5feae198e03d6a99"
+    },
+    {
+      "path": "lib/screens/Authentication/create_account/dob_input.dart",
+      "sha256": "e90164bcc0d943ab8ca1f8b0a47907dfaf9ad831f44dc3a2e8bc517c24ce29fa"
+    },
+    {
+      "path": "lib/screens/Authentication/create_account/steps/step_basic_info.dart",
+      "sha256": "94f35a5e103e65a357b7bdef96b07d6d1819b81943e2a7a3b0012ecd3596efff"
+    },
+    {
+      "path": "lib/screens/Authentication/create_account/steps/step_contacts.dart",
+      "sha256": "742c13808c57b49170518dec0cc2a3873083c7d552dcb393336b577ab1f9c341"
+    },
+    {
+      "path": "lib/screens/Authentication/create_account/steps/step_password.dart",
+      "sha256": "a2e4386763653666abf9da40630dd1d68fb479237e938151fe3e23cefd8bb703"
+    },
+    {
+      "path": "lib/screens/Authentication/create_account/steps/step_professional_info.dart",
+      "sha256": "48b08687aa450ef4eb43b2bca78ac1fdbe4bc38de2c4c68969cee0b6a25b65b4"
+    },
+    {
+      "path": "lib/screens/Authentication/create_account/steps/step_profile_photo.dart",
+      "sha256": "2f5e99dd88645a3f44a945a9869563c0de6ee3f3b390a3bf57fe26d4051e99ee"
+    },
+    {
+      "path": "lib/screens/Authentication/create_account/suggested_contacts_screen.dart",
+      "sha256": "4cb42bac4579f8549be76a8b26c75843a5063dea7787f01f275e922cbe4a0da0"
+    },
+    {
+      "path": "lib/screens/Authentication/forgot_password_screen.dart",
+      "sha256": "d855e4c116fefcd966e4ce0c2367d5581bb1d964ae425f5b98c3db8e8c0b57a3"
+    },
+    {
+      "path": "lib/screens/Authentication/login_screen.dart",
+      "sha256": "760d974fbad3da30997a86f7d657b03ec27b9a1c58e4ace91a7f3d9634d86df2"
+    },
+    {
+      "path": "lib/screens/Events/Attendance/attendance_history_screen.dart",
+      "sha256": "4393b6cccc5cd2b2f3bf3effd8349f0872f34a8fcff6ac706e82ce979c17aca2"
+    },
+    {
+      "path": "lib/screens/Events/Attendance/attendance_sheet_screen.dart",
+      "sha256": "e7c433ff85c2313bc70758fa7e545784756faf15853bf9bf1ae4026b8501ef1e"
+    },
+    {
+      "path": "lib/screens/Events/Attendance/attendance_wallet_pass_screen.dart",
+      "sha256": "da440a2a7c49a2bfc31541d08f6469036ef598590c1f6cc30b0f5bfba29f49fc"
+    },
+    {
+      "path": "lib/screens/Events/Attendance/check_in_console_screen.dart",
+      "sha256": "6c4f6da47aec3e9bc4dc82ca75ee9c711a9e7d86c380047cef346539b28ed6a6"
+    },
+    {
+      "path": "lib/screens/Events/Attendance/personal_attendance_pass_screen.dart",
+      "sha256": "834343729e4b0d6cba9b6b111693e9a68a5e0d979b46450911f4022a447e7046"
+    },
+    {
+      "path": "lib/screens/Events/Widget/access_list_management_widget.dart",
+      "sha256": "908a735093bcf3ed1ab39bcd7b5994c6228343686652d3cef841193d844b0a4b"
+    },
+    {
+      "path": "lib/screens/Events/Widget/add_question_popup.dart",
+      "sha256": "b8b7204989939f39e0f23e3ec2f33c05bb3721a2f022ddfa2b919fd1140093a5"
+    },
+    {
+      "path": "lib/screens/Events/Widget/arrival_profile_selector.dart",
+      "sha256": "652d112c633ad248761db1b99f4fade4c9e097524516cb789033b59847719b25"
+    },
+    {
+      "path": "lib/screens/Events/Widget/attendance_answers_popup.dart",
+      "sha256": "4397aeab712bf0d154f116ec688b03ad7409f3fd83fdbfac1f4087b5c277d65d"
+    },
+    {
+      "path": "lib/screens/Events/Widget/attendees_horizontal_list.dart",
+      "sha256": "d1e8ab9717d2030ac35904db61f07c145afe3b7420576f407554ebcc2d7d6684"
+    },
+    {
+      "path": "lib/screens/Events/Widget/co_host_management_widget.dart",
+      "sha256": "03093e469aa39346a16738472ab3319ff7d3284a21b94850e46026043caacea8"
+    },
+    {
+      "path": "lib/screens/Events/Widget/comments_section.dart",
+      "sha256": "596d0d72dfa7204143913258b98979c069223ab3775d5d47dc02f7f8024ff161"
+    },
+    {
+      "path": "lib/screens/Events/Widget/delete_event_dialogue.dart",
+      "sha256": "d5dcd98f6ca8cbb32661dbea62edefc45e9abdbe7f0fb580a94b463e4737b070"
+    },
+    {
+      "path": "lib/screens/Events/Widget/pre_registered_horizontal_list.dart",
+      "sha256": "60586c7fda0ac56484e85caeaf78aae51655abfa3a6561b1cb71fb9736167d80"
+    },
+    {
+      "path": "lib/screens/Events/Widget/qr_dialogue.dart",
+      "sha256": "d69271c53195a954136d0df8053ddd0a627c7afbfd1e89e31a7ee138e9830d73"
+    },
+    {
+      "path": "lib/screens/Events/Widget/sign_in_methods_display.dart",
+      "sha256": "0f8a1a88369619faac005321c43286d686325cd93094c4bd5cd1727d79795068"
+    },
+    {
+      "path": "lib/screens/Events/Widget/sign_in_methods_selector.dart",
+      "sha256": "4481973488b7de38254b01b67af49ebb9fce3fa341390fb8d665d5fafa2a4c6e"
+    },
+    {
+      "path": "lib/screens/Events/Widget/sign_in_security_tier_selector.dart",
+      "sha256": "e9684b35ed71823573856d13e66be32bb03e25680011db62729f546202603f7a"
+    },
+    {
+      "path": "lib/screens/Events/Widget/single_event_list_view_item.dart",
+      "sha256": "fab4b2774f5cdaa525c30fa9529c44262d84e437f543d82ccd99d5d5b46d9ccb"
+    },
+    {
+      "path": "lib/screens/Events/add_questions_prompt_screen.dart",
+      "sha256": "6ae884680396d8277beeb6f3f027cd2f81caa354f08f99e9bf5af3ca045c9a72"
+    },
+    {
+      "path": "lib/screens/Events/add_questions_to_event_screen.dart",
+      "sha256": "8c3871635edb4728c363c796989b6df5fa6e0cf23e37e2d6813362e9abf8ab94"
+    },
+    {
+      "path": "lib/screens/Events/all_attendees_screen.dart",
+      "sha256": "7dab25f4a6b688e8d954adc5618e3f8ae947d7ea77dc8310800ba8cdc3d0f3d9"
+    },
+    {
+      "path": "lib/screens/Events/chose_location_in_map_screen.dart",
+      "sha256": "6696b17f0ed535c279d618cb9f213917263c34f37a9a36a43e1d4c68d17cdc70"
+    },
+    {
+      "path": "lib/screens/Events/chose_sign_in_methods_screen.dart",
+      "sha256": "c2254eb77aa250670fcea60882c6ee97d88966c1911c8e105056fa3b1e5270f3"
+    },
+    {
+      "path": "lib/screens/Events/create_event_screen.dart",
+      "sha256": "b10e8f72f45008d6044209cd338339f930b73dfbb2d0a37a8a14530a30e3726f"
+    },
+    {
+      "path": "lib/screens/Events/edit_event_screen.dart",
+      "sha256": "50d7fdc082d03a67c766babbb8e1cb1f8a96af89a9f911e82507d00910e58e2f"
+    },
+    {
+      "path": "lib/screens/Events/event_analytics_screen.dart",
+      "sha256": "e954ec79d61b50ee0061a7be0cb111eb2075cf1cf9c74ce7f25c241e053fea7e"
+    },
+    {
+      "path": "lib/screens/Events/event_creation_wizard_screen.dart",
+      "sha256": "519db4ee7587235f674fcdc0f75e0743aa8966ad363ff21930e3c8055c334677"
+    },
+    {
+      "path": "lib/screens/Events/event_feedback_management_screen.dart",
+      "sha256": "81a29ee847105b98473c36004213896966a9ac16acf55878a73be076e61ad328"
+    },
+    {
+      "path": "lib/screens/Events/event_feedback_screen.dart",
+      "sha256": "b2bac1e73bbfe66adec74208b4fd5735d51e48c80e75aab69c0fdf1b11c7ed3e"
+    },
+    {
+      "path": "lib/screens/Events/event_location_view_screen.dart",
+      "sha256": "05adc3d1fc9a75c13e3818520f1c6f3749a2c22085eae177abd9cbebd0aad4f9"
+    },
+    {
+      "path": "lib/screens/Events/feature_event_screen.dart",
+      "sha256": "483e6cbbc45a703b70cb1063d5e41faf21dd9e89bf55d5120e726552b54b9a43"
+    },
+    {
+      "path": "lib/screens/Events/geofence_setup_screen.dart",
+      "sha256": "b8fae7085d78e18c1ab48c8197978feec4a05d8112878c10c071ee1eea026be5"
+    },
+    {
+      "path": "lib/screens/Events/global_events_map_screen.dart",
+      "sha256": "5da054b44b33c0260b303a21ee4da4d5106b625962148b3d6b01b8878dfab1fc"
+    },
+    {
+      "path": "lib/screens/Events/location_picker_screen.dart",
+      "sha256": "c492b5aecb65b224c8b5035cc8c165b027eb897bc007a1be7efd7f4b40fe004f"
+    },
+    {
+      "path": "lib/screens/Events/premium_event_creation_wrapper.dart",
+      "sha256": "bd61429068ee7d959f08680a7d9a54eaa7fa76300cbb3cbc190e4fd0b11deb53"
+    },
+    {
+      "path": "lib/screens/Events/select_group_screen.dart",
+      "sha256": "303e7d5dbeedc04fb8647772e9999ff7c40c31deedc140e36f9b98c810ac310b"
+    },
+    {
+      "path": "lib/screens/Events/shared_event_screen.dart",
+      "sha256": "dfbe901a06eccbdb84725e25c87db6ff46c2a0885ef4c087905affa7ecc45066"
+    },
+    {
+      "path": "lib/screens/Events/single_event_screen.dart",
+      "sha256": "979173da62858017bc45a5190550f3facabd4f5c8948c0d4adc3fec501c82a04"
+    },
+    {
+      "path": "lib/screens/Events/ticket_management_screen.dart",
+      "sha256": "f63a36835483c4cd75e42eae72c07c77463be47884b863dd83520fc0e28672c1"
+    },
+    {
+      "path": "lib/screens/Events/ticket_revenue_screen.dart",
+      "sha256": "97c47fd5527ecf542c82fd0a5182280d5b2c65525fd8ac44a04cb05da3113f23"
+    },
+    {
+      "path": "lib/screens/Events/ticket_scanner_screen.dart",
+      "sha256": "eeeead0e687e5c46f2ca0024413540629bfd29683cfe68adbd922e4c2208ea4c"
+    },
+    {
+      "path": "lib/screens/FaceRecognition/face_enrollment_screen.dart",
+      "sha256": "d0e37c13a23ef1ce1e313556eb44c2fa872ec9d9aad38d4e60016bb1eda8256a"
+    },
+    {
+      "path": "lib/screens/FaceRecognition/face_recognition_scanner_screen.dart",
+      "sha256": "2c7c9b934d32f723644e9337425756ea9c4dd8193a147d24fcc5780dc13b8909"
+    },
+    {
+      "path": "lib/screens/FaceRecognition/picture_face_enrollment_screen.dart",
+      "sha256": "e58b5695f717d7cf2ea0ea14be314fd38b3e1b3879f167c1e42d627dfc67227d"
+    },
+    {
+      "path": "lib/screens/FaceRecognition/picture_face_scanner_screen.dart",
+      "sha256": "2669c3e4907a5efa1f846075ac443a84e966e745442e8b63990b28f475f136d2"
+    },
+    {
+      "path": "lib/screens/FaceRecognition/simple_face_enrollment_screen.dart",
+      "sha256": "d12c08afa46b2f7fa32385c6a51215e42b060b31901bbc8efdd148925ecbff90"
+    },
+    {
+      "path": "lib/screens/Feedback/feedback_screen.dart",
+      "sha256": "32706dc3e8cb17d3c2d04a052d56009a53f6ca879f2bc35cb4e3d14a807d018b"
+    },
+    {
+      "path": "lib/screens/Groups/create_announcement_screen.dart",
+      "sha256": "c6e6543a323b6896bd0a542d6a82bed34039ef9fe5c08e4ba5d2ddbff3c6edc7"
+    },
+    {
+      "path": "lib/screens/Groups/create_group_screen.dart",
+      "sha256": "1fd8c41b006e4a9014f931714b11188f92c96fc894243b8590707677fed50f90"
+    },
+    {
+      "path": "lib/screens/Groups/create_photo_post_screen.dart",
+      "sha256": "0ecb02a23db7807355e4a1a4ae15a6f989b17758d5579b3fede9c05bc3e38993"
+    },
+    {
+      "path": "lib/screens/Groups/create_poll_screen.dart",
+      "sha256": "c8a9e110e79983328a431f182bbf4c8251106491b5a8d3e50b8b7f255e8f22d7"
+    },
+    {
+      "path": "lib/screens/Groups/edit_event_settings_screen.dart",
+      "sha256": "7d8321ca80ffd10cc698b21d8789544ebe2afd4a9bbaee0bf544b45e487de064"
+    },
+    {
+      "path": "lib/screens/Groups/edit_group_details_screen.dart",
+      "sha256": "505303a733e7c4db6defa0ec49ec556e7d0cc43dca9bd865e38c8f9560ff6cfc"
+    },
+    {
+      "path": "lib/screens/Groups/enhanced_feed_tab.dart",
+      "sha256": "80ad6e4b7c1e639e3f47574ed69e8f2d469a6f828feba7b9f229a5519d275568"
+    },
+    {
+      "path": "lib/screens/Groups/group_admin_settings_screen.dart",
+      "sha256": "2027dc0f758010b26bd1cb632979b33d4afdaeed9823532d0d1ab8d5a109f6c6"
+    },
+    {
+      "path": "lib/screens/Groups/group_analytics_dashboard_screen.dart",
+      "sha256": "83602c5f5d060381db206b6bb72cd78165e3915b3c558dee8759abc4d7402213"
+    },
+    {
+      "path": "lib/screens/Groups/group_location_settings_screen.dart",
+      "sha256": "77e3c027fb8152fd4931189970b2d6ba61464d64efb63fab23adbd80c5686709"
+    },
+    {
+      "path": "lib/screens/Groups/group_profile_screen_v2.dart",
+      "sha256": "30966cc06a5f393bf4d2592fdcff1f1e3904fe1636a189910dc0681f8eb86104"
+    },
+    {
+      "path": "lib/screens/Groups/groups_list_screen.dart",
+      "sha256": "2bc4d30bca744e756e16801d3e7962009605e3e9c561e10349d3a76beea22171"
+    },
+    {
+      "path": "lib/screens/Groups/groups_screen.dart",
+      "sha256": "e62a75107aedc831e53441e564183a97d7b0ca6eb94950d744347501cae52912"
+    },
+    {
+      "path": "lib/screens/Groups/groups_tab.dart",
+      "sha256": "95fcb961e58ae41e19298f17bc39a9cc7bdb867dc6621a49cf03f3000e5ea137"
+    },
+    {
+      "path": "lib/screens/Groups/join_requests_screen.dart",
+      "sha256": "c6c276f8c1fb3d1aeef28fd5fdb0a18735c77cec6ecd0234a446dfdf31cc7007"
+    },
+    {
+      "path": "lib/screens/Groups/manage_feed_posts_screen.dart",
+      "sha256": "0b3dd251eadff4e941c8066188ebfa7594c886bf77b9699cd1e405938cea17b9"
+    },
+    {
+      "path": "lib/screens/Groups/manage_groups_screen.dart",
+      "sha256": "0cb224ca141f644b0be017ba27fe78d69928b2bd25b38b9f6c585d058a657e2b"
+    },
+    {
+      "path": "lib/screens/Groups/manage_members_screen.dart",
+      "sha256": "6d55585477f105b86a6cbb22877d924c348b3cbc4c421e16aa9ac6492eed7d8f"
+    },
+    {
+      "path": "lib/screens/Groups/pending_events_screen.dart",
+      "sha256": "333376d0ef70dcd056bf3100090ec14723a82613ab6b53f5393e5df230e7fcbf"
+    },
+    {
+      "path": "lib/screens/Groups/photo_comments_modal.dart",
+      "sha256": "4d149ef6f4f71b8d66af90ee501d528f227b22ad284ec7b8a344692722ab68ed"
+    },
+    {
+      "path": "lib/screens/Groups/photo_viewer_screen.dart",
+      "sha256": "9a25e8d854748aaa5cbc607dfc0b25fcd8340c638b9e63ba18b7cec1da1e0ca2"
+    },
+    {
+      "path": "lib/screens/Groups/post_comments_modal.dart",
+      "sha256": "32ec4e0e6240a1a810d6435b45f187eddd4b26ec274d1e516406fd4d9c6541f3"
+    },
+    {
+      "path": "lib/screens/Groups/role_permissions_screen.dart",
+      "sha256": "62c905133ff758876c40aebdbc1a42555b399799bfe81fb5ed681d81b94d4bf7"
+    },
+    {
+      "path": "lib/screens/Groups/shared_community_screen.dart",
+      "sha256": "caf59104c5ceda1dead21538ff40e4bd1a6426b493822f5b21aa1ea0e2a340cc"
+    },
+    {
+      "path": "lib/screens/Groups/widgets/event_card.dart",
+      "sha256": "d2a89c12b3a5051d0bf9d6a6b0e8a090be17bad56974599806d10a58ce7a6bec"
+    },
+    {
+      "path": "lib/screens/Home/about_us_screen.dart",
+      "sha256": "2b8c037b792d433b630a7ea66123cc5fe46c5efe115393be8c8d0cf8dfd5b2db"
+    },
+    {
+      "path": "lib/screens/Home/account_details_screen.dart",
+      "sha256": "f26fda9fe63bf6c95dcabe91c85cc472388c8540e3233399d9872d24897c03bd"
+    },
+    {
+      "path": "lib/screens/Home/account_details_screen_v2.dart",
+      "sha256": "37fc63c8db364b25c21488ea9908d11b77f60e825c69225973592f3029731d9b"
+    },
+    {
+      "path": "lib/screens/Home/analytics_dashboard_screen.dart",
+      "sha256": "070ded19966ad92a0186e19c87f3c3c659c3c8cf0a7fcb20f53ccee3905f9166"
+    },
+    {
+      "path": "lib/screens/Home/attendee_notification_screen.dart",
+      "sha256": "a0312ff764497a1d9077080f744e57d8de9ab52dab46fbbf878144b81ce080e2"
+    },
+    {
+      "path": "lib/screens/Home/blocked_users_screen.dart",
+      "sha256": "498bfa635b3efe61f66afca75e3fc6168d22a5a6200998ec492e248b8a6c3417"
+    },
+    {
+      "path": "lib/screens/Home/calendar_screen.dart",
+      "sha256": "57fb913b0e5c19029f53df57222090b78287dcf8a57f425bf3b8cf8d15fd6119"
+    },
+    {
+      "path": "lib/screens/Home/dashboard_screen.dart",
+      "sha256": "6305c414275157bef754df2ff106a611c77c5bc3885a1bf83a86354b13fc8ba8"
+    },
+    {
+      "path": "lib/screens/Home/delete_account_screen.dart",
+      "sha256": "91711c7c5e6574c1b324822ba1f54ba2e63b39256cde38187c7a4b80acf2ca39"
+    },
+    {
+      "path": "lib/screens/Home/discovery_marketplace_view.dart",
+      "sha256": "0e0539b91805eff6a28d6b590b653962c96e7b45123c9c3c0794014084f1de33"
+    },
+    {
+      "path": "lib/screens/Home/help_screen.dart",
+      "sha256": "76f401bcd061432f4864495f0790c427f2bd1570eb9f0ac815cb6700d8b79beb"
+    },
+    {
+      "path": "lib/screens/Home/home_hub_screen.dart",
+      "sha256": "aec5e74212213fe41b6f83d9be00cdf0f6fe029e4ea5c6797ee8f9fb589fd933"
+    },
+    {
+      "path": "lib/screens/Home/home_screen.dart",
+      "sha256": "5361e3865c65b09accced6656965fb85fb68271fdf21b8f2007ae1442b028d7d"
+    },
+    {
+      "path": "lib/screens/Home/login_settings_screen.dart",
+      "sha256": "c15bcd26174c0929834cad35ab5fd0b1c4365bc5f2b571a9fba8bc172766584f"
+    },
+    {
+      "path": "lib/screens/Home/notification_settings_screen.dart",
+      "sha256": "479189a1ec9378b0042c51c341929d19a7c9ad0d54e0d4b5011d25cf51495c4a"
+    },
+    {
+      "path": "lib/screens/Home/notifications_screen.dart",
+      "sha256": "0ae59f39c3cae992fa3d8f67e20a89ab0fccb4c70fd46937a2a9fa0750d06513"
+    },
+    {
+      "path": "lib/screens/Home/search_screen.dart",
+      "sha256": "45bf18a721c40d339b18f7220ac988de987f4ca1cecad2434fbcf2bbca0c936d"
+    },
+    {
+      "path": "lib/screens/Home/settings_screen.dart",
+      "sha256": "6a0b48f916fbaa436a59fc3f12c1235f09b809e8bef7a7bb843ce7e798cbc42c"
+    },
+    {
+      "path": "lib/screens/Home/test_connectivity_screen.dart",
+      "sha256": "6020959cda6503c97cd7f3c1e42a1c9f81417b0eda54894ead767fbcabef57e9"
+    },
+    {
+      "path": "lib/screens/Legal/legal_document_layout.dart",
+      "sha256": "6e65b6e205b7723e8be990889536ce1e02b6a510600b34737620875a81f3eb69"
+    },
+    {
+      "path": "lib/screens/Legal/privacy_policy_screen.dart",
+      "sha256": "706e5a962036fe18e8644e0184e69430442ea617635f3283cb38a81385f08780"
+    },
+    {
+      "path": "lib/screens/Legal/terms_conditions_screen.dart",
+      "sha256": "c174fd2ccd35fa4494f66c5492271fccc136886324fb87e565caf78157c07edc"
+    },
+    {
+      "path": "lib/screens/LiveQuiz/quiz_builder_screen.dart",
+      "sha256": "255c0a044e7f4be7bb93307d42fe9f98898fc76d3130bdbeef8dcb838a7fa8c6"
+    },
+    {
+      "path": "lib/screens/LiveQuiz/quiz_host_screen.dart",
+      "sha256": "ead185df5c19fe5ca5030ae9fcf852538f260695c6aeccb5159b69531f81cb51"
+    },
+    {
+      "path": "lib/screens/LiveQuiz/quiz_participant_screen.dart",
+      "sha256": "beb85efed7cbdedf0efb237df236db6fc694e2e6d302fbee44d5eee53fdd8c0d"
+    },
+    {
+      "path": "lib/screens/LiveQuiz/widgets/live_leaderboard_widget.dart",
+      "sha256": "e78b0d9acb577cf12c98840a644a42bc43c1db9b9a0310a167d29af5dc9793e1"
+    },
+    {
+      "path": "lib/screens/LiveQuiz/widgets/quiz_waiting_lobby.dart",
+      "sha256": "fc35a030b61beb200f61101ede08a552e5d6963a27db50586201c957a915e474"
+    },
+    {
+      "path": "lib/screens/Messaging/chat_screen.dart",
+      "sha256": "74ca221ae9a41df48a72cc15dcba35c94317d121d113b8a00dcb4614e15fbc1f"
+    },
+    {
+      "path": "lib/screens/Messaging/messaging_screen.dart",
+      "sha256": "f446bf7919e73e6a2194e72bddbb96a183073cd69ad9153e3d919005f17f4234"
+    },
+    {
+      "path": "lib/screens/Messaging/new_message_screen.dart",
+      "sha256": "e9af58a56ec2c52d0bfb210847e8bf7480bd7534d5c90402db4d033f7241d757"
+    },
+    {
+      "path": "lib/screens/MyProfile/Widgets/compact_ticket_card.dart",
+      "sha256": "6728c026248c1db7ee54e26be02911140f1a9c34ae460801bc96282c5bc1fad6"
+    },
+    {
+      "path": "lib/screens/MyProfile/Widgets/gradient_mesh_painter.dart",
+      "sha256": "412143c34848e001674648290ce95a4211ab3641f0d678aa48ead8b88fcb9d00"
+    },
+    {
+      "path": "lib/screens/MyProfile/Widgets/perforated_edge_painter.dart",
+      "sha256": "54b7bacb1b976a03beada0b0b8e1c8e740367887fdc55174d961cafdf0b0a0ce"
+    },
+    {
+      "path": "lib/screens/MyProfile/Widgets/professional_badge_widget.dart",
+      "sha256": "18bbe88507e71439b34caba63f9f6c85265b7320b4f06def90d7740741f303b9"
+    },
+    {
+      "path": "lib/screens/MyProfile/Widgets/qr_code_modal.dart",
+      "sha256": "fcc7d0873cb34c8896bd5252a55062b41644e514b89f63efd77149b14c938cd3"
+    },
+    {
+      "path": "lib/screens/MyProfile/Widgets/realistic_ticket_card.dart",
+      "sha256": "ae889b294df6dcd9f00f8d2cbe433aee88b26182e0f6899891db53a1a9ffe9b5"
+    },
+    {
+      "path": "lib/screens/MyProfile/Widgets/security_pattern_painter.dart",
+      "sha256": "1261a4b9a82b5721705ba97877303754f4f25d8636946e72103e4043bd5a758c"
+    },
+    {
+      "path": "lib/screens/MyProfile/Widgets/ticket_corner_notch_clipper.dart",
+      "sha256": "9420ce57ecea2df0498241a57a139c33f712936c527b99b2636fefaf405bf6dd"
+    },
+    {
+      "path": "lib/screens/MyProfile/Widgets/ticket_shape_clipper.dart",
+      "sha256": "6eae54c3ccce65e06e203a007ce196840f24b44897be279e166768b330e0d9cf"
+    },
+    {
+      "path": "lib/screens/MyProfile/Widgets/ticket_stats_dashboard.dart",
+      "sha256": "a8fcb8ab2878aee17b03445e6a4854c2fe01ee799acdb9bad4e9dc8bee220197"
+    },
+    {
+      "path": "lib/screens/MyProfile/followers_following_screen.dart",
+      "sha256": "77e9b20f975cfdd81947612346f5227c99461011c5daede8f34009b63e05198c"
+    },
+    {
+      "path": "lib/screens/MyProfile/my_profile_screen.dart",
+      "sha256": "64d154ebb779e97aca8322faffb3557fa830cdfc6bfc6bb5124862435e2cd99b"
+    },
+    {
+      "path": "lib/screens/MyProfile/my_registrations_screen.dart",
+      "sha256": "64ceca5742c1091d4b99d1cbff015597c210d617ac97f6bc18d03a8b9a7fc4c8"
+    },
+    {
+      "path": "lib/screens/MyProfile/my_tickets_screen.dart",
+      "sha256": "57cc5502f1f8f1ff0bdbd3b8a6cf89278ab9e1bacfd620e1f85b8c633e2ba529"
+    },
+    {
+      "path": "lib/screens/MyProfile/user_profile_screen.dart",
+      "sha256": "55f8c9a7cbbb422de3c7e786b632e6d032ca19b63ded29d3db90bff2949e50f9"
+    },
+    {
+      "path": "lib/screens/Premium/premium_features_screen.dart",
+      "sha256": "19dc164352119075989043d2e0e46a0f6410166af46e1014f2e4f286b999684e"
+    },
+    {
+      "path": "lib/screens/Premium/premium_upgrade_screen.dart",
+      "sha256": "7670703708fe120c2baf755b9f514cfd1f1a5b81e80bb50d95db26b1d00acda8"
+    },
+    {
+      "path": "lib/screens/Premium/premium_upgrade_screen_v2.dart",
+      "sha256": "c2c9e6ec0a7e1dcd6be5728dd2effe244cbe7e4f69c924c2cb153545c4fa0c58"
+    },
+    {
+      "path": "lib/screens/Premium/subscription_management_screen.dart",
+      "sha256": "3bab972a1d637bc1884f8e377e88dbd379fb174b2bcfb64e462839ad67b512a7"
+    },
+    {
+      "path": "lib/screens/QRScanner/ans_questions_to_sign_in_event_screen.dart",
+      "sha256": "2103d98ff12c0c6cc37e689ae319e924cb534a89b67782ce9937efde5473c9eb"
+    },
+    {
+      "path": "lib/screens/QRScanner/modern_qr_scanner_screen.dart",
+      "sha256": "a02168d30e95db47bcfe4b1ab5d20c4893f71ed0e6d65a3df33be81b325fa590"
+    },
+    {
+      "path": "lib/screens/QRScanner/modern_sign_in_flow_screen.dart",
+      "sha256": "aa34d2650ca6e66ff613b77e3a27fff078b7e12270ee581cfca65816b4203147"
+    },
+    {
+      "path": "lib/screens/QRScanner/qr_code_generator_screen.dart",
+      "sha256": "8b63b62f04294e421f433c74da941101425fd503df36b1afea4531a906d5bf07"
+    },
+    {
+      "path": "lib/screens/QRScanner/qr_scanner_flow_screen.dart",
+      "sha256": "307a3a5115419e2ba5b4bc8c4da0357c787ea6ed5cc9b5fe6a07e164763e3ee1"
+    },
+    {
+      "path": "lib/screens/QRScanner/qr_scanner_screen.dart",
+      "sha256": "d9bd53e3e4febbc758287bb52cb1815839d0f414808e4e35807003993d438166"
+    },
+    {
+      "path": "lib/screens/QRScanner/qr_scanner_screen_for_loged_in.dart",
+      "sha256": "05284b349847c9371172a3eccea8182be0db61cc83c9388ab5b29c4c479eaf73"
+    },
+    {
+      "path": "lib/screens/QRScanner/qr_scanner_without_login_screen.dart",
+      "sha256": "e7a876b2ef8d4c35bb53b61275c22bb7057936d8031c15b1f2da6c30080ab22b"
+    },
+    {
+      "path": "lib/screens/Splash/Widgets/social_icons_view.dart",
+      "sha256": "af60a30565bd7519a5d894f98cb479e7893d76cdccc9707fa22d0377114c7dd8"
+    },
+    {
+      "path": "lib/screens/Splash/second_splash_screen.dart",
+      "sha256": "b7ca441f9ffc53bd6344c29817662a756ce8d90b6bd539281fa6d633eea87ba4"
+    },
+    {
+      "path": "lib/screens/Splash/splash_screen.dart",
+      "sha256": "1353588e011ed01d8e60153fe0c0e5b9384cb62e1d26437961939e438accae0c"
+    },
+    {
+      "path": "lib/widgets/account_required_sheet.dart",
+      "sha256": "f8eb05c93f43f39974f619c0b81f74df1488300eddb57741fff7083a78727fe2"
+    },
+    {
+      "path": "lib/widgets/app_bottom_navigation.dart",
+      "sha256": "7e4fa7ca85991d601811c1d302d78df3f7152900cecd7e3cd4874dc7f8c5cdd1"
+    },
+    {
+      "path": "lib/widgets/app_scaffold_wrapper.dart",
+      "sha256": "3e7a89ec24df3a3f4ba673a8634c20a8f790492b102c78e17f634e855f40272c"
+    },
+    {
+      "path": "lib/widgets/app_startup_gate.dart",
+      "sha256": "ac210cc15f242e72a0bf24aea62dd935ad865198a6579dc6c82f80573f5500e8"
+    },
+    {
+      "path": "lib/widgets/attendus_auth_layout.dart",
+      "sha256": "9eb400a7cb3d301f9c8c555c4a4fc18fe1df0d20655ddd59478f861c4f99c999"
+    },
+    {
+      "path": "lib/widgets/attendus_design_system.dart",
+      "sha256": "f792659a0ac7f773adeaa4a53ed0970218530102c4cd27c3fbaf9a99c8ceb300"
+    },
+    {
+      "path": "lib/widgets/attendus_scaffold.dart",
+      "sha256": "6b7ca9187282bf18d87365f4cc6c84963315d6fc7fbc5a041bd9c16d2e8b04ab"
+    },
+    {
+      "path": "lib/widgets/auth_gate.dart",
+      "sha256": "5a043ad49523999d50b1086d28c58bfe6c52a544c3ace69f2f6ddd07cff79273"
+    },
+    {
+      "path": "lib/widgets/create_button_with_limit.dart",
+      "sha256": "a28d763e3d210c63faa62a2fcf83514a2d003f33b15434219e832ac0758f2820"
+    },
+    {
+      "path": "lib/widgets/creation_limit_indicator.dart",
+      "sha256": "1f8953bbfb397d9e6dc34781ca82a3460d3ac55531887c44dd112cfdd0dbc44c"
+    },
+    {
+      "path": "lib/widgets/deferred_conversation_screen.dart",
+      "sha256": "e416c9e6bacb40c2fcb0ebc279283abe0d5d4d25ee0940cf54bb434b2e13eb05"
+    },
+    {
+      "path": "lib/widgets/deferred_premium_event_creation.dart",
+      "sha256": "8a5f06c989b69f65da5510704a3edcb21e7c967fb7203f59c0ff40abf41b2456"
+    },
+    {
+      "path": "lib/widgets/deferred_screen_loader.dart",
+      "sha256": "06d45a7a30aba5a86bae2ed1dc63700b6b912ae653031fb94de53d74936c5d9b"
+    },
+    {
+      "path": "lib/widgets/deferred_shared_community_screen.dart",
+      "sha256": "9f7e32f8648a363f68d209c7fc8aefe4ddf2cd26fc990f2aca793642216c5226"
+    },
+    {
+      "path": "lib/widgets/deferred_shared_event_screen.dart",
+      "sha256": "a131a133bb9613bd20a723634e72e4c6e674d3e61385b479c23744b30050009a"
+    },
+    {
+      "path": "lib/widgets/event_announcement_composer.dart",
+      "sha256": "ca8e92a1eda652bc9e724d2946159957b100e1628cfce25e1e908cf0f6b7314f"
+    },
+    {
+      "path": "lib/widgets/event_practical_details.dart",
+      "sha256": "7625ac0edfef5c8c7d9d223238952d58a4f0a5d31d3709a99ee5717732da5375"
+    },
+    {
+      "path": "lib/widgets/event_roster.dart",
+      "sha256": "58069efa4414bee65180fbd55fc504db9f3453d9335398f7165f481de5b25610"
+    },
+    {
+      "path": "lib/widgets/limit_reached_dialog.dart",
+      "sha256": "c7677587d93eb2d225b6c27560ae0b98617380206fcdf13af2c153c767196aa5"
+    },
+    {
+      "path": "lib/widgets/month_year_picker.dart",
+      "sha256": "61c617d41ed4a1d6789e99bb29866263c6bb62345c5828bdf0682af44104cae6"
+    },
+    {
+      "path": "lib/widgets/profile_safety_dialog.dart",
+      "sha256": "aee5f2243d84cc074b2aa3c93aac387f09335b6d4c62934649949d522f584361"
+    },
+    {
+      "path": "lib/widgets/public_events_error_state.dart",
+      "sha256": "5d365709674e4aee5984bfcbf99c9c651631f415c180ae64904712524ff3307e"
+    },
+    {
+      "path": "lib/widgets/public_registration_card.dart",
+      "sha256": "d2029479425f7ae37a08e4e19b8a864ac2eb9219d4be0c26a8f89e4f496aed03"
+    },
+    {
+      "path": "lib/widgets/smart_arrival_card.dart",
+      "sha256": "700bca1f1ad8eea55632b73f32d7762451f35e3245e0e9ae0b0e82a192383b3c"
+    },
+    {
+      "path": "lib/widgets/subscription_migration_dialog.dart",
+      "sha256": "fbd5660b3fe1cf2467667f48468d13945c7183f78efc4527315ef7d1c6522fd3"
+    },
+    {
+      "path": "lib/widgets/tier_comparison_widget.dart",
+      "sha256": "fb2bcc02afeb16bf65c132e3973d2fe54feef8af0f93db38c3213235cbee2315"
+    },
+    {
+      "path": "lib/widgets/upgrade_prompt_dialog.dart",
+      "sha256": "7109d390be7b597e0886b7172fcd5bbc096ba4d96b53169e7a2b4f8e18aa6eea"
+    },
+    {
+      "path": "linux/.gitignore",
+      "sha256": "5ded4f1a9d10d34bf6ee5beb0711d88ee2ef07b0f07ace9ed77935a246e8eb82"
+    },
+    {
+      "path": "linux/CMakeLists.txt",
+      "sha256": "4193217b6caa32fa09eb4f5f530c50902528f69665feffb9f29fb003424f5e36"
+    },
+    {
+      "path": "linux/flutter/CMakeLists.txt",
+      "sha256": "787189e2623313cfee590a0b553338eb9fc68b3af922ddd77c5d39c75f989aeb"
+    },
+    {
+      "path": "linux/flutter/generated_plugin_registrant.cc",
+      "sha256": "f6384ffd8c16f502d31568175cd5ab39ec5ac99aec6f46519c1041a3b68ec8dc"
+    },
+    {
+      "path": "linux/flutter/generated_plugin_registrant.h",
+      "sha256": "00f93bb5b1faefdede8f6065df327522900fb0b8efee86bacf424fd947ed14bb"
+    },
+    {
+      "path": "linux/flutter/generated_plugins.cmake",
+      "sha256": "3dec6dd57dfb22a58941c449091af62423be988fb5622263de73164fb0a60760"
+    },
+    {
+      "path": "linux/runner/CMakeLists.txt",
+      "sha256": "8cdcfd911e770fd7d511c97c7bce6559486a815352a47c953f7ef632e236d2cc"
+    },
+    {
+      "path": "linux/runner/main.cc",
+      "sha256": "ea23f7cdf74091d63bba29ef60486370b766157b848f0cfe62bd8b1c1695a0c1"
+    },
+    {
+      "path": "linux/runner/my_application.cc",
+      "sha256": "f4ceb8e367f476f07049272b5a2b4662f9dfab8f35eb89d32cc98f771c44e216"
+    },
+    {
+      "path": "linux/runner/my_application.h",
+      "sha256": "a044da4b485c93d0e1a79c62356b22c8856dd2bab537ffb6a9446fc905131316"
+    },
+    {
+      "path": "macos/.gitignore",
+      "sha256": "ffec1a0bbd70547186b82ad4e49089bafab2de309b89de97c776d70debb179fa"
+    },
+    {
+      "path": "macos/Flutter/Flutter-Debug.xcconfig",
+      "sha256": "802714a37a8fd3065fb3d8e21cbcfbb3147c7ad25f25934b64590085aa9f5b28"
+    },
+    {
+      "path": "macos/Flutter/Flutter-Release.xcconfig",
+      "sha256": "d575f436f8bab30d7096792396e73b65db242edc01913c4123d2c29e713b3a6d"
+    },
+    {
+      "path": "macos/Flutter/GeneratedPluginRegistrant.swift",
+      "sha256": "ce4dcc8f53f8da753c731badcc06c3b97403910bfd96611052b9059ea2dea82f"
+    },
+    {
+      "path": "macos/Podfile",
+      "sha256": "e85521f1c80ceaca2c2af8578c97857fc84f4c467514025c0b89bb55c0e8543a"
+    },
+    {
+      "path": "macos/Runner.xcodeproj/project.pbxproj",
+      "sha256": "beb3a39a008c2da45270e1c059da3754e4792b201c664c7b45581f2f9caf0ae6"
+    },
+    {
+      "path": "macos/Runner.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist",
+      "sha256": "dfa0f9bb85b95ccba9c6811adadf8cb407fb5d52088e89db83ebc308ec448542"
+    },
+    {
+      "path": "macos/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme",
+      "sha256": "5e3fad24b9e6cbcf621702f781c4649609755f564004e3ad9677b8f55e4d4d6e"
+    },
+    {
+      "path": "macos/Runner.xcworkspace/contents.xcworkspacedata",
+      "sha256": "46c3c9702ff7c5584e11c954d943cfb6e07fb26e3fbd072ddbc0f388aa352de1"
+    },
+    {
+      "path": "macos/Runner.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist",
+      "sha256": "dfa0f9bb85b95ccba9c6811adadf8cb407fb5d52088e89db83ebc308ec448542"
+    },
+    {
+      "path": "macos/Runner/AppDelegate.swift",
+      "sha256": "ce9dbe45a57c59e85519da50a26c471615b9c8cdd85a8f4a39d2e480e62a4af4"
+    },
+    {
+      "path": "macos/Runner/Assets.xcassets/AppIcon.appiconset/Contents.json",
+      "sha256": "bc6ba8105ca69651aeeb77358851590de295dca04681a1d58c0f449641c242f3"
+    },
+    {
+      "path": "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_1024.png",
+      "sha256": "6232e5815af17e25e0268b2fec7aea9e068cc92ec709e9605c2b31df4ff2a313"
+    },
+    {
+      "path": "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_128.png",
+      "sha256": "15591f03f31313af6fd644ed0512106cc04365130b8b73244f1cfa6dddfb4400"
+    },
+    {
+      "path": "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_16.png",
+      "sha256": "cc6928b5adfc00dbf526192e2705dd9af641cdf20ab4c6c7ca7cd4936dca59f0"
+    },
+    {
+      "path": "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_256.png",
+      "sha256": "416efd77cde932d42ef34168da24dd428a495b1f4f34bbbd125a18d2add186a2"
+    },
+    {
+      "path": "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_32.png",
+      "sha256": "ae8c4458e41f1e28b1e851ed87d3268d4a0351ceea427fa2a84cc94ddfb6d4c5"
+    },
+    {
+      "path": "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png",
+      "sha256": "0a91c6c1bf242e54ee179e34629e9ef3e8a6d286c0fce01e302280a8be9277e6"
+    },
+    {
+      "path": "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_64.png",
+      "sha256": "6ad229623498e5f1277800db3ab7cb11faf85eb2569e1213f7d8e55003c07b42"
+    },
+    {
+      "path": "macos/Runner/Base.lproj/MainMenu.xib",
+      "sha256": "be9e9ef8469d3262370e0f0b855ed163cbf9c8362c59e330b2ffe63b86fa42f4"
+    },
+    {
+      "path": "macos/Runner/Configs/AppInfo.xcconfig",
+      "sha256": "2265e165d70203a6526d2b7c31096ab4dc2d7be03769128bad1c9d0fa934caa7"
+    },
+    {
+      "path": "macos/Runner/Configs/Debug.xcconfig",
+      "sha256": "8067d533ef6593760baad9a9855a786a7a77470fcc3f0925ec04fe43bc1ac4b0"
+    },
+    {
+      "path": "macos/Runner/Configs/Release.xcconfig",
+      "sha256": "7a6a4b4d973a23052fa0a0388dd261e32d311d7b66ba1bfc3b914b361808ac61"
+    },
+    {
+      "path": "macos/Runner/Configs/Warnings.xcconfig",
+      "sha256": "0e341a392b16ad302d12890aa3dac9257a6c10ece685437604259a85341645a3"
+    },
+    {
+      "path": "macos/Runner/DebugProfile.entitlements",
+      "sha256": "ebaab2b9992173de422c33e1fbab7f6e31acaa2213956097ac8cefd894a91ac8"
+    },
+    {
+      "path": "macos/Runner/Info.plist",
+      "sha256": "f253e89c512b3a9a81bc5cdd7a14bf932470f835f261654a808ea4549cd94aad"
+    },
+    {
+      "path": "macos/Runner/MainFlutterWindow.swift",
+      "sha256": "65c9613c11bcedfa51416b16c975d8ba6ff12b405fc19d60db8755d92e86d9fe"
+    },
+    {
+      "path": "macos/Runner/Release.entitlements",
+      "sha256": "b746c74b201e6af4e0864fbd1f4f629f96156a7ec4b7208bc995d0a5089bb592"
+    },
+    {
+      "path": "macos/RunnerTests/RunnerTests.swift",
+      "sha256": "6bc180bc77c7def7a21d197233e25dff42cc493ab9d294632edafc18fdf0ac44"
+    },
+    {
+      "path": "optimize_performance.sh",
+      "sha256": "1a9a2f72fa6874f2c0fc94e0febe35fdef22eed31d094a4ed2cbd29deb557762"
+    },
+    {
+      "path": "public/index.html",
+      "sha256": "87450c6144b6643b59c51c7b1bed29463e40d77027ebaafef2e2ce6e592e4fd5"
+    },
+    {
+      "path": "pubspec.yaml",
+      "sha256": "e91adefc1bfad0cf72800f86afa521fe675036fc138f8d5bbddbe321d6f7dda6"
+    },
+    {
+      "path": "replace_logo.sh",
+      "sha256": "5c8d4a98939591dc3a9801b16b3a85b368f716fe4cee6007161d0cc339b6b257"
+    },
+    {
+      "path": "router_fixed.dart",
+      "sha256": "92806d5b76256c68f1ad6856ec35500c824a7a9bc6be93cee2780cdadf62a42d"
+    },
+    {
+      "path": "run_app.sh",
+      "sha256": "8a7cd456b73a40fef65c29cd25eee0b343a7f46055bffa702381c4fedb8cca17"
+    },
+    {
+      "path": "run_face_enrollment_test.sh",
+      "sha256": "9833c34dae2717a917f68c3fe57479ee1ab5661c8fef23d897b40f6297cfe3ca"
+    },
+    {
+      "path": "scripts/build_admin_windows.ps1",
+      "sha256": "23ab69923f27eb2f1bebaa6a7c44cc4e6f71bb209ee349538b317781577c55be"
+    },
+    {
+      "path": "scripts/build_web_release.ps1",
+      "sha256": "7fd7c8f3ef41fb090e97b58d58d7461eabef1e630cd45b9bc88ca6dba440f8a1"
+    },
+    {
+      "path": "scripts/package_admin_msix.ps1",
+      "sha256": "7398fd60a6b8a3310c2ca56ca9b22899f9dbfc23665682f781f50c1ce3f70e9b"
+    },
+    {
+      "path": "scripts/requirements.txt",
+      "sha256": "2971c772513d4ad23196f17789f22e80806854adb6026ccabff3f3f7caffea1b"
+    },
+    {
+      "path": "scripts/setup_distilbert_onnx.py",
+      "sha256": "b49e1cb66648b5dd86069e0b1c902f017d77188f2546b15a83b49eed43f4d538"
+    },
+    {
+      "path": "scripts/update_subscription_price.dart",
+      "sha256": "bb4274fcabcded078fbd26efe084450651da4d5c98ee082b2305f0cc67a55cda"
+    },
+    {
+      "path": "setup_google_wallet.sh",
+      "sha256": "2451d44b4316530a8a77dfe2881d5508f0d3a6f8e108f31741fa97c73c0a014c"
+    },
+    {
+      "path": "storage.rules",
+      "sha256": "8ca7b7c8a0794f915cf36f847709b22677896806a533ab086cbeadb96804fe69"
+    },
+    {
+      "path": "studio.vmoptions",
+      "sha256": "242fc7bce6fbf208740538698af6a5ab706e2bd1a2dff5007baa5fd51b916f4f"
+    },
+    {
+      "path": "test/app_startup_gate_test.dart",
+      "sha256": "2ad2e8e49e47d6a16189f6e2cc5f35118e5bdc2ac16868f050322d1e8d7fb7cf"
+    },
+    {
+      "path": "test/attendance_check_in_service_test.dart",
+      "sha256": "5d8cd943e7d17459cd10e06c00370b558611dec8059fdcf045c9973cff4ed097"
+    },
+    {
+      "path": "test/attendance_offline_test.dart",
+      "sha256": "de272e86a95d2b3002415cfef44f51d5052d3b7f88711750abaa928925993e79"
+    },
+    {
+      "path": "test/attendus_design_system_test.dart",
+      "sha256": "c170be882f7bb3eb5c023e281ccabdf288793433473983367a29377c02936d3d"
+    },
+    {
+      "path": "test/attendus_scaffold_test.dart",
+      "sha256": "13273f7624d8d8a92f5ad8af29c4fe9f6e4f88b17331389871c62cea2f05ceeb"
+    },
+    {
+      "path": "test/auth_onboarding_smoke_test.dart",
+      "sha256": "3474b9cddbdb8bbb4e50ccb3e38002c85107d5ef488cb36812e95684c5ff38f2"
+    },
+    {
+      "path": "test/check_in_policy_test.dart",
+      "sha256": "4579b05c2c77a24c8a39fd132886b923b2b9a5d280b57a4fe02b3c98786d97f7"
+    },
+    {
+      "path": "test/community_share_service_test.dart",
+      "sha256": "65885394df387950c87c2fc344ec1c6c7b141244c975b5a052f643b15a0d0f26"
+    },
+    {
+      "path": "test/date_of_birth_input_test.dart",
+      "sha256": "60e4b2f37ec990709cefaa5f9f3b936c9743f427abb326c86896cfe7a96a8c81"
+    },
+    {
+      "path": "test/deferred_screen_loader_test.dart",
+      "sha256": "4abd7cf9890ad2dcb404d3701d8c3e844ae2238393f5adc89736a1e770952b57"
+    },
+    {
+      "path": "test/discover_mobile_scroll_test.dart",
+      "sha256": "03f6fdd183f83380be2a25dd3ecd7e06f4fae40446cc326d73a06be1e25b8805"
+    },
+    {
+      "path": "test/discovery_category_test.dart",
+      "sha256": "5621679a5d39478d81885d7846351c804312f555d50c4373afe68186bfd3c454"
+    },
+    {
+      "path": "test/discovery_rollback_test.dart",
+      "sha256": "8c75eecc7122654f0ca2c848dbb06d48837529608802b27f0acba6389ed0b3c6"
+    },
+    {
+      "path": "test/event_creation_entitlement_test.dart",
+      "sha256": "526c659e7641ec32a3ac74471e2244134a40ee7b24a881208358af17e7973086"
+    },
+    {
+      "path": "test/event_creation_smoke_test.dart",
+      "sha256": "450bf9f1b03a14cc05970b2b7bc8fbe2fb344d8fac8ac150eed1bbb7cf6dd337"
+    },
+    {
+      "path": "test/event_creation_wizard_test.dart",
+      "sha256": "3d8e139ac4f45dcb0c52306856f29ffc3a3bd50ae7d7904ad2f1f24ba99bbc5f"
+    },
+    {
+      "path": "test/event_image_test.dart",
+      "sha256": "995ecb662130e67c3bb4d03d0b47710630a79add25d1df732ff312901c992b63"
+    },
+    {
+      "path": "test/event_map_model_test.dart",
+      "sha256": "3ff02bd0822f3a575eceb2f74106d216220720c8dca0a1ff27809246fa1bd0f1"
+    },
+    {
+      "path": "test/event_schedule_test.dart",
+      "sha256": "a89407e24e38a0f88b4161f239e4a74578a66eaa86f4b956eecbb85ee26eea3c"
+    },
+    {
+      "path": "test/event_share_service_test.dart",
+      "sha256": "e296223201a6201875580ed17436c19f03f66be8bc7b161218a0ab2d919fb737"
+    },
+    {
+      "path": "test/event_summary_card_test.dart",
+      "sha256": "3a9f98aeeec84caf880fdeb6c7fe9fd84a8a911d791553bbe8690ad5e2ceacca"
+    },
+    {
+      "path": "test/event_wizard_model_test.dart",
+      "sha256": "d80b424123425e47887d98858a8f3bf7d6f5676083383b02ff8966eda393dbb2"
+    },
+    {
+      "path": "test/firebase/firebase_storage_helper_test.dart",
+      "sha256": "fa8978a324519c289c4a6d7172253ecec90942a3221de891ec8f421e66b49e56"
+    },
+    {
+      "path": "test/global_events_map_screen_test.dart",
+      "sha256": "1fdf8ff71d5e7481e2c33c3d26d34523582a8395027a5c9da54d45ca7bad4daa"
+    },
+    {
+      "path": "test/groups_community_smoke_test.dart",
+      "sha256": "9241d38fe1b668594efe4d7ea98bbcc534521f30af940a4b282c516dc80655b1"
+    },
+    {
+      "path": "test/guest_access_experience_test.dart",
+      "sha256": "af466158466b44d1217b83c6875d7f64e183e842498833b2e24e6135e4f06053"
+    },
+    {
+      "path": "test/guest_header_auth_test.dart",
+      "sha256": "906635ce71d406b94a248cb8df8f2d7104235cd84ddbed19291f551c7048d689"
+    },
+    {
+      "path": "test/legal_documents_test.dart",
+      "sha256": "1dd9d96c4ffa0f8b2923dbcacde265fb06794816bab39ba09daa297b9be299f3"
+    },
+    {
+      "path": "test/location_picker_screen_test.dart",
+      "sha256": "d282d35f6ffba54fe29740daae05042d71af01b6f80197ec0ebbf19c01370212"
+    },
+    {
+      "path": "test/logger_test.dart",
+      "sha256": "6e03b7d641e8a40d3b9b787cf9ee9a39ab0500f74f37d8c1a766a6d378d40f47"
+    },
+    {
+      "path": "test/messaging_feed_test.dart",
+      "sha256": "d832d4f983108870b967f64e14357f1b00cce368ed534e7701601a7a2f16c355"
+    },
+    {
+      "path": "test/messaging_link_test.dart",
+      "sha256": "b11350f91d1400de039df5104847da213a6e37fe78e5e3c1a30cee1d860467ed"
+    },
+    {
+      "path": "test/messaging_model_test.dart",
+      "sha256": "e97bd2967d5ec9d5818fedf87d552a74b9150404fd5e948c7fd6dabccabe239e"
+    },
+    {
+      "path": "test/onnx_nlp_test.dart",
+      "sha256": "496e3d7720fe6ef7bfe11eb8f13f576480536545050e7406e1168f7431f743f5"
+    },
+    {
+      "path": "test/profile_tickets_settings_smoke_test.dart",
+      "sha256": "782476fc884fb944beaa71eaa181f15b0f0c059354bfb4bda142fcd7475c8029"
+    },
+    {
+      "path": "test/public_events_error_state_test.dart",
+      "sha256": "a0a9386c8ceb716565d3c5fc2c049c1fd00091550207c3c930cf3bc4c69d2435"
+    },
+    {
+      "path": "test/public_events_repository_test.dart",
+      "sha256": "79081519794232da6afb36908420e3e0996cbb3cd06f3f974600963f927e37a2"
+    },
+    {
+      "path": "test/settings_navigation_test.dart",
+      "sha256": "15fa563c0e69292d202f316fd7f1a88f45ee32f99ce9500811350d0186df4a75"
+    },
+    {
+      "path": "test/smart_arrival_service_test.dart",
+      "sha256": "d6f830d56720f41419bda7993cc1b4749113f037ed9af2bbc55bbfda538289c8"
+    },
+    {
+      "path": "test/web/legacy_flutter_service_worker.js",
+      "sha256": "70dc81733b6f000601accbd3736cdca685bc58d00862e2dac21407d57e92c426"
+    },
+    {
+      "path": "test/web/legacy_worker_seed.html",
+      "sha256": "62eb2c1f2b433e26c258a25216df587983b3fe3cc62a5b2e6f0e340df4b76981"
+    },
+    {
+      "path": "test/web_bootstrap_cache_test.dart",
+      "sha256": "0185fb5966500731d669f327a34f3611ae31160293ffd3f239aeb1d77a7a5c75"
+    },
+    {
+      "path": "test/widget_test.dart",
+      "sha256": "02f19f2db932fecc002513e20ceff5b03425f6a8d1b3b4e5e946804363b82d82"
+    },
+    {
+      "path": "test_face_enrollment.sh",
+      "sha256": "2e4a28bbacbda27fe120264eb5cea4c6b83d19426130e0acf8559267d2dcd905"
+    },
+    {
+      "path": "tools/attendance-production-status.cjs",
+      "sha256": "beac098a3c5f0d38d73a4280c39ae56a6b3917acd34b311f2bffd433f4b533e0"
+    },
+    {
+      "path": "tools/backfill_organizations_lowercase.dart",
+      "sha256": "1ac2de3dc67516d93b1e3a9db6014bce0bef685b1f0d9168c6af771f72e28263"
+    },
+    {
+      "path": "tools/check_android_release_config.dart",
+      "sha256": "afcb3bb8254ad74811bd598a3f0719ad68a2bd25f5e063cfa9cb54a6c9f7db18"
+    },
+    {
+      "path": "tools/check_deferred_web_chunks.dart",
+      "sha256": "38a6b4da7398288804d165d5d16c1702b4c1058845085e75cff2e04d17a71dd5"
+    },
+    {
+      "path": "tools/check_discovery_category_catalog.js",
+      "sha256": "891de4c418e534175ff73ce80b20d58215ccc7b77d54f80533f1b5fe282e4f8a"
+    },
+    {
+      "path": "tools/check_discovery_category_catalog.test.js",
+      "sha256": "865fc6a46f211d03b96dffe2c3c3a178770898fae367ee6c9707ffe4a1076b15"
+    },
+    {
+      "path": "tools/check_firestore_query_contracts.js",
+      "sha256": "d58376d9a6004543b1a01227bba11aa6910dcbf780b8b15f4e94cee8e4f772a0"
+    },
+    {
+      "path": "tools/check_firestore_query_contracts.test.js",
+      "sha256": "f1f5042443268de8003b4b810f2354c849ea0fed38c8b3597fea36086f7a598a"
+    },
+    {
+      "path": "tools/check_function_manifest.js",
+      "sha256": "3b167a0db17084f779eefcb1c723402973ea558c9299e6d913ea3a3a04db54ed"
+    },
+    {
+      "path": "tools/check_function_manifest.test.js",
+      "sha256": "bba966805957fef7509b788a1f64e3045ec3810e17e48342289e8ab400641c2a"
+    },
+    {
+      "path": "tools/check_function_secrets.js",
+      "sha256": "6b364ce68bc68552b425f7a502f8756b165e71bb884660d47b7968585153a9cd"
+    },
+    {
+      "path": "tools/check_function_secrets.test.js",
+      "sha256": "383efd1be9b7c86c641c1a0babf75f224616b06149290d0fd398c52f3d662831"
+    },
+    {
+      "path": "tools/check_maps_web_key.dart",
+      "sha256": "ffce55b4d20ec9c5f5978cf792c8276d7615bbace901b196dd14c520b3808a95"
+    },
+    {
+      "path": "tools/check_public_web_contract.js",
+      "sha256": "b91825ac0cc44e624dd849f2b98b6bd445b9e69a4dfc8eec2a0dcc7b1eff1bce"
+    },
+    {
+      "path": "tools/check_public_web_contract.test.js",
+      "sha256": "595d48db3a81d58ab36744007deee65621237ef6ba90f73908b13eb4130d49f1"
+    },
+    {
+      "path": "tools/check_web_bundle_size.dart",
+      "sha256": "70d263d6a39ecc89de8b44956138125c75077052def7673b083902b3ae1826db"
+    },
+    {
+      "path": "tools/configure_web_environment.dart",
+      "sha256": "75ba5ebfb56bb0e0752e1b0313f665499a48375593dbc69048d399312c918842"
+    },
+    {
+      "path": "tools/event-lineup-20260926.cjs",
+      "sha256": "8c26efc5cac7a1eddd822ef981bb590c86b93b47902377e584fb0182d1d8c6c4"
+    },
+    {
+      "path": "tools/event-lineup-covers.json",
+      "sha256": "4dd1616e7ee76c04ef77806eefd7a1d9ec320889cd23e2be0f8a5eeb98b9cf7f"
+    },
+    {
+      "path": "tools/fingerprint_web_release.dart",
+      "sha256": "73d33091745742014729429e4d26ca36220d2aebc8f9760ef6fec5dd3a602d8a"
+    },
+    {
+      "path": "tools/firestore_query_contracts.js",
+      "sha256": "558c295b2337e9bb376ca55c3b786046be4fb48083d0860785776c4adc61765a"
+    },
+    {
+      "path": "tools/migrate_add_categories.dart",
+      "sha256": "641b1f546120a27ef8ec000ee99fcfaba2de051df1b73aded5938b6c0b91be50"
+    },
+    {
+      "path": "tools/package_web_release.dart",
+      "sha256": "824d72f1920766bf0ab5b203b958699520f1405dd5f8ffaf96de48adefd280b7"
+    },
+    {
+      "path": "tools/prepare_ios_release.py",
+      "sha256": "6d6d6861a2ae15c9b042df9194bbb51a09e0899bb9e8ff33212ec8e536cb70ed"
+    },
+    {
+      "path": "tools/prepare_mobile_associations.js",
+      "sha256": "cbc567f85943d86e9a37db7de31734dd37a54254f63fb08f1072c70ce298d511"
+    },
+    {
+      "path": "tools/retain_web_releases.dart",
+      "sha256": "076b084711af1da2c035b6b3370daccec80b82c284be33d3e8a96da893bb16fa"
+    },
+    {
+      "path": "tools/rollback-owner-event-lineup.cjs",
+      "sha256": "f1105f68b1e599c1c88bba8c05f5bd17990f6df86888f7906839704f7e141abf"
+    },
+    {
+      "path": "tools/seed-owner-event-lineup.cjs",
+      "sha256": "0c525fce0778ad784d1b9e233e433e282094230150e9191d81563b0461dd7aa7"
+    },
+    {
+      "path": "tools/setup_wif_github.sh",
+      "sha256": "7e9fb6e9d576f9cf818191b351a3b5b3faa7c017895969ece98e0a4f4f2ba91f"
+    },
+    {
+      "path": "tools/update_users.dart",
+      "sha256": "81c4f56297d1161e0c10b815563de3d9b5f51749215dbfc285d47bbd4e89a8af"
+    },
+    {
+      "path": "tools/verify_firestore_indexes.js",
+      "sha256": "798dbd08358a124e668670a4f9e505ac64f49074de9c5da3464430658db22a63"
+    },
+    {
+      "path": "tools/verify_firestore_indexes.test.js",
+      "sha256": "2d55c3f4e2d5b257fd0150cebb91d7f0a111b0be5264cffc5cf58dfe34d953e1"
+    },
+    {
+      "path": "verify_face_enrollment.sh",
+      "sha256": "4ca1295a598b9a8633efbf645a1274bacdfab239a7e9d9975ec336a5212a94a3"
+    },
+    {
+      "path": "web/favicon.png",
+      "sha256": "229b71dafdd99dea2cdfd810d5b698afd406973a404b5f982115db2de675d252"
+    },
+    {
+      "path": "web/firebase-messaging-sw.js",
+      "sha256": "af46afeec96df64d01c76919478e236182cc46d498bf2b3cab15c50e6400bd5e"
+    },
+    {
+      "path": "web/flutter_bootstrap.js",
+      "sha256": "3fc0d447b14fcbeb5442a8e25912edc994317b72ff75062bddfb1dbf60322103"
+    },
+    {
+      "path": "web/flutter_service_worker_retirement.js",
+      "sha256": "4741a8b1f29b97efa1ca847cd6da9bb5d556efd71f378d9fd2b5409c4194258b"
+    },
+    {
+      "path": "web/icons/Icon-192.png",
+      "sha256": "c62c5823b1572bdafbb19292cb5c643b7cd71468567b2d3ba7c4849ec992e6c9"
+    },
+    {
+      "path": "web/icons/Icon-512.png",
+      "sha256": "7fd196dd1484267e3d2a567d73b8dc78d7fdb901ea57ac574592234ed3f8d260"
+    },
+    {
+      "path": "web/icons/Icon-maskable-192.png",
+      "sha256": "c62c5823b1572bdafbb19292cb5c643b7cd71468567b2d3ba7c4849ec992e6c9"
+    },
+    {
+      "path": "web/icons/Icon-maskable-512.png",
+      "sha256": "7fd196dd1484267e3d2a567d73b8dc78d7fdb901ea57ac574592234ed3f8d260"
+    },
+    {
+      "path": "web/index.html",
+      "sha256": "1fb071d738c219c09120e165b7cec704c111b0a454283e3f4bd99e5f8ec3d8bf"
+    },
+    {
+      "path": "web/manifest.json",
+      "sha256": "c23088b03d2c323794023a1d2d44af672978acca2867a9ffab0fe3c121d8450d"
+    },
+    {
+      "path": "web/public-web/v1/actions-email-v2.js",
+      "sha256": "32dc68464dd4530f129cf84e20711ed9a0a1802511f15c3e8781d687cc1ee60c"
+    },
+    {
+      "path": "web/public-web/v1/event-fallback.png",
+      "sha256": "a8414165aed7cd68229ad93fa74487752bb252896e6b62a2389c99af6146f56d"
+    },
+    {
+      "path": "web/public-web/v1/event-fallback.svg",
+      "sha256": "8b01ad7983e4e60b73b71320296241880504adf349cfbe951d1be91e12cb2b22"
+    },
+    {
+      "path": "web/public-web/v1/public.css",
+      "sha256": "93f81969ea977001f23111be4fa8e3063473f132529683f0097495701dde6d7e"
+    },
+    {
+      "path": "web/public-web/v1/registration-email-v2.css",
+      "sha256": "0890eaa8117490d3a437746f0708b7e8fba9a814625bdf45bc9cff706c522460"
+    },
+    {
+      "path": "web/robots.txt",
+      "sha256": "44d81659e7431a1c135cb9461819a9e66a4109f5985deedb92f521bd55b15055"
+    },
+    {
+      "path": "windows/.gitignore",
+      "sha256": "96345475f1a3c66bd32d28178fba151ab1506b35b1f7857b8f7651863093ea11"
+    },
+    {
+      "path": "windows/CMakeLists.txt",
+      "sha256": "f62df3c653c30a1e1dc2e187ede337a62e02678ccdfba12fd2fc4058d5392e4a"
+    },
+    {
+      "path": "windows/flutter/CMakeLists.txt",
+      "sha256": "1fe418971b6f41bb35ceb3d64113a835f3f6f171ecaa707bf232492b57a588d6"
+    },
+    {
+      "path": "windows/flutter/generated_plugin_registrant.cc",
+      "sha256": "565d68f211a6197fdfba6a040c74c3336ed40518880946207c460fa7953ce895"
+    },
+    {
+      "path": "windows/flutter/generated_plugin_registrant.h",
+      "sha256": "dbc11635d7b1ba1887adf40df5b83d634e9c3ab0bee34510c71528bb4d73602a"
+    },
+    {
+      "path": "windows/flutter/generated_plugins.cmake",
+      "sha256": "d83b4edd454e14a3cc016e8a7adf9b845ce57f2cceeef95f828268105bc521fd"
+    },
+    {
+      "path": "windows/runner/CMakeLists.txt",
+      "sha256": "34119ec122e36940235ef4bc245fcfb43b6960ed443e28af1a8d833a81209b9e"
+    },
+    {
+      "path": "windows/runner/Runner.rc",
+      "sha256": "81ad2c35d3ba288d601debb19078ee88910aac7236804a3d87b43261ce3922e5"
+    },
+    {
+      "path": "windows/runner/flutter_window.cpp",
+      "sha256": "dd185884c0b5301d400b58f12ebb36b1c8b326531597e531b40e44a6eeb0e943"
+    },
+    {
+      "path": "windows/runner/flutter_window.h",
+      "sha256": "38e0fcd3a0b83895852ec295cb70d90179c0dcd40d58f065eb5232a4ecd84898"
+    },
+    {
+      "path": "windows/runner/main.cpp",
+      "sha256": "2d0cbfea302f1cb618b7caa848e4ce1a76b5e992a74caedca3265fb48f2461c2"
+    },
+    {
+      "path": "windows/runner/resource.h",
+      "sha256": "1fa98588b04561590ba1cf0521ab86a9db4a878312f21c9d5861d965ddd8d1ae"
+    },
+    {
+      "path": "windows/runner/resources/app_icon.ico",
+      "sha256": "c098d3fc85cacff98b8e69811b48e9f0d852fcee278132d794411d978869cbf8"
+    },
+    {
+      "path": "windows/runner/runner.exe.manifest",
+      "sha256": "825d243e9fa1542619909c1b72d09b3ed7c1f3b225bb8367c125835e5dc3f8aa"
+    },
+    {
+      "path": "windows/runner/utils.cpp",
+      "sha256": "dc2ee94d43116f959a4abd42557f71d07acc631abbffe03b11489dbeed35bedb"
+    },
+    {
+      "path": "windows/runner/utils.h",
+      "sha256": "95a7f7dddb832997cefa937a96f89472332277e75734a5de553610760b744b03"
+    },
+    {
+      "path": "windows/runner/win32_window.cpp",
+      "sha256": "9065f31ccf746cf8b390121f958f9e959033af864aed779597066625ed56bc36"
+    },
+    {
+      "path": "windows/runner/win32_window.h",
+      "sha256": "7dd03746b19dcf3542829b2f6e8ed40a2714ce5f2cb3b0e23f0118a2fcf62d62"
+    }
+  ]
+}

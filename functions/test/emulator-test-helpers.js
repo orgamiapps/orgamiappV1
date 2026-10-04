@@ -7,6 +7,12 @@ function uniqueId(prefix) {
   return `${prefix}-${Date.now()}-${randomUUID().slice(0, 8)}`;
 }
 
+function emulatorOrigin(environmentVariable) {
+  const host = process.env[environmentVariable];
+  assert.match(host || "", /^(127\.0\.0\.1|localhost):\d+$/, `${environmentVariable} must name a local emulator`);
+  return `http://${host}`;
+}
+
 async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
   return fetch(url, {
     ...options,
@@ -45,4 +51,4 @@ async function waitFor(check, description, options = {}) {
   );
 }
 
-module.exports = {fetchWithTimeout, uniqueId, waitFor};
+module.exports = {fetchWithTimeout, uniqueId, waitFor, emulatorOrigin};

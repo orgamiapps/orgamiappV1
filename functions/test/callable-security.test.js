@@ -45,3 +45,16 @@ test("notification data accepts only bounded scalar fields", () => {
   });
   expectCode(() => requireDataMap({nested: {unsafe: true}}), "invalid-argument");
 });
+
+
+test("idempotency keys bind payload and preserve unknown outcomes", async () => {
+  const {memoryAdmin} = require("./helpers/community-memory");
+  const {reserveIdempotencyKey} = require("../security/callable");
+  const {db} = memoryAdmin();
+  const input = {operation: "notify", uid: "admin", key: "request1", fingerprint: "original"};
+  const reservation = await reserveIdempotencyKey(db, input);
+  await assert.rejects(reserveIdempotencyKey(db, {...input, fingerprint: "changed"}), {code: "failed-precondition"});
+  await assert.rejects(reserveIdempotencyKey(db, input), {code: "aborted"});
+  db.values.set(reservation.ref.path, {...db.values.get(reservation.ref.path), status: "completed", result: {sent: 1}});
+  assert.deepEqual((await reserveIdempotencyKey(db, input)).result, {sent: 1});
+});

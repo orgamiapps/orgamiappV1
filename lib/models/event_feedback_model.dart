@@ -89,7 +89,12 @@ class EventFeedbackAnalytics {
     return EventFeedbackAnalytics(
       averageRating: (data['averageRating'] ?? 0.0).toDouble(),
       totalRatings: data['totalRatings'] ?? 0,
-      ratingDistribution: Map<int, int>.from(data['ratingDistribution'] ?? {}),
+      ratingDistribution: {
+        for (final entry
+            in (data['ratingDistribution'] as Map? ?? const {}).entries)
+          if (int.tryParse(entry.key.toString()) != null && entry.value is num)
+            int.parse(entry.key.toString()): (entry.value as num).toInt(),
+      },
       sentiment: data['sentiment'] ?? 'neutral',
       commentSummaries: List<String>.from(data['commentSummaries'] ?? []),
       anonymousCount: data['anonymousCount'] ?? 0,
@@ -101,7 +106,9 @@ class EventFeedbackAnalytics {
     return {
       'averageRating': averageRating,
       'totalRatings': totalRatings,
-      'ratingDistribution': ratingDistribution,
+      'ratingDistribution': ratingDistribution.map(
+        (rating, total) => MapEntry(rating.toString(), total),
+      ),
       'sentiment': sentiment,
       'commentSummaries': commentSummaries,
       'anonymousCount': anonymousCount,

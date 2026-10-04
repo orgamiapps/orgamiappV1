@@ -1,3 +1,4 @@
+import 'package:attendus/config/safety_flags.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
@@ -98,6 +99,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
   }
 
   void _startScanning() async {
+    if (!SafetyFlags.biometricCheckInEnabled) return;
     _updateState(ScanState.initializing);
 
     // Start initialization timeout
@@ -211,6 +213,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
   }
 
   Future<void> _initializeFaceDetector() async {
+    if (!SafetyFlags.biometricCheckInEnabled) return;
     final options = FaceDetectorOptions(
       enableContours: false,
       enableLandmarks: true,
@@ -237,6 +240,7 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
   }
 
   Future<void> _initializeCamera() async {
+    if (!SafetyFlags.biometricCheckInEnabled) return;
     try {
       final cameras = await availableCameras();
 
@@ -802,6 +806,18 @@ class _PictureFaceScannerScreenState extends State<PictureFaceScannerScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (!SafetyFlags.biometricCheckInEnabled) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Check-in')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(SafetyFlags.biometricMaintenanceMessage),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(

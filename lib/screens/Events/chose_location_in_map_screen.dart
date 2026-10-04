@@ -1,3 +1,4 @@
+import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
@@ -385,6 +386,9 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (widget.eventModel != null) {
+      return EventCreationExperienceGate(event: widget.eventModel);
+    }
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(

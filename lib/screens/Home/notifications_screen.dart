@@ -558,6 +558,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return const Color(0xFF667EEA);
       case 'ticket_update':
         return Colors.blue;
+      case 'new_message':
+      case 'message':
+      case 'group_message':
       case 'message_mention':
         return Colors.purple;
       case 'org_update':
@@ -583,6 +586,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return Icons.group_add;
       case 'ticket_update':
         return Icons.confirmation_number;
+      case 'new_message':
+      case 'message':
+      case 'group_message':
       case 'message_mention':
         return Icons.alternate_email;
       case 'org_update':
@@ -608,6 +614,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'ticket_update':
         await _openEvent(notification.eventId);
         break;
+      case 'new_message':
+      case 'message':
+      case 'group_message':
       case 'message_mention':
         final conversationId = notification.data?['conversationId'] as String?;
         if (conversationId != null && context.mounted) {

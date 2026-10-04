@@ -30,6 +30,7 @@ class _PagedResourceScreenState extends State<PagedResourceScreen> {
   AdminPage? page;
   ApiException? error;
   bool loading = true;
+  int _loadRevision = 0;
   @override
   void initState() {
     super.initState();
@@ -37,9 +38,12 @@ class _PagedResourceScreenState extends State<PagedResourceScreen> {
   }
 
   Future<void> load() async {
+    if (!mounted) return;
+    final revision = ++_loadRevision;
     setState(() {
       loading = true;
       error = null;
+      page = null;
     });
     try {
       final result = await context.read<AdminApiClient>().page(
@@ -47,12 +51,32 @@ class _PagedResourceScreenState extends State<PagedResourceScreen> {
         search: search.text.trim(),
         pageToken: tokens[pageIndex],
       );
-      if (mounted) setState(() => page = result);
+      if (mounted && revision == _loadRevision) setState(() => page = result);
     } on ApiException catch (e) {
-      if (mounted) setState(() => error = e);
+      if (mounted && revision == _loadRevision) setState(() => error = e);
     } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted && revision == _loadRevision) setState(() => loading = false);
     }
+  }
+
+  @override
+  void didUpdateWidget(covariant PagedResourceScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.path != widget.path) {
+      search.clear();
+      tokens
+        ..clear()
+        ..add(null);
+      pageIndex = 0;
+      load();
+    }
+  }
+
+  @override
+  void dispose() {
+    _loadRevision++;
+    search.dispose();
+    super.dispose();
   }
 
   @override
@@ -108,7 +132,7 @@ class _PagedResourceScreenState extends State<PagedResourceScreen> {
             const SizedBox(width: 12),
             IconButton(
               tooltip: 'Previous page',
-              onPressed: pageIndex > 0
+              onPressed: !loading && pageIndex > 0
                   ? () {
                       setState(() => pageIndex--);
                       load();
@@ -118,7 +142,7 @@ class _PagedResourceScreenState extends State<PagedResourceScreen> {
             ),
             IconButton(
               tooltip: 'Next page',
-              onPressed: page?.nextPageToken != null
+              onPressed: !loading && page?.nextPageToken != null
                   ? () {
                       if (tokens.length == pageIndex + 1) {
                         tokens.add(page!.nextPageToken);

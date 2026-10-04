@@ -1,3 +1,5 @@
+import 'package:attendus/Services/public_profile_service.dart';
+import 'package:attendus/Services/community_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -66,6 +68,7 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
       await showAccountRequiredSheet(
         context: context,
         feature: AccountFeature.groups,
+        sharedCommunityId: widget.organizationId,
       );
       return;
     }
@@ -165,6 +168,7 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
       await showAccountRequiredSheet(
         context: context,
         feature: AccountFeature.joinGroup,
+        sharedCommunityId: widget.organizationId,
       );
       return;
     }
@@ -618,51 +622,16 @@ class _FeedTab extends StatefulWidget {
 
 class _FeedTabState extends State<_FeedTab> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final User? _currentUser = FirebaseAuth.instance.currentUser;
+  User? get _currentUser => FirebaseAuth.instance.currentUser;
 
   Future<void> _votePoll(String feedId, int optionIndex) async {
     if (_currentUser == null) return;
 
     try {
-      final docRef = _db
-          .collection('Organizations')
-          .doc(widget.organizationId)
-          .collection('Feed')
-          .doc(feedId);
-
-      await _db.runTransaction((transaction) async {
-        final snapshot = await transaction.get(docRef);
-        if (!snapshot.exists) return;
-
-        final data = snapshot.data()!;
-        final options = List<Map<String, dynamic>>.from(data['options']);
-        final voters = List<String>.from(data['voters'] ?? []);
-        final allowMultiple = data['allowMultipleVotes'] ?? false;
-
-        // Check if user already voted
-        if (!allowMultiple && voters.contains(_currentUser.uid)) {
-          throw Exception('You have already voted in this poll');
-        }
-
-        // Add vote
-        final votes = List<String>.from(options[optionIndex]['votes'] ?? []);
-        if (!votes.contains(_currentUser.uid)) {
-          votes.add(_currentUser.uid);
-          options[optionIndex]['votes'] = votes;
-          options[optionIndex]['voteCount'] = votes.length;
-        }
-
-        // Add to voters list
-        if (!voters.contains(_currentUser.uid)) {
-          voters.add(_currentUser.uid);
-        }
-
-        // Update document
-        transaction.update(docRef, {
-          'options': options,
-          'voters': voters,
-          'totalVotes': voters.length,
-        });
+      await CommunityService().mutate('votePoll', {
+        'organizationId': widget.organizationId,
+        'postId': feedId,
+        'optionIndex': optionIndex,
       });
 
       if (mounted) {
@@ -797,7 +766,10 @@ class _FeedTabState extends State<_FeedTab> {
         }
 
         // Sort docs to put pinned items first
-        final docs = snapshot.data!.docs;
+        final docs = snapshot.data!.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return data['deleted'] != true && data['isHidden'] != true;
+        }).toList();
         docs.sort((a, b) {
           final aData = a.data() as Map<String, dynamic>;
           final bData = b.data() as Map<String, dynamic>;
@@ -1075,12 +1047,11 @@ class _AnnouncementCardState extends State<_AnnouncementCard> {
   Future<void> _togglePin() async {
     try {
       final isPinned = widget.data['isPinned'] ?? false;
-      await FirebaseFirestore.instance
-          .collection('Organizations')
-          .doc(widget.organizationId)
-          .collection('Feed')
-          .doc(widget.docId)
-          .update({'isPinned': !isPinned});
+      await CommunityService().mutate('updateFeed', {
+        'organizationId': widget.organizationId,
+        'postId': widget.docId,
+        'updates': {'isPinned': !isPinned},
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1129,12 +1100,10 @@ class _AnnouncementCardState extends State<_AnnouncementCard> {
 
   Future<void> _deletePost() async {
     try {
-      await FirebaseFirestore.instance
-          .collection('Organizations')
-          .doc(widget.organizationId)
-          .collection('Feed')
-          .doc(widget.docId)
-          .delete();
+      await CommunityService().mutate('deleteFeed', {
+        'organizationId': widget.organizationId,
+        'postId': widget.docId,
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1475,12 +1444,10 @@ class _PollCardState extends State<_PollCard> {
 
   Future<void> _deletePoll() async {
     try {
-      await FirebaseFirestore.instance
-          .collection('Organizations')
-          .doc(widget.organizationId)
-          .collection('Feed')
-          .doc(widget.docId)
-          .delete();
+      await CommunityService().mutate('deleteFeed', {
+        'organizationId': widget.organizationId,
+        'postId': widget.docId,
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1608,7 +1575,14 @@ class _PollCardState extends State<_PollCard> {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: InkWell(
-                  onTap: hasVoted ? null : () => widget.onVote(index),
+                  onTap:
+                      CommunityService.isPollClosed(widget.data) ||
+                          widget.currentUserId == null ||
+                          votes.contains(widget.currentUserId) ||
+                          (hasVoted &&
+                              widget.data['allowMultipleVotes'] != true)
+                      ? null
+                      : () => widget.onVote(index),
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     decoration: BoxDecoration(
@@ -1704,37 +1678,6 @@ class _MembersTab extends StatefulWidget {
 }
 
 class _MembersTabState extends State<_MembersTab> {
-  final Map<String, Map<String, dynamic>> _userCache = {};
-
-  Future<Map<String, dynamic>?> _getUserData(String userId) async {
-    if (_userCache.containsKey(userId)) {
-      return _userCache[userId];
-    }
-
-    try {
-      final userDoc = await FirebaseFirestore.instance
-          .collection('Customers')
-          .doc(userId)
-          .get();
-
-      if (userDoc.exists) {
-        final userData = userDoc.data()!;
-        _userCache[userId] = userData;
-        return userData;
-      }
-    } catch (e) {
-      // If user data not found, create a fallback
-      final fallbackData = {
-        'name': 'Unknown User',
-        'email': '',
-        'profileImageUrl': null,
-      };
-      _userCache[userId] = fallbackData;
-      return fallbackData;
-    }
-    return null;
-  }
-
   @override
   Widget build(BuildContext context) {
     final membersQuery = FirebaseFirestore.instance
@@ -1756,6 +1699,24 @@ class _MembersTabState extends State<_MembersTab> {
             subtitle: 'Invite people to grow your community.',
           );
         }
+
+        final profiles = PublicProfileService()
+            .getByIds(
+              docs
+                  .map(
+                    (doc) =>
+                        ((doc.data() as Map<String, dynamic>)['userId'] ??
+                                doc.id)
+                            .toString(),
+                  )
+                  .toList(),
+            )
+            .then(
+              (users) => {
+                for (final user in users)
+                  user.uid: CustomerModel.getPublicMap(user),
+              },
+            );
 
         // Sort members: owner/admin first, then by joinedAt (most recent first)
         final sortedDocs = List.from(docs);
@@ -1794,14 +1755,16 @@ class _MembersTabState extends State<_MembersTab> {
             final joinedAt = memberData['joinedAt'] as Timestamp?;
 
             return FutureBuilder<Map<String, dynamic>?>(
-              future: _getUserData(userId),
+              future: profiles.then((users) => users[userId]),
               builder: (context, userSnapshot) {
                 final userData = userSnapshot.data;
                 final userName =
                     userData?['name'] ??
                     userData?['displayName'] ??
-                    'Loading...';
-                final profileImageUrl = userData?['profileImageUrl'];
+                    (userSnapshot.connectionState == ConnectionState.waiting
+                        ? 'Loading...'
+                        : 'Unavailable account');
+                final profileImageUrl = userData?['profilePictureUrl'];
 
                 final normalizedRole = role.toLowerCase();
                 return Padding(
@@ -1848,29 +1811,10 @@ class _MembersTabState extends State<_MembersTab> {
     Map<String, dynamic> userData,
   ) {
     try {
-      // Create CustomerModel from userData
-      final customerModel = CustomerModel(
-        uid: userId,
-        name: userData['name'] ?? userData['displayName'] ?? 'Unknown User',
-        email: userData['email'] ?? '',
-        username: userData['username'],
-        profilePictureUrl:
-            userData['profileImageUrl'] ?? userData['profilePictureUrl'],
-        bannerUrl: userData['bannerUrl'],
-        bio: userData['bio'] ?? '',
-        phoneNumber: userData['phoneNumber'],
-        age: userData['age'],
-        gender: userData['gender'],
-        location: userData['location'],
-        occupation: userData['occupation'],
-        company: userData['company'],
-        website: userData['website'],
-        socialMediaLinks: userData['socialMediaLinks'],
-        isDiscoverable: userData['isDiscoverable'] ?? true,
-        favorites: List<String>.from(userData['favorites'] ?? []),
-        createdAt:
-            (userData['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      );
+      final customerModel = CustomerModel.fromPublicProfile({
+        ...userData,
+        'uid': userId,
+      });
 
       Navigator.push(
         context,
@@ -2806,14 +2750,11 @@ class _AboutTabState extends State<_AboutTab> {
             ],
           ),
         ),
-        FutureBuilder<DocumentSnapshot>(
-          future: FirebaseFirestore.instance
-              .collection('Customers')
-              .doc(createdBy)
-              .get(),
+        FutureBuilder<List<CustomerModel>>(
+          future: PublicProfileService().getByIds([createdBy]),
           builder: (context, snapshot) {
-            final adminData = snapshot.hasData && snapshot.data!.exists
-                ? snapshot.data!.data() as Map<String, dynamic>
+            final adminData = snapshot.data?.isNotEmpty == true
+                ? CustomerModel.getPublicMap(snapshot.data!.first)
                 : null;
 
             final adminName = adminData?['name'] ?? 'Group Admin';

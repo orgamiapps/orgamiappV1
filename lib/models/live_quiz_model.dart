@@ -5,6 +5,9 @@ enum QuizStatus { draft, live, paused, ended }
 class LiveQuizModel {
   static String firebaseKey = 'LiveQuizzes';
 
+  final int session;
+  final int revision;
+  final DateTime? currentQuestionEndsAt;
   final String id;
   final String eventId;
   final String creatorId;
@@ -29,6 +32,9 @@ class LiveQuizModel {
   final int participantCount;
 
   const LiveQuizModel({
+    this.session = 0,
+    this.revision = 0,
+    this.currentQuestionEndsAt,
     required this.id,
     required this.eventId,
     required this.creatorId,
@@ -51,6 +57,10 @@ class LiveQuizModel {
 
   factory LiveQuizModel.fromJson(Map<String, dynamic> data) {
     return LiveQuizModel(
+      session: (data['session'] as num?)?.toInt() ?? 0,
+      revision: (data['revision'] as num?)?.toInt() ?? 0,
+      currentQuestionEndsAt: (data['currentQuestionEndsAt'] as Timestamp?)
+          ?.toDate(),
       id: data['id'] ?? '',
       eventId: data['eventId'] ?? '',
       creatorId: data['creatorId'] ?? '',
@@ -83,6 +93,11 @@ class LiveQuizModel {
 
   Map<String, dynamic> toJson() {
     return {
+      'session': session,
+      'revision': revision,
+      'currentQuestionEndsAt': currentQuestionEndsAt == null
+          ? null
+          : Timestamp.fromDate(currentQuestionEndsAt!),
       'id': id,
       'eventId': eventId,
       'creatorId': creatorId,
@@ -127,6 +142,9 @@ class LiveQuizModel {
     int? participantCount,
   }) {
     return LiveQuizModel(
+      session: session,
+      revision: revision,
+      currentQuestionEndsAt: currentQuestionEndsAt,
       id: id ?? this.id,
       eventId: eventId ?? this.eventId,
       creatorId: creatorId ?? this.creatorId,
@@ -164,6 +182,10 @@ class LiveQuizModel {
   Duration? get timeRemainingForCurrentQuestion {
     if (!hasCurrentQuestion || currentQuestionStartedAt == null) return null;
 
+    if (currentQuestionEndsAt != null) {
+      final remaining = currentQuestionEndsAt!.difference(DateTime.now());
+      return remaining.isNegative ? Duration.zero : remaining;
+    }
     final elapsed = DateTime.now().difference(currentQuestionStartedAt!);
     final remaining = Duration(seconds: timePerQuestion) - elapsed;
     return remaining.isNegative ? Duration.zero : remaining;

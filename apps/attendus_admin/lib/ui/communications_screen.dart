@@ -213,7 +213,7 @@ class CommunicationsScreen extends StatelessWidget {
       final response = await context.read<AdminApiClient>().getJson(
         '/v1/communications/guests/$id',
       );
-      final data = response['data'] as Map<String, dynamic>;
+      final data = requireApiObject(response['data']);
       if (!context.mounted) return;
       await showDialog<void>(
         context: context,
@@ -263,7 +263,7 @@ class CommunicationsScreen extends StatelessWidget {
       final response = await context.read<AdminApiClient>().getJson(
         '/v1/communications/templates/$id',
       );
-      final data = response['data'] as Map<String, dynamic>;
+      final data = requireApiObject(response['data']);
       if (!context.mounted) return;
       final subject = TextEditingController(text: data['subject']?.toString());
       final text = TextEditingController(text: data['text']?.toString());

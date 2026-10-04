@@ -1,3 +1,4 @@
+import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
@@ -2354,7 +2355,16 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => EventCreationExperienceGate(
+    selectedDateTime: widget.selectedDateTime,
+    eventDurationHours: widget.eventDurationHours,
+    preselectedOrganizationId: widget.preselectedOrganizationId,
+    forceOrganizationEvent: widget.forceOrganizationEvent,
+  );
+
+  // Retained while legacy layout references migrate to the canonical editor.
+  // ignore: unused_element
+  Widget _legacyLayout(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(

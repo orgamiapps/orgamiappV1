@@ -26,21 +26,20 @@ async function enforceSharedPlacesRateLimit(
 ) {
   const id = createHash("sha256").update(uid).digest("hex").slice(0, 32);
   const reference = db.collection("service_rate_limits").doc(`places_${id}`);
-  let allowed = false;
-  await db.runTransaction(async (transaction) => {
+  const allowed = await db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(reference);
     const next = nextRateState(
         snapshot.exists ? snapshot.data() : null,
         nowMs,
         limit,
     );
-    if (!next) return;
-    allowed = true;
+    if (!next) return false;
     transaction.set(reference, {
       service: "places",
       ...next,
       expiresAt: Timestamp.fromMillis(nowMs + (2 * PLACES_RATE_WINDOW_MS)),
     }, {merge: true});
+    return true;
   });
   if (!allowed) {
     throw new HttpsError(

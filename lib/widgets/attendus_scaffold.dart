@@ -27,6 +27,7 @@ class AttendUsScaffold extends StatelessWidget {
   final VoidCallback? onBrandPressed;
   final List<Widget> actions;
   final Widget? floatingActionButton;
+  final VoidCallback? onLoginPressed;
   final VoidCallback? onNotificationsPressed;
   final VoidCallback? onProfilePressed;
   final String? profileName;
@@ -44,6 +45,7 @@ class AttendUsScaffold extends StatelessWidget {
     this.onBrandPressed,
     this.actions = const [],
     this.floatingActionButton,
+    this.onLoginPressed,
     this.onNotificationsPressed,
     this.onProfilePressed,
     this.profileName,
@@ -58,6 +60,16 @@ class AttendUsScaffold extends StatelessWidget {
     final useExpandedSidebar = width >= 1100;
     final shellActions = [
       ...actions,
+      if (onLoginPressed != null) ...[
+        ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          child: AttendUsButton.primary(
+            label: 'Log in',
+            onPressed: onLoginPressed,
+          ),
+        ),
+        const SizedBox(width: 8),
+      ],
       if (onNotificationsPressed != null)
         _NotificationButton(
           onPressed: onNotificationsPressed!,
@@ -206,7 +218,14 @@ class _AttendUsSidebar extends StatelessWidget {
                         ),
                         if (expanded) ...[
                           const SizedBox(width: 12),
-                          Text('Attendus', style: theme.textTheme.titleLarge),
+                          Expanded(
+                            child: Text(
+                              'Attendus',
+                              style: theme.textTheme.titleLarge,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         ],
                       ],
                     ),
@@ -346,6 +365,7 @@ class _NotificationButton extends StatelessWidget {
       children: [
         IconButton(
           tooltip: 'Notifications',
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
           onPressed: onPressed,
           icon: const Icon(Icons.notifications_none),
         ),

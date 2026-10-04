@@ -1,4 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:convert';
+import 'package:attendus/firebase/firebase_google_auth_helper.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:attendus/Services/attendance_check_in_service.dart';
 import 'package:flutter/material.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
@@ -26,15 +30,35 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
     });
 
     try {
+      if (await AttendanceCheckInService().pendingCount() > 0) {
+        throw StateError(
+          'Reconnect and reconcile pending attendance scans before deleting this account.',
+        );
+      }
+      await FirebaseGoogleAuthHelper().revokeAppleAccessForDeletion();
       await FirebaseFirestoreHelper().deleteAccountViaCloudFunction(user.uid);
-
+      const storage = FlutterSecureStorage();
+      for (final entry in (await storage.readAll()).entries) {
+        if (entry.key.startsWith('registration-attempt-${user.uid}-')) {
+          await storage.delete(key: entry.key);
+        } else if (entry.key.startsWith('attendance_v2_offline_kit_')) {
+          final kit = jsonDecode(entry.value);
+          if (kit is Map && kit['staffUid'] == user.uid) {
+            await storage.delete(key: entry.key);
+            await storage.delete(
+              key:
+                  'attendance_redemptions_${entry.key.substring('attendance_v2_offline_kit_'.length)}',
+            );
+          }
+        }
+      }
       await AuthService().signOut();
       if (!mounted) return;
       RouterClass().appRest(context: context);
     } catch (e) {
       if (!mounted) return;
       ShowToast().showNormalToast(
-        msg: 'Failed to delete account. Please try again.',
+        msg: 'Deletion did not finish: $e. It is safe to retry.',
       );
       setState(() {
         _isDeleting = false;
@@ -87,7 +111,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
                             context,
                             icon: Icons.event_busy_outlined,
                             text:
-                                'Tickets, attendance records, and related user data will be deleted.',
+                                'Admission credentials will be revoked. Recorded attendance and totals remain without your name, account identifier or contact details. Your identifying attendance information will be removed.',
                           ),
                           const SizedBox(height: 24),
                           Row(

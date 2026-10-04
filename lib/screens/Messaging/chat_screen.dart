@@ -1,7 +1,9 @@
+import 'package:attendus/Services/messaging_feed.dart';
+import 'package:attendus/Services/conversation_redirect.dart';
+import 'package:attendus/Utils/logger.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:attendus/models/message_model.dart';
@@ -36,263 +38,244 @@ class _ChatScreenState extends State<ChatScreen> {
   List<MessageModel> _messages = [];
   bool _isLoading = true;
   bool _isSending = false;
-  StreamSubscription<List<MessageModel>>? _messagesSubscription;
+  final _feed = MessagingFeed<MessageModel>();
+  StreamSubscription<User?>? _authSubscription;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+  _conversationSubscription;
+  String? _messageError;
+  String? _pendingRequestId;
+  String? _pendingContent;
+  String? _lastReadId;
+  String? _accountUid;
+  int _chatGeneration = 0;
+  String? _resolvedConversationId;
+  bool _conversationMoving = false;
   ConversationModel? _conversation;
   String? _swipedMessageId; // Track which message is currently swiped
   final Map<String, double> _messageSwipeOffsets =
       {}; // Track individual message swipe positions
 
+  CustomerModel? get _otherParticipant {
+    if (_conversation?.isGroup == true) return null;
+    if (widget.otherParticipantInfo != null &&
+        _conversation?.participantIds.contains(
+              widget.otherParticipantInfo!.uid,
+            ) ==
+            true) {
+      return widget.otherParticipantInfo;
+    }
+    final others = _conversation?.participantIds.where(
+      (id) => id != _auth.currentUser?.uid,
+    );
+    if (others == null || others.isEmpty) return null;
+    final id = others.first;
+    final info = _conversation?.participantInfo[id] ?? <String, dynamic>{};
+    return CustomerModel(
+      uid: id,
+      name: info['name'] ?? 'User',
+      email: '',
+      username: info['username'],
+      profilePictureUrl: info['profilePictureUrl'],
+      createdAt: DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
-    _initializeChat();
+    _feed.addListener(_onMessagesChanged);
+    _authSubscription = _auth.authStateChanges().listen((user) {
+      if (_accountUid != user?.uid) {
+        _messageController.clear();
+        _pendingRequestId = null;
+        _pendingContent = null;
+        _lastReadId = null;
+        _conversation = null;
+      }
+      _accountUid = user?.uid;
+      _initializeChat();
+    });
   }
 
   @override
   void dispose() {
+    _chatGeneration++;
     _messageController.dispose();
     _scrollController.dispose();
-    _messagesSubscription?.cancel();
+    _feed.dispose();
+    _authSubscription?.cancel();
+    _conversationSubscription?.cancel();
     super.dispose();
   }
 
   Future<void> _initializeChat() async {
-    try {
-      User? currentUser = _auth.currentUser;
-      if (currentUser == null) return;
-
-      // Start listener ASAP so new messages appear instantly
-      _listenForMessages();
-
-      // Load conversation metadata and initial messages
-      await _loadConversation();
-      await _loadMessages();
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('❌ Error initializing chat: $e');
-      }
-    }
-  }
-
-  Future<void> _loadConversation() async {
-    try {
-      final doc = await _firestore
-          .collection('Conversations')
-          .doc(widget.conversationId)
+    final generation = ++_chatGeneration;
+    final user = _auth.currentUser;
+    final uid = user != null && !user.isAnonymous ? user.uid : null;
+    _conversationSubscription?.cancel();
+    _resolvedConversationId = null;
+    _conversationMoving = false;
+    _conversation = null;
+    _lastReadId = null;
+    await _feed.bind(uid, () async {
+      final doc = await resolveConversationRedirect(
+        widget.conversationId,
+        load: (id) => _firestore.collection('Conversations').doc(id).get(),
+        redirect: (doc) => doc.data()?['redirectConversationId'] as String?,
+      );
+      if (!doc.exists) throw StateError('Conversation is unavailable');
+      final conversation = ConversationModel.fromFirestore(
+        doc,
+        currentUserId: uid,
+      );
+      final blocks = await _firestore
+          .collection('Customers')
+          .doc(uid)
+          .collection('blocks')
           .get();
-      if (doc.exists) {
-        setState(() {
-          _conversation = ConversationModel.fromFirestore(doc);
-        });
+      final blocked = blocks.docs.map((doc) => doc.id).toSet();
+      if (!mounted ||
+          generation != _chatGeneration ||
+          _auth.currentUser?.uid != uid) {
+        return const Stream<List<MessageModel>>.empty();
       }
-    } catch (e) {
-      if (kDebugMode) debugPrint('❌ Error loading conversation: $e');
-    }
-  }
-
-  Future<void> _loadMessages() async {
-    try {
-      User? currentUser = _auth.currentUser;
-      if (currentUser == null) return;
-
-      if (kDebugMode) {
-        debugPrint(
-          '🔍 Loading messages for conversation: ${widget.conversationId}',
-        );
-        debugPrint('🔍 Current user: ${currentUser.uid}');
-        debugPrint('🔍 Conversation loaded: ${_conversation?.id}');
-      }
-
-      // Get messages from Firestore
-      Stream<List<MessageModel>> messagesStream = FirebaseMessagingHelper()
-          .getMessages(widget.conversationId);
-
-      // Listen to the stream and get the first value
-      List<MessageModel> messages = await messagesStream.first;
-
-      if (mounted) {
-        setState(() {
-          _messages = messages;
-          _isLoading = false;
-        });
-
-        if (kDebugMode) {
-          debugPrint('✅ Received ${messages.length} messages');
-          debugPrint('📱 Messages loaded successfully');
-        }
-
-        // Mark messages as read
-        await FirebaseMessagingHelper().markMessagesAsRead(
-          widget.conversationId,
-          currentUser.uid,
-        );
-
-        // Scroll to bottom
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scrollController.hasClients) {
-            _scrollController.animateTo(
-              _scrollController.position.maxScrollExtent,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeOut,
-            );
+      _conversation = conversation;
+      _resolvedConversationId = doc.id;
+      _conversationMoving = doc.data()?['migrationState'] == 'moving';
+      _conversationSubscription = doc.reference.snapshots().listen(
+        (snapshot) {
+          if (!mounted ||
+              generation != _chatGeneration ||
+              _auth.currentUser?.uid != uid ||
+              !snapshot.exists) {
+            return;
           }
-        });
+          if (snapshot.data()?['redirectConversationId'] != null ||
+              (snapshot.data()?['migrationState'] == 'moving') !=
+                  _conversationMoving) {
+            unawaited(_initializeChat());
+            return;
+          }
+          setState(
+            () => _conversation = ConversationModel.fromFirestore(
+              snapshot,
+              currentUserId: uid,
+            ),
+          );
+        },
+        onError: (Object error) {
+          if (mounted &&
+              generation == _chatGeneration &&
+              _auth.currentUser?.uid == uid) {
+            setState(() => _messageError = messagingErrorMessage(error));
+          }
+        },
+      );
+      if (_conversationMoving) {
+        throw FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'failed-precondition',
+          message: 'Conversation migration is in progress',
+        );
       }
-    } catch (error) {
-      if (kDebugMode) {
-        debugPrint('❌ Error loading messages: $error');
-      }
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
+      return FirebaseMessagingHelper()
+          .getMessages(doc.id)
+          .map(
+            (messages) => messages
+                .where((message) => !blocked.contains(message.senderId))
+                .toList(),
+          );
+    }, clearItems: true);
   }
 
-  void _listenForMessages() {
-    try {
-      User? currentUser = _auth.currentUser;
-      if (currentUser == null) return;
-
-      _messagesSubscription = FirebaseMessagingHelper()
-          .getMessages(widget.conversationId)
-          .listen((newMessages) async {
-            try {
-              // Sort by timestamp (oldest first)
-              newMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-
-              // If group chat: hide messages from blocked users
-              final isGroup = _conversation?.isGroup == true;
-              if (isGroup) {
-                try {
-                  final blocksSnap = await _firestore
-                      .collection('Customers')
-                      .doc(currentUser.uid)
-                      .collection('blocks')
-                      .get();
-                  final blocked = blocksSnap.docs.map((d) => d.id).toSet();
-                  newMessages = newMessages
-                      .where((m) => !blocked.contains(m.senderId))
-                      .toList();
-                } catch (_) {}
-              }
-              if (mounted) {
-                setState(() {
-                  _messages = newMessages;
-                });
-
-                // Mark messages as read
-                FirebaseMessagingHelper().markMessagesAsRead(
-                  widget.conversationId,
-                  currentUser.uid,
-                );
-
-                // Scroll to bottom for new messages
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (_scrollController.hasClients) {
-                    _scrollController.animateTo(
-                      _scrollController.position.maxScrollExtent,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeOut,
-                    );
-                  }
-                });
-              }
-            } catch (e) {
-              if (kDebugMode) debugPrint('❌ Listen error: $e');
-            }
-          });
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('❌ Error loading messages: $e');
+  void _onMessagesChanged() {
+    if (!mounted) return;
+    setState(() {
+      _messages = _feed.items;
+      _isLoading = _feed.loading;
+      _messageError = _feed.error;
+    });
+    if (_messages.isEmpty || _messageError != null) return;
+    final boundary = _messages.last.id;
+    final uid = _auth.currentUser?.uid;
+    if (uid == null || boundary == _lastReadId) return;
+    // Mark only the snapshot rendered in this frame, never later arrivals.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted ||
+          _auth.currentUser?.uid != uid ||
+          boundary == _lastReadId ||
+          ModalRoute.of(context)?.isCurrent != true) {
+        return;
       }
-    }
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        await WidgetsBinding.instance.endOfFrame;
+      }
+      if (!mounted ||
+          _auth.currentUser?.uid != uid ||
+          ModalRoute.of(context)?.isCurrent != true) {
+        return;
+      }
+      _lastReadId = boundary;
+      try {
+        await FirebaseMessagingHelper().markMessagesAsRead(
+          _resolvedConversationId ?? widget.conversationId,
+          uid,
+          lastMessageId: boundary,
+        );
+      } catch (error) {
+        _lastReadId = null;
+        Logger.error(
+          'messaging_mark_read: ${error is FirebaseException ? error.code : error.runtimeType}',
+        );
+      }
+    });
   }
 
   Future<void> _sendMessage() async {
-    if (_messageController.text.trim().isEmpty) return;
-
-    try {
-      User? currentUser = _auth.currentUser;
-      if (currentUser == null) return;
-
-      String message = _messageController.text.trim();
-
-      setState(() {
-        _isSending = true;
-      });
-
-      if (kDebugMode) {
-        debugPrint(
-          '📤 Sending message to conversation ${widget.conversationId}: $message',
-        );
-        debugPrint('📤 Conversation ID: ${widget.conversationId}');
-      }
-
-      final isGroup = _conversation?.isGroup == true;
-
-      // Optimistically add message to the list for instant feedback
-      final provisional = MessageModel(
-        id: 'local_${DateTime.now().millisecondsSinceEpoch}',
-        senderId: currentUser.uid,
-        receiverId: isGroup ? null : widget.otherParticipantInfo?.uid,
-        conversationId: widget.conversationId,
-        content: message,
-        timestamp: DateTime.now(),
-        isRead: false,
+    if (_isSending ||
+        _conversationMoving ||
+        _resolvedConversationId == null ||
+        _messageController.text.trim().isEmpty) {
+      return;
+    }
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    final content = _messageController.text.trim();
+    if (content.length > 4000) {
+      ShowToast().showSnackBar(
+        'Messages can contain up to 4000 characters',
+        context,
       );
-      setState(() {
-        _messages = [..._messages, provisional];
-      });
-      // Scroll to bottom immediately
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) {
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-          );
-        }
-      });
-
-      // Persist to Firestore
-      if (isGroup) {
-        await FirebaseMessagingHelper().sendMessage(
-          content: message,
-          conversationId: widget.conversationId,
-        );
-      } else {
-        final receiverId = widget.otherParticipantInfo!.uid;
-        await FirebaseMessagingHelper().sendMessage(
-          receiverId: receiverId,
-          content: message,
-          conversationId: widget.conversationId,
+      return;
+    }
+    if (_pendingContent != content) {
+      _pendingContent = content;
+      _pendingRequestId = _firestore.collection('Messages').doc().id;
+    }
+    setState(() => _isSending = true);
+    try {
+      await FirebaseMessagingHelper().sendMessage(
+        content: content,
+        conversationId: _resolvedConversationId!,
+        requestId: _pendingRequestId,
+      );
+      if (!mounted || _auth.currentUser?.uid != uid) return;
+      if (_messageController.text.trim() == content) _messageController.clear();
+      _pendingContent = null;
+      _pendingRequestId = null;
+    } catch (error) {
+      if (mounted && _auth.currentUser?.uid == uid) {
+        ShowToast().showSnackBar(
+          'Message not confirmed. Your text is still here; try again.',
+          context,
         );
       }
-
-      if (kDebugMode) {
-        debugPrint('✅ Message sent successfully');
-      }
-
-      // Clear text field
-      _messageController.clear();
-
-      setState(() {
-        _isSending = false;
-      });
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('❌ Error sending message: $e');
-      }
-
-      setState(() {
-        _isSending = false;
-      });
-
-      if (mounted) {
-        ShowToast().showSnackBar('Failed to send message', context);
-      }
+      Logger.error(
+        'messaging_send: ${error is FirebaseException ? error.code : error.runtimeType}',
+      );
+    } finally {
+      if (mounted) setState(() => _isSending = false);
     }
   }
 
@@ -482,7 +465,18 @@ class _ChatScreenState extends State<ChatScreen> {
                   Padding(
                     padding: const EdgeInsets.only(right: 16, top: 4),
                     child: Text(
-                      'Delivered',
+                      (_conversation?.participantIds
+                                      .where((id) => id != currentUser?.uid)
+                                      .every(
+                                        (id) =>
+                                            (_conversation?.readSequences[id] ??
+                                                0) >=
+                                            message.sequence,
+                                      ) ==
+                                  true &&
+                              message.sequence > 0)
+                          ? 'Read'
+                          : 'Delivered',
                       style: TextStyle(
                         fontSize: 11,
                         color: Theme.of(
@@ -504,6 +498,20 @@ class _ChatScreenState extends State<ChatScreen> {
       return const AttendUsLoadingState(label: 'Loading conversation...');
     }
 
+    if (_messageError != null && _messages.isEmpty) {
+      return Center(
+        child: AttendUsEmptyState(
+          icon: Icons.cloud_off_outlined,
+          title: 'Messages unavailable',
+          message: _messageError!,
+          action: AttendUsButton.primary(
+            label: 'Try again',
+            icon: Icons.refresh,
+            onPressed: _initializeChat,
+          ),
+        ),
+      );
+    }
     if (_messages.isEmpty) {
       return Center(
         child: AttendUsEmptyState(
@@ -514,25 +522,44 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     }
 
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 980),
-        child: ListView.builder(
-          controller: _scrollController,
-          padding: EdgeInsets.only(
-            left: 12,
-            right: 12,
-            top: 10,
-            bottom: MediaQuery.of(context).padding.bottom + 96,
+    return Column(
+      children: [
+        if (_messageError != null)
+          MaterialBanner(
+            content: Text(_messageError!),
+            actions: [
+              TextButton(
+                onPressed: _initializeChat,
+                child: const Text('Try again'),
+              ),
+            ],
           ),
-          itemCount: _messages.length,
-          itemBuilder: (context, index) {
-            final message = _messages[index];
-            final showDateHeader = _shouldShowDateHeader(index);
-            return _buildMessageBubble(message, showDateHeader: showDateHeader);
-          },
+        Expanded(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 980),
+              child: ListView.builder(
+                controller: _scrollController,
+                padding: EdgeInsets.only(
+                  left: 12,
+                  right: 12,
+                  top: 10,
+                  bottom: MediaQuery.of(context).padding.bottom + 96,
+                ),
+                itemCount: _messages.length,
+                itemBuilder: (context, index) {
+                  final message = _messages[index];
+                  final showDateHeader = _shouldShowDateHeader(index);
+                  return _buildMessageBubble(
+                    message,
+                    showDateHeader: showDateHeader,
+                  );
+                },
+              ),
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -985,27 +1012,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _navigateToUserProfile(Map<String, dynamic> memberInfo) {
-    final customerModel = CustomerModel(
-      uid: memberInfo['uid'] ?? '',
-      name: memberInfo['name'] ?? 'Unknown User',
-      email: memberInfo['email'] ?? '',
-      username: memberInfo['username'],
-      profilePictureUrl: memberInfo['profilePictureUrl'],
-      bio: memberInfo['bio'],
-      phoneNumber: memberInfo['phoneNumber'],
-      age: memberInfo['age'],
-      gender: memberInfo['gender'],
-      location: memberInfo['location'],
-      occupation: memberInfo['occupation'],
-      company: memberInfo['company'],
-      website: memberInfo['website'],
-      socialMediaLinks: memberInfo['socialMediaLinks'],
-      isDiscoverable: memberInfo['isDiscoverable'] ?? true,
-      favorites: List<String>.from(memberInfo['favorites'] ?? []),
-      createdAt: memberInfo['createdAt'] != null
-          ? DateTime.parse(memberInfo['createdAt'])
-          : DateTime.now(),
-    );
+    final customerModel = CustomerModel.fromPublicProfile(memberInfo);
 
     Navigator.push(
       context,
@@ -1070,7 +1077,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _handleMenuAction(String value) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) return;
-    final otherId = widget.otherParticipantInfo?.uid;
+    final otherId = _otherParticipant?.uid;
 
     try {
       switch (value) {
@@ -1157,7 +1164,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       );
     }
-    final user = widget.otherParticipantInfo;
+    final user = _otherParticipant;
     if (user == null) return const SizedBox.shrink();
     return GestureDetector(
       onTap: () => _navigateToDirectMessageUserProfile(user),
@@ -1180,13 +1187,14 @@ class _ChatScreenState extends State<ChatScreen> {
                   ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                   overflow: TextOverflow.ellipsis,
                 ),
-                Text(
-                  user.email,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                if (user.username?.isNotEmpty == true)
+                  Text(
+                    '@${user.username}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
               ],
             ),
           ),

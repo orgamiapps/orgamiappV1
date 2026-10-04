@@ -25,7 +25,15 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
   late final double _screenWidth = MediaQuery.of(context).size.width;
   late final double _screenHeight = MediaQuery.of(context).size.height;
 
-  late GoogleMapController mapController;
+  GoogleMapController? mapController;
+  bool get _hasCoordinates =>
+      widget.eventModel.latitude.isFinite &&
+      widget.eventModel.longitude.isFinite &&
+      widget.eventModel.latitude >= -90 &&
+      widget.eventModel.latitude <= 90 &&
+      widget.eventModel.longitude >= -180 &&
+      widget.eventModel.longitude <= 180 &&
+      !(widget.eventModel.latitude == 0 && widget.eventModel.longitude == 0);
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
   late AnimationController _slideController;
@@ -96,7 +104,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
   }
 
   void _initializeMap() {
-    if (widget.eventModel.latitude != 0 && widget.eventModel.longitude != 0) {
+    if (_hasCoordinates) {
       final eventLocation = widget.eventModel.getLatLng();
 
       setState(() {
@@ -131,6 +139,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
 
   @override
   void dispose() {
+    mapController?.dispose();
     _fadeController.dispose();
     _slideController.dispose();
     super.dispose();
@@ -326,7 +335,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
                         return;
                       }
                       final latLng = widget.eventModel.getLatLng();
-                      mapController.animateCamera(
+                      mapController?.animateCamera(
                         CameraUpdate.newCameraPosition(
                           CameraPosition(target: latLng, zoom: 16),
                         ),
@@ -361,7 +370,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
                   child: InkWell(
                     borderRadius: BorderRadius.circular(12),
                     onTap: () {
-                      mapController.animateCamera(CameraUpdate.zoomIn());
+                      mapController?.animateCamera(CameraUpdate.zoomIn());
                     },
                     child: const Icon(
                       Icons.add,
@@ -393,7 +402,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
                   child: InkWell(
                     borderRadius: BorderRadius.circular(12),
                     onTap: () {
-                      mapController.animateCamera(CameraUpdate.zoomOut());
+                      mapController?.animateCamera(CameraUpdate.zoomOut());
                     },
                     child: const Icon(
                       Icons.remove,
@@ -732,14 +741,13 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
 
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
-    mapController.moveCamera(
+    mapController?.moveCamera(
       CameraUpdate.newCameraPosition(_eventCameraPosition),
     );
   }
 
   CameraPosition get _eventCameraPosition {
-    final hasCoordinates =
-        widget.eventModel.latitude != 0 && widget.eventModel.longitude != 0;
+    final hasCoordinates = _hasCoordinates;
     return CameraPosition(
       target: hasCoordinates
           ? widget.eventModel.getLatLng()
@@ -751,7 +759,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
   /// Gets the address from latitude and longitude coordinates using reverse geocoding
   Future<void> _getAddressFromCoordinates() async {
     // Only attempt if coordinates are available
-    if (widget.eventModel.latitude == 0 || widget.eventModel.longitude == 0) {
+    if (!_hasCoordinates) {
       return;
     }
 

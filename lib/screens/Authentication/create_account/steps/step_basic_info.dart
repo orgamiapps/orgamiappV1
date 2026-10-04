@@ -65,7 +65,7 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
       firstDate: DateTime(1900),
       lastDate: DateTime(now.year - 13, now.month, now.day),
     );
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() {
         _selectedDob = picked;
         _dobController.text = DateFormat('MM/dd/yyyy').format(picked);
@@ -345,7 +345,7 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
                 ShowToast().showNormalToast(
                   msg:
                       FirebaseGoogleAuthHelper.lastGoogleErrorMessage ??
-                      'Google sign-in failed.',
+                      'Google login failed.',
                 );
               }
             }
@@ -386,7 +386,7 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
                 ShowToast().showNormalToast(
                   msg:
                       FirebaseGoogleAuthHelper.lastAppleErrorMessage ??
-                      'Apple sign-in failed.',
+                      'Apple login failed.',
                 );
               }
             }

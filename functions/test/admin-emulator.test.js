@@ -6,13 +6,15 @@ const {runAccountDeletion} = require("../account/deletion");
 const {
   fetchWithTimeout,
   uniqueId,
+  emulatorOrigin,
 } = require("./emulator-test-helpers");
 
 const projectId = process.env.GCLOUD_PROJECT;
 assert.equal(projectId, "demo-attendus-admin");
-const api = `http://127.0.0.1:5001/${projectId}/us-central1/adminApi`;
-const freeTicketApi = `http://127.0.0.1:5001/${projectId}/us-central1/issueFreeTicket`;
-const authApi = "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1";
+const functionsOrigin = emulatorOrigin("FIREBASE_FUNCTIONS_EMULATOR_HOST");
+const api = `${functionsOrigin}/${projectId}/us-central1/adminApi`;
+const freeTicketApi = `${functionsOrigin}/${projectId}/us-central1/issueFreeTicket`;
+const authApi = `${emulatorOrigin("FIREBASE_AUTH_EMULATOR_HOST")}/identitytoolkit.googleapis.com/v1`;
 async function auth(method, body) {
   const response = await fetchWithTimeout(
       `${authApi}/accounts:${method}?key=emulator-key`,
@@ -51,7 +53,8 @@ test("account erasure is complete, auditable, and idempotent", async () => {
   await db.collection("users").doc(uid).set({email});
   await db.collection("users").doc(uid).collection("notifications").doc("n1").set({seen: false});
   await db.collection("Customers").doc(uid).set({email});
-  await db.collection("Attendance").doc(`attendance-${uid}`).set({userId: uid});
+  await db.collection("Attendance").doc(`attendance-${uid}`).set({userId: uid, eventId: `owned-fixture-${uid}`,
+    checkedInAt: new Date("2026-09-01T12:00:00Z"), verificationSource: "staff_roster"});
   await db.collection("FaceEnrollments").doc(`face-${uid}`).set({userId: uid, faceFeatures: [0.1]});
   await db.collection("Messages").doc(`message-${uid}`).set({senderId: uid});
   await db.collection("TicketPayments").doc(`payment-${uid}`).set({
@@ -64,6 +67,9 @@ test("account erasure is complete, auditable, and idempotent", async () => {
     contentType: "image/jpeg",
   });
 
+  for (const path of [`user_banners/${uid}/banner.jpg`, `event-drafts/${uid}/draft/cover.jpg`]) {
+    await bucket.file(path).save(Buffer.from("fixture"), {contentType: "image/jpeg"});
+  }
   const first = await runAccountDeletion({
     uid,
     db,
@@ -76,6 +82,11 @@ test("account erasure is complete, auditable, and idempotent", async () => {
   assert.equal((await db.collection("FaceEnrollments").doc(`face-${uid}`).get()).exists, false);
   assert.equal((await db.collection("Messages").doc(`message-${uid}`).get()).exists, false);
   assert.equal((await bucket.file(`profile_pictures/${uid}/avatar.jpg`).exists())[0], false);
+  for (const path of [`user_banners/${uid}/banner.jpg`, `event-drafts/${uid}/draft/cover.jpg`]) {
+    assert.equal((await bucket.file(path).exists())[0], false);
+  }
+  const archiveId = require("../events/roster").key(`attendance-${uid}`);
+  assert.equal((await db.collection("HistoricalAttendance").doc(archiveId).get()).exists, true);
 
   const payment = await db.collection("TicketPayments").doc(`payment-${uid}`).get();
   assert.equal(payment.exists, true);
@@ -110,19 +121,21 @@ test("free ticket issuance is atomic and idempotent", async () => {
     maxTickets: 2,
     issuedTickets: 0,
     selectedDateTime: admin.firestore.Timestamp.fromDate(
-        new Date("2026-10-01T18:00:00Z"),
+        new Date(Date.now() + 24 * 60 * 60 * 1000),
     ),
   });
 
-  const call = () => fetchWithTimeout(freeTicketApi, {
+  const call = (timeoutMs = 15000) => fetchWithTimeout(freeTicketApi, {
     method: "POST",
     headers: {
       authorization: `Bearer ${created.idToken}`,
       "content-type": "application/json",
     },
     body: JSON.stringify({data: {eventId}}),
-  });
-  const firstResponse = await call();
+  }, timeoutMs);
+  // A fresh emulator starts a separate runtime for this callable. Give only
+  // that cold invocation a startup allowance; the replay keeps the normal limit.
+  const firstResponse = await call(60000);
   const firstText = await firstResponse.text();
   assert.equal(firstResponse.status, 200, firstText);
   const first = JSON.parse(firstText).result;

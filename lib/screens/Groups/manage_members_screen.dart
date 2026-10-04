@@ -143,47 +143,62 @@ class _ManageMembersScreenState extends State<ManageMembersScreen> {
                       }
 
                       final members = snapshot.data!.docs;
-                      final filteredMembers = _filterMembers(members);
-
-                      return ListView(
-                        padding: AttendUsTokens.pagePadding,
-                        children: [
-                          _buildMemberControls(members.length),
-                          const SizedBox(height: 16),
-                          if (filteredMembers.isEmpty)
-                            _buildEmptyState(isFiltered: true)
-                          else
-                            ...filteredMembers.map((member) {
-                              final memberData =
-                                  member.data() as Map<String, dynamic>;
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 10),
-                                child: FutureBuilder<Map<String, dynamic>>(
-                                  future: _enrichMemberData(
-                                    member.id,
-                                    memberData,
+                      return FutureBuilder<List<CustomerModel>>(
+                        future: FirebaseFirestoreHelper().getUsersByIds(
+                          userIds: members.map((member) => member.id).toList(),
+                        ),
+                        builder: (context, profilesSnapshot) {
+                          if (profilesSnapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const AttendUsLoadingState(
+                              label: 'Loading member profiles',
+                            );
+                          }
+                          if (profilesSnapshot.hasError) {
+                            return const AttendUsEmptyState(
+                              icon: Icons.error_outline,
+                              title: 'Member profiles unavailable',
+                              message: 'Reopen this screen to retry.',
+                            );
+                          }
+                          final byId = {
+                            for (final profile
+                                in profilesSnapshot.data ?? <CustomerModel>[])
+                              profile.uid: profile,
+                          };
+                          final rows = members
+                              .map(
+                                (member) =>
+                                    MapEntry(member.id, <String, dynamic>{
+                                      ...member.data() as Map<String, dynamic>,
+                                      if (byId[member.id] != null)
+                                        ...CustomerModel.getPublicMap(
+                                          byId[member.id]!,
+                                        ),
+                                    }),
+                              )
+                              .toList();
+                          final filteredMembers = _filterMembers(rows);
+                          return ListView(
+                            padding: AttendUsTokens.pagePadding,
+                            children: [
+                              _buildMemberControls(members.length),
+                              const SizedBox(height: 16),
+                              if (filteredMembers.isEmpty)
+                                _buildEmptyState(isFiltered: true)
+                              else
+                                ...filteredMembers.map(
+                                  (member) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 10),
+                                    child: _buildMemberCard(
+                                      member.key,
+                                      member.value,
+                                    ),
                                   ),
-                                  builder: (context, snapshot) {
-                                    if (snapshot.connectionState ==
-                                        ConnectionState.waiting) {
-                                      return const AttendUsListTile(
-                                        leadingIcon: Icons.person_outline,
-                                        title: 'Loading...',
-                                        subtitle: 'Please wait',
-                                      );
-                                    }
-
-                                    final enrichedData =
-                                        snapshot.data ?? memberData;
-                                    return _buildMemberCard(
-                                      member.id,
-                                      enrichedData,
-                                    );
-                                  },
                                 ),
-                              );
-                            }),
-                        ],
+                            ],
+                          );
+                        },
                       );
                     },
                   ),
@@ -266,42 +281,19 @@ class _ManageMembersScreenState extends State<ManageMembersScreen> {
         .snapshots();
   }
 
-  Future<Map<String, dynamic>> _enrichMemberData(
-    String memberId,
-    Map<String, dynamic> memberData,
-  ) async {
-    try {
-      // Fetch user profile data from Customers collection
-      final userDoc = await _db.collection('Customers').doc(memberId).get();
-      if (userDoc.exists) {
-        final userData = userDoc.data()!;
-        // Merge membership data with user profile data
-        return {
-          ...memberData, // membership data (role, status, joinedAt, etc.)
-          'name': userData['name'] ?? userData['displayName'] ?? 'Unknown User',
-          'email': userData['email'] ?? '',
-          'profilePictureUrl': userData['profilePictureUrl'],
-        };
-      }
-    } catch (e) {
-      // If user fetch fails, return original data
-    }
-    return memberData;
-  }
-
-  List<QueryDocumentSnapshot> _filterMembers(
-    List<QueryDocumentSnapshot> members,
+  List<MapEntry<String, Map<String, dynamic>>> _filterMembers(
+    List<MapEntry<String, Map<String, dynamic>>> members,
   ) {
     return members.where((member) {
-      final data = member.data() as Map<String, dynamic>;
+      final data = member.value;
       final name = (data['name']?.toString() ?? '').toLowerCase();
-      final email = (data['email']?.toString() ?? '').toLowerCase();
+      final username = (data['username']?.toString() ?? '').toLowerCase();
       final role = data['role']?.toString() ?? 'member';
       final status = data['status']?.toString() ?? 'approved';
 
       // Filter by search query
       if (_searchQuery.isNotEmpty) {
-        if (!name.contains(_searchQuery) && !email.contains(_searchQuery)) {
+        if (!name.contains(_searchQuery) && !username.contains(_searchQuery)) {
           return false;
         }
       }

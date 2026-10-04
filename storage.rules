@@ -3,7 +3,8 @@ service firebase.storage {
   match /b/{bucket}/o {
     function fullUser() {
       return request.auth != null &&
-        request.auth.token.firebase.sign_in_provider != 'anonymous';
+        request.auth.token.firebase.sign_in_provider != 'anonymous' &&
+        !firestore.exists(/databases/(default)/documents/account_deletion_jobs/$(request.auth.uid));
     }
 
     function validImage(maxBytes) {

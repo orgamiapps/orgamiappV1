@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:attendus/Permissions/permissions_helper.dart';
@@ -17,10 +18,12 @@ class ModernQRScannerScreen extends StatefulWidget {
 
 class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
     with TickerProviderStateMixin {
-  Barcode? result;
   QRViewController? controller;
+  StreamSubscription<Barcode>? _scanSubscription;
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
   Future<bool>? _cameraInitFuture;
+  Future<bool>? _permissionFuture;
+  bool _completed = false;
 
   final TextEditingController _codeController = TextEditingController();
 
@@ -37,15 +40,9 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
   void initState() {
     super.initState();
     _initializeAnimations();
+    _animationController.forward();
     // Memoize camera initialization to avoid recreating the Future on rebuilds
     _cameraInitFuture = _initializeCamera();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Re-check permissions when returning to this screen
-    _checkPermissions();
   }
 
   void _initializeAnimations() {
@@ -70,11 +67,15 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
     _pulseController.repeat(reverse: true);
   }
 
-  Future<void> _checkPermissions() async {
+  Future<bool> _checkPermissions() => _permissionFuture ??=
+      _requestCameraPermission().whenComplete(() => _permissionFuture = null);
+
+  Future<bool> _requestCameraPermission() async {
     try {
       final hasPermission = await PermissionsHelperClass.checkCameraPermission(
         context: context,
       );
+      if (!mounted || _completed) return false;
       QRDebugHelper.logCameraPermissionStatus(hasPermission);
       setState(() {
         _isCameraPermissionGranted = hasPermission;
@@ -82,13 +83,15 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
       if (hasPermission) {
         debugPrint('Camera permission granted for QR scanner');
       }
+      return hasPermission;
     } catch (e) {
       // Handle permission denied or emulator scenario
       debugPrint('Camera permission check failed in QR scanner: $e');
       QRDebugHelper.logScannerInitialization(false, e.toString());
-      setState(() {
-        _isCameraPermissionGranted = false;
-      });
+      if (mounted && !_completed) {
+        setState(() => _isCameraPermissionGranted = false);
+      }
+      return false;
     }
   }
 
@@ -175,21 +178,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
                     ),
                     const SizedBox(height: 30),
                     ElevatedButton(
-                      onPressed: () async {
-                        await _checkPermissions();
-                        if (_isCameraPermissionGranted) {
-                          setState(() {
-                            // Re-run camera initialization now that permission is granted
-                            _cameraInitFuture = _initializeCamera();
-                          });
-                        } else {
-                          // If still no permission, show manual entry option
-                          setState(() {
-                            _isManualEntry = true;
-                          });
-                          _animationController.forward();
-                        }
-                      },
+                      onPressed: _retryCameraPermission,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppThemeColor.darkBlueColor,
                         foregroundColor: AppThemeColor.pureWhiteColor,
@@ -283,12 +272,23 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
 
   Future<bool> _initializeCamera() async {
     try {
-      await _checkPermissions();
-      return _isCameraPermissionGranted;
+      return await _checkPermissions();
     } catch (e) {
       debugPrint('Camera initialization failed: $e');
       // For emulator, always return false to show demo mode
       return false;
+    }
+  }
+
+  Future<void> _retryCameraPermission() async {
+    if (!mounted || _completed || _permissionFuture != null) return;
+    final pending = _initializeCamera();
+    setState(() => _cameraInitFuture = pending);
+    final granted = await pending;
+    if (!mounted || _completed) return;
+    if (!granted) {
+      setState(() => _isManualEntry = true);
+      _animationController.forward();
     }
   }
 
@@ -403,11 +403,6 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
               setState(() {
                 _isManualEntry = !_isManualEntry;
               });
-              if (_isManualEntry) {
-                _animationController.forward();
-              } else {
-                _animationController.reverse();
-              }
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
@@ -629,10 +624,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
         child: Row(
           children: [
             GestureDetector(
-              onTap: () {
-                // Safely navigate back without result
-                Navigator.of(context).pop();
-              },
+              onTap: () => _finish(null),
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -663,19 +655,31 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
     );
   }
 
-  void _toggleFlash() {
-    setState(() {
-      _isFlashOn = !_isFlashOn;
-    });
-    controller?.toggleFlash();
+  Future<void> _toggleFlash() async {
+    final active = controller;
+    if (active == null || !mounted || _completed) return;
+    try {
+      await active.toggleFlash();
+      if (mounted && !_completed && identical(controller, active)) {
+        setState(() => _isFlashOn = !_isFlashOn);
+      }
+    } catch (error) {
+      debugPrint('QR flashlight unavailable: $error');
+    }
   }
 
   void _onQRViewCreated(QRViewController controller) {
-    setState(() {
-      this.controller = controller;
-    });
+    if (!mounted || _completed) {
+      _cameraOperation(controller.pauseCamera());
+      return;
+    }
+    _cancelScanSubscription();
+    this.controller = controller;
 
-    controller.scannedDataStream.listen((scanData) async {
+    _scanSubscription = controller.scannedDataStream.listen((scanData) {
+      if (!mounted || _completed || !identical(this.controller, controller)) {
+        return;
+      }
       if (scanData.code != null) {
         final scannedCode = scanData.code!;
 
@@ -719,17 +723,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
         }
 
         if (eventCode != null) {
-          _codeController.text = eventCode;
-          setState(() {
-            result = scanData;
-          });
-
-          // Haptic feedback
-          HapticFeedback.lightImpact();
-
-          // Return the scanned code to the previous screen
-          if (!mounted) return;
-          Navigator.of(context).pop(eventCode);
+          _finish(eventCode);
         } else {
           ShowToast().showNormalToast(
             msg: 'Invalid QR code format. Please scan a valid event QR code.',
@@ -739,17 +733,52 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
     });
   }
 
-  Future<void> _handleSignIn() async {
-    if (_codeController.text.isEmpty) {
+  void _handleSignIn() {
+    if (!mounted || _completed) return;
+    final code = _codeController.text.trim();
+    if (code.isEmpty) {
       ShowToast().showNormalToast(msg: 'Enter the six-character venue code.');
       return;
     }
-    HapticFeedback.lightImpact();
-    Navigator.of(context).pop(_codeController.text.trim().toUpperCase());
+    _finish(code.toUpperCase());
+  }
+
+  void _finish(String? code) {
+    if (!mounted || _completed || ModalRoute.of(context)?.isCurrent == false) {
+      return;
+    }
+    _completed = true;
+    _cancelScanSubscription();
+    _cameraOperation(controller?.pauseCamera());
+    if (code != null) unawaited(HapticFeedback.lightImpact());
+    Navigator.of(context).pop(code);
+  }
+
+  void _cancelScanSubscription() {
+    final subscription = _scanSubscription;
+    _scanSubscription = null;
+    if (subscription != null) {
+      _cameraOperation(subscription.cancel());
+    }
+  }
+
+  void _cameraOperation(Future<void>? operation) {
+    if (operation == null) return;
+    unawaited(
+      operation.catchError((Object error) {
+        debugPrint('QR camera operation failed: $error');
+      }),
+    );
   }
 
   @override
   void dispose() {
+    _completed = true;
+    _cancelScanSubscription();
+    _cameraOperation(controller?.pauseCamera());
+    // qr_code_scanner_plus 2.2 owns controller disposal in QRView. Its public
+    // dispose method is deprecated and does nothing; release our reference.
+    controller = null;
     _animationController.dispose();
     _pulseController.dispose();
     _codeController.dispose();
@@ -759,17 +788,24 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
   @override
   void deactivate() {
     // Pause camera when screen is deactivated
-    controller?.pauseCamera();
+    _cameraOperation(controller?.pauseCamera());
     super.deactivate();
   }
 
   @override
   void reassemble() {
     super.reassemble();
-    // Resume camera when screen is reassembled
-    if (Platform.isAndroid) {
-      controller?.pauseCamera();
+    if (!kIsWeb) _cameraOperation(_restartCamera());
+  }
+
+  Future<void> _restartCamera() async {
+    final active = controller;
+    if (active == null || !mounted || _completed) return;
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      await active.pauseCamera();
     }
-    controller?.resumeCamera();
+    if (mounted && !_completed && identical(controller, active)) {
+      await active.resumeCamera();
+    }
   }
 }

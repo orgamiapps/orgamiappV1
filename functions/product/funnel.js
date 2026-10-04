@@ -6,6 +6,9 @@ const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {Timestamp, FieldValue} = require("firebase-admin/firestore");
 
 const EVENTS = new Set([
+  "smart_arrival_fallback",
+  "smart_arrival_completed",
+  "attendance_offline_reconciled",
   "guest_discover_view",
   "guest_auth_cta_selected",
   "guest_locked_feature_prompt",
@@ -55,7 +58,7 @@ const EVENTS = new Set([
   "event_wizard_abandoned",
 ]);
 const DIMENSIONS = new Set([
-  "entryPoint", "feature", "authChoice", "checkInMethod", "platform",
+  "durationMs", "entryPoint", "feature", "authChoice", "checkInMethod", "platform",
   "result", "errorCategory", "section", "position", "radiusBand",
   "locationSource", "category", "accessMode", "resultCount", "source",
   "targetType", "metro", "categoryId", "choice", "experienceVersion",
@@ -66,21 +69,20 @@ const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 async function rateLimit(db, uid, nowMs = Date.now()) {
   const id = crypto.createHash("sha256").update(uid).digest("hex").slice(0, 32);
   const ref = db.collection("service_rate_limits").doc(`funnel_${id}`);
-  let allowed = false;
-  await db.runTransaction(async (transaction) => {
+  const allowed = await db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(ref);
     const data = snapshot.exists ? snapshot.data() : {};
     const start = Number(data.windowStartedAtMs || 0);
     const active = nowMs - start < 60000;
     const count = active ? Number(data.count || 0) : 0;
-    if (count >= 120) return;
-    allowed = true;
+    if (count >= 120) return false;
     transaction.set(ref, {
       service: "product_funnel",
       windowStartedAtMs: active ? start : nowMs,
       count: count + 1,
       expiresAt: Timestamp.fromMillis(nowMs + 120000),
     }, {merge: true});
+    return true;
   });
   if (!allowed) throw new HttpsError("resource-exhausted", "Analytics rate limit reached.");
 }
@@ -132,7 +134,14 @@ function createRecordProductFunnelEvent(adminSdk) {
 }
 
 function increment(target, key) {
-  target[key] = Number(target[key] || 0) + 1;
+  // The Firestore serializer itself uses ordinary objects internally. Escape
+  // reserved map names before serialization as well as using safe local maps.
+  // '%' is not allowed by dimension validation; escaping it also makes legacy
+  // values unambiguous. Ordinary existing dimension bucket names stay unchanged.
+  const raw = String(key);
+  const bucket = /^__.*__$/.test(raw) || raw.startsWith("%") ?
+    `%${Buffer.from(raw, "utf8").toString("base64url")}` : raw;
+  target[bucket] = Number(target[bucket] || 0) + 1;
 }
 
 function createAggregateProductFunnelDaily(adminSdk) {
@@ -149,11 +158,13 @@ function createAggregateProductFunnelDaily(adminSdk) {
     const snapshot = await db.collection("product_funnel_events")
         .where("occurredAt", ">=", Timestamp.fromDate(start))
         .where("occurredAt", "<", Timestamp.fromDate(end)).get();
-    const counts = {};
-    const byEntryPoint = {};
-    const byCheckInMethod = {};
-    const byFeature = {};
-    const discoveryCounts = {};
+    // Dimension values are untrusted property names, including __proto__ and
+    // constructor. Null-prototype maps count them as data, not inherited keys.
+    const counts = Object.create(null);
+    const byEntryPoint = Object.create(null);
+    const byCheckInMethod = Object.create(null);
+    const byFeature = Object.create(null);
+    const discoveryCounts = Object.create(null);
     const sessions = new Set();
     for (const doc of snapshot.docs) {
       const data = doc.data();
@@ -174,6 +185,7 @@ function createAggregateProductFunnelDaily(adminSdk) {
       byEntryPoint,
       byCheckInMethod,
       byFeature,
+      dimensionKeyEncoding: "reserved-base64url-v1",
       discovery: {
         counts: discoveryCounts,
         eventDetailCtr: (discoveryCounts.discovery_view || 0) > 0 ?

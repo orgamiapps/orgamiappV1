@@ -6,6 +6,12 @@ plugins {
     id "com.google.gms.google-services"
 }
 
+def nativeRelease = new Properties()
+def nativeReleaseFile = rootProject.file('native-release.properties')
+if (nativeReleaseFile.exists()) {
+    nativeReleaseFile.withInputStream { nativeRelease.load(it) }
+}
+
 def kotlin_version = '2.3.10'
 def mapsAndroidApiKey = System.getenv('GOOGLE_MAPS_ANDROID_API_KEY') ?: ''
 def signingProperties = new Properties()
@@ -69,7 +75,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.stormdeve.orgami"
+        applicationId = nativeRelease.getProperty("applicationId", "com.stormdeve.orgami")
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdkVersion = project.findProperty('android.minSdkVersion')?.toInteger() ?: 24
@@ -78,6 +84,7 @@ android {
         versionName = flutter.versionName
         // Preserve Flutter's `applicationName` placeholder while adding Maps.
         manifestPlaceholders["GOOGLE_MAPS_ANDROID_API_KEY"] = mapsAndroidApiKey
+        manifestPlaceholders["ATTENDUS_ASSOCIATED_DOMAIN"] = nativeRelease.getProperty("associatedDomain", "attendus.app")
         ndk {
             abiFilters 'arm64-v8a', 'armeabi-v7a'
         }

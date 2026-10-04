@@ -132,6 +132,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       selectedIndex: _selectedIndex,
       destinations: destinations,
       actions: _actionsForTab(_selectedIndex),
+      onLoginPressed: isGuest
+          ? () => showGuestAuthSheet(context: context)
+          : null,
       onNotificationsPressed: _openNotifications,
       onProfilePressed: _selectedIndex == RouteNames.homeTab
           ? null

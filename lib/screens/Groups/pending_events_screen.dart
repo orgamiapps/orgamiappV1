@@ -1,7 +1,7 @@
+import 'package:attendus/Services/community_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
@@ -500,10 +500,9 @@ class _PendingEventsScreenState extends State<PendingEventsScreen> {
     setState(() => _processingEvents.add(eventId));
 
     try {
-      await _db.collection('Events').doc(eventId).update({
-        'status': 'scheduled',
-        'approvedAt': FieldValue.serverTimestamp(),
-        'approvedBy': FirebaseAuth.instance.currentUser?.uid,
+      await CommunityService().mutate('approveEvent', {
+        'organizationId': widget.organizationId,
+        'eventId': eventId,
       });
 
       if (mounted) {
@@ -524,7 +523,7 @@ class _PendingEventsScreenState extends State<PendingEventsScreen> {
         );
       }
     } finally {
-      setState(() => _processingEvents.remove(eventId));
+      if (mounted) setState(() => _processingEvents.remove(eventId));
     }
   }
 
@@ -535,7 +534,7 @@ class _PendingEventsScreenState extends State<PendingEventsScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Reject Event'),
         content: Text(
-          'Are you sure you want to reject "${data['title']}"? This will permanently delete the event.',
+          'Are you sure you want to reject "${data['title']}"? The event will be marked as rejected.',
         ),
         actions: [
           TextButton(
@@ -551,18 +550,21 @@ class _PendingEventsScreenState extends State<PendingEventsScreen> {
       ),
     );
 
-    if (confirmed != true) return;
+    if (!mounted || confirmed != true) return;
 
     setState(() => _processingEvents.add(eventId));
 
     try {
-      // Delete the event instead of just changing status
-      await _db.collection('Events').doc(eventId).delete();
+      // Keep event records while recording the moderation decision.
+      await CommunityService().mutate('rejectEvent', {
+        'organizationId': widget.organizationId,
+        'eventId': eventId,
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Event "${data['title']}" rejected and removed'),
+            content: Text('Event "${data['title']}" rejected'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -577,7 +579,7 @@ class _PendingEventsScreenState extends State<PendingEventsScreen> {
         );
       }
     } finally {
-      setState(() => _processingEvents.remove(eventId));
+      if (mounted) setState(() => _processingEvents.remove(eventId));
     }
   }
 

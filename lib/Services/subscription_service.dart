@@ -1,3 +1,5 @@
+import 'package:attendus/config/safety_flags.dart';
+import 'package:attendus/Services/event_creation_entitlement_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/widgets.dart';
@@ -10,7 +12,9 @@ import 'package:attendus/Services/stripe_service.dart';
 class SubscriptionService extends ChangeNotifier {
   static final SubscriptionService _instance = SubscriptionService._internal();
   factory SubscriptionService() => _instance;
-  SubscriptionService._internal();
+  SubscriptionService._internal() {
+    EventCreationEntitlementService.instance.addListener(notifyListeners);
+  }
 
   FirebaseFirestore get _firestore => FirebaseFirestore.instance;
   FirebaseAuth get _auth => FirebaseAuth.instance;
@@ -57,11 +61,13 @@ class SubscriptionService extends ChangeNotifier {
 
   /// Check if user has unlimited events
   bool hasUnlimitedEvents() {
-    return _currentSubscription?.hasUnlimitedEvents() ?? false;
+    return EventCreationEntitlementService.instance.unlimited ||
+        (_currentSubscription?.hasUnlimitedEvents() ?? false);
   }
 
   /// Check if user can create an event based on their tier
   Future<bool> canCreateEvent() async {
+    if (hasUnlimitedEvents()) return true;
     if (_currentSubscription == null || !_currentSubscription!.isActive) {
       return false; // Free tier handled by CreationLimitService
     }
@@ -83,6 +89,7 @@ class SubscriptionService extends ChangeNotifier {
 
   /// Get remaining events for current billing period
   int? getRemainingEvents() {
+    if (hasUnlimitedEvents()) return -1;
     if (_currentSubscription == null || !_currentSubscription!.isActive) {
       return null;
     }
@@ -100,6 +107,7 @@ class SubscriptionService extends ChangeNotifier {
 
   /// Initialize subscription service and load user's subscription
   Future<void> initialize() async {
+    EventCreationEntitlementService.instance.initialize();
     if (_auth.currentUser == null) return;
 
     try {
@@ -358,7 +366,7 @@ class SubscriptionService extends ChangeNotifier {
 
   /// Check if user can create events (has premium subscription)
   bool canCreateEvents() {
-    return hasPremium;
+    return hasUnlimitedEvents() || hasPremium;
   }
 
   /// Get subscription status text for UI
@@ -412,6 +420,7 @@ class SubscriptionService extends ChangeNotifier {
 
   /// Clear subscription data (for logout)
   void clear() {
+    EventCreationEntitlementService.instance.clear();
     _currentSubscription = null;
     _isLoading = false;
     notifyListeners();
@@ -423,6 +432,7 @@ class SubscriptionService extends ChangeNotifier {
     required String planId,
     required String priceId,
   }) async {
+    if (!SafetyFlags.paidCheckoutEnabled) return null;
     try {
       final userId = _auth.currentUser?.uid;
       final userEmail = _auth.currentUser?.email;
@@ -479,6 +489,7 @@ class SubscriptionService extends ChangeNotifier {
     required String customerId,
     required String priceId,
   }) async {
+    if (!SafetyFlags.paidCheckoutEnabled) return false;
     try {
       final userId = _auth.currentUser?.uid;
       if (userId == null) return false;
@@ -518,6 +529,7 @@ class SubscriptionService extends ChangeNotifier {
 
   /// Process real Stripe payment (for future use)
   Future<bool> processStripePayment({required String planId}) async {
+    if (!SafetyFlags.paidCheckoutEnabled) return false;
     try {
       _isLoading = true;
       notifyListeners();
@@ -572,6 +584,7 @@ class SubscriptionService extends ChangeNotifier {
   /// Update existing subscription price (for migration purposes)
   /// This method updates the price from $20 to $5 for existing subscriptions
   Future<bool> updateSubscriptionPrice() async {
+    if (!SafetyFlags.paidCheckoutEnabled) return false;
     final userId = _auth.currentUser?.uid;
     if (userId == null || _currentSubscription == null) return false;
 
@@ -603,6 +616,7 @@ class SubscriptionService extends ChangeNotifier {
 
   /// Schedule a plan change to take effect after current period ends
   Future<bool> schedulePlanChange(String newPlanId) async {
+    if (!SafetyFlags.scheduledPlanChangesEnabled) return false;
     final userId = _auth.currentUser?.uid;
     if (userId == null || _currentSubscription == null) return false;
 
@@ -649,6 +663,7 @@ class SubscriptionService extends ChangeNotifier {
 
   /// Cancel a scheduled plan change
   Future<bool> cancelScheduledPlanChange() async {
+    if (!SafetyFlags.scheduledPlanChangesEnabled) return false;
     final userId = _auth.currentUser?.uid;
     if (userId == null || _currentSubscription == null) return false;
 
@@ -763,6 +778,7 @@ class SubscriptionService extends ChangeNotifier {
 
   /// Increment monthly event count for Basic tier
   Future<bool> incrementMonthlyEventCount() async {
+    if (EventCreationEntitlementService.instance.unlimited) return true;
     final userId = _auth.currentUser?.uid;
     if (userId == null || _currentSubscription == null) return false;
 
@@ -833,6 +849,7 @@ class SubscriptionService extends ChangeNotifier {
 
   /// Upgrade from Basic to Premium
   Future<bool> upgradeTier({required String newPlanId}) async {
+    if (!SafetyFlags.paidCheckoutEnabled) return false;
     final userId = _auth.currentUser?.uid;
     if (userId == null || _currentSubscription == null) return false;
 

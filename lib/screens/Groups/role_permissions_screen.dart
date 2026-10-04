@@ -23,6 +23,13 @@ class RolePermissionsScreen extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
+          if (snapshot.hasError) {
+            return const Center(
+              child: Text(
+                'Could not load members. Reopen this screen to retry.',
+              ),
+            );
+          }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
             return const Center(child: Text('No members'));
           }
@@ -31,7 +38,7 @@ class RolePermissionsScreen extends StatelessWidget {
             itemBuilder: (context, i) {
               final doc = snapshot.data!.docs[i];
               final data = doc.data() as Map<String, dynamic>;
-              final userId = (data['userId'] ?? '').toString();
+              final userId = (data['userId'] ?? doc.id).toString();
               final role = (data['role'] ?? 'Member').toString();
               final List<dynamic> perms =
                   (data['permissions'] as List<dynamic>?) ?? [];
@@ -66,7 +73,11 @@ class _MemberTile extends StatefulWidget {
 }
 
 class _MemberTileState extends State<_MemberTile> {
-  late String _role = widget.role;
+  late String _role = switch (widget.role.toLowerCase()) {
+    'admin' => 'Admin',
+    'owner' => 'Owner',
+    _ => 'Member',
+  };
   late final OrganizationHelper _helper = OrganizationHelper();
   final Map<String, bool> _permMap = {
     'CreateEditEvents': false,
@@ -90,13 +101,23 @@ class _MemberTileState extends State<_MemberTile> {
         .where((e) => e.value)
         .map((e) => e.key)
         .toList();
-    await _helper.updateMemberPermissions(
+    final saved = await _helper.updateMemberPermissions(
       widget.organizationId,
       widget.userId,
       permissions: selected,
       role: _role,
     );
-    if (mounted) setState(() => _saving = false);
+    if (!mounted) return;
+    setState(() => _saving = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          saved
+              ? 'Permissions saved.'
+              : 'Could not save permissions. Check your access and retry.',
+        ),
+      ),
+    );
   }
 
   @override
@@ -116,10 +137,20 @@ class _MemberTileState extends State<_MemberTile> {
                 DropdownButton<String>(
                   value: _role,
                   items: const [
+                    DropdownMenuItem(
+                      value: 'Owner',
+                      enabled: false,
+                      child: Text('Owner'),
+                    ),
                     DropdownMenuItem(value: 'Admin', child: Text('Admin')),
                     DropdownMenuItem(value: 'Member', child: Text('Member')),
                   ],
-                  onChanged: (v) => setState(() => _role = v ?? 'Member'),
+                  onChanged: _role == 'Owner'
+                      ? null
+                      : (v) {
+                          if (v == 'Owner') return;
+                          setState(() => _role = v ?? 'Member');
+                        },
                 ),
               ],
             ),

@@ -1,3 +1,4 @@
+import 'package:attendus/widgets/smart_arrival_card.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -71,6 +72,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
   String? _selectedCategoryLower;
   String? _discoverError;
   bool _useLegacyDiscovery = true;
+  bool _discoveryConfigReady = false;
   int _marketplaceExperienceVersion = 1;
   // Removed unused _categoryOptions (old UI)
 
@@ -99,7 +101,8 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
       final document = await FirebaseFirestore.instance
           .collection('AppConfig')
           .doc('discovery')
-          .get();
+          .get()
+          .timeout(const Duration(seconds: 10));
       if (mounted) {
         setState(() {
           _useLegacyDiscovery = resolveUseLegacyDiscovery(document.data());
@@ -112,6 +115,8 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
       // Fail closed to the legacy feed. The marketplace is enabled only by an
       // explicit, successfully loaded configuration value.
       if (mounted) setState(() => _useLegacyDiscovery = true);
+    } finally {
+      if (mounted) setState(() => _discoveryConfigReady = true);
     }
   }
 
@@ -257,7 +262,9 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
     final isGuestMode = _isGuestMode;
     final publicContent =
         widget._publicContentOverride ??
-        (_useLegacyDiscovery
+        (!_discoveryConfigReady
+            ? const Center(child: CircularProgressIndicator())
+            : _useLegacyDiscovery
             ? const legacy.HomeScreen(
                 key: ValueKey('legacy-public-events'),
                 showHeader: false,
@@ -280,6 +287,9 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
             child: Column(
               children: [
                 if (!isGuestMode) _buildSegmentedTabs(),
+                if ((_tabIndex == 0 || isGuestMode) &&
+                    widget._publicContentOverride == null)
+                  const SmartArrivalCard(),
                 Expanded(
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 250),
@@ -683,7 +693,7 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
                   },
                 ),
                 AttendUsButton.secondary(
-                  label: 'Sign in',
+                  label: 'Log in',
                   icon: Icons.login,
                   onPressed: () async {
                     ProductFunnelService().record(

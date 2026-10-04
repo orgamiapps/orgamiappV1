@@ -1,5 +1,5 @@
-import 'dart:io';
-import 'dart:typed_data';
+import 'package:attendus/Services/artifact_download_service.dart';
+import 'package:attendus/Services/event_export_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:intl/intl.dart';
@@ -10,7 +10,6 @@ import 'package:attendus/models/event_model.dart';
 import 'package:attendus/models/event_question_model.dart';
 import 'package:attendus/screens/Events/event_analytics_screen.dart';
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
-import 'package:attendus/StorageHelper/file_storage.dart';
 import 'package:attendus/Utils/app_buttons.dart';
 import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/router.dart';
@@ -18,10 +17,7 @@ import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/dimensions.dart';
 import 'package:attendus/Services/subscription_service.dart';
 import 'package:attendus/widgets/upgrade_prompt_dialog.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xcel;
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:attendus/screens/Events/Attendance/check_in_console_screen.dart';
 
 class AttendanceSheetScreen extends StatefulWidget {
@@ -90,91 +86,27 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
     return indexIs;
   }
 
-  void makeExcelFileForSignIn() {
-    titlesOfSheet = [];
-    titlesOfSheet = ['#', 'Name', 'Date', 'Time'];
-
-    final xcel.Workbook workbook = xcel.Workbook();
-    final xcel.Worksheet sheet = workbook.worksheets[0];
-    int index = 1;
-    for (var element in questionsList) {
-      titlesOfSheet.add(element.questionTitle);
-    }
-
-    for (var element in titlesOfSheet) {
-      sheet.getRangeByIndex(1, index).setText(element);
-      index++;
-    }
-
-    for (var i = 0; i < attendanceList.length; i++) {
-      final item = attendanceList[i];
-      sheet.getRangeByIndex(i + 2, 1).setText((i + 1).toString());
-      sheet.getRangeByIndex(i + 2, 2).setText(item.userName);
-      sheet
-          .getRangeByIndex(i + 2, 3)
-          .setText(DateFormat('MMM dd, yyyy').format(item.attendanceDateTime));
-      sheet
-          .getRangeByIndex(i + 2, 4)
-          .setText(DateFormat('h:mm a').format(item.attendanceDateTime));
-      for (var element in item.answers) {
-        String title = element.split('--ans--').first;
-        String answer = element.split('--ans--').last;
-        int? indexIs = getTitleIndex(title: title);
-        if (indexIs != null) {
-          sheet.getRangeByIndex(i + 2, indexIs).setText(answer);
-        }
+  final _exportService = EventExportService();
+  bool _exporting = false;
+  Future<void> makeExcelFileForSignIn() => _exportComplete('arrived');
+  Future<void> makeExcelFileForRegister() => _exportComplete('all');
+  Future<void> _exportComplete(String attendanceStatus) async {
+    if (_exporting) return;
+    setState(() => _exporting = true);
+    try {
+      final outcome = await _exportService.download(
+        eventModel.id,
+        attendanceStatus: attendanceStatus,
+        sharePositionOrigin: artifactShareOrigin(context),
+      );
+      if (mounted) ShowToast().showSnackBar(outcome.message, context);
+    } catch (error) {
+      if (mounted) {
+        ShowToast().showSnackBar('Export did not finish: $error', context);
       }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
     }
-
-    final List<int> bytes = workbook.saveAsStream();
-    FileStorage.writeCounter(
-      Uint8List.fromList(bytes),
-      "${eventModel.title} Attendance Sheet.xlsx",
-    ).then((value) {
-      ShowToast().showNormalToast(
-        msg: '${eventModel.title} Attendance Sheet.xlsx Saved!',
-      );
-    });
-
-    workbook.dispose();
-  }
-
-  void makeExcelFileForRegister() {
-    titlesOfSheet = [];
-    titlesOfSheet = ['#', 'Name', 'Date', 'Time'];
-
-    final xcel.Workbook workbook = xcel.Workbook();
-    final xcel.Worksheet sheet = workbook.worksheets[0];
-    int index = 1;
-
-    for (var element in titlesOfSheet) {
-      sheet.getRangeByIndex(1, index).setText(element);
-      index++;
-    }
-
-    for (var i = 0; i < registerAttendanceList.length; i++) {
-      final item = registerAttendanceList[i];
-      sheet.getRangeByIndex(i + 2, 1).setText((i + 1).toString());
-      sheet.getRangeByIndex(i + 2, 2).setText(item.userName);
-      sheet
-          .getRangeByIndex(i + 2, 3)
-          .setText(DateFormat('MMM dd, yyyy').format(item.attendanceDateTime));
-      sheet
-          .getRangeByIndex(i + 2, 4)
-          .setText(DateFormat('h:mm a').format(item.attendanceDateTime));
-    }
-
-    final List<int> bytes = workbook.saveAsStream();
-    FileStorage.writeCounter(
-      Uint8List.fromList(bytes),
-      "${eventModel.title} ${selectedTab == 1 ? '' : "RSVP's"} Attendance Sheet.xlsx",
-    ).then((value) {
-      ShowToast().showNormalToast(
-        msg: '${eventModel.title} Attendance Sheet.xlsx Saved!',
-      );
-    });
-
-    workbook.dispose();
   }
 
   void _showExportOptions() {
@@ -337,49 +269,8 @@ class _AttendanceSheetScreenState extends State<AttendanceSheetScreen> {
     );
   }
 
-  Future<void> _shareAttendanceSheet() async {
-    try {
-      // Create the Excel file first
-      if (selectedTab == 1) {
-        makeExcelFileForSignIn();
-      } else {
-        makeExcelFileForRegister();
-      }
-
-      // Wait a moment for the file to be created
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      // Get the file path
-      final fileName =
-          "${eventModel.title} ${selectedTab == 1 ? '' : "RSVP's"} Attendance Sheet.xlsx";
-      final directory = await getApplicationDocumentsDirectory();
-      final filePath = '${directory.path}/$fileName';
-
-      // Check if file exists
-      final file = File(filePath);
-      if (await file.exists()) {
-        // Share the file
-        await SharePlus.instance.share(
-          ShareParams(
-            files: [XFile(filePath)],
-            text: 'Attendance Sheet for ${eventModel.title}',
-            subject: 'Event Attendance Sheet',
-          ),
-        );
-      } else {
-        if (mounted) {
-          ShowToast().showSnackBar(
-            'File not found. Please try saving first.',
-            context,
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ShowToast().showSnackBar('Error sharing file: $e', context);
-      }
-    }
-  }
+  Future<void> _shareAttendanceSheet() =>
+      _exportComplete(selectedTab == 1 ? 'arrived' : 'all');
 
   @override
   void initState() {

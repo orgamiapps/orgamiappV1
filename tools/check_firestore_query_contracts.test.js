@@ -23,3 +23,11 @@ test("missing Followers.userId index fails the contract check", () => {
   );
   assert.throws(() => validate(root, value), /Followers\.userId/);
 });
+
+for (const collection of ["Conversations", "Messages"]) {
+  test(`missing ${collection} collection index fails`, () => {
+    const value = manifest();
+    value.indexes = value.indexes.filter((entry) => entry.collectionGroup !== collection);
+    assert.throws(() => validate(root, value), new RegExp(collection));
+  });
+}
