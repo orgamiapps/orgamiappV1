@@ -1,6 +1,6 @@
 Status: implementation in progress; web/backend qualification only. Native/store/Admin distribution is excluded.
 
-Latest checkpoint, October 4 at 20:47 UTC: the new registration, membership and guest-page repairs (WEBQA-12 through WEBQA-21) pass local verification: 515 Flutter tests with clean full analysis, 392 Functions tests with clean lint, 55 Firestore launch tests, 36 rendered public-page cases across four browser projects, and 23 asset/versioning checks. The launch receipt precedes the final display-only changes; matching complete hosted CI is still required for the new source freeze. These repairs have not been deployed. Candidate10 remains held after its failed browser run; seven retired fixture roster records await the new fenced backend and separately verified cleanup. Production is unchanged.
+Latest checkpoint, October 4 at 21:09 UTC: hosted source `4ba7e20` failed qualification. Firebase emulator, Flutter quality and secret checks passed; Functions unit tests passed 392/392, but one of 316 deployment contracts hit an stdin pipe race. Public browsers passed 48/60, with 12 Linux Firefox/WebKit management-page overflow failures; the subsequent Flutter browser step did not run. The new follow-up fixes the test input transport and the confirmed details/contact-form layout defects (WEBQA-22/23). Locally the unchanged contract selection passes 316/316, expanded rendered cases pass 36/36, and asset checks pass 23/23. A fresh exact-source hosted run is required. These repairs have not been deployed. Candidate10 remains held after its failed browser run; seven retired fixture roster records await the new fenced backend and separately verified cleanup. Production is unchanged.
 
 The current journey matrix is [debugging-web-coverage-20261004.md](debugging-web-coverage-20261004.md), and defects are tracked in [debugging-ledger-20261003.md](debugging-ledger-20261003.md). The baseline and dated entries below are chronological evidence, not current readiness claims. A passing earlier CI run does not qualify later source changes or replace live browser, provider, data and observation gates.
 
@@ -492,3 +492,14 @@ not the Windows working-file hash. Final independent preparation review SHA256:
 `2f851eda0f5c2dae5177a15cc08c274bf0fe161bf03ff4a19bb8f2538be82323`.
 Actual successful candidate, deployment, rollback/restore and complete runtime
 source receipts are still required before residual cleanup or another seed.
+
+Hosted run `37233539046` on source `4ba7e2030520929563cddac6dcb5a80a9adce69d`
+passes all 392 Functions cases but fails one release-contract test with a
+stdin-pipe EPIPE race against an intentionally immediate-exit shell guard.
+Its full failed log SHA256 is
+`afafd094bef28cc1c7f9d93f9b1a97a9838f469ea5a09e8ca9d4e96af1d035d8`.
+The test now provides the identical input through a read-only owned fixture
+file; every exit/error/guard-text/no-command assertion is preserved. All five
+guard scripts are unchanged. The focused 11-case suite and unchanged complete
+316-case selection pass locally, and independent review is clear. This run
+remains unqualified; a new exact-source hosted run must pass before merge.

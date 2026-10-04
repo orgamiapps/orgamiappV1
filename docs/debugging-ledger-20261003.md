@@ -615,3 +615,32 @@ The source manifest references this new path and retains the previous
 `49fc8739d038b38eb58ecd506d04369b32c872cef4cc66fbda6308f9fa569dee`
 file for existing cached pages. This stylesheet change does not alter the
 reviewed registration or roster transaction logic.
+
+| ID / severity / surface | Reproduction and expected versus actual behavior | Root cause and correction | Verification and remaining acceptance |
+| --- | --- | --- | --- |
+| WEBQA-22 / P2 / deployment-safety test harness | Hosted source `4ba7e20` passes 392 Functions cases but fails one of 316 release-contract cases when `/bin/bash` exits before Node finishes supplying synthetic stdin, returning EPIPE. | The intentionally immediate-exit guard script races the test's input pipe. Supply exactly the same input through a read-only owned file descriptor and close it in finally. | All five scripts are byte-identical to the prior source. Exit 1, no spawn error, guard text and zero external commands remain required. Focused 11/11 and the unchanged complete serialized selection 316/316 pass; independent review is clear. A replacement exact-source CI run is required. |
+
+Failed CI run `37233539046`, Functions job `111528047406`, is retained with log
+SHA256 `afafd094bef28cc1c7f9d93f9b1a97a9838f469ea5a09e8ca9d4e96af1d035d8`.
+The corrected test SHA256 is
+`c1cdd0773ac996785959bb4a3282fb3158486b52b141e1ff4b6ea5275cb73843`;
+the complete 316-pass local log SHA256 is
+`22a1c231e4c72a32c6d50c3a9d675f99c4a308fad2da09863f1f4330f88c8356`.
+No failing result was accepted, timeout increased or deployment guard weakened.
+
+| ID / severity / surface | Reproduction and expected versus actual behavior | Root cause and correction | Verification and remaining acceptance |
+| --- | --- | --- | --- |
+| WEBQA-23 / P2 / guest management at enlarged text | Hosted Linux Firefox and WebKit overflow the 320px viewport in all six manage states at actual 200% text. The retained Firefox screenshot shows the masked email beyond the viewport; opening the contact disclosure also exposes an input wider than the panel locally. | Details cells have an unbreakable email and automatic grid minimum; the contact form lacks the registration form's width/font rules. Allow details text to wrap with zero minimum width and apply the existing responsive input/label/form styles to the contact form. | New assertions check text rectangles inside details, then actually open the form and check control bounds and 200% text. The expanded pre-fix cases fail in all four projects (three layout failures and one mobile click timeout, retained separately). After correction, 36/36 local rendered cases and 23/23 asset checks pass. Exact-source hosted Linux verification is still required. |
+
+Source `4ba7e20`, browser job `111528047351`, had 48/60 passing public
+cases and 12 failures; its Flutter browser step did not execute. The failed
+artifact `11315330210` is retained with ZIP SHA256
+`14f1bb01d46914aebfdd6dbf0086a2a7a7f65f5968a00e1c67e3b95544780e73`.
+The actual hosted screenshot is 340px wide for a 320px viewport. Per-email
+hosted DOM bounds were not retained; the screenshot and whole-page measurement
+establish overflow without inventing an element measurement.
+
+The corrected immutable registration stylesheet is
+`443a6f84d04a8f0465d4917b63932fdac32250c9250384ac18c95e8dc2e9b879`.
+Both earlier immutable copies remain available. Renderer, transaction and
+deployment-guard script contents are unchanged by this follow-up.

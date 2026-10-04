@@ -61,11 +61,21 @@ for (const filename of scripts) {
     test(`${filename} blocks before any command${requestedOverride ? ' despite force arguments and environment' : ''}`, t => {
       assert.ok(fs.existsSync(bash), 'Bash is required; this guard must not silently skip');
       const f = fixture(t, filename);
-      const result = spawnSync(bash, ['--noprofile', '--norc', './entry.sh', ...(requestedOverride ? ['--force', '--project', 'orgami-66nxok'] : [])], {
-        cwd: f.directory,
-        env: {...f.env, ...(requestedOverride ? {ALLOW_DEPLOY: '1', FORCE_DEPLOY: 'true'} : {})},
-        input: 'synthetic-local-issuer\n', encoding: 'utf8', timeout: 5000, maxBuffer: 16384,
-      });
+      const stdinFile = path.join(f.directory, 'stdin.txt');
+      fs.writeFileSync(stdinFile, 'synthetic-local-issuer\n');
+      // An immediate exit can close a pipe before spawnSync writes its input.
+      // Keep the same available input without a parent-to-child pipe write.
+      const stdin = fs.openSync(stdinFile, 'r');
+      let result;
+      try {
+        result = spawnSync(bash, ['--noprofile', '--norc', './entry.sh', ...(requestedOverride ? ['--force', '--project', 'orgami-66nxok'] : [])], {
+          cwd: f.directory,
+          env: {...f.env, ...(requestedOverride ? {ALLOW_DEPLOY: '1', FORCE_DEPLOY: 'true'} : {})},
+          stdio: [stdin, 'pipe', 'pipe'], encoding: 'utf8', timeout: 5000, maxBuffer: 16384,
+        });
+      } finally {
+        fs.closeSync(stdin);
+      }
       assert.equal(result.error, undefined);
       const commands = fs.existsSync(f.log) ? fs.readFileSync(f.log, 'utf8').trim().split('\n') : [];
       assert.deepEqual(commands, [], 'No login, build, dependency install, deployment, provider setup or dispatch may run');

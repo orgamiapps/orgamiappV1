@@ -63,7 +63,7 @@ for (const scenario of [
         csrfToken: 'synthetic-csrf', expiresAt: new Date(Date.now() + 2 * 3600000)},
       'RegisterAttendance/registration': {eventId: 'event', guestId: 'guest', realName: 'Controlled guest',
         status: scenario.status, ...(scenario.ticket ? {ticketId: 'ticket'} : {})},
-      'GuestAttendees/guest': {maskedEmail: 'c***@example.test'},
+      'GuestAttendees/guest': {maskedEmail: 'c***@qualification.example.test'},
       'Events/event': {title: 'Controlled registration status', status: 'active',
         selectedDateTime: new Date('2035-10-04T15:15:00Z'), eventDurationMinutes: 90, eventTimeZone: 'UTC',
         ticketsEnabled: !!scenario.ticket},
@@ -118,10 +118,45 @@ for (const scenario of [
         codeText: element.querySelector('strong').textContent,
         codeBoxes: [...range.getClientRects()].map((rect) => ({left: rect.left, right: rect.right}))};
     }) : null;
+    const detailBounds = await page.locator('.details').evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      return {left: box.left, right: box.right, values: [...element.querySelectorAll('dt,dd')].map((value) => {
+        const range = document.createRange(); range.selectNodeContents(value);
+        return {text: value.textContent, overflow: getComputedStyle(value).overflowX,
+          textBoxes: [...range.getClientRects()].map((rect) => ({left: rect.left, right: rect.right}))};
+      })};
+    });
+    await page.getByText('Update confirmation email', {exact: true}).click();
+    await expect(page.getByRole('textbox', {name: 'Email address', exact: true})).toBeVisible();
+    const expandedBounds = await page.evaluate(htmlResponsiveProbe);
+    const contactBounds = await page.locator('.contact-update').evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      return {left: box.left, right: box.right, pageFits: document.documentElement.scrollWidth <= window.innerWidth + 1,
+        controls: [...element.querySelectorAll('input:not([type=hidden]),button')].map((control) => {
+          const rect = control.getBoundingClientRect();
+          return {tag: control.tagName, left: rect.left, right: rect.right};
+        })};
+    });
+    // Reset the scroll position before full-page capture so offscreen fixed
+    // skip links remain outside the captured page rather than over its middle.
+    await page.evaluate(() => window.scrollTo({top: 0, left: 0, behavior: 'instant'}));
     await page.screenshot({path: info.outputPath(`manage-${scenario.name}-320px-200percent.png`), fullPage: true});
-    await info.attach('status-and-artifacts.json', {body: JSON.stringify({status, artifacts, bounds, ticketBounds, unexpected}), contentType: 'application/json'});
+    await info.attach('status-and-artifacts.json', {body: JSON.stringify({status, artifacts, bounds, ticketBounds, detailBounds, expandedBounds, contactBounds, unexpected}), contentType: 'application/json'});
     expect(status).toBe(scenario.label);
     expect(bounds.textIs200Percent).toBe(true); expect(bounds.pageFits).toBe(true);
+    for (const value of detailBounds.values) {
+      expect(['hidden', 'clip']).not.toContain(value.overflow);
+      for (const box of value.textBoxes) {
+        expect(box.left).toBeGreaterThanOrEqual(detailBounds.left - 1);
+        expect(box.right).toBeLessThanOrEqual(detailBounds.right + 1);
+      }
+    }
+    expect(contactBounds.pageFits).toBe(true);
+    expect(expandedBounds.textIs200Percent).toBe(true);
+    for (const box of contactBounds.controls) {
+      expect(box.left).toBeGreaterThanOrEqual(contactBounds.left - 1);
+      expect(box.right).toBeLessThanOrEqual(contactBounds.right + 1);
+    }
     expect(unexpected).toEqual([]);
     const pass = page.getByRole('link', {name: 'Check in or get my event pass', exact: true});
     const calendar = page.getByRole('link', {name: 'Download calendar invite', exact: true});

@@ -3,7 +3,7 @@
   "algorithm": "sha256-lf",
   "assets": {
     "public.css": "4b135c20b4843253e824c0ebe35465f48b87573becfc112695d25aa2b2a7fe5c",
-    "registration-email-v2.css": "5b3c898270ee766874a8e7d4db561b791cccb5b0f26fbb4fd6e0bb3e6ed1f311",
+    "registration-email-v2.css": "443a6f84d04a8f0465d4917b63932fdac32250c9250384ac18c95e8dc2e9b879",
     "actions-email-v2.js": "a56cadbc7e57cf165c082b38d96f152959e31666f43aaa1e8090519546b16ed2"
   }
 }
