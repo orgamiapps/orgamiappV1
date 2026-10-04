@@ -444,3 +444,16 @@ All 48 affected deployment-adapter tests also pass in an isolated, credential-fr
 network-blocked run. No timeout was increased, assertion removed or product code
 changed for this diagnostic. The earlier delay's cause is not established;
 fresh hosted CI still must pass on the committed candidate.
+
+Hosted source `c872150c50146c995ff3304e354c4883c88f838d` exposed one stale
+Flutter release-wiring assertion: it expected deployment commands inside the
+now-disabled `deploy_web.sh`. The job reports 464 passing tests and this one
+failure; its retained log SHA256 is
+`757beb67e74be7525d702e8b8fb73a5af1dbd2e8a5efc58bb9cd5a68d62e426a`.
+The failure reproduces locally. The corrected test follows the active candidate
+and promotion workflows, checks retention/packaging/deferred verification before
+sealing, preserves artifact and predecessor checks, rejects promotion rebuilds,
+and checks sealed-byte verification on both production origins. All five tests
+in the affected file pass. The executable Node contracts remain responsible for
+behavioral drift and mismatch cases. No release safeguard was removed; the
+corrected source requires a new hosted run before merge or staging deployment.
