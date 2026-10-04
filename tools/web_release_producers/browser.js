@@ -8,6 +8,7 @@ const dependencies = createRequire(path.resolve(__dirname, '../../tests/browser/
 const serverDependencies = createRequire(path.resolve(__dirname, '../../functions/package.json'));
 const {gitSourceFiles} = require('../web_release_contract');
 const {collectRosterPages} = require('./roster-read');
+const {activateFlutterSemanticsPage} = require('./flutter-semantics');
 const {htmlResponsiveProbe} = require('./safari');
 const {validScope, bindingId} = require('../../functions/communications/qualification-isolation');
 const {chromium, firefox, webkit} = dependencies('@playwright/test');
@@ -15,6 +16,15 @@ const GATES = ['browser-auth-guest-organizer', 'account-switch-privacy', 'cache-
   'accessibility-responsive', 'large-roster-export-download-expiry'];
 const sha = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function openCheckInConsole(page) {
+  for (const label of ['Manage event', 'Check-in']) {
+    const control = page.getByText(label, {exact: true}).last();
+    await control.scrollIntoViewIfNeeded(); await control.click();
+  }
+  await page.getByText('Check-in Console', {exact: true}).waitFor();
+  await page.getByText('Event roster', {exact: true}).waitFor();
+}
 
 function validateFixture(context) {
   if (context.projectId !== 'attendus-staging' || context.baseUrl !== 'https://attendus-staging.web.app') throw Error('Browser qualification requires the exact staging project/origin.');
@@ -262,9 +272,7 @@ async function produce({candidate, context, outputDir}) {
     });
   }
   async function semantics(page) {
-    const placeholder = page.locator('flt-semantics-placeholder');
-    if (await placeholder.count()) await placeholder.first().click({force: true});
-    await page.locator('flt-semantics').first().waitFor({timeout: 90000});
+    await activateFlutterSemanticsPage(page);
   }
   async function app(page, pathname = '/app/discover') {
     await page.goto(context.baseUrl + pathname, {waitUntil: 'domcontentloaded'});
@@ -406,6 +414,30 @@ async function produce({candidate, context, outputDir}) {
       record(gate, 'unexpected-blocked-network-requests', [], blocked);
       write(gate, 'fixture-created-identities.json', {runId: fixture.runId, projectId: context.projectId, anonymousUids: [...anonymousUids].sort()});
       write(gate, 'browser-replay-network.json', {identity, blocked, browserErrors});
+      return {gates, observedDeploymentIdentity: identity};
+    }
+    // Observe the original source timers before long UI journeys can cross an
+    // hourly claim boundary. This records pending/absent/claimed state only;
+    // provider capture and source-specific timer verification remain later gates.
+    let earlyTimerSource;
+    await step(GATES[0], async () => {
+      const helperName = 'tools/web_release_producers/timer-source-read.js';
+      const helperBytes = gitSourceFiles(path.resolve(__dirname, '../..'), 'tools/web_release_producers/')[helperName];
+      if (!helperBytes || candidate.sourceFiles?.[helperName] !== sha(helperBytes)) throw Error('Original timer source reader differs from the frozen candidate.');
+      const {readOriginalTimerSource} = require('./timer-source-read');
+      const {initializeApp, applicationDefault, deleteApp} = serverDependencies('firebase-admin/app');
+      const {getFirestore} = serverDependencies('firebase-admin/firestore');
+      const observer = initializeApp({projectId: 'attendus-staging', credential: applicationDefault()}, `browser-original-timers-${fixture.runId}`);
+      const db = getFirestore(observer);
+      let snapshot;
+      try {
+        snapshot = await readOriginalTimerSource({db, candidate, fixture});
+        write(GATES[0], 'original-timer-source-early.json', snapshot);
+      } finally {await db.terminate(); await deleteApp(observer);}
+      earlyTimerSource = snapshot;
+    });
+    if (!earlyTimerSource) {
+      for (const gate of GATES) gates[gate].blockers.push('Original timer source preflight failed; no browser fixture mutations started.');
       return {gates, observedDeploymentIdentity: identity};
     }
     let brandedBrowsers;
@@ -601,9 +633,7 @@ async function produce({candidate, context, outputDir}) {
       const {seen, pages} = await collectRosterPages((name, data) => callable(name, data, token), {eventId: large.eventId});
       record(GATES[4], 'large-roster-all-rows', large.expectedRows, seen);
       await app(exportPage, `/app/event/${encodeURIComponent(large.eventId)}`);
-      await textClick(exportPage, 'Manage event');
-      await exportPage.getByText('Check-in Console', {exact: true}).waitFor();
-      await exportPage.getByText('Event roster', {exact: true}).waitFor();
+      await openCheckInConsole(exportPage);
       let uiPages = 1;
       while (await exportPage.getByText('Load more', {exact: true}).count()) {
         const next = exportPage.waitForResponse((response) => response.url().endsWith('/listEventRosterV2') && response.request().method() === 'POST');
@@ -794,4 +824,4 @@ async function produce({candidate, context, outputDir}) {
 
 module.exports = produce;
 module.exports.produce = produce;
-module.exports._test = {validateFixture, allowStagingRequest, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, htmlResponsiveProbe, readOwnedHistoryTitles, visibleHistoryTitle};
+module.exports._test = {validateFixture, allowStagingRequest, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, htmlResponsiveProbe, readOwnedHistoryTitles, visibleHistoryTitle, openCheckInConsole};

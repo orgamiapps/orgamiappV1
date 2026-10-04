@@ -105,6 +105,37 @@ async function verifyLive(candidate) {
     }));
   }
 }
+function validateFunctionCompletion(receipt, candidate, predecessor, preflight, invokedAt) {
+  const adapter = require("./deploy_web_functions");
+  const mode = preflight ? "preflight" : "deploy", status = preflight ? "preflight-passed" : "success";
+  const started = Date.parse(receipt?.startedAt), finished = Date.parse(receipt?.finishedAt);
+  if (receipt?.schemaVersion !== 1 || receipt.mode !== mode || receipt.status !== status || receipt.error ||
+      receipt.projectId !== candidate.projectId || receipt.sourceSha !== candidate.sourceSha ||
+      receipt.candidateRunId !== candidate.candidateRunId || receipt.candidateSha256 !== c.digest(candidate) ||
+      receipt.predecessorFunctionsSha256 !== c.digest(predecessor.functions) || receipt.globalForce !== false ||
+      receipt.firebaseToolsVersion !== adapter.VERSION || c.digest(receipt.moduleHashes) !== c.digest(adapter.PINS) ||
+      !Number.isFinite(started) || !Number.isFinite(finished) || started < invokedAt || finished < started || finished > Date.now() ||
+      !Array.isArray(receipt.plans) || !receipt.plans.some((plan) => plan.phase === "prepare-before-upload") ||
+      (preflight ? receipt.plans.some((plan) => plan.phase !== "prepare-before-upload") : !receipt.plans.some((plan) => plan.phase === "release"))) {
+    throw Error("Functions command did not retain a completed, matching deployment receipt");
+  }
+  return receipt;
+}
+function runFunctionsCommand({candidate, configPath, predecessor, candidateFile, predecessorFile, receiptPath, preflight}, execute = execFileSync) {
+  if (fs.existsSync(receiptPath)) throw Error("Functions receipt already exists; reconcile the prior attempt before continuing");
+  const invokedAt = Date.now();
+  const output = execute(process.execPath, ["tools/deploy_web_functions.js", candidateFile, configPath, predecessorFile,
+    receiptPath, ...(preflight ? ["--preflight"] : [])],
+  {cwd: root, encoding: "utf8", maxBuffer: 20 * 1024 * 1024, stdio: ["ignore", "pipe", "inherit"]});
+  // A pending promise alone does not keep a Node child alive. Exit zero is not
+  // sufficient: the pinned CLI can leave queued work unsettled after failure.
+  try {
+    let receipt;
+    try { receipt = read(receiptPath); } catch (_) { throw Error("Functions command did not retain a readable completion receipt"); }
+    validateFunctionCompletion(receipt, candidate, predecessor, preflight, invokedAt);
+  } catch (error) { error.stdout = output; throw error; }
+  return output;
+}
 async function deploy(candidate, bundle, expectedState, output) {
   c.validateArtifact(candidate, root, path.join(bundle, "web"));
   const before = await captureState(candidate.projectId);
@@ -152,11 +183,9 @@ async function deploy(candidate, bundle, expectedState, output) {
     }
   }
   function deployFunctionsStep(preflight) {
-    return deployStep(preflight ? "functions-preflight" : "functions", null, () => execFileSync(process.execPath,
-        ["tools/deploy_web_functions.js", functionCandidate, configPath, functionPredecessor,
-          path.join(path.dirname(output), preflight ? "function-preflight-plan.json" : "function-deployment-plan.json"),
-          ...(preflight ? ["--preflight"] : [])],
-        {cwd: root, encoding: "utf8", maxBuffer: 20 * 1024 * 1024, stdio: ["ignore", "pipe", "inherit"]}));
+    return deployStep(preflight ? "functions-preflight" : "functions", null, () => runFunctionsCommand({candidate,
+      configPath, predecessor: before.state, candidateFile: functionCandidate, predecessorFile: functionPredecessor,
+      receiptPath: path.join(path.dirname(output), preflight ? "function-preflight-plan.json" : "function-deployment-plan.json"), preflight}));
   }
   // Real CLI preparation precedes Hosting/rule changes. Dry-run can enable
   // prerequisite APIs, but the adapter forbids Function upload and release.
@@ -176,6 +205,8 @@ async function deploy(candidate, bundle, expectedState, output) {
   deployFunctionsStep(false);
   const backendState = verifyState(candidate, await captureState(candidate.projectId), read(path.join(root, "firestore.indexes.json")));
   assets.assertBridgeState(backendState.state, bridge);
+  write(path.join(path.dirname(output), "function-source-verification.json"),
+      await require("./verify_web_function_sources").verifyFunctionSources({candidate, state: backendState.state}));
   if (candidate.environment === "staging") {
     const rehearsal = require("./rehearse_web_backend");
     const manifest = read(path.join(root, "config/web_backend_predecessor_archives.json"));
@@ -249,4 +280,4 @@ async function main() {
   throw Error("Expected capture-predecessors, seal, stage, qualify or promote");
 }
 if (require.main === module) main().catch((error) => { console.error(error.stack); process.exitCode = 1; });
-module.exports = {download, loadCandidate, materializeBackend, materializeRules, options, verifyLive, deploy, qualify, promote, write};
+module.exports = {download, loadCandidate, materializeBackend, materializeRules, options, verifyLive, validateFunctionCompletion, runFunctionsCommand, deploy, qualify, promote, write};
