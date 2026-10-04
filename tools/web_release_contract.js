@@ -83,9 +83,12 @@ function sourceFiles(root) {
 }
 function deploymentManifest(root, source) {
   const names = [...expectedFunctions(fs.readFileSync(path.join(root, "functions/index.js"), "utf8"))].sort();
+  const retryPolicy = JSON.parse(fs.readFileSync(path.join(root, "config/web_function_retry_acknowledgements.json"), "utf8"));
+  if (retryPolicy.schemaVersion !== 1 || !Array.isArray(retryPolicy.functions)) fail("Invalid reviewed retry acknowledgements");
   if (!names.includes("triggerAIInsights") || !names.includes("triggerAIInsightsV2")) fail("Both analytics trigger generations must remain exported");
   return {
     functions: names, deleteFunctions: [],
+    retryAcknowledgements: retryPolicy.functions,
     publicAssets: JSON.parse(fs.readFileSync(path.join(root, "functions/public-web/asset-manifest.json"), "utf8")),
     backendSha256: digest(Object.fromEntries(Object.entries(source).filter(([name]) => name.startsWith("functions/")))),
     firestoreRulesSha256: source["firestore.rules"], storageRulesSha256: source["storage.rules"],
@@ -104,6 +107,7 @@ function validateCandidate(candidate, environment) {
   if (!/^[1-9][0-9]*$/.test(String(candidate.candidateRunId || ""))) fail("Missing candidate run identity");
   if (digest(candidate.sourceFiles) !== candidate.sourceManifestSha256 || digest(candidate.webFiles) !== candidate.webSha256 || digest(candidate.deployment) !== candidate.deploymentSha256) fail("Candidate manifest digest mismatch");
   if (candidate.deployment.deleteFunctions.length || !candidate.deployment.functions.length || candidate.deployment.functions.some((name) => !/^[A-Za-z][A-Za-z0-9_]+$/.test(name))) fail("Unsafe function deployment selectors");
+  if (!Array.isArray(candidate.deployment.retryAcknowledgements)) fail("Missing reviewed retry acknowledgements");
   if (!candidate.webFiles["index.html"] || !candidate.webFiles[`releases/${candidate.releaseId}/main.dart.js`]) fail("Candidate lacks immutable web entrypoint");
   if (!candidate.predecessor?.production || !candidate.predecessor?.staging || !candidate.predecessor.production.hostingVersion) fail("Missing captured predecessor deployment state");
   if (candidate.configSha256 !== digest({environment, projectId: candidate.projectId, firebaseConfig: candidate.deployment.firebaseConfigSha256, worker: candidate.webFiles["firebase-messaging-sw.js"]})) fail("Candidate configuration digest mismatch");

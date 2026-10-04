@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 1,
+  "functions": [
+    {
+      "id": "aggregateAttendanceData",
+      "region": "us-central1",
+      "platform": "gcfv2",
+      "eventType": "google.cloud.firestore.document.v1.created",
+      "eventTriggerRegion": "nam5",
+      "eventFilters": {
+        "database": "(default)",
+        "namespace": "(default)"
+      },
+      "eventFilterPathPatterns": {
+        "document": "Attendance/{docId}"
+      }
+    },
+    {
+      "id": "aggregateFeedbackData",
+      "region": "us-central1",
+      "platform": "gcfv2",
+      "eventType": "google.cloud.firestore.document.v1.created",
+      "eventTriggerRegion": "nam5",
+      "eventFilters": {
+        "database": "(default)",
+        "namespace": "(default)"
+      },
+      "eventFilterPathPatterns": {
+        "document": "event_feedback/{docId}"
+      }
+    },
+    {
+      "id": "maintainDiscoveryMetadataV1",
+      "region": "us-central1",
+      "platform": "gcfv2",
+      "eventType": "google.cloud.firestore.document.v1.written",
+      "eventTriggerRegion": "nam5",
+      "eventFilters": {
+        "database": "(default)",
+        "namespace": "(default)"
+      },
+      "eventFilterPathPatterns": {
+        "document": "Events/{eventId}"
+      }
+    },
+    {
+      "id": "notifyOrgAdminsOnJoinRequest",
+      "region": "us-central1",
+      "platform": "gcfv2",
+      "eventType": "google.cloud.firestore.document.v1.created",
+      "eventTriggerRegion": "nam5",
+      "eventFilters": {
+        "database": "(default)",
+        "namespace": "(default)"
+      },
+      "eventFilterPathPatterns": {
+        "document": "Organizations/{orgId}/JoinRequests/{userId}"
+      }
+    },
+    {
+      "id": "notifyOrganizerOnFeedback",
+      "region": "us-central1",
+      "platform": "gcfv2",
+      "eventType": "google.cloud.firestore.document.v1.created",
+      "eventTriggerRegion": "nam5",
+      "eventFilters": {
+        "database": "(default)",
+        "namespace": "(default)"
+      },
+      "eventFilterPathPatterns": {
+        "document": "event_feedback/{docId}"
+      }
+    },
+    {
+      "id": "notifyOrgJoinRequestDecision",
+      "region": "us-central1",
+      "platform": "gcfv2",
+      "eventType": "google.cloud.firestore.document.v1.written",
+      "eventTriggerRegion": "nam5",
+      "eventFilters": {
+        "database": "(default)",
+        "namespace": "(default)"
+      },
+      "eventFilterPathPatterns": {
+        "document": "Organizations/{orgId}/JoinRequests/{userId}"
+      }
+    },
+    {
+      "id": "notifyOrgMembershipChanges",
+      "region": "us-central1",
+      "platform": "gcfv2",
+      "eventType": "google.cloud.firestore.document.v1.written",
+      "eventTriggerRegion": "nam5",
+      "eventFilters": {
+        "database": "(default)",
+        "namespace": "(default)"
+      },
+      "eventFilterPathPatterns": {
+        "document": "Organizations/{orgId}/Members/{userId}"
+      }
+    },
+    {
+      "id": "queueDiscoveryNotificationsV1",
+      "region": "us-central1",
+      "platform": "gcfv2",
+      "eventType": "google.cloud.firestore.document.v1.written",
+      "eventTriggerRegion": "nam5",
+      "eventFilters": {
+        "database": "(default)",
+        "namespace": "(default)"
+      },
+      "eventFilterPathPatterns": {
+        "document": "Events/{eventId}"
+      }
+    },
+    {
+      "id": "triggerAIInsights",
+      "region": "us-central1",
+      "platform": "gcfv2",
+      "eventType": "google.cloud.firestore.document.v1.updated",
+      "eventTriggerRegion": "nam5",
+      "eventFilters": {
+        "database": "(default)",
+        "namespace": "(default)"
+      },
+      "eventFilterPathPatterns": {
+        "document": "event_analytics/{docId}"
+      }
+    },
+    {
+      "id": "triggerAIInsightsV2",
+      "region": "us-central1",
+      "platform": "gcfv2",
+      "eventType": "google.cloud.firestore.document.v1.written",
+      "eventTriggerRegion": "nam5",
+      "eventFilters": {
+        "database": "(default)",
+        "namespace": "(default)"
+      },
+      "eventFilterPathPatterns": {
+        "document": "event_analytics/{docId}"
+      }
+    },
+    {
+      "id": "updateDiscoverySaveCountV1",
+      "region": "us-central1",
+      "platform": "gcfv2",
+      "eventType": "google.cloud.firestore.document.v1.written",
+      "eventTriggerRegion": "nam5",
+      "eventFilters": {
+        "database": "(default)",
+        "namespace": "(default)"
+      },
+      "eventFilterPathPatterns": {
+        "document": "Customers/{uid}/SavedEvents/{eventId}"
+      }
+    }
+  ]
+}
