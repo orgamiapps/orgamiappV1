@@ -9,10 +9,24 @@ const fromFunctions = createRequire(path.resolve(__dirname, "../functions/packag
 const {validateCandidate, digest} = require("./web_release_contract");
 const {captureState, verifyState} = require("./web_release_state");
 const {bindingId, emailHash} = require("../functions/communications/qualification-isolation");
+const {desiredMetadata} = require("../functions/discovery/maintenance");
 const projectId = "attendus-staging";
 const roles = ["owner", "attendee", "unauthorized", "staff", "administrator", "deletion"];
 const read = (file) => JSON.parse(fs.readFileSync(file, "utf8").replace(/^\uFEFF/, ""));
 const csvHeaders = ["Name", "Email", "Registration", "Attendance", "Checked in", "Checked out", "Generated at", "Event timezone", "Filters", "Row count", "Registration answers", "Attendance answers", "Snapshot ID", "Snapshot time"];
+function mapFixtureLocation(fixture, eventId) {
+  const index = [fixture.secondEventId, fixture.canaryEventId].indexOf(eventId);
+  if (index < 0) return {};
+  // Two public-space test points, never an attendee's location or a real event.
+  // Reuse existing owned events so the seven-event timer scope stays identical.
+  const [latitude, longitude] = [[40.7829, -73.9654], [40.7851, -73.9683]][index];
+  const location = {latitude, longitude, locationType: "in_person",
+    locationName: `Synthetic qualification venue ${index === 0 ? "A" : "B"}`,
+    location: "Central Park, New York, NY — synthetic test location, not a real event venue",
+    city: "New York", regionCode: "NY", countryCode: "US"};
+  const {geohash, discoveryLocationValid} = desiredMetadata(location);
+  return {...location, geohash, discoveryLocationValid};
+}
 function validateLiveEnvironment(environment = process.env) {
   const emulatorVariables = ["FIRESTORE_EMULATOR_HOST", "FIREBASE_AUTH_EMULATOR_HOST", "FIREBASE_STORAGE_EMULATOR_HOST", "STORAGE_EMULATOR_HOST", "FIREBASE_DATABASE_EMULATOR_HOST"];
   if (emulatorVariables.some((name) => environment[name])) throw Error("Staging fixture setup cannot use emulator endpoints");
@@ -111,7 +125,7 @@ async function apply(file, candidateFile, receiptFile) {
       await db.doc(`Events/${id}`).create({id, customerUid: fixture.owner.uid, title: id === fixture.event.id ? fixture.event.title : `Controlled ${id.split("-").at(-1)} event`,
         description: "Synthetic event used only for isolated web release qualification.", imageUrl: "", groupName: "Qualification community", organizationId: fixture.organizationId, private: id === fixture.privateEventId,
         isHidden: false, status: "active", selectedDateTime: eventStart, eventDurationMinutes: 120, eventTimeZone: "America/New_York", location: "Controlled test venue",
-        locationType: "in_person", eventRevision: 1, checkInStaff: [fixture.staff.uid], ticketsEnabled: false, ticketPrice: 0,
+        locationType: "in_person", ...mapFixtureLocation(fixture, id), eventRevision: 1, checkInStaff: [fixture.staff.uid], ticketsEnabled: false, ticketPrice: 0,
         confirmedRegistrationCount: id === fixture.largeRoster.eventId ? 1201 : 0, issuedTickets: 0, reservedTickets: 0,
         registrationPolicy: {mode: "rsvp", capacity: id === fixture.largeRoster.eventId ? 1500 : 100, waitlistEnabled: true},
         eventReminderPolicy: "24h_1h", checkInPolicy: {version: 2, profile: "staff_entry", openingMode: "manual", eligibility: "registered_only"}, createdAt: now});
