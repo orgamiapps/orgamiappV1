@@ -3,7 +3,11 @@ import 'package:attendus/Utils/responsive_helper.dart';
 import 'package:attendus/Utils/colors.dart';
 
 class ResponsiveTestHelper {
-  static Widget buildTestCard(BuildContext context, String title, Widget content) {
+  static Widget buildTestCard(
+    BuildContext context,
+    String title,
+    Widget content,
+  ) {
     return Container(
       margin: ResponsiveHelper.getResponsiveMargin(context),
       padding: ResponsiveHelper.getResponsivePadding(context),
@@ -46,7 +50,7 @@ class ResponsiveTestHelper {
   static Widget buildDeviceInfo(BuildContext context) {
     final deviceType = ResponsiveHelper.getDeviceType(context);
     final screenSize = MediaQuery.of(context).size;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -67,10 +71,16 @@ class ResponsiveTestHelper {
         Text('Font Size: ${ResponsiveHelper.getResponsiveFontSize(context)}'),
         Text('Padding: ${ResponsiveHelper.getResponsivePadding(context)}'),
         Text('Spacing: ${ResponsiveHelper.getResponsiveSpacing(context)}'),
-        Text('Button Height: ${ResponsiveHelper.getResponsiveButtonHeight(context)}'),
+        Text(
+          'Button Height: ${ResponsiveHelper.getResponsiveButtonHeight(context)}',
+        ),
         Text('Icon Size: ${ResponsiveHelper.getResponsiveIconSize(context)}'),
-        Text('Avatar Size: ${ResponsiveHelper.getResponsiveAvatarSize(context)}'),
-        Text('Border Radius: ${ResponsiveHelper.getResponsiveBorderRadius(context)}'),
+        Text(
+          'Avatar Size: ${ResponsiveHelper.getResponsiveAvatarSize(context)}',
+        ),
+        Text(
+          'Border Radius: ${ResponsiveHelper.getResponsiveBorderRadius(context)}',
+        ),
         Text('Elevation: ${ResponsiveHelper.getResponsiveElevation(context)}'),
       ],
     );
@@ -112,10 +122,7 @@ class ResponsiveTestHelper {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: AppThemeColor.darkBlueColor.withValues(alpha: 0.1),
-        border: Border.all(
-          color: AppThemeColor.darkBlueColor,
-          width: 2,
-        ),
+        border: Border.all(color: AppThemeColor.darkBlueColor, width: 2),
       ),
       child: Icon(
         Icons.person,

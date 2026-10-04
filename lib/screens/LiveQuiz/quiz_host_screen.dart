@@ -163,6 +163,7 @@ class _QuizHostScreenState extends State<QuizHostScreen>
     _quizSubscription = _liveQuizService.getQuizStream(widget.quizId).listen((
       quiz,
     ) {
+      if (!mounted) return;
       setState(() => _quiz = quiz);
 
       // Update current question if changed
@@ -185,7 +186,7 @@ class _QuizHostScreenState extends State<QuizHostScreen>
     _questionsSubscription = _liveQuizService
         .getQuestionsStream(widget.quizId)
         .listen((questions) {
-          setState(() => _questions = questions);
+          if (mounted) setState(() => _questions = questions);
         }, onError: (error) => _showError('Questions stream error: $error'));
   }
 
@@ -197,7 +198,7 @@ class _QuizHostScreenState extends State<QuizHostScreen>
 
     try {
       final question = await _liveQuizService.getCurrentQuestion(widget.quizId);
-      setState(() => _currentQuestion = question);
+      if (mounted) setState(() => _currentQuestion = question);
     } catch (e) {
       _showError('Failed to load current question: $e');
     }
@@ -209,12 +210,20 @@ class _QuizHostScreenState extends State<QuizHostScreen>
     _countdownTimer?.cancel();
 
     setState(() {
-      _timeRemaining = _quiz!.timeRemainingForCurrentQuestion!.inSeconds;
+      _timeRemaining = _liveQuizService.remainingTime(widget.quizId).inSeconds;
     });
 
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       if (_timeRemaining > 0) {
-        setState(() => _timeRemaining--);
+        setState(
+          () => _timeRemaining = _liveQuizService
+              .remainingTime(widget.quizId)
+              .inSeconds,
+        );
       } else {
         timer.cancel();
       }
@@ -1492,7 +1501,7 @@ class QuizAnalyticsWidget extends StatelessWidget {
                 ],
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );

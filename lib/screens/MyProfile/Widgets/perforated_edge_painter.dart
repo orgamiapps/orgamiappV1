@@ -51,17 +51,9 @@ class PerforatedEdgePainter extends CustomPainter {
     double currentX = holeSpacing;
     while (currentX < size.width - holeSpacing) {
       // Draw hole (white circle with border)
-      canvas.drawCircle(
-        Offset(currentX, 0),
-        holeRadius,
-        holePaint,
-      );
-      canvas.drawCircle(
-        Offset(currentX, 0),
-        holeRadius,
-        holeBorderPaint,
-      );
-      
+      canvas.drawCircle(Offset(currentX, 0), holeRadius, holePaint);
+      canvas.drawCircle(Offset(currentX, 0), holeRadius, holeBorderPaint);
+
       currentX += holeSpacing + (holeRadius * 2);
     }
   }
@@ -108,4 +100,3 @@ class PerforatedDivider extends StatelessWidget {
     );
   }
 }
-

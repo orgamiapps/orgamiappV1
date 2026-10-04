@@ -29,16 +29,15 @@ class _TicketStatsDashboardState extends State<TicketStatsDashboard>
       duration: const Duration(milliseconds: 600),
     );
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, -0.3),
       end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    );
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
 
     _controller.forward();
   }
@@ -97,7 +96,9 @@ class _TicketStatsDashboardState extends State<TicketStatsDashboard>
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF667EEA).withValues(alpha: 0.1),
+                            color: const Color(
+                              0xFF667EEA,
+                            ).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Icon(
@@ -189,10 +190,7 @@ class _TicketStatsDashboardState extends State<TicketStatsDashboard>
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: color.withValues(alpha: 0.2),
-          width: 1,
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.2), width: 1),
       ),
       child: Column(
         children: [
@@ -220,4 +218,3 @@ class _TicketStatsDashboardState extends State<TicketStatsDashboard>
     );
   }
 }
-

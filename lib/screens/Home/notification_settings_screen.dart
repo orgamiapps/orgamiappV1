@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:attendus/firebase/firebase_messaging_helper.dart';
 import 'package:attendus/models/notification_model.dart';
@@ -19,6 +21,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   UserNotificationSettings? _settings;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  StreamSubscription<User?>? _authSubscription;
+  int _revision = 0;
+  String? _settingsError;
   bool _hasPermission = false;
   bool _permissionChecked = false;
 
@@ -33,55 +38,87 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       parent: _animationController,
       curve: Curves.easeInOut,
     );
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((_) {
+      if (!mounted) return;
+      setState(() {
+        _settings = null;
+        _settingsError = null;
+      });
+      _loadSettings();
+    });
     _loadSettings();
     _checkPermissionStatus();
   }
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _animationController.dispose();
     super.dispose();
   }
 
+  bool _allowed(AuthorizationStatus status) =>
+      status == AuthorizationStatus.authorized ||
+      status == AuthorizationStatus.provisional;
+
   Future<void> _checkPermissionStatus() async {
-    final settings = await FirebaseMessaging.instance.getNotificationSettings();
-    setState(() {
-      _hasPermission =
-          settings.authorizationStatus == AuthorizationStatus.authorized;
-      _permissionChecked = true;
-    });
+    try {
+      final settings = await FirebaseMessaging.instance
+          .getNotificationSettings();
+      if (!mounted) return;
+      setState(() {
+        _hasPermission = _allowed(settings.authorizationStatus);
+        _permissionChecked = true;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _permissionChecked = true);
+    }
   }
 
   Future<void> _loadSettings() async {
+    final revision = ++_revision;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
     try {
       final settings = await _messagingHelper.getUserNotificationSettings();
+      if (!mounted ||
+          revision != _revision ||
+          uid != FirebaseAuth.instance.currentUser?.uid) {
+        return;
+      }
       setState(() {
         _settings = settings;
+        _settingsError = null;
       });
       _animationController.forward();
-    } catch (e) {
-      if (!mounted) return;
-      ShowToast().showSnackBar('Error loading settings: $e', context);
+    } catch (error) {
+      if (!mounted || revision != _revision) return;
+      setState(
+        () => _settingsError = 'Unable to load notification preferences.',
+      );
     }
   }
 
   Future<void> _updateSettings(UserNotificationSettings newSettings) async {
+    final revision = ++_revision;
+    final previous = _settings;
+    setState(() => _settings = newSettings);
     try {
       await _messagingHelper.updateNotificationSettings(newSettings);
-      setState(() {
-        _settings = newSettings;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      ShowToast().showSnackBar('Error updating settings: $e', context);
+    } catch (error) {
+      if (!mounted || revision != _revision) return;
+      setState(() => _settings = _messagingHelper.settings ?? previous);
+      ShowToast().showSnackBar(
+        'Preferences were not saved. Please retry.',
+        context,
+      );
     }
   }
 
   Future<void> _requestPermission() async {
     final result = await _messagingHelper.requestPermissions();
+    if (!mounted) return;
     setState(() {
-      _hasPermission =
-          result.authorizationStatus == AuthorizationStatus.authorized;
+      _hasPermission = _allowed(result.authorizationStatus);
     });
     if (!mounted) return;
 
@@ -123,7 +160,20 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         title: const Text('Notification settings'),
       ),
       body: _settings == null
-          ? const AttendUsLoadingState(label: 'Loading preferences...')
+          ? (_settingsError == null
+                ? const AttendUsLoadingState(label: 'Loading preferences...')
+                : Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(_settingsError!),
+                        TextButton(
+                          onPressed: _loadSettings,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ))
           : FadeTransition(
               opacity: _fadeAnimation,
               child: Center(

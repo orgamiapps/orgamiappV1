@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:attendus/Utils/event_discovery_visibility.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -17,8 +18,7 @@ import 'package:attendus/firebase/recommendation_analytics.dart';
 import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:attendus/Services/onnx_nlp_service.dart';
+import 'package:attendus/Services/event_search_service.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -167,7 +167,14 @@ class _SearchScreenState extends State<SearchScreen>
 
 class EventsList extends StatefulWidget {
   final String searchQuery;
-  const EventsList({super.key, required this.searchQuery});
+  final Future<List<EventModel>> Function()? loadInitialEvents;
+  final Future<List<EventModel>> Function(String)? searchEvents;
+  const EventsList({
+    super.key,
+    required this.searchQuery,
+    this.loadInitialEvents,
+    this.searchEvents,
+  });
 
   @override
   State<EventsList> createState() => _EventsListState();
@@ -180,6 +187,10 @@ class _EventsListState extends State<EventsList>
   bool _isLoading = false;
   bool _usingAi = false;
   bool _hasMore = true;
+  int _searchRevision = 0;
+  String? _loadError;
+  DocumentSnapshot? _lastDocument;
+  late final EventSearchService _searchService = EventSearchService();
   final ScrollController _scrollController = ScrollController();
   static const int _pageSize = 10;
 
@@ -216,18 +227,19 @@ class _EventsListState extends State<EventsList>
 
   void _filterEvents() {
     if (!mounted) return;
-    setState(() {
-      if (widget.searchQuery.isEmpty) {
+    final revision = ++_searchRevision;
+    if (widget.searchQuery.trim().isEmpty) {
+      setState(() {
         _usingAi = false;
+        _isLoading = false;
         _filteredEvents = List.from(_allEvents);
-      } else {
-        // Use hybrid AI search for non-empty queries
-        _searchWithHybridAi(widget.searchQuery);
-      }
-    });
+      });
+    } else {
+      _searchWithHybridAi(widget.searchQuery, revision);
+    }
   }
 
-  Future<void> _searchWithHybridAi(String query) async {
+  Future<void> _searchWithHybridAi(String query, int revision) async {
     if (!mounted) return;
     setState(() {
       _isLoading = true;
@@ -254,7 +266,7 @@ class _EventsListState extends State<EventsList>
         });
 
         // Enhance with AI results in background
-        _enhanceWithAiResults(query, exactMatches);
+        _enhanceWithAiResults(query, exactMatches, revision);
         return;
       }
 
@@ -266,7 +278,7 @@ class _EventsListState extends State<EventsList>
         query,
       );
 
-      if (!mounted) return;
+      if (!mounted || revision != _searchRevision) return;
       setState(() {
         _filteredEvents = combinedResults.isNotEmpty
             ? combinedResults
@@ -274,7 +286,7 @@ class _EventsListState extends State<EventsList>
         _isLoading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || revision != _searchRevision) return;
       setState(() {
         _filteredEvents = _fallbackFilter(query);
         _isLoading = false;
@@ -379,13 +391,16 @@ class _EventsListState extends State<EventsList>
   Future<void> _enhanceWithAiResults(
     String query,
     List<EventModel> exactMatches,
+    int revision,
   ) async {
     try {
       final aiResults = await _getAiResults(query);
       final enhanced = _mergeSearchResults(exactMatches, aiResults, query);
 
       // Only update if results are actually better (more results)
-      if (mounted && enhanced.length > exactMatches.length) {
+      if (mounted &&
+          revision == _searchRevision &&
+          enhanced.length > exactMatches.length) {
         setState(() {
           _filteredEvents = enhanced;
         });
@@ -395,63 +410,9 @@ class _EventsListState extends State<EventsList>
     }
   }
 
-  /// Get AI-powered search results
-  Future<List<EventModel>> _getAiResults(String query) async {
-    try {
-      final onnxService = OnnxNlpService.instance;
-      await onnxService.initialize();
-
-      double? lat;
-      double? lng;
-
-      // Try to get current location for proximity search
-      try {
-        final position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.medium,
-          ),
-        ).timeout(const Duration(seconds: 3));
-        lat = position.latitude;
-        lng = position.longitude;
-      } catch (_) {
-        // Location not available, continue without it
-      }
-
-      // Parse query with ONNX DistilBERT model
-      final intent = await onnxService.parseQuery(query);
-
-      // Try SQLite cache first
-      final cachedResults = await onnxService.queryEvents(
-        intent: intent,
-        userLat: lat,
-        userLng: lng,
-        limit: 25, // Leave room for exact matches
-      );
-
-      if (cachedResults.isNotEmpty) {
-        return cachedResults.map((data) => EventModel.fromJson(data)).toList();
-      }
-
-      // Fall back to Firestore with AI intent
-      final helper = FirebaseFirestoreHelper();
-      final aiEvents = await helper.aiSearchEvents(
-        query: query,
-        latitude: lat,
-        longitude: lng,
-        limit: 25,
-      );
-
-      // Cache results for future searches
-      if (aiEvents.isNotEmpty) {
-        final eventsData = aiEvents.map((e) => e.toJson()).toList();
-        await onnxService.cacheEvents(eventsData);
-      }
-
-      return aiEvents;
-    } catch (e) {
-      return [];
-    }
-  }
+  /// Search public events without depending on optional native model assets.
+  Future<List<EventModel>> _getAiResults(String query) =>
+      widget.searchEvents?.call(query) ?? _searchService.search(query);
 
   /// Intelligently merge exact matches and AI results
   List<EventModel> _mergeSearchResults(
@@ -520,27 +481,42 @@ class _EventsListState extends State<EventsList>
     if (mounted) {
       setState(() {
         _isLoading = true;
+        _loadError = null;
       });
     }
 
     try {
-      Query query = FirebaseFirestore.instance
-          .collection(EventModel.firebaseKey)
-          .where('private', isEqualTo: false)
-          .where(
-            'selectedDateTime',
-            isGreaterThan: DateTime.now().subtract(const Duration(hours: 3)),
-          )
-          .orderBy('selectedDateTime')
-          .limit(_pageSize);
+      List<EventModel> events;
+      var hasMore = false;
+      if (widget.loadInitialEvents != null) {
+        events = await widget.loadInitialEvents!();
+      } else {
+        Query query = FirebaseFirestore.instance
+            .collection(EventModel.firebaseKey)
+            .where('private', isEqualTo: false)
+            .where(
+              'selectedDateTime',
+              isGreaterThan: DateTime.now().subtract(const Duration(hours: 3)),
+            )
+            .orderBy('selectedDateTime')
+            .limit(_pageSize);
 
-      QuerySnapshot snapshot = await query.get();
-      // Ensure each event includes its document ID even if the field isn't stored
-      List<EventModel> events = snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        data['id'] = data['id'] ?? doc.id;
-        return EventModel.fromJson(data);
-      }).toList();
+        QuerySnapshot snapshot = await query.get();
+        _lastDocument = snapshot.docs.lastOrNull;
+        hasMore = snapshot.docs.length == _pageSize;
+        // Ensure each event includes its document ID even if the field isn't stored
+        events = snapshot.docs
+            .where(
+              (doc) =>
+                  isDiscoverableEventData(doc.data() as Map<String, dynamic>),
+            )
+            .map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              data['id'] = data['id'] ?? doc.id;
+              return EventModel.fromJson(data);
+            })
+            .toList();
+      }
 
       // Sort events with featured first
       events.sort((a, b) {
@@ -554,23 +530,32 @@ class _EventsListState extends State<EventsList>
           _allEvents = events;
           _filteredEvents = List.from(_allEvents);
           _isLoading = false;
-          _hasMore = events.length == _pageSize;
+          _hasMore = hasMore;
         });
+        _filterEvents();
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _loadError =
+              'Events could not be loaded. Check your connection and try again.';
+        });
       }
     }
   }
 
   Future<void> _loadMoreEvents() async {
-    if (_isLoading || !_hasMore || widget.searchQuery.isNotEmpty) return;
+    if (_isLoading ||
+        !_hasMore ||
+        widget.searchQuery.isNotEmpty ||
+        _lastDocument == null) {
+      return;
+    }
 
     setState(() => _isLoading = true);
 
     try {
-      final lastEvent = _allEvents.last;
       Query query = FirebaseFirestore.instance
           .collection(EventModel.firebaseKey)
           .where('private', isEqualTo: false)
@@ -579,23 +564,31 @@ class _EventsListState extends State<EventsList>
             isGreaterThan: DateTime.now().subtract(const Duration(hours: 3)),
           )
           .orderBy('selectedDateTime')
-          .startAfter([lastEvent.selectedDateTime])
+          .startAfterDocument(_lastDocument!)
           .limit(_pageSize);
 
       QuerySnapshot snapshot = await query.get();
-      List<EventModel> newEvents = snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        data['id'] = data['id'] ?? doc.id;
-        return EventModel.fromJson(data);
-      }).toList();
+      if (snapshot.docs.isNotEmpty) _lastDocument = snapshot.docs.last;
+      List<EventModel> newEvents = snapshot.docs
+          .where(
+            (doc) =>
+                isDiscoverableEventData(doc.data() as Map<String, dynamic>),
+          )
+          .map((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            data['id'] = data['id'] ?? doc.id;
+            return EventModel.fromJson(data);
+          })
+          .toList();
 
       if (mounted) {
         setState(() {
-          _allEvents.addAll(newEvents);
-          _filteredEvents = List.from(_allEvents);
-          _hasMore = newEvents.length == _pageSize;
+          final existing = _allEvents.map((event) => event.id).toSet();
+          _allEvents.addAll(newEvents.where((event) => existing.add(event.id)));
+          _hasMore = snapshot.docs.length == _pageSize;
           _isLoading = false;
         });
+        _filterEvents();
       }
     } catch (e) {
       if (mounted) {
@@ -615,6 +608,25 @@ class _EventsListState extends State<EventsList>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+
+    if (_loadError != null && _allEvents.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_loadError!, textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: _loadEvents,
+                child: const Text('Try again'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     if (_isLoading && _allEvents.isEmpty) {
       return _buildLoadingState();
@@ -832,7 +844,14 @@ class _EventsListState extends State<EventsList>
 // [The rest of the original file content would go here...]
 class OrgEventsList extends StatefulWidget {
   final String searchQuery;
-  const OrgEventsList({super.key, required this.searchQuery});
+  final FirebaseAuth? auth;
+  final Future<List<EventModel>> Function(String uid)? loadEvents;
+  const OrgEventsList({
+    super.key,
+    required this.searchQuery,
+    this.auth,
+    this.loadEvents,
+  });
 
   @override
   State<OrgEventsList> createState() => _OrgEventsListState();
@@ -843,6 +862,10 @@ class _OrgEventsListState extends State<OrgEventsList>
   List<EventModel> _allEvents = [];
   List<EventModel> _filteredEvents = [];
   bool _isLoading = false;
+  String? _loadError;
+  int _loadRevision = 0;
+  late final FirebaseAuth _auth = widget.auth ?? FirebaseAuth.instance;
+  StreamSubscription<User?>? _authSubscription;
   final ScrollController _scrollController = ScrollController();
 
   @override
@@ -851,11 +874,21 @@ class _OrgEventsListState extends State<OrgEventsList>
   @override
   void initState() {
     super.initState();
+    _authSubscription = _auth.authStateChanges().listen((_) {
+      if (!mounted) return;
+      setState(() {
+        _allEvents = [];
+        _filteredEvents = [];
+      });
+      _loadOrgEvents();
+    });
     _loadOrgEvents();
   }
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
+    _loadRevision++;
     _scrollController.dispose();
     super.dispose();
   }
@@ -892,125 +925,125 @@ class _OrgEventsListState extends State<OrgEventsList>
   // Fallback filter removed (no longer referenced)
 
   Future<void> _loadOrgEvents() async {
-    if (_isLoading) return;
-    setState(() => _isLoading = true);
-
+    if (!mounted) return;
+    final revision = ++_loadRevision;
+    final account = _auth.currentUser;
+    if (account == null || account.isAnonymous) {
+      setState(() {
+        _allEvents = [];
+        _filteredEvents = [];
+        _isLoading = false;
+        _loadError = null;
+      });
+      return;
+    }
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
     try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid == null) {
-        if (mounted) {
-          setState(() {
-            _allEvents = [];
-            _filteredEvents = [];
-            _isLoading = false;
-          });
-        }
+      final events =
+          await (widget.loadEvents?.call(account.uid) ??
+              _fetchOrgEvents(account.uid));
+      if (!mounted ||
+          revision != _loadRevision ||
+          _auth.currentUser?.uid != account.uid) {
         return;
       }
+      setState(() {
+        _allEvents = events;
+        _isLoading = false;
+      });
+      _filterEvents();
+    } catch (_) {
+      if (!mounted || revision != _loadRevision) return;
+      setState(() {
+        _isLoading = false;
+        _loadError = 'Group events could not be loaded. Please try again.';
+      });
+    }
+  }
 
-      // Fetch organization IDs where user is an approved member.
-      // Query by stored field userId (new schema)
-      final qByField = await FirebaseFirestore.instance
-          .collectionGroup('Members')
-          .where('userId', isEqualTo: uid)
-          .where('status', isEqualTo: 'approved')
-          .limit(100)
-          .get();
+  Future<List<EventModel>> _fetchOrgEvents(String uid) async {
+    // Fetch organization IDs where user is an approved member.
+    // Query by stored field userId (new schema)
+    final qByField = await FirebaseFirestore.instance
+        .collectionGroup('Members')
+        .where('userId', isEqualTo: uid)
+        .where('status', isEqualTo: 'approved')
+        .limit(100)
+        .get();
 
-      // Also query by documentId == uid to support legacy docs without userId field
-      final qByDocId = await FirebaseFirestore.instance
-          .collectionGroup('Members')
-          .where(FieldPath.documentId, isEqualTo: uid)
-          .limit(100)
-          .get();
-
-      // Resolve organization IDs robustly: prefer field, fall back to parent path (legacy docs)
-      final Set<String> orgIds = <String>{};
-      for (final d in [...qByField.docs, ...qByDocId.docs]) {
-        final data = d.data();
-        final String? fromField = data['organizationId']?.toString();
-        final String? fromPath = d.reference.parent.parent?.id;
-        final String? resolved = (fromField != null && fromField.isNotEmpty)
-            ? fromField
-            : fromPath;
-        if (resolved != null && resolved.isNotEmpty) {
-          orgIds.add(resolved);
-        }
+    // Resolve organization IDs robustly: prefer field, fall back to parent path (legacy docs)
+    final Set<String> orgIds = <String>{};
+    for (final d in qByField.docs) {
+      final data = d.data();
+      final String? fromField = data['organizationId']?.toString();
+      final String? fromPath = d.reference.parent.parent?.id;
+      final String? resolved = (fromField != null && fromField.isNotEmpty)
+          ? fromField
+          : fromPath;
+      if (resolved != null && resolved.isNotEmpty) {
+        orgIds.add(resolved);
       }
+    }
 
-      List<EventModel> events = [];
+    List<EventModel> events = [];
 
-      // Query events created by these orgs (via organizationId field)
-      if (orgIds.isNotEmpty) {
-        final List<String> ids = orgIds.toList();
-        for (int i = 0; i < ids.length; i += 10) {
-          final chunk = ids.sublist(
-            i,
-            i + 10 > ids.length ? ids.length : i + 10,
-          );
-          // Avoid composite index requirement by fetching by organization only
-          // and then filtering/sorting on the client.
-          final qs = await FirebaseFirestore.instance
-              .collection(EventModel.firebaseKey)
-              .where('organizationId', whereIn: chunk)
-              .limit(100)
-              .get();
-          final chunkEvents = qs.docs.map((doc) {
-            final Map<String, dynamic> data = doc.data();
-            data['id'] = data['id'] ?? doc.id;
-            return EventModel.fromJson(data);
-          }).toList();
-          events.addAll(chunkEvents);
-        }
-      }
-
-      // Also include events where the user is the creator/admin
-      final createdQs = await FirebaseFirestore.instance
-          .collection(EventModel.firebaseKey)
-          .where('customerUid', isEqualTo: uid)
-          .limit(100)
-          .get();
-      events.addAll(
-        createdQs.docs.map((doc) {
+    // Query events created by these orgs (via organizationId field)
+    if (orgIds.isNotEmpty) {
+      final List<String> ids = orgIds.toList();
+      for (int i = 0; i < ids.length; i += 10) {
+        final chunk = ids.sublist(i, i + 10 > ids.length ? ids.length : i + 10);
+        // Avoid composite index requirement by fetching by organization only
+        // and then filtering/sorting on the client.
+        final qs = await FirebaseFirestore.instance
+            .collection(EventModel.firebaseKey)
+            .where('organizationId', whereIn: chunk)
+            .limit(100)
+            .get();
+        final chunkEvents = qs.docs.map((doc) {
           final Map<String, dynamic> data = doc.data();
           data['id'] = data['id'] ?? doc.id;
           return EventModel.fromJson(data);
-        }),
-      );
-
-      // Filter to upcoming (with a small grace window) and then sort
-      final DateTime threshold = DateTime.now().subtract(
-        const Duration(hours: 3),
-      );
-      events = events
-          .where((e) => e.selectedDateTime.isAfter(threshold))
-          .toList();
-
-      // De-duplicate by id
-      final Map<String, EventModel> idToEvent = {
-        for (final e in events) e.id: e,
-      };
-      final List<EventModel> unique = idToEvent.values.toList();
-
-      unique.sort((a, b) {
-        if (a.isFeatured && !b.isFeatured) return -1;
-        if (!a.isFeatured && b.isFeatured) return 1;
-        return a.selectedDateTime.compareTo(b.selectedDateTime);
-      });
-
-      if (mounted) {
-        setState(() {
-          _allEvents = unique;
-          _filteredEvents = List.from(_allEvents);
-          _isLoading = false;
-        });
-        _filterEvents();
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
+        }).toList();
+        events.addAll(chunkEvents);
       }
     }
+
+    // Also include events where the user is the creator/admin
+    final createdQs = await FirebaseFirestore.instance
+        .collection(EventModel.firebaseKey)
+        .where('customerUid', isEqualTo: uid)
+        .limit(100)
+        .get();
+    events.addAll(
+      createdQs.docs.map((doc) {
+        final Map<String, dynamic> data = doc.data();
+        data['id'] = data['id'] ?? doc.id;
+        return EventModel.fromJson(data);
+      }),
+    );
+
+    // Filter to upcoming (with a small grace window) and then sort
+    final DateTime threshold = DateTime.now().subtract(
+      const Duration(hours: 3),
+    );
+    events = events
+        .where((e) => e.selectedDateTime.isAfter(threshold))
+        .toList();
+
+    // De-duplicate by id
+    final Map<String, EventModel> idToEvent = {for (final e in events) e.id: e};
+    final List<EventModel> unique = idToEvent.values.toList();
+
+    unique.sort((a, b) {
+      if (a.isFeatured && !b.isFeatured) return -1;
+      if (!a.isFeatured && b.isFeatured) return 1;
+      return a.selectedDateTime.compareTo(b.selectedDateTime);
+    });
+
+    return unique;
   }
 
   Future<void> _refresh() async {
@@ -1020,6 +1053,20 @@ class _OrgEventsListState extends State<OrgEventsList>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    if (_loadError != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_loadError!),
+            FilledButton(
+              onPressed: _loadOrgEvents,
+              child: const Text('Try again'),
+            ),
+          ],
+        ),
+      );
+    }
 
     if (_isLoading && _allEvents.isEmpty) {
       return const Center(
@@ -1101,7 +1148,8 @@ class _OrgEventsListState extends State<OrgEventsList>
 
 class UsersList extends StatefulWidget {
   final String searchQuery;
-  const UsersList({super.key, required this.searchQuery});
+  final Future<List<CustomerModel>> Function(String)? searchUsers;
+  const UsersList({super.key, required this.searchQuery, this.searchUsers});
 
   @override
   State<UsersList> createState() => _UsersListState();
@@ -1111,6 +1159,7 @@ class _UsersListState extends State<UsersList>
     with AutomaticKeepAliveClientMixin {
   List<CustomerModel> _users = [];
   bool _isLoading = false;
+  int _searchRevision = 0;
   Timer? _debounce;
   final ScrollController _scrollController = ScrollController();
 
@@ -1134,6 +1183,7 @@ class _UsersListState extends State<UsersList>
   void didUpdateWidget(covariant UsersList oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.searchQuery != oldWidget.searchQuery) {
+      _searchRevision++;
       if (_debounce?.isActive ?? false) _debounce!.cancel();
       _debounce = Timer(const Duration(milliseconds: 500), () {
         _loadUsers();
@@ -1143,17 +1193,20 @@ class _UsersListState extends State<UsersList>
 
   Future<void> _loadUsers() async {
     if (!mounted) return;
+    final revision = ++_searchRevision;
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final users = await FirebaseFirestoreHelper().searchUsers(
-        searchQuery: widget.searchQuery,
-        limit: 50,
-      );
+      final users =
+          await (widget.searchUsers?.call(widget.searchQuery) ??
+              FirebaseFirestoreHelper().searchUsers(
+                searchQuery: widget.searchQuery,
+                limit: 50,
+              ));
 
-      if (mounted) {
+      if (mounted && revision == _searchRevision) {
         setState(() {
           _users = users;
           _isLoading = false;
@@ -1163,7 +1216,7 @@ class _UsersListState extends State<UsersList>
       if (kDebugMode) {
         debugPrint('Error loading users: $e');
       }
-      if (mounted) {
+      if (mounted && revision == _searchRevision) {
         setState(() {
           _isLoading = false;
         });

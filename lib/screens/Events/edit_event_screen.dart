@@ -1,3 +1,4 @@
+import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:firebase_storage/firebase_storage.dart';
@@ -8,6 +9,8 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:attendus/models/event_model.dart';
+import 'package:attendus/models/discovery_category.dart';
+import 'package:attendus/models/check_in_policy.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/screens/Events/Widget/delete_event_dialogue.dart';
 
@@ -15,11 +18,10 @@ import 'package:attendus/Utils/text_fields.dart';
 import 'package:attendus/Utils/toast.dart';
 
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
-import 'package:attendus/screens/Events/Widget/sign_in_security_tier_selector.dart';
+import 'package:attendus/screens/Events/Widget/arrival_profile_selector.dart';
 import 'package:attendus/screens/Events/location_picker_screen.dart';
 import 'package:attendus/Utils/attendus_theme.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
-import 'dart:io';
 
 class EditEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -38,17 +40,9 @@ class _EditEventScreenState extends State<EditEventScreen>
   final _btnCtlr = RoundedLoadingButtonController();
 
   bool privateEvent = false;
-  final List<String> _allCategories = [
-    'Social & Networking',
-    'Entertainment',
-    'Sports & Fitness',
-    'Education & Learning',
-    'Arts & Culture',
-    'Food & Dining',
-    'Technology',
-    'Community & Charity',
-  ];
   List<String> _selectedCategories = [];
+  List<String> _selectedDiscoveryCategoryIds = [];
+  String? _primaryDiscoveryCategoryId;
 
   final TextEditingController groupNameEdtController = TextEditingController();
   final TextEditingController titleEdtController = TextEditingController();
@@ -58,12 +52,14 @@ class _EditEventScreenState extends State<EditEventScreen>
       TextEditingController();
 
   String? _selectedImagePath;
+  Uint8List? _selectedImageBytes;
   String? _currentImageUrl;
 
   // Sign-in security tier
   String _selectedSignInTier =
       'regular'; // 'most_secure', 'geofence_only', 'regular', or 'all'
   List<String> _selectedSignInMethods = ['qr_code', 'manual_code'];
+  CheckInPolicy _checkInPolicy = const CheckInPolicy();
   String? _manualCode;
 
   // Location selection
@@ -73,6 +69,12 @@ class _EditEventScreenState extends State<EditEventScreen>
   String _locationType = 'in_person';
   String? _selectedPlaceId;
   String? _selectedPlaceName;
+  String _selectedCity = '';
+  String _selectedRegionCode = '';
+  String _selectedCountryCode = 'US';
+  String _selectedStreetAddress = '';
+  String _selectedPostalCode = '';
+  String _selectedEventTimeZone = 'UTC';
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -140,13 +142,27 @@ class _EditEventScreenState extends State<EditEventScreen>
     descriptionEdtController.text = event.description;
     _currentImageUrl = event.imageUrl;
     _selectedCategories = List.from(event.categories);
+    _selectedDiscoveryCategoryIds = event.discoveryCategoryIds.isNotEmpty
+        ? List.from(event.discoveryCategoryIds.take(3))
+        : DiscoveryCategory.fromLegacyLabels(event.categories);
+    _primaryDiscoveryCategoryId =
+        _selectedDiscoveryCategoryIds.contains(event.primaryDiscoveryCategoryId)
+        ? event.primaryDiscoveryCategoryId
+        : _selectedDiscoveryCategoryIds.firstOrNull;
     privateEvent = event.private;
     _selectedSignInTier = event.signInSecurityTier ?? 'regular';
-    _selectedSignInMethods = List.from(event.signInMethods);
+    _checkInPolicy = event.checkInPolicy;
+    _syncLegacyAttendanceFields();
     _manualCode = event.manualCode;
     _locationType = event.locationType;
     _selectedPlaceId = event.placeId;
     _selectedPlaceName = event.locationName;
+    _selectedCity = event.city;
+    _selectedRegionCode = event.regionCode;
+    _selectedCountryCode = event.countryCode;
+    _selectedStreetAddress = event.streetAddress;
+    _selectedPostalCode = event.postalCode;
+    _selectedEventTimeZone = event.eventTimeZone;
     _resolvedAddress = event.location;
 
     // Initialize location and radius
@@ -157,8 +173,6 @@ class _EditEventScreenState extends State<EditEventScreen>
         : const LatLng(0, 0);
     _selectedRadius = event.radius;
     if (_locationType == 'online') {
-      _selectedSignInTier = 'regular';
-      _selectedSignInMethods = const ['qr_code', 'manual_code'];
       _selectedPlaceId = null;
       _selectedPlaceName = null;
       _selectedRadius = null;
@@ -187,8 +201,11 @@ class _EditEventScreenState extends State<EditEventScreen>
         imageQuality: 85,
       );
       if (image != null) {
+        final imageBytes = await image.readAsBytes();
+        if (!mounted) return;
         setState(() {
           _selectedImagePath = image.path;
+          _selectedImageBytes = imageBytes;
           thumbnailUrlCtlr.text = image.path;
           _hasChanges = true;
         });
@@ -213,6 +230,12 @@ class _EditEventScreenState extends State<EditEventScreen>
           initialPlaceId: _selectedPlaceId,
           initialDisplayName: _selectedPlaceName,
           initialAddress: _resolvedAddress,
+          initialCity: _selectedCity,
+          initialRegionCode: _selectedRegionCode,
+          initialCountryCode: _selectedCountryCode,
+          initialStreetAddress: _selectedStreetAddress,
+          initialPostalCode: _selectedPostalCode,
+          initialEventTimeZone: _selectedEventTimeZone,
         ),
       ),
     );
@@ -223,6 +246,16 @@ class _EditEventScreenState extends State<EditEventScreen>
         _selectedPlaceId = picked.placeId;
         _selectedPlaceName = picked.displayName;
         _resolvedAddress = picked.formattedAddress;
+        _selectedCity = picked.city;
+        _selectedRegionCode = picked.regionCode;
+        _selectedCountryCode = picked.countryCode.isEmpty
+            ? 'US'
+            : picked.countryCode;
+        _selectedStreetAddress = picked.streetAddress;
+        _selectedPostalCode = picked.postalCode;
+        _selectedEventTimeZone = picked.eventTimeZone.isEmpty
+            ? 'UTC'
+            : picked.eventTimeZone;
         locationEdtController.text = picked.formattedAddress;
         _hasChanges = true;
       });
@@ -238,12 +271,14 @@ class _EditEventScreenState extends State<EditEventScreen>
       _selectedRadius = value == 'in_person' ? 100 : null;
       _selectedPlaceId = null;
       _selectedPlaceName = null;
+      _selectedCity = '';
+      _selectedRegionCode = '';
+      _selectedCountryCode = 'US';
+      _selectedStreetAddress = '';
+      _selectedPostalCode = '';
+      _selectedEventTimeZone = 'UTC';
       _resolvedAddress = null;
       locationEdtController.clear();
-      if (value == 'online') {
-        _selectedSignInTier = 'regular';
-        _selectedSignInMethods = const ['qr_code', 'manual_code'];
-      }
     });
   }
 
@@ -262,7 +297,8 @@ class _EditEventScreenState extends State<EditEventScreen>
     try {
       debugPrint('🔍 DEBUG: Starting image upload...');
       String? imageUrl;
-      Uint8List imageData = await XFile(_selectedImagePath!).readAsBytes();
+      final imageData =
+          _selectedImageBytes ?? await XFile(_selectedImagePath!).readAsBytes();
       debugPrint(
         '🔍 DEBUG: Image data loaded, size: ${imageData.length} bytes',
       );
@@ -312,6 +348,15 @@ class _EditEventScreenState extends State<EditEventScreen>
     debugPrint('🔍 DEBUG: _handleSubmit called');
     if (_formKey.currentState!.validate()) {
       debugPrint('🔍 DEBUG: Form validation passed');
+      if (!privateEvent && _primaryDiscoveryCategoryId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Choose a primary attendee category'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
       _btnCtlr.start();
 
       try {
@@ -365,11 +410,22 @@ class _EditEventScreenState extends State<EditEventScreen>
           locationName: hasPhysicalLocation ? _selectedPlaceName : null,
           locationType: _locationType,
           placeId: hasPhysicalLocation ? _selectedPlaceId : null,
+          geohash: widget.eventModel.geohash,
+          city: hasPhysicalLocation ? _selectedCity : '',
+          regionCode: hasPhysicalLocation ? _selectedRegionCode : '',
+          countryCode: hasPhysicalLocation ? _selectedCountryCode : '',
+          streetAddress: hasPhysicalLocation ? _selectedStreetAddress : '',
+          postalCode: hasPhysicalLocation ? _selectedPostalCode : '',
+          eventTimeZone: _selectedEventTimeZone,
           groupName: groupNameEdtController.text.trim(),
           imageUrl: imageUrl ?? '', // Use empty string if no image
           selectedDateTime: widget.eventModel.selectedDateTime,
           customerUid: widget.eventModel.customerUid,
           categories: _selectedCategories,
+          primaryDiscoveryCategoryId: _primaryDiscoveryCategoryId,
+          discoveryCategoryIds: _selectedDiscoveryCategoryIds,
+          discoveryCategorySource: 'organizer',
+          discoveryCategoryVersion: 1,
           private: privateEvent,
           getLocation: hasPhysicalLocation,
           radius: hasPhysicalLocation
@@ -378,6 +434,8 @@ class _EditEventScreenState extends State<EditEventScreen>
           ticketsEnabled: widget.eventModel.ticketsEnabled,
           maxTickets: widget.eventModel.maxTickets,
           issuedTickets: widget.eventModel.issuedTickets,
+          reservedTickets: widget.eventModel.reservedTickets,
+          saveCount: widget.eventModel.saveCount,
           isFeatured: widget.eventModel.isFeatured,
           status: widget.eventModel.status,
           eventGenerateTime: widget.eventModel.eventGenerateTime,
@@ -389,6 +447,7 @@ class _EditEventScreenState extends State<EditEventScreen>
               : 0,
           eventDuration: widget.eventModel.eventDuration,
           coHosts: widget.eventModel.coHosts,
+          checkInStaff: widget.eventModel.checkInStaff,
           ticketPrice: widget.eventModel.ticketPrice,
           ticketUpgradeEnabled: widget.eventModel.ticketUpgradeEnabled,
           ticketUpgradePrice: widget.eventModel.ticketUpgradePrice,
@@ -396,6 +455,7 @@ class _EditEventScreenState extends State<EditEventScreen>
           accessList: widget.eventModel.accessList,
           signInMethods: _selectedSignInMethods,
           signInSecurityTier: _selectedSignInTier, // Add security tier
+          checkInPolicy: _checkInPolicy,
           manualCode: _manualCode,
           hasLiveQuiz: widget.eventModel.hasLiveQuiz,
           liveQuizId: widget.eventModel.liveQuizId,
@@ -405,10 +465,14 @@ class _EditEventScreenState extends State<EditEventScreen>
           '🔍 DEBUG: Updating Firestore document: ${widget.eventModel.id}',
         );
         // Update in Firestore
+        final updateData = updatedEvent.toJson()
+          ..remove('geohash')
+          ..remove('countryCode')
+          ..remove('saveCount');
         await FirebaseFirestore.instance
             .collection(EventModel.firebaseKey)
             .doc(widget.eventModel.id)
-            .update(updatedEvent.toJson());
+            .update(updateData);
 
         debugPrint('✅ SUCCESS: Event updated in Firestore');
         _btnCtlr.success();
@@ -446,7 +510,12 @@ class _EditEventScreenState extends State<EditEventScreen>
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      EventCreationExperienceGate(event: widget.eventModel);
+
+  // Retained while legacy layout references migrate to the canonical editor.
+  // ignore: unused_element
+  Widget _legacyLayout(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
@@ -720,6 +789,7 @@ class _EditEventScreenState extends State<EditEventScreen>
                   onTap: () {
                     setState(() {
                       _selectedImagePath = null;
+                      _selectedImageBytes = null;
                       _currentImageUrl = null;
                       thumbnailUrlCtlr.clear();
                     });
@@ -1031,7 +1101,7 @@ class _EditEventScreenState extends State<EditEventScreen>
               ),
               const SizedBox(width: 12),
               const Text(
-                'Categories',
+                'Attendee categories',
                 style: TextStyle(
                   color: Color(0xFF1A1A1A),
                   fontWeight: FontWeight.w600,
@@ -1041,106 +1111,112 @@ class _EditEventScreenState extends State<EditEventScreen>
               ),
             ],
           ),
+          Text(
+            'Choose one primary category and up to two more. The first selection is primary.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
           const SizedBox(height: 16),
           Wrap(
-            spacing: 8, // Reduced spacing to fit more categories
+            spacing: 8,
             runSpacing: 10,
-            children: _allCategories.map((category) {
-              final isSelected = _selectedCategories.contains(category);
-              return GestureDetector(
-                onTap: () {
+            children: DiscoveryCategory.all.map((category) {
+              final isSelected = _selectedDiscoveryCategoryIds.contains(
+                category.id,
+              );
+              return FilterChip(
+                avatar: Icon(category.icon, size: 17),
+                label: Text(category.label),
+                selected: isSelected,
+                onSelected: (selected) {
                   setState(() {
-                    if (isSelected) {
-                      _selectedCategories.remove(category);
+                    if (selected) {
+                      if (_selectedDiscoveryCategoryIds.length >= 3) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Choose up to three categories'),
+                          ),
+                        );
+                        return;
+                      }
+                      _selectedDiscoveryCategoryIds.add(category.id);
+                      _primaryDiscoveryCategoryId ??= category.id;
                     } else {
-                      _selectedCategories.add(category);
+                      _selectedDiscoveryCategoryIds.remove(category.id);
+                      if (_primaryDiscoveryCategoryId == category.id) {
+                        _primaryDiscoveryCategoryId =
+                            _selectedDiscoveryCategoryIds.firstOrNull;
+                      }
                     }
+                    _selectedCategories = DiscoveryCategory.legacyLabels(
+                      _selectedDiscoveryCategoryIds,
+                    );
                     _hasChanges = true;
                   });
                 },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12, // Slightly reduced horizontal padding
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? const Color(0xFF667EEA)
-                        : const Color(0xFF667EEA).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: const Color(0xFF667EEA),
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    category,
-                    style: TextStyle(
-                      color: isSelected
-                          ? Colors.white
-                          : const Color(0xFF667EEA),
-                      fontSize:
-                          13, // Slightly smaller font for longer category names
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Roboto',
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                ),
               );
             }).toList(),
           ),
+          if (_selectedDiscoveryCategoryIds.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              key: ValueKey(
+                '${_selectedDiscoveryCategoryIds.join(',')}:$_primaryDiscoveryCategoryId',
+              ),
+              initialValue: _primaryDiscoveryCategoryId,
+              decoration: const InputDecoration(
+                labelText: 'Primary category',
+                helperText: 'This is the main category attendees will see.',
+              ),
+              items: _selectedDiscoveryCategoryIds
+                  .map(DiscoveryCategory.fromId)
+                  .whereType<DiscoveryCategory>()
+                  .map(
+                    (category) => DropdownMenuItem(
+                      value: category.id,
+                      child: Text(category.label),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                setState(() {
+                  _primaryDiscoveryCategoryId = value;
+                  _hasChanges = true;
+                });
+              },
+            ),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildSignInMethodsSection() {
-    return SignInSecurityTierSelector(
-      selectedTier: _selectedSignInTier,
-      onTierChanged: (tier) {
-        if (_locationType == 'online' &&
-            (tier == 'most_secure' ||
-                tier == 'geofence_only' ||
-                tier == 'all')) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Geofence sign-in is unavailable for online events',
-              ),
-            ),
-          );
-          return;
-        }
+    return ArrivalProfileSelector(
+      policy: _checkInPolicy,
+      onChanged: (policy) {
         setState(() {
-          _selectedSignInTier = tier;
+          _checkInPolicy = policy;
+          _syncLegacyAttendanceFields();
           _hasChanges = true;
-
-          // Update legacy methods list based on tier
-          switch (tier) {
-            case 'most_secure':
-              _selectedSignInMethods = ['geofence', 'facial_recognition'];
-              break;
-            case 'geofence_only':
-              _selectedSignInMethods = ['geofence'];
-              break;
-            case 'regular':
-              _selectedSignInMethods = ['qr_code', 'manual_code'];
-              break;
-            case 'all':
-              _selectedSignInMethods = [
-                'geofence',
-                'facial_recognition',
-                'qr_code',
-                'manual_code',
-              ];
-              break;
-          }
         });
       },
-      isEditing: true,
     );
+  }
+
+  void _syncLegacyAttendanceFields() {
+    _selectedSignInTier = _checkInPolicy.profile == CheckInProfile.hybrid
+        ? 'all'
+        : 'regular';
+    _selectedSignInMethods = switch (_checkInPolicy.profile) {
+      CheckInProfile.selfCheckIn => ['qr_code', 'manual_code'],
+      CheckInProfile.staffEntry => ['personal_pass', 'staff_roster'],
+      CheckInProfile.hybrid => [
+        'qr_code',
+        'manual_code',
+        'personal_pass',
+        'staff_roster',
+      ],
+    };
   }
 
   Widget _buildPrivacySection() {
@@ -1349,11 +1425,12 @@ class _EditEventScreenState extends State<EditEventScreen>
         ClipRRect(
           borderRadius: BorderRadius.circular(14),
           child: _selectedImagePath != null
-              ? Image.file(
-                  File(_selectedImagePath!),
+              ? Image.memory(
+                  _selectedImageBytes!,
                   width: double.infinity,
                   height: double.infinity,
                   fit: BoxFit.cover,
+                  gaplessPlayback: true,
                   errorBuilder: (context, error, stackTrace) {
                     return Container(
                       width: double.infinity,
@@ -1370,26 +1447,12 @@ class _EditEventScreenState extends State<EditEventScreen>
                     );
                   },
                 )
-              : Image.network(
-                  _currentImageUrl!,
+              : AttendUsEventImage(
+                  imageUrl: _currentImageUrl,
                   width: double.infinity,
                   height: double.infinity,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      width: double.infinity,
-                      height: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(
-                        Icons.broken_image,
-                        color: Colors.grey,
-                        size: 48,
-                      ),
-                    );
-                  },
+                  compact: true,
                 ),
         ),
         Positioned(

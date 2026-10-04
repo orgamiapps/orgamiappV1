@@ -5,10 +5,7 @@ class TicketCornerNotchClipper extends CustomClipper<Path> {
   final double notchRadius;
   final double cornerRadius;
 
-  TicketCornerNotchClipper({
-    this.notchRadius = 12.0,
-    this.cornerRadius = 20.0,
-  });
+  TicketCornerNotchClipper({this.notchRadius = 12.0, this.cornerRadius = 20.0});
 
   @override
   Path getClip(Size size) {
@@ -92,4 +89,3 @@ class TicketCornerNotchClipper extends CustomClipper<Path> {
       notchRadius != oldClipper.notchRadius ||
       cornerRadius != oldClipper.cornerRadius;
 }
-

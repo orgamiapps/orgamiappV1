@@ -1,0 +1,3975 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-10-04T04:08:14.736Z",
+  "verifiedAt": "2026-10-04T04:10:48.898Z",
+  "entries": [
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/adminApi",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "adminApi/function-source.zip",
+        "generation": "1790545897688598",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/adminApi/1790545897688598.zip",
+        "generation": "1791086894977587",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/aggregateAdminMetricsDaily",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "aggregateAdminMetricsDaily/function-source.zip",
+        "generation": "1790545900612774",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/aggregateAdminMetricsDaily/1790545900612774.zip",
+        "generation": "1791086894980132",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/aggregateAttendanceData",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "aggregateAttendanceData/function-source.zip",
+        "generation": "1790545815296128",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/aggregateAttendanceData/1790545815296128.zip",
+        "generation": "1791086894979294",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/aggregateFeedbackData",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "aggregateFeedbackData/function-source.zip",
+        "generation": "1790545832698806",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/aggregateFeedbackData/1790545832698806.zip",
+        "generation": "1791086894962964",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/aggregateProductFunnelDaily",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "aggregateProductFunnelDaily/function-source.zip",
+        "generation": "1790545904614680",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/aggregateProductFunnelDaily/1790545904614680.zip",
+        "generation": "1791086894971731",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/aggregateUserAnalyticsV2",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "aggregateUserAnalyticsV2/function-source.zip",
+        "generation": "1790545815281412",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/aggregateUserAnalyticsV2/1790545815281412.zip",
+        "generation": "1791086895018392",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/aiSearchEvents",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "aiSearchEvents/function-source.zip",
+        "generation": "1790545955464737",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/aiSearchEvents/1790545955464737.zip",
+        "generation": "1791086895454060",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/anonymizeExpiredGuestContactsV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "anonymizeExpiredGuestContactsV1/function-source.zip",
+        "generation": "1790545880351250",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/anonymizeExpiredGuestContactsV1/1790545880351250.zip",
+        "generation": "1791086895445110",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/applyScheduledPlanChanges",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "applyScheduledPlanChanges/function-source.zip",
+        "generation": "1790545884825296",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/applyScheduledPlanChanges/1790545884825296.zip",
+        "generation": "1791086895437789",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/archiveEventDraftV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "archiveEventDraftV1/function-source.zip",
+        "generation": "1790545883803389",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/archiveEventDraftV1/1790545883803389.zip",
+        "generation": "1791086895492502",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/attendanceWallet",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "attendanceWallet/function-source.zip",
+        "generation": "1790545814765491",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/attendanceWallet/1790545814765491.zip",
+        "generation": "1791086895468250",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/backfillUserAnalyticsV2",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "backfillUserAnalyticsV2/function-source.zip",
+        "generation": "1790545894433256",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/backfillUserAnalyticsV2/1790545894433256.zip",
+        "generation": "1791086895476198",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/cancelPublicRegistrationV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "cancelPublicRegistrationV1/function-source.zip",
+        "generation": "1790545880142166",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/cancelPublicRegistrationV1/1790545880142166.zip",
+        "generation": "1791086895906081",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/claimPublicRegistrationV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "claimPublicRegistrationV1/function-source.zip",
+        "generation": "1790545880637524",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/claimPublicRegistrationV1/1790545880637524.zip",
+        "generation": "1791086895913230",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/confirmFeaturePayment",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "confirmFeaturePayment/function-source.zip",
+        "generation": "1790545842793260",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/confirmFeaturePayment/1790545842793260.zip",
+        "generation": "1791086895925005",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/confirmTicketPayment",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "confirmTicketPayment/function-source.zip",
+        "generation": "1790545833168438",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/confirmTicketPayment/1790545833168438.zip",
+        "generation": "1791086895933858",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/createEditEventDraftV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "createEditEventDraftV1/function-source.zip",
+        "generation": "1790545889962733",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/createEditEventDraftV1/1790545889962733.zip",
+        "generation": "1791086895959140",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/createFeaturePaymentIntent",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "createFeaturePaymentIntent/function-source.zip",
+        "generation": "1790545842709066",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/createFeaturePaymentIntent/1790545842709066.zip",
+        "generation": "1791086895955406",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/createPublicTicketCheckoutV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "createPublicTicketCheckoutV1/function-source.zip",
+        "generation": "1790545873612653",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/createPublicTicketCheckoutV1/1790545873612653.zip",
+        "generation": "1791086896364171",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/createTicketPaymentIntent",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "createTicketPaymentIntent/function-source.zip",
+        "generation": "1790545833077693",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/createTicketPaymentIntent/1790545833077693.zip",
+        "generation": "1791086896363949",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/createTicketUpgradePaymentIntent",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "createTicketUpgradePaymentIntent/function-source.zip",
+        "generation": "1790545842552659",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/createTicketUpgradePaymentIntent/1790545842552659.zip",
+        "generation": "1791086896380292",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/decideEventRegistrationV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "decideEventRegistrationV1/function-source.zip",
+        "generation": "1790545890744160",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/decideEventRegistrationV1/1790545890744160.zip",
+        "generation": "1791086896380530",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/deleteEventDraftV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "deleteEventDraftV1/function-source.zip",
+        "generation": "1790545888073047",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/deleteEventDraftV1/1790545888073047.zip",
+        "generation": "1791086896564711",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/deleteEventTemplateV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "deleteEventTemplateV1/function-source.zip",
+        "generation": "1790545890729395",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/deleteEventTemplateV1/1790545890729395.zip",
+        "generation": "1791086896408601",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/deleteUserAccount",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "deleteUserAccount/function-source.zip",
+        "generation": "1790545948233104",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/deleteUserAccount/1790545948233104.zip",
+        "generation": "1791086896752656",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/deliverAttendanceWallets",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "deliverAttendanceWallets/function-source.zip",
+        "generation": "1790545814733135",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/deliverAttendanceWallets/1790545814733135.zip",
+        "generation": "1791086896822823",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/deliverDiscoveryNotificationsV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "deliverDiscoveryNotificationsV1/function-source.zip",
+        "generation": "1790545872939840",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/deliverDiscoveryNotificationsV1/1790545872939840.zip",
+        "generation": "1791086896811171",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/deliverOutboundMessageV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "deliverOutboundMessageV1/function-source.zip",
+        "generation": "1790545883578016",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/deliverOutboundMessageV1/1790545883578016.zip",
+        "generation": "1791086896818170",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/dispatchPendingPush",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "dispatchPendingPush/function-source.zip",
+        "generation": "1790545815656088",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/dispatchPendingPush/1790545815656088.zip",
+        "generation": "1791086896880534",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/duplicateEventToDraftV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "duplicateEventToDraftV1/function-source.zip",
+        "generation": "1790545888514279",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/duplicateEventToDraftV1/1790545888514279.zip",
+        "generation": "1791086897183228",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/endCheckInSession",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "endCheckInSession/function-source.zip",
+        "generation": "1790545890775751",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/endCheckInSession/1790545890775751.zip",
+        "generation": "1791086897215788",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/exportOrganizerEventRegistrationsV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "exportOrganizerEventRegistrationsV1/function-source.zip",
+        "generation": "1790545883710960",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/exportOrganizerEventRegistrationsV1/1790545883710960.zip",
+        "generation": "1791086897214535",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/followPublicEventOrganizerV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "followPublicEventOrganizerV1/function-source.zip",
+        "generation": "1790545883500150",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/followPublicEventOrganizerV1/1790545883500150.zip",
+        "generation": "1791086897239917",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/generateUserBadgePass",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "generateUserBadgePass/function-source.zip",
+        "generation": "1790545815642436",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/generateUserBadgePass/1790545815642436.zip",
+        "generation": "1791086897286308",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/getAttendanceControl",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "getAttendanceControl/function-source.zip",
+        "generation": "1790545814784223",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/getAttendanceControl/1790545814784223.zip",
+        "generation": "1791086897409177",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/getAttendanceOfflineKit",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "getAttendanceOfflineKit/function-source.zip",
+        "generation": "1790545814735398",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/getAttendanceOfflineKit/1790545814735398.zip",
+        "generation": "1791086897647868",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/getAttendancePass",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "getAttendancePass/function-source.zip",
+        "generation": "1790545814776602",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/getAttendancePass/1790545814776602.zip",
+        "generation": "1791086897680284",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/getAttendanceScanContext",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "getAttendanceScanContext/function-source.zip",
+        "generation": "1790545814792500",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/getAttendanceScanContext/1790545814792500.zip",
+        "generation": "1791086897659042",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/getDiscoveryHomeV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "getDiscoveryHomeV1/function-source.zip",
+        "generation": "1790545955630583",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/getDiscoveryHomeV1/1790545955630583.zip",
+        "generation": "1791086897701247",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/getDiscoveryHomeV2",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "getDiscoveryHomeV2/function-source.zip",
+        "generation": "1790545955559675",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/getDiscoveryHomeV2/1790545955559675.zip",
+        "generation": "1791086897795909",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/getOrCreateDirectConversationV2",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "getOrCreateDirectConversationV2/function-source.zip",
+        "generation": "1790545735626080",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/getOrCreateDirectConversationV2/1790545735626080.zip",
+        "generation": "1791086897872400",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/getOrganizerEventRegistrationsV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "getOrganizerEventRegistrationsV1/function-source.zip",
+        "generation": "1790545883313311",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/getOrganizerEventRegistrationsV1/1790545883313311.zip",
+        "generation": "1791086898100771",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/getPersonalAttendancePass",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "getPersonalAttendancePass/function-source.zip",
+        "generation": "1790545893458816",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/getPersonalAttendancePass/1790545893458816.zip",
+        "generation": "1791086898168042",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/getPublicRegistrationStatusV2",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "getPublicRegistrationStatusV2/function-source.zip",
+        "generation": "1790545880016437",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/getPublicRegistrationStatusV2/1790545880016437.zip",
+        "generation": "1791086898144322",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/getPublicTicketCheckoutStatusV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "getPublicTicketCheckoutStatusV1/function-source.zip",
+        "generation": "1790545873725948",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/getPublicTicketCheckoutStatusV1/1790545873725948.zip",
+        "generation": "1791086898157955",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/getSmartArrivalCandidates",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "getSmartArrivalCandidates/function-source.zip",
+        "generation": "1790545814782779",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/getSmartArrivalCandidates/1790545814782779.zip",
+        "generation": "1791086898261740",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/guestAttendanceWeb",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "guestAttendanceWeb/function-source.zip",
+        "generation": "1790545814750939",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/guestAttendanceWeb/1790545814750939.zip",
+        "generation": "1791086898271947",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/issueFreeTicket",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "issueFreeTicket/function-source.zip",
+        "generation": "1790545894537900",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/issueFreeTicket/1790545894537900.zip",
+        "generation": "1791086898562381",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/listEventDraftsV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "listEventDraftsV1/function-source.zip",
+        "generation": "1790545883880382",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/listEventDraftsV1/1790545883880382.zip",
+        "generation": "1791086898611704",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/listEventTemplatesV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "listEventTemplatesV1/function-source.zip",
+        "generation": "1790545890168899",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/listEventTemplatesV1/1790545890168899.zip",
+        "generation": "1791086898642453",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/maintainDiscoveryMetadataV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "maintainDiscoveryMetadataV1/function-source.zip",
+        "generation": "1790545863084863",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/maintainDiscoveryMetadataV1/1790545863084863.zip",
+        "generation": "1791086899298563",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/maintainPublicCommunityPageV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "maintainPublicCommunityPageV1/function-source.zip",
+        "generation": "1790545873559175",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/maintainPublicCommunityPageV1/1790545873559175.zip",
+        "generation": "1791086898710814",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/maintainPublicEventPageV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "maintainPublicEventPageV1/function-source.zip",
+        "generation": "1790545873338729",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/maintainPublicEventPageV1/1790545873338729.zip",
+        "generation": "1791086898751550",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/maintainSmartArrivalBoundary",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "maintainSmartArrivalBoundary/function-source.zip",
+        "generation": "1790545814705279",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/maintainSmartArrivalBoundary/1790545814705279.zip",
+        "generation": "1791086898948630",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/markConversationReadV2",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "markConversationReadV2/function-source.zip",
+        "generation": "1790545814726078",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/markConversationReadV2/1790545814726078.zip",
+        "generation": "1791086899058550",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/mintVenueCredential",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "mintVenueCredential/function-source.zip",
+        "generation": "1790545891035689",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/mintVenueCredential/1790545891035689.zip",
+        "generation": "1791086899085755",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/notifyOrgAdminsOnJoinRequest",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "notifyOrgAdminsOnJoinRequest/function-source.zip",
+        "generation": "1790545815288815",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/notifyOrgAdminsOnJoinRequest/1790545815288815.zip",
+        "generation": "1791086899093779",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/notifyOrganizerOnFeedback",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "notifyOrganizerOnFeedback/function-source.zip",
+        "generation": "1790545815288737",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/notifyOrganizerOnFeedback/1790545815288737.zip",
+        "generation": "1791086899191616",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/notifyOrgMembershipChanges",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "notifyOrgMembershipChanges/function-source.zip",
+        "generation": "1790545815295444",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/notifyOrgMembershipChanges/1790545815295444.zip",
+        "generation": "1791086899396986",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/placeDetails",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "placeDetails/function-source.zip",
+        "generation": "1790545815544636",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/placeDetails/1790545815544636.zip",
+        "generation": "1791086899588210",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/placesAutocomplete",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "placesAutocomplete/function-source.zip",
+        "generation": "1790545815621976",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/placesAutocomplete/1790545815621976.zip",
+        "generation": "1791086899546475",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/processUserAnalyticsRecomputeV2",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "processUserAnalyticsRecomputeV2/function-source.zip",
+        "generation": "1790545815343233",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/processUserAnalyticsRecomputeV2/1790545815343233.zip",
+        "generation": "1791086899574497",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/publicWeb",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "publicWeb/function-source.zip",
+        "generation": "1790545900608516",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/publicWeb/1790545900608516.zip",
+        "generation": "1791086899693168",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/publishEventDraftV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "publishEventDraftV1/function-source.zip",
+        "generation": "1790545955668650",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/publishEventDraftV1/1790545955668650.zip",
+        "generation": "1791086899814890",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/queueAttendanceWalletDelivery",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "queueAttendanceWalletDelivery/function-source.zip",
+        "generation": "1790545814767905",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/queueAttendanceWalletDelivery/1790545814767905.zip",
+        "generation": "1791086899926597",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/queueDiscoveryNotificationsV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "queueDiscoveryNotificationsV1/function-source.zip",
+        "generation": "1790545871084020",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/queueDiscoveryNotificationsV1/1790545871084020.zip",
+        "generation": "1791086900013594",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/reconcileAttendanceAccountPasses",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "reconcileAttendanceAccountPasses/function-source.zip",
+        "generation": "1790545814780217",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/reconcileAttendanceAccountPasses/1790545814780217.zip",
+        "generation": "1791086899999579",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/reconcileAttendanceEventPasses",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "reconcileAttendanceEventPasses/function-source.zip",
+        "generation": "1790545814739898",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/reconcileAttendanceEventPasses/1790545814739898.zip",
+        "generation": "1791086900059007",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/reconcileAttendanceRegistrationPasses",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "reconcileAttendanceRegistrationPasses/function-source.zip",
+        "generation": "1790545814732227",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/reconcileAttendanceRegistrationPasses/1790545814732227.zip",
+        "generation": "1791086900196339",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/reconcileAttendanceTicketPasses",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "reconcileAttendanceTicketPasses/function-source.zip",
+        "generation": "1790545814861671",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/reconcileAttendanceTicketPasses/1790545814861671.zip",
+        "generation": "1791086900388755",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/reconcileEventRemindersV2",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "reconcileEventRemindersV2/function-source.zip",
+        "generation": "1790545893694899",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/reconcileEventRemindersV2/1790545893694899.zip",
+        "generation": "1791086900311540",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/reconcileReminderSettingsV2",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "reconcileReminderSettingsV2/function-source.zip",
+        "generation": "1790545897464350",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/reconcileReminderSettingsV2/1790545897464350.zip",
+        "generation": "1791086900462253",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/reconcileTicketRemindersV2",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "reconcileTicketRemindersV2/function-source.zip",
+        "generation": "1790545897195505",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/reconcileTicketRemindersV2/1790545897195505.zip",
+        "generation": "1791086900571110",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/recordProductFunnelEvent",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "recordProductFunnelEvent/function-source.zip",
+        "generation": "1790545894833022",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/recordProductFunnelEvent/1790545894833022.zip",
+        "generation": "1791086900440366",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/refreshAttendanceWallets",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "refreshAttendanceWallets/function-source.zip",
+        "generation": "1790545814709140",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/refreshAttendanceWallets/1790545814709140.zip",
+        "generation": "1791086900570903",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/registerPublicEventV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "registerPublicEventV1/function-source.zip",
+        "generation": "1790545913546350",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/registerPublicEventV1/1790545913546350.zip",
+        "generation": "1791086900740590",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/releaseExpiredTicketReservationsV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "releaseExpiredTicketReservationsV1/function-source.zip",
+        "generation": "1790545937795488",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/releaseExpiredTicketReservationsV1/1790545937795488.zip",
+        "generation": "1791086900778042",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/resendPublicRegistrationConfirmationV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "resendPublicRegistrationConfirmationV1/function-source.zip",
+        "generation": "1790545880961754",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/resendPublicRegistrationConfirmationV1/1790545880961754.zip",
+        "generation": "1791086900904390",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/resetMonthlyEventLimits",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "resetMonthlyEventLimits/function-source.zip",
+        "generation": "1790545884522356",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/resetMonthlyEventLimits/1790545884522356.zip",
+        "generation": "1791086900914164",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/resolveCheckInCredential",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "resolveCheckInCredential/function-source.zip",
+        "generation": "1790545891148884",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/resolveCheckInCredential/1790545891148884.zip",
+        "generation": "1791086901011506",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/resolveOutboundDeliveryUnknownV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "resolveOutboundDeliveryUnknownV1/function-source.zip",
+        "generation": "1790545814780744",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/resolveOutboundDeliveryUnknownV1/1790545814780744.zip",
+        "generation": "1791086900998599",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/resumeAccountDeletion",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "resumeAccountDeletion/function-source.zip",
+        "generation": "1790545814664406",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/resumeAccountDeletion/1790545814664406.zip",
+        "generation": "1791086901138589",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/retryOutboundMessagesV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "retryOutboundMessagesV1/function-source.zip",
+        "generation": "1790545883582899",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/retryOutboundMessagesV1/1790545883582899.zip",
+        "generation": "1791086901157417",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/reverseGeocode",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "reverseGeocode/function-source.zip",
+        "generation": "1790545815617318",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/reverseGeocode/1790545815617318.zip",
+        "generation": "1791086901341745",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/saveEventDraftV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "saveEventDraftV1/function-source.zip",
+        "generation": "1790545883682118",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/saveEventDraftV1/1790545883682118.zip",
+        "generation": "1791086901298140",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/saveEventTemplateV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "saveEventTemplateV1/function-source.zip",
+        "generation": "1790545890590727",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/saveEventTemplateV1/1790545890590727.zip",
+        "generation": "1791086901445941",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/searchDiscoveryEventsV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "searchDiscoveryEventsV1/function-source.zip",
+        "generation": "1790545955648927",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/searchDiscoveryEventsV1/1790545955648927.zip",
+        "generation": "1791086901490291",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/searchDiscoveryEventsV2",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "searchDiscoveryEventsV2/function-source.zip",
+        "generation": "1790545955631363",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/searchDiscoveryEventsV2/1790545955631363.zip",
+        "generation": "1791086901596147",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/sendBasicTierUsageReminder",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "sendBasicTierUsageReminder/function-source.zip",
+        "generation": "1790545893039632",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/sendBasicTierUsageReminder/1790545893039632.zip",
+        "generation": "1791086901626493",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/sendConversationMessageV2",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "sendConversationMessageV2/function-source.zip",
+        "generation": "1790545814718867",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/sendConversationMessageV2/1790545814718867.zip",
+        "generation": "1791086901754220",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/sendCustomNotifications",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "sendCustomNotifications/function-source.zip",
+        "generation": "1790545815624923",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/sendCustomNotifications/1790545815624923.zip",
+        "generation": "1791086901716704",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/sendEventUpdateNotifications",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "sendEventUpdateNotifications/function-source.zip",
+        "generation": "1790545815280283",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/sendEventUpdateNotifications/1790545815280283.zip",
+        "generation": "1791086901974116",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/sendMentionNotifications",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "sendMentionNotifications/function-source.zip",
+        "generation": "1790545825252662",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/sendMentionNotifications/1790545825252662.zip",
+        "generation": "1791086901971394",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/sendMessageNotifications",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "sendMessageNotifications/function-source.zip",
+        "generation": "1790545832905720",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/sendMessageNotifications/1790545832905720.zip",
+        "generation": "1791086902179405",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/sendNewEventNotifications",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "sendNewEventNotifications/function-source.zip",
+        "generation": "1790545815283453",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/sendNewEventNotifications/1790545815283453.zip",
+        "generation": "1791086902017656",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/sendPostEventFeedbackNotifications",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "sendPostEventFeedbackNotifications/function-source.zip",
+        "generation": "1790545832159848",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/sendPostEventFeedbackNotifications/1790545832159848.zip",
+        "generation": "1791086902116235",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/sendScheduledNotifications",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "sendScheduledNotifications/function-source.zip",
+        "generation": "1790545815289891",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/sendScheduledNotifications/1790545815289891.zip",
+        "generation": "1791086902194235",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/sendTicketUpdateNotifications",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "sendTicketUpdateNotifications/function-source.zip",
+        "generation": "1790545815625913",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/sendTicketUpdateNotifications/1790545815625913.zip",
+        "generation": "1791086902368341",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/setAdminByEmail",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "setAdminByEmail/function-source.zip",
+        "generation": "1790545833099239",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/setAdminByEmail/1790545833099239.zip",
+        "generation": "1791086902384352",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/setAttendanceControl",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "setAttendanceControl/function-source.zip",
+        "generation": "1790545814743250",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/setAttendanceControl/1790545814743250.zip",
+        "generation": "1791086902520287",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/startCheckInSession",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "startCheckInSession/function-source.zip",
+        "generation": "1790545890889412",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/startCheckInSession/1790545890889412.zip",
+        "generation": "1791086902490777",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/startPublicRegistrationV2",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "startPublicRegistrationV2/function-source.zip",
+        "generation": "1790545873820020",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/startPublicRegistrationV2/1790545873820020.zip",
+        "generation": "1791086902638653",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/startPublicRegistrationV3",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "startPublicRegistrationV3/function-source.zip",
+        "generation": "1790545883540968",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/startPublicRegistrationV3/1790545883540968.zip",
+        "generation": "1791086902640800",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/stripeWebhook",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "stripeWebhook/function-source.zip",
+        "generation": "1790545842747254",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/stripeWebhook/1790545842747254.zip",
+        "generation": "1791086902781224",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/submitCheckIn",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "submitCheckIn/function-source.zip",
+        "generation": "1790545891071153",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/submitCheckIn/1790545891071153.zip",
+        "generation": "1791086902769283",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/submitGuestAttendance",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "submitGuestAttendance/function-source.zip",
+        "generation": "1790545894392214",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/submitGuestAttendance/1790545894392214.zip",
+        "generation": "1791086902960757",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/submitUserReport",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "submitUserReport/function-source.zip",
+        "generation": "1790545832987835",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/submitUserReport/1790545832987835.zip",
+        "generation": "1791086902964989",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/triggerAIInsights",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "triggerAIInsights/function-source.zip",
+        "generation": "1790545815614952",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/triggerAIInsights/1790545815614952.zip",
+        "generation": "1791086903135124",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/updateDiscoverySaveCountV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "updateDiscoverySaveCountV1/function-source.zip",
+        "generation": "1790545870761166",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/updateDiscoverySaveCountV1/1790545870761166.zip",
+        "generation": "1791086903189159",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/updatePublicRegistrationEmailV1",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "updatePublicRegistrationEmailV1/function-source.zip",
+        "generation": "1790545883228700",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/updatePublicRegistrationEmailV1/1790545883228700.zip",
+        "generation": "1791086903191426",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/updateUserAnalyticsOnEventCreateV2",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "updateUserAnalyticsOnEventCreateV2/function-source.zip",
+        "generation": "1790545815643106",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/updateUserAnalyticsOnEventCreateV2/1790545815643106.zip",
+        "generation": "1791086903287555",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/updateUserAnalyticsOnEventDeleteV2",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "updateUserAnalyticsOnEventDeleteV2/function-source.zip",
+        "generation": "1790545815633828",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/updateUserAnalyticsOnEventDeleteV2/1790545815633828.zip",
+        "generation": "1791086903405371",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "attendus-staging",
+      "functionName": "projects/attendus-staging/locations/us-central1/functions/voidAttendance",
+      "original": {
+        "bucket": "gcf-v2-sources-925344893088-us-central1",
+        "object": "voidAttendance/function-source.zip",
+        "generation": "1790545893324006",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/attendus-staging/voidAttendance/1790545893324006.zip",
+        "generation": "1791086903430793",
+        "sha256": "3280f06865d86a9be96761a3cdf3abca141fa3face08872d0e83a1e23042c410"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/adminApi",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "adminApi/function-source.zip",
+        "generation": "1789197761272999",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/adminApi/1789197761272999.zip",
+        "generation": "1791086903915635",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/aggregateAdminMetricsDaily",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "aggregateAdminMetricsDaily/function-source.zip",
+        "generation": "1789197769185488",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/aggregateAdminMetricsDaily/1789197769185488.zip",
+        "generation": "1791086904049222",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/aggregateAttendanceData",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "aggregateAttendanceData/function-source.zip",
+        "generation": "1789197683972914",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/aggregateAttendanceData/1789197683972914.zip",
+        "generation": "1791086903912249",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/aggregateFeedbackData",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "aggregateFeedbackData/function-source.zip",
+        "generation": "1789197684862626",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/aggregateFeedbackData/1789197684862626.zip",
+        "generation": "1791086903912945",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/aggregateProductFunnelDaily",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "aggregateProductFunnelDaily/function-source.zip",
+        "generation": "1789197737446551",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/aggregateProductFunnelDaily/1789197737446551.zip",
+        "generation": "1791086903915963",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/aggregateUserAnalyticsV2",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "aggregateUserAnalyticsV2/function-source.zip",
+        "generation": "1789197683975582",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/aggregateUserAnalyticsV2/1789197683975582.zip",
+        "generation": "1791086903909591",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/aiSearchEvents",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "aiSearchEvents/function-source.zip",
+        "generation": "1789197813318435",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/aiSearchEvents/1789197813318435.zip",
+        "generation": "1791086904344838",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/anonymizeExpiredGuestContactsV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "anonymizeExpiredGuestContactsV1/function-source.zip",
+        "generation": "1789197738778631",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/anonymizeExpiredGuestContactsV1/1789197738778631.zip",
+        "generation": "1791086904347039",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/applyScheduledPlanChanges",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "applyScheduledPlanChanges/function-source.zip",
+        "generation": "1789197705854124",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/applyScheduledPlanChanges/1789197705854124.zip",
+        "generation": "1791086904407785",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/archiveEventDraftV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "archiveEventDraftV1/function-source.zip",
+        "generation": "1789197749270068",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/archiveEventDraftV1/1789197749270068.zip",
+        "generation": "1791086904289475",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/attendanceWallet",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "attendanceWallet/function-source.zip",
+        "generation": "1789197683381066",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/attendanceWallet/1789197683381066.zip",
+        "generation": "1791086904349114",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/backfillUserAnalyticsV2",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "backfillUserAnalyticsV2/function-source.zip",
+        "generation": "1789197706003055",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/backfillUserAnalyticsV2/1789197706003055.zip",
+        "generation": "1791086904536009",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/cancelEventV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "cancelEventV1/function-source.zip",
+        "generation": "1790547229821369",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/cancelEventV1/1790547229821369.zip",
+        "generation": "1791086904726199",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/cancelPublicRegistrationV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "cancelPublicRegistrationV1/function-source.zip",
+        "generation": "1789197738804130",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/cancelPublicRegistrationV1/1789197738804130.zip",
+        "generation": "1791086904790207",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/claimPublicRegistrationV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "claimPublicRegistrationV1/function-source.zip",
+        "generation": "1789197738812643",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/claimPublicRegistrationV1/1789197738812643.zip",
+        "generation": "1791086904805571",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/confirmFeaturePayment",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "confirmFeaturePayment/function-source.zip",
+        "generation": "1789197705731800",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/confirmFeaturePayment/1789197705731800.zip",
+        "generation": "1791086904833786",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/confirmTicketPayment",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "confirmTicketPayment/function-source.zip",
+        "generation": "1789197704762184",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/confirmTicketPayment/1789197704762184.zip",
+        "generation": "1791086904903602",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/createEditEventDraftV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "createEditEventDraftV1/function-source.zip",
+        "generation": "1789197751229505",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/createEditEventDraftV1/1789197751229505.zip",
+        "generation": "1791086904935534",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/createEventExportV2",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "createEventExportV2/function-source.zip",
+        "generation": "1790547229757273",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/createEventExportV2/1790547229757273.zip",
+        "generation": "1791086905166726",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/createFeaturePaymentIntent",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "createFeaturePaymentIntent/function-source.zip",
+        "generation": "1789197705689419",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/createFeaturePaymentIntent/1789197705689419.zip",
+        "generation": "1791086905254923",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/createPublicTicketCheckoutV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "createPublicTicketCheckoutV1/function-source.zip",
+        "generation": "1789197780287419",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/createPublicTicketCheckoutV1/1789197780287419.zip",
+        "generation": "1791086905165232",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/createTicketPaymentIntent",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "createTicketPaymentIntent/function-source.zip",
+        "generation": "1789197697345100",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/createTicketPaymentIntent/1789197697345100.zip",
+        "generation": "1791086905413353",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/createTicketUpgradePaymentIntent",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "createTicketUpgradePaymentIntent/function-source.zip",
+        "generation": "1789197704906199",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/createTicketUpgradePaymentIntent/1789197704906199.zip",
+        "generation": "1791086905351256",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/decideEventRegistrationV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "decideEventRegistrationV1/function-source.zip",
+        "generation": "1789197750225758",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/decideEventRegistrationV1/1789197750225758.zip",
+        "generation": "1791086905300608",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/deleteEmptyEventV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "deleteEmptyEventV1/function-source.zip",
+        "generation": "1790547229829005",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/deleteEmptyEventV1/1790547229829005.zip",
+        "generation": "1791086905647532",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/deleteEventDraftV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "deleteEventDraftV1/function-source.zip",
+        "generation": "1789197749926453",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/deleteEventDraftV1/1789197749926453.zip",
+        "generation": "1791086905650425",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/deleteEventTemplateV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "deleteEventTemplateV1/function-source.zip",
+        "generation": "1789197750376276",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/deleteEventTemplateV1/1789197750376276.zip",
+        "generation": "1791086905744679",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/deleteUserAccount",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "deleteUserAccount/function-source.zip",
+        "generation": "1789197831880479",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/deleteUserAccount/1789197831880479.zip",
+        "generation": "1791086905666336",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/deliverAttendanceWallets",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "deliverAttendanceWallets/function-source.zip",
+        "generation": "1789197683459534",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/deliverAttendanceWallets/1789197683459534.zip",
+        "generation": "1791086905811118",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/deliverDiscoveryNotificationsV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "deliverDiscoveryNotificationsV1/function-source.zip",
+        "generation": "1789197738273498",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/deliverDiscoveryNotificationsV1/1789197738273498.zip",
+        "generation": "1791086905857260",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/deliverEventAnnouncement",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "deliverEventAnnouncement/function-source.zip",
+        "generation": "1790547229776209",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/deliverEventAnnouncement/1790547229776209.zip",
+        "generation": "1791086906057252",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/deliverOutboundMessageV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "deliverOutboundMessageV1/function-source.zip",
+        "generation": "1789197749687903",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/deliverOutboundMessageV1/1789197749687903.zip",
+        "generation": "1791086906170260",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/dispatchPendingPush",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "dispatchPendingPush/function-source.zip",
+        "generation": "1789197683959751",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/dispatchPendingPush/1789197683959751.zip",
+        "generation": "1791086906064527",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/duplicateEventToDraftV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "duplicateEventToDraftV1/function-source.zip",
+        "generation": "1789197749543889",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/duplicateEventToDraftV1/1789197749543889.zip",
+        "generation": "1791086906130103",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/endCheckInSession",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "endCheckInSession/function-source.zip",
+        "generation": "1789197751082762",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/endCheckInSession/1789197751082762.zip",
+        "generation": "1791086906256161",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/exportOrganizerEventRegistrationsV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "exportOrganizerEventRegistrationsV1/function-source.zip",
+        "generation": "1789197748515067",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/exportOrganizerEventRegistrationsV1/1789197748515067.zip",
+        "generation": "1791086906227865",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/followPublicEventOrganizerV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "followPublicEventOrganizerV1/function-source.zip",
+        "generation": "1789197748296830",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/followPublicEventOrganizerV1/1789197748296830.zip",
+        "generation": "1791086906433066",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/generateEventExport",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "generateEventExport/function-source.zip",
+        "generation": "1790547229808437",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/generateEventExport/1790547229808437.zip",
+        "generation": "1791086906468722",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/generateUserBadgePass",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "generateUserBadgePass/function-source.zip",
+        "generation": "1789197683969784",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/generateUserBadgePass/1789197683969784.zip",
+        "generation": "1791086906524928",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/getAttendanceControl",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "getAttendanceControl/function-source.zip",
+        "generation": "1789197683380763",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/getAttendanceControl/1789197683380763.zip",
+        "generation": "1791086906539593",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/getAttendanceOfflineKit",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "getAttendanceOfflineKit/function-source.zip",
+        "generation": "1789197683429042",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/getAttendanceOfflineKit/1789197683429042.zip",
+        "generation": "1791086906609808",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/getAttendancePass",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "getAttendancePass/function-source.zip",
+        "generation": "1789197683356673",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/getAttendancePass/1789197683356673.zip",
+        "generation": "1791086906649576",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/getAttendanceScanContext",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "getAttendanceScanContext/function-source.zip",
+        "generation": "1789197683368429",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/getAttendanceScanContext/1789197683368429.zip",
+        "generation": "1791086906863992",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/getDiscoveryHomeV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "getDiscoveryHomeV1/function-source.zip",
+        "generation": "1789197813796230",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/getDiscoveryHomeV1/1789197813796230.zip",
+        "generation": "1791086906872059",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/getDiscoveryHomeV2",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "getDiscoveryHomeV2/function-source.zip",
+        "generation": "1789197813116196",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/getDiscoveryHomeV2/1789197813116196.zip",
+        "generation": "1791086906909027",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/getEventAnnouncementV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "getEventAnnouncementV1/function-source.zip",
+        "generation": "1790547229782095",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/getEventAnnouncementV1/1790547229782095.zip",
+        "generation": "1791086906911627",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/getEventCapabilitiesV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "getEventCapabilitiesV1/function-source.zip",
+        "generation": "1790547229745073",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/getEventCapabilitiesV1/1790547229745073.zip",
+        "generation": "1791086907082567",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/getEventExportV2",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "getEventExportV2/function-source.zip",
+        "generation": "1790547229755402",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/getEventExportV2/1790547229755402.zip",
+        "generation": "1791086907074394",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/getOrCreateDirectConversationV2",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "getOrCreateDirectConversationV2/function-source.zip",
+        "generation": "1790462252334469",
+        "sha256": "483e814c985c8c7d0424c35aea25cd67620f4d126bde1ea37ff823d047279637"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/getOrCreateDirectConversationV2/1790462252334469.zip",
+        "generation": "1791086907370670",
+        "sha256": "483e814c985c8c7d0424c35aea25cd67620f4d126bde1ea37ff823d047279637"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/getOrganizerEventRegistrationsV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "getOrganizerEventRegistrationsV1/function-source.zip",
+        "generation": "1789197781594946",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/getOrganizerEventRegistrationsV1/1789197781594946.zip",
+        "generation": "1791086907256692",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/getPersonalAttendancePass",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "getPersonalAttendancePass/function-source.zip",
+        "generation": "1789197761373019",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/getPersonalAttendancePass/1789197761373019.zip",
+        "generation": "1791086907399111",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/getPublicRegistrationStatusV2",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "getPublicRegistrationStatusV2/function-source.zip",
+        "generation": "1789197738417282",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/getPublicRegistrationStatusV2/1789197738417282.zip",
+        "generation": "1791086907280666",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/getPublicTicketCheckoutStatusV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "getPublicTicketCheckoutStatusV1/function-source.zip",
+        "generation": "1789197780278303",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/getPublicTicketCheckoutStatusV1/1789197780278303.zip",
+        "generation": "1791086907480115",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/getSmartArrivalCandidates",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "getSmartArrivalCandidates/function-source.zip",
+        "generation": "1789197683140377",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/getSmartArrivalCandidates/1789197683140377.zip",
+        "generation": "1791086907530556",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/guestAttendanceWeb",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "guestAttendanceWeb/function-source.zip",
+        "generation": "1789197683014038",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/guestAttendanceWeb/1789197683014038.zip",
+        "generation": "1791086907664099",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/issueFreeTicket",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "issueFreeTicket/function-source.zip",
+        "generation": "1789197715667948",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/issueFreeTicket/1789197715667948.zip",
+        "generation": "1791086907751303",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/listEventDraftsV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "listEventDraftsV1/function-source.zip",
+        "generation": "1789197750263214",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/listEventDraftsV1/1789197750263214.zip",
+        "generation": "1791086907902816",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/listEventRosterV2",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "listEventRosterV2/function-source.zip",
+        "generation": "1790547229764971",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/listEventRosterV2/1790547229764971.zip",
+        "generation": "1791086907801873",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/listEventTemplatesV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "listEventTemplatesV1/function-source.zip",
+        "generation": "1789197750969009",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/listEventTemplatesV1/1789197750969009.zip",
+        "generation": "1791086908097101",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/listMyAdmissionsV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "listMyAdmissionsV1/function-source.zip",
+        "generation": "1790547229760662",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/listMyAdmissionsV1/1790547229760662.zip",
+        "generation": "1791086907928361",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/maintainDiscoveryMetadataV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "maintainDiscoveryMetadataV1/function-source.zip",
+        "generation": "1789197780182081",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/maintainDiscoveryMetadataV1/1789197780182081.zip",
+        "generation": "1791086908093910",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/maintainPublicCommunityPageV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "maintainPublicCommunityPageV1/function-source.zip",
+        "generation": "1789197780772236",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/maintainPublicCommunityPageV1/1789197780772236.zip",
+        "generation": "1791086908329557",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/maintainPublicEventPageV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "maintainPublicEventPageV1/function-source.zip",
+        "generation": "1789197738589868",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/maintainPublicEventPageV1/1789197738589868.zip",
+        "generation": "1791086908225879",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/maintainSmartArrivalBoundary",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "maintainSmartArrivalBoundary/function-source.zip",
+        "generation": "1789197638265538",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/maintainSmartArrivalBoundary/1789197638265538.zip",
+        "generation": "1791086908372556",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/markConversationReadV2",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "markConversationReadV2/function-source.zip",
+        "generation": "1790462301619436",
+        "sha256": "483e814c985c8c7d0424c35aea25cd67620f4d126bde1ea37ff823d047279637"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/markConversationReadV2/1790462301619436.zip",
+        "generation": "1791086908299808",
+        "sha256": "483e814c985c8c7d0424c35aea25cd67620f4d126bde1ea37ff823d047279637"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/mintVenueCredential",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "mintVenueCredential/function-source.zip",
+        "generation": "1789197750534447",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/mintVenueCredential/1789197750534447.zip",
+        "generation": "1791086908503586",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/notifyOrgAdminsOnJoinRequest",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "notifyOrgAdminsOnJoinRequest/function-source.zip",
+        "generation": "1789197684889888",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/notifyOrgAdminsOnJoinRequest/1789197684889888.zip",
+        "generation": "1791086908589052",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/notifyOrganizerOnFeedback",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "notifyOrganizerOnFeedback/function-source.zip",
+        "generation": "1789197684924970",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/notifyOrganizerOnFeedback/1789197684924970.zip",
+        "generation": "1791086908669331",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/notifyOrgMembershipChanges",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "notifyOrgMembershipChanges/function-source.zip",
+        "generation": "1789197684893146",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/notifyOrgMembershipChanges/1789197684893146.zip",
+        "generation": "1791086908793718",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/placeDetails",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "placeDetails/function-source.zip",
+        "generation": "1789197683968384",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/placeDetails/1789197683968384.zip",
+        "generation": "1791086908783162",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/placesAutocomplete",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "placesAutocomplete/function-source.zip",
+        "generation": "1789197683963698",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/placesAutocomplete/1789197683963698.zip",
+        "generation": "1791086908778809",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/previewEventAnnouncementV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "previewEventAnnouncementV1/function-source.zip",
+        "generation": "1790547229788109",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/previewEventAnnouncementV1/1790547229788109.zip",
+        "generation": "1791086908882586",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/previewEventCancellationV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "previewEventCancellationV1/function-source.zip",
+        "generation": "1790547229766790",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/previewEventCancellationV1/1790547229766790.zip",
+        "generation": "1791086908993768",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/previewEventChangeV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "previewEventChangeV1/function-source.zip",
+        "generation": "1790547229771596",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/previewEventChangeV1/1790547229771596.zip",
+        "generation": "1791086909144280",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/processUserAnalyticsRecomputeV2",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "processUserAnalyticsRecomputeV2/function-source.zip",
+        "generation": "1789197683969402",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/processUserAnalyticsRecomputeV2/1789197683969402.zip",
+        "generation": "1791086909385590",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/publicWeb",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "publicWeb/function-source.zip",
+        "generation": "1789197770187363",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/publicWeb/1789197770187363.zip",
+        "generation": "1791086909387336",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/publishEventDraftV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "publishEventDraftV1/function-source.zip",
+        "generation": "1790475686762183",
+        "sha256": "e5c92146f8f67d63cc4e6994811aa2371c8133adb825ed66e3677a7d02d71182"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/publishEventDraftV1/1790475686762183.zip",
+        "generation": "1791086909285401",
+        "sha256": "e5c92146f8f67d63cc4e6994811aa2371c8133adb825ed66e3677a7d02d71182"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/queueAttendanceWalletDelivery",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "queueAttendanceWalletDelivery/function-source.zip",
+        "generation": "1789197683367100",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/queueAttendanceWalletDelivery/1789197683367100.zip",
+        "generation": "1791086909269640",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/queueDiscoveryNotificationsV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "queueDiscoveryNotificationsV1/function-source.zip",
+        "generation": "1789197780672795",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/queueDiscoveryNotificationsV1/1789197780672795.zip",
+        "generation": "1791086909599320",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/reconcileAttendanceAccountPasses",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "reconcileAttendanceAccountPasses/function-source.zip",
+        "generation": "1789197683380704",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/reconcileAttendanceAccountPasses/1789197683380704.zip",
+        "generation": "1791086909571896",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/reconcileAttendanceEventPasses",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "reconcileAttendanceEventPasses/function-source.zip",
+        "generation": "1789197683399251",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/reconcileAttendanceEventPasses/1789197683399251.zip",
+        "generation": "1791086909769971",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/reconcileAttendanceRegistrationPasses",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "reconcileAttendanceRegistrationPasses/function-source.zip",
+        "generation": "1789197683409643",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/reconcileAttendanceRegistrationPasses/1789197683409643.zip",
+        "generation": "1791086909686082",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/reconcileAttendanceTicketPasses",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "reconcileAttendanceTicketPasses/function-source.zip",
+        "generation": "1789197683411295",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/reconcileAttendanceTicketPasses/1789197683411295.zip",
+        "generation": "1791086909839449",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/reconcileEventRemindersV2",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "reconcileEventRemindersV2/function-source.zip",
+        "generation": "1789197760728217",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/reconcileEventRemindersV2/1789197760728217.zip",
+        "generation": "1791086909890131",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/reconcileReminderSettingsV2",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "reconcileReminderSettingsV2/function-source.zip",
+        "generation": "1789197760863682",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/reconcileReminderSettingsV2/1789197760863682.zip",
+        "generation": "1791086910103378",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/reconcileTicketRemindersV2",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "reconcileTicketRemindersV2/function-source.zip",
+        "generation": "1789197760408355",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/reconcileTicketRemindersV2/1789197760408355.zip",
+        "generation": "1791086910004854",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/recordProductFunnelEvent",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "recordProductFunnelEvent/function-source.zip",
+        "generation": "1789197779953877",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/recordProductFunnelEvent/1789197779953877.zip",
+        "generation": "1791086910116498",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/refreshAttendanceWallets",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "refreshAttendanceWallets/function-source.zip",
+        "generation": "1789197683370525",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/refreshAttendanceWallets/1789197683370525.zip",
+        "generation": "1791086910175417",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/refreshRosterAttendance",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "refreshRosterAttendance/function-source.zip",
+        "generation": "1790547229785134",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/refreshRosterAttendance/1790547229785134.zip",
+        "generation": "1791086910244526",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/refreshRosterCorrection",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "refreshRosterCorrection/function-source.zip",
+        "generation": "1790547229783713",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/refreshRosterCorrection/1790547229783713.zip",
+        "generation": "1791086910409136",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/refreshRosterCustomers",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "refreshRosterCustomers/function-source.zip",
+        "generation": "1790547229763256",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/refreshRosterCustomers/1790547229763256.zip",
+        "generation": "1791086910419369",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/refreshRosterEvent",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "refreshRosterEvent/function-source.zip",
+        "generation": "1790547229769172",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/refreshRosterEvent/1790547229769172.zip",
+        "generation": "1791086910529427",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/refreshRosterGuestAttendees",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "refreshRosterGuestAttendees/function-source.zip",
+        "generation": "1790547229765301",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/refreshRosterGuestAttendees/1790547229765301.zip",
+        "generation": "1791086910583773",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/refreshRosterHistoricalAttendance",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "refreshRosterHistoricalAttendance/function-source.zip",
+        "generation": "1790547229776704",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/refreshRosterHistoricalAttendance/1790547229776704.zip",
+        "generation": "1791086910590567",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/refreshRosterRegisterAttendance",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "refreshRosterRegisterAttendance/function-source.zip",
+        "generation": "1790547229774114",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/refreshRosterRegisterAttendance/1790547229774114.zip",
+        "generation": "1791086910709511",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/refreshRosterTickets",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "refreshRosterTickets/function-source.zip",
+        "generation": "1790547229798263",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/refreshRosterTickets/1790547229798263.zip",
+        "generation": "1791086910819169",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/registerPublicEventV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "registerPublicEventV1/function-source.zip",
+        "generation": "1789197780886815",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/registerPublicEventV1/1789197780886815.zip",
+        "generation": "1791086910893221",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/releaseExpiredTicketReservationsV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "releaseExpiredTicketReservationsV1/function-source.zip",
+        "generation": "1789197843091299",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/releaseExpiredTicketReservationsV1/1789197843091299.zip",
+        "generation": "1791086911038062",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/resendPublicRegistrationConfirmationV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "resendPublicRegistrationConfirmationV1/function-source.zip",
+        "generation": "1789197781225712",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/resendPublicRegistrationConfirmationV1/1789197781225712.zip",
+        "generation": "1791086911038581",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/resetMonthlyEventLimits",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "resetMonthlyEventLimits/function-source.zip",
+        "generation": "1789197705820404",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/resetMonthlyEventLimits/1789197705820404.zip",
+        "generation": "1791086911037436",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/resolveCheckInCredential",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "resolveCheckInCredential/function-source.zip",
+        "generation": "1789197752358674",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/resolveCheckInCredential/1789197752358674.zip",
+        "generation": "1791086911099052",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/retryEventOperations",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "retryEventOperations/function-source.zip",
+        "generation": "1790547229786652",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/retryEventOperations/1790547229786652.zip",
+        "generation": "1791086911216965",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/retryOutboundMessagesV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "retryOutboundMessagesV1/function-source.zip",
+        "generation": "1789197747724417",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/retryOutboundMessagesV1/1789197747724417.zip",
+        "generation": "1791086911309999",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/reverseGeocode",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "reverseGeocode/function-source.zip",
+        "generation": "1789197683966741",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/reverseGeocode/1789197683966741.zip",
+        "generation": "1791086911480687",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/saveEventDraftV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "saveEventDraftV1/function-source.zip",
+        "generation": "1789197749354482",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/saveEventDraftV1/1789197749354482.zip",
+        "generation": "1791086911422777",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/saveEventTemplateV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "saveEventTemplateV1/function-source.zip",
+        "generation": "1789197749680608",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/saveEventTemplateV1/1789197749680608.zip",
+        "generation": "1791086911429178",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/searchDiscoveryEventsV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "searchDiscoveryEventsV1/function-source.zip",
+        "generation": "1789197813750723",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/searchDiscoveryEventsV1/1789197813750723.zip",
+        "generation": "1791086911602816",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/searchDiscoveryEventsV2",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "searchDiscoveryEventsV2/function-source.zip",
+        "generation": "1789197813667491",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/searchDiscoveryEventsV2/1789197813667491.zip",
+        "generation": "1791086911679901",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/sendBasicTierUsageReminder",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "sendBasicTierUsageReminder/function-source.zip",
+        "generation": "1789197706003618",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/sendBasicTierUsageReminder/1789197706003618.zip",
+        "generation": "1791086911691485",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/sendConversationMessageV2",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "sendConversationMessageV2/function-source.zip",
+        "generation": "1790462301599532",
+        "sha256": "483e814c985c8c7d0424c35aea25cd67620f4d126bde1ea37ff823d047279637"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/sendConversationMessageV2/1790462301599532.zip",
+        "generation": "1791086911787746",
+        "sha256": "483e814c985c8c7d0424c35aea25cd67620f4d126bde1ea37ff823d047279637"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/sendCustomNotifications",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "sendCustomNotifications/function-source.zip",
+        "generation": "1789197683984807",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/sendCustomNotifications/1789197683984807.zip",
+        "generation": "1791086911870950",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/sendEventAnnouncementV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "sendEventAnnouncementV1/function-source.zip",
+        "generation": "1790547229764695",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/sendEventAnnouncementV1/1790547229764695.zip",
+        "generation": "1791086911880781",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/sendEventUpdateNotifications",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "sendEventUpdateNotifications/function-source.zip",
+        "generation": "1789197683971862",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/sendEventUpdateNotifications/1789197683971862.zip",
+        "generation": "1791086911969842",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/sendMentionNotifications",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "sendMentionNotifications/function-source.zip",
+        "generation": "1790462302343007",
+        "sha256": "483e814c985c8c7d0424c35aea25cd67620f4d126bde1ea37ff823d047279637"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/sendMentionNotifications/1790462302343007.zip",
+        "generation": "1791086912079574",
+        "sha256": "483e814c985c8c7d0424c35aea25cd67620f4d126bde1ea37ff823d047279637"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/sendMessageNotifications",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "sendMessageNotifications/function-source.zip",
+        "generation": "1790462302325675",
+        "sha256": "483e814c985c8c7d0424c35aea25cd67620f4d126bde1ea37ff823d047279637"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/sendMessageNotifications/1790462302325675.zip",
+        "generation": "1791086912092108",
+        "sha256": "483e814c985c8c7d0424c35aea25cd67620f4d126bde1ea37ff823d047279637"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/sendNewEventNotifications",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "sendNewEventNotifications/function-source.zip",
+        "generation": "1789197683964223",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/sendNewEventNotifications/1789197683964223.zip",
+        "generation": "1791086912185175",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/sendPostEventFeedbackNotifications",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "sendPostEventFeedbackNotifications/function-source.zip",
+        "generation": "1789197684739675",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/sendPostEventFeedbackNotifications/1789197684739675.zip",
+        "generation": "1791086912285590",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/sendScheduledNotifications",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "sendScheduledNotifications/function-source.zip",
+        "generation": "1789197683992443",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/sendScheduledNotifications/1789197683992443.zip",
+        "generation": "1791086912382622",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/sendTicketUpdateNotifications",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "sendTicketUpdateNotifications/function-source.zip",
+        "generation": "1789197683972978",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/sendTicketUpdateNotifications/1789197683972978.zip",
+        "generation": "1791086912344038",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/setAdminByEmail",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "setAdminByEmail/function-source.zip",
+        "generation": "1789197696400396",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/setAdminByEmail/1789197696400396.zip",
+        "generation": "1791086912469153",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/setAttendanceControl",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "setAttendanceControl/function-source.zip",
+        "generation": "1789197683365528",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/setAttendanceControl/1789197683365528.zip",
+        "generation": "1791086912454929",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/setEventStaffV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "setEventStaffV1/function-source.zip",
+        "generation": "1790547180393724",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/setEventStaffV1/1790547180393724.zip",
+        "generation": "1791086912677012",
+        "sha256": "88350d7f07918de0f1597ce3453448f812760341924552a5c99bcca4d4a9a4f2"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/startCheckInSession",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "startCheckInSession/function-source.zip",
+        "generation": "1789197750941711",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/startCheckInSession/1789197750941711.zip",
+        "generation": "1791086912823545",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/startPublicRegistrationV2",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "startPublicRegistrationV2/function-source.zip",
+        "generation": "1789197738747720",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/startPublicRegistrationV2/1789197738747720.zip",
+        "generation": "1791086912736896",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/startPublicRegistrationV3",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "startPublicRegistrationV3/function-source.zip",
+        "generation": "1789197747771286",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/startPublicRegistrationV3/1789197747771286.zip",
+        "generation": "1791086912804381",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/stripeWebhook",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "stripeWebhook/function-source.zip",
+        "generation": "1789197705236629",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/stripeWebhook/1789197705236629.zip",
+        "generation": "1791086912900431",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/submitCheckIn",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "submitCheckIn/function-source.zip",
+        "generation": "1789197759779021",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/submitCheckIn/1789197759779021.zip",
+        "generation": "1791086912879839",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/submitGuestAttendance",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "submitGuestAttendance/function-source.zip",
+        "generation": "1789197761387451",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/submitGuestAttendance/1789197761387451.zip",
+        "generation": "1791086913118785",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/submitUserReport",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "submitUserReport/function-source.zip",
+        "generation": "1789197684856591",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/submitUserReport/1789197684856591.zip",
+        "generation": "1791086913101607",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/triggerAIInsights",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "triggerAIInsights/function-source.zip",
+        "generation": "1789197683974147",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/triggerAIInsights/1789197683974147.zip",
+        "generation": "1791086913361151",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/updateDiscoverySaveCountV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "updateDiscoverySaveCountV1/function-source.zip",
+        "generation": "1789197781568758",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/updateDiscoverySaveCountV1/1789197781568758.zip",
+        "generation": "1791086913327811",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/updatePublicRegistrationEmailV1",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "updatePublicRegistrationEmailV1/function-source.zip",
+        "generation": "1789197739255072",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/updatePublicRegistrationEmailV1/1789197739255072.zip",
+        "generation": "1791086913276637",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/updateUserAnalyticsOnEventCreateV2",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "updateUserAnalyticsOnEventCreateV2/function-source.zip",
+        "generation": "1789197683982677",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/updateUserAnalyticsOnEventCreateV2/1789197683982677.zip",
+        "generation": "1791086913304648",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/updateUserAnalyticsOnEventDeleteV2",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "updateUserAnalyticsOnEventDeleteV2/function-source.zip",
+        "generation": "1789197683978857",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/updateUserAnalyticsOnEventDeleteV2/1789197683978857.zip",
+        "generation": "1791086913469375",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    },
+    {
+      "projectId": "orgami-66nxok",
+      "functionName": "projects/orgami-66nxok/locations/us-central1/functions/voidAttendance",
+      "original": {
+        "bucket": "gcf-v2-sources-951311475019-us-central1",
+        "object": "voidAttendance/function-source.zip",
+        "generation": "1789197760389480",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      },
+      "backup": {
+        "bucket": "attendus-recovery-20261004-backups",
+        "object": "backend-source/orgami-66nxok/voidAttendance/1789197760389480.zip",
+        "generation": "1791086913487028",
+        "sha256": "c2f0c903ac6637c1361deeaf14840ebc077c766a73991816f885ead68cfe4772"
+      }
+    }
+  ]
+}

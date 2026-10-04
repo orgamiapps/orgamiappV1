@@ -54,14 +54,14 @@ class _SecondSplashScreenState extends State<SecondSplashScreen> {
         ShowToast().showNormalToast(
           msg:
               FirebaseGoogleAuthHelper.lastGoogleErrorMessage ??
-              'Google sign-in failed.',
+              'Google login failed.',
         );
       }
     } catch (e) {
       ShowToast().showNormalToast(
         msg:
             FirebaseGoogleAuthHelper.lastGoogleErrorMessage ??
-            'Google sign-in failed.',
+            'Google login failed.',
       );
     } finally {
       if (mounted) setState(() => _googleLoading = false);
@@ -73,7 +73,7 @@ class _SecondSplashScreenState extends State<SecondSplashScreen> {
 
     if (!AppConstants.enableAppleSignIn) {
       ShowToast().showNormalToast(
-        msg: 'Apple sign-in is unavailable in this build',
+        msg: 'Apple login is unavailable in this build',
       );
       return;
     }
@@ -94,14 +94,14 @@ class _SecondSplashScreenState extends State<SecondSplashScreen> {
         ShowToast().showNormalToast(
           msg:
               FirebaseGoogleAuthHelper.lastAppleErrorMessage ??
-              'Apple sign-in is not available on this device',
+              'Apple login is not available on this device',
         );
       }
     } catch (e) {
       ShowToast().showNormalToast(
         msg:
             FirebaseGoogleAuthHelper.lastAppleErrorMessage ??
-            'Apple sign-in failed.',
+            'Apple login failed.',
       );
     } finally {
       if (mounted) setState(() => _appleLoading = false);
@@ -144,7 +144,7 @@ class _SecondSplashScreenState extends State<SecondSplashScreen> {
           ),
           const SizedBox(height: 10),
           AttendUsButton.secondary(
-            label: 'Sign in',
+            label: 'Log in',
             icon: Icons.login,
             onPressed: () =>
                 RouterClass.nextScreenNormal(context, const LoginScreen()),

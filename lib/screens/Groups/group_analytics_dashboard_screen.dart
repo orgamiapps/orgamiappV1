@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:attendus/Services/artifact_download_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -8,9 +11,6 @@ import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/dimensions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xlsio;
 import 'package:attendus/widgets/attendus_design_system.dart';
 
@@ -31,12 +31,20 @@ class _GroupAnalyticsDashboardScreenState
     extends State<GroupAnalyticsDashboardScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  String? _ownerUid;
+  StreamSubscription<User?>? _authSubscription;
+  bool _accountChanged = false;
+  bool get _accountCurrent =>
+      mounted &&
+      !_accountChanged &&
+      FirebaseAuth.instance.currentUser?.uid == _ownerUid;
   bool _isLoading = false;
   List<EventModel> _groupEvents = [];
   Map<String, dynamic> _aggregatedAnalytics = {};
   AIInsights? _globalAIInsights;
   bool _isLoadingAI = false;
   bool _hasEvents = false;
+  bool _dataUnavailable = false;
   final TextEditingController _aiQuestionController = TextEditingController();
   String? _aiAnswer;
   bool _qaLoading = false;
@@ -45,6 +53,12 @@ class _GroupAnalyticsDashboardScreenState
   @override
   void initState() {
     super.initState();
+    _ownerUid = FirebaseAuth.instance.currentUser?.uid;
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (mounted && user?.uid != _ownerUid) {
+        setState(() => _accountChanged = true);
+      }
+    });
     _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(() {
       if (_tabController.index == 1 &&
@@ -59,14 +73,17 @@ class _GroupAnalyticsDashboardScreenState
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _tabController.dispose();
     _aiQuestionController.dispose();
     super.dispose();
   }
 
   Future<void> _loadGroupData() async {
+    if (!mounted || !_accountCurrent) return;
     setState(() {
       _isLoading = true;
+      _dataUnavailable = false;
     });
 
     try {
@@ -93,6 +110,7 @@ class _GroupAnalyticsDashboardScreenState
       // Sort events by date (newest first)
       events.sort((a, b) => b.selectedDateTime.compareTo(a.selectedDateTime));
 
+      if (!mounted || !_accountCurrent) return;
       setState(() {
         _groupEvents = events;
         _hasEvents = events.isNotEmpty;
@@ -103,6 +121,7 @@ class _GroupAnalyticsDashboardScreenState
         _loadAggregatedAnalytics();
       }
     } catch (e) {
+      if (!mounted || !_accountCurrent) return;
       setState(() {
         _isLoading = false;
         _hasEvents = false;
@@ -150,9 +169,7 @@ class _GroupAnalyticsDashboardScreenState
             attendees = eventData['totalAttendees'] ?? 0;
             repeatAttendees = eventData['repeatAttendees'] ?? 0;
           } else {
-            // If no analytics document exists, create placeholder data
-            attendees = 0;
-            repeatAttendees = 0;
+            throw StateError('Event analytics are not ready');
           }
 
           analytics['totalAttendees'] += attendees;
@@ -203,23 +220,7 @@ class _GroupAnalyticsDashboardScreenState
           if (kDebugMode) {
             debugPrint('Error loading analytics for event ${event.id}: $e');
           }
-          // Still process the event even if analytics loading fails
-          final category = event.categories.isNotEmpty
-              ? event.categories.first
-              : 'Other';
-          analytics['eventCategories'][category] =
-              (analytics['eventCategories'][category] ?? 0) + 1;
-
-          analytics['attendanceByEvent'][event.title] = 0;
-
-          if (analytics['topPerformingEvent'] == null) {
-            analytics['topPerformingEvent'] = {
-              'title': event.title,
-              'attendees': 0,
-              'date': event.selectedDateTime,
-              'id': event.id,
-            };
-          }
+          rethrow;
         }
       }
 
@@ -267,7 +268,7 @@ class _GroupAnalyticsDashboardScreenState
         if (kDebugMode) {
           debugPrint('Error computing retention rate: $e');
         }
-        analytics['retentionRate'] = 0.0;
+        rethrow;
       }
 
       // Calculate averages and rates
@@ -294,6 +295,7 @@ class _GroupAnalyticsDashboardScreenState
         debugPrint('Group Aggregated Analytics: $analytics');
       }
 
+      if (!mounted || !_accountCurrent) return;
       setState(() {
         _aggregatedAnalytics = analytics;
       });
@@ -301,57 +303,13 @@ class _GroupAnalyticsDashboardScreenState
       if (kDebugMode) {
         debugPrint('Error loading aggregated analytics: $e');
       }
-      // Provide fallback analytics data
-      setState(() {
-        _aggregatedAnalytics = {
-          'totalEvents': _groupEvents.length,
-          'totalAttendees': 0,
-          'totalRevenue': 0.0,
-          'averageAttendance': 0.0,
-          'upcomingEvents': _groupEvents
-              .where((e) => e.selectedDateTime.isAfter(DateTime.now()))
-              .length,
-          'pastEvents': _groupEvents
-              .where((e) => e.eventEndTime.isBefore(DateTime.now()))
-              .length,
-          'activeEvents': 0,
-          'totalTicketsSold': 0,
-          'totalTicketRevenue': 0.0,
-          'topPerformingEvent': _groupEvents.isNotEmpty
-              ? {
-                  'title': _groupEvents.first.title,
-                  'attendees': 0,
-                  'date': _groupEvents.first.selectedDateTime,
-                  'id': _groupEvents.first.id,
-                }
-              : null,
-          'eventCategories': _groupEvents.fold<Map<String, int>>({}, (
-            map,
-            event,
-          ) {
-            final category = event.categories.isNotEmpty
-                ? event.categories.first
-                : 'Other';
-            map[category] = (map[category] ?? 0) + 1;
-            return map;
-          }),
-          'monthlyTrends': <String, int>{},
-          'attendanceByEvent': _groupEvents.fold<Map<String, int>>({}, (
-            map,
-            event,
-          ) {
-            map[event.title] = 0;
-            return map;
-          }),
-          'repeatAttendees': 0,
-          'dropoutRate': 0.0,
-          'engagementScore': 0.0,
-        };
-      });
+      if (!mounted || !_accountCurrent) return;
+      setState(() => _dataUnavailable = true);
     }
   }
 
   Future<void> _loadGlobalAIInsights() async {
+    if (!mounted || !_accountCurrent) return;
     setState(() {
       _isLoadingAI = true;
     });
@@ -360,11 +318,13 @@ class _GroupAnalyticsDashboardScreenState
       final aiHelper = AIAnalyticsHelper();
       final insights = await aiHelper.generateGlobalAIInsights(_groupEvents);
 
+      if (!mounted || !_accountCurrent) return;
       setState(() {
         _globalAIInsights = insights;
         _isLoadingAI = false;
       });
     } catch (e) {
+      if (!mounted || !_accountCurrent) return;
       setState(() {
         _isLoadingAI = false;
       });
@@ -373,6 +333,7 @@ class _GroupAnalyticsDashboardScreenState
   }
 
   Future<void> _exportData() async {
+    final origin = artifactShareOrigin(context);
     final xlsio.Workbook workbook = xlsio.Workbook();
     final xlsio.Worksheet sheet = workbook.worksheets[0];
     sheet.name = 'Group Analytics';
@@ -401,17 +362,43 @@ class _GroupAnalyticsDashboardScreenState
     final List<int> bytes = workbook.saveAsStream();
     workbook.dispose();
 
-    final String directory = (await getTemporaryDirectory()).path;
-    final String fileName =
-        '$directory/group_analytics_${_groupName.replaceAll(' ', '_')}_${DateFormat('yyyyMMdd').format(DateTime.now())}.xlsx';
-    final File file = File(fileName);
-    await file.writeAsBytes(bytes, flush: true);
-
-    await Share.shareXFiles([XFile(fileName)], text: 'Group Analytics Export');
+    final outcome = await downloadArtifact(
+      Uint8List.fromList(bytes),
+      'group_analytics_${DateFormat('yyyyMMdd').format(DateTime.now())}.xlsx',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      sharePositionOrigin: origin,
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(outcome.message)));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_accountChanged) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Analytics')),
+        body: const Center(
+          child: Text('Your account changed. Reopen analytics to continue.'),
+        ),
+      );
+    }
+    if (_dataUnavailable) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Group Analytics')),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Analytics are unavailable or still being prepared.'),
+              TextButton(onPressed: _loadGroupData, child: const Text('Retry')),
+            ],
+          ),
+        ),
+      );
+    }
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(title: const Text('Group Analytics')),
@@ -1529,6 +1516,7 @@ class _GroupAnalyticsDashboardScreenState
   void _askAIQuestion() async {
     if (_aiQuestionController.text.trim().isEmpty || _qaLoading) return;
 
+    if (!mounted || !_accountCurrent) return;
     setState(() {
       _qaLoading = true;
       _aiAnswer = null;
@@ -1539,6 +1527,7 @@ class _GroupAnalyticsDashboardScreenState
       // For now, provide a placeholder response
       await Future.delayed(const Duration(seconds: 2));
 
+      if (!mounted || !_accountCurrent) return;
       setState(() {
         _aiAnswer =
             'This feature is being developed. AI-powered Q&A about your group analytics will provide insights about event performance, optimal timing, audience engagement, and recommendations for improvement.';
@@ -1547,6 +1536,7 @@ class _GroupAnalyticsDashboardScreenState
 
       _aiQuestionController.clear();
     } catch (e) {
+      if (!mounted || !_accountCurrent) return;
       setState(() {
         _aiAnswer =
             'Sorry, I couldn\'t process your question. Please try again.';

@@ -1,5 +1,5 @@
 # Uncomment this line to define a global platform for your project
-platform :ios, '15.0'
+platform :ios, '15.5'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -39,5 +39,26 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+
+    # The QR scanner requests camera access through permission_handler. Its
+    # Apple implementation otherwise compiles out camera support by default.
+    # Smart Arrival only requests foreground location; do not link the Always
+    # authorization path or require an Always usage description.
+    permission_definitions = {
+      'permission_handler_apple' => ['PERMISSION_CAMERA=1'],
+      'geolocator_apple' => ['BYPASS_PERMISSION_LOCATION_ALWAYS=1'],
+    }[target.name]
+    next unless permission_definitions
+
+    target.build_configurations.each do |config|
+      definitions = Array(config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'])
+      definitions << '$(inherited)' unless definitions.include?('$(inherited)')
+      permission_definitions.each do |definition|
+        key = definition.split('=').first
+        definitions.reject! { |existing| existing.start_with?("#{key}=") }
+        definitions << definition
+      end
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = definitions
+    end
   end
 end

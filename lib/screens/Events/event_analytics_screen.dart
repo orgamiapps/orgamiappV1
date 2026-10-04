@@ -1,6 +1,10 @@
-import 'dart:io';
+import 'dart:async';
+import 'dart:convert';
+import 'package:attendus/Utils/analytics_csv.dart';
+import 'dart:typed_data';
+import 'package:attendus/Services/artifact_download_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-// import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
@@ -11,8 +15,6 @@ import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/dimensions.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/logger.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 import 'package:attendus/Services/subscription_service.dart';
@@ -31,6 +33,13 @@ class EventAnalyticsScreen extends StatefulWidget {
 class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  String? _ownerUid;
+  StreamSubscription<User?>? _authSubscription;
+  bool _accountChanged = false;
+  bool get _accountCurrent =>
+      mounted &&
+      !_accountChanged &&
+      FirebaseAuth.instance.currentUser?.uid == _ownerUid;
   // Deprecated: time filtering not used for single-day event view
   bool _isAuthorized = false;
   String? _eventHostUid;
@@ -48,6 +57,12 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
   @override
   void initState() {
     super.initState();
+    _ownerUid = FirebaseAuth.instance.currentUser?.uid;
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (mounted && user?.uid != _ownerUid) {
+        setState(() => _accountChanged = true);
+      }
+    });
     _tabController = TabController(length: 4, vsync: this);
 
     // Check Premium access before loading data
@@ -124,6 +139,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _tabController.dispose();
     super.dispose();
   }
@@ -152,11 +168,14 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
           ?.toDate();
       final String? eventTitle = eventData['title'] as String?;
 
+      if (!mounted || !_accountCurrent) return;
+      if (!mounted || !_accountCurrent) return;
       setState(() {
         _eventHostUid = eventHostUid;
         _eventDate = eventDate;
         _eventTitle = eventTitle;
-        _isAuthorized = true; // Assume authorization
+        _isAuthorized =
+            true; // Protected attendance and analytics reads enforce manager access.
       });
 
       // Load attendees data and other dependent data
@@ -172,6 +191,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
   }
 
   Future<void> _loadAttendeesData() async {
+    if (!mounted || !_accountCurrent) return;
     setState(() {
       _isLoadingAttendees = true;
     });
@@ -181,11 +201,15 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
         eventId: widget.eventId,
       );
 
+      if (!mounted || !_accountCurrent) return;
+      if (!mounted || !_accountCurrent) return;
       setState(() {
         _attendeesList = attendees;
         _isLoadingAttendees = false;
       });
     } catch (e) {
+      if (!mounted || !_accountCurrent) return;
+      if (!mounted || !_accountCurrent) return;
       setState(() {
         _isLoadingAttendees = false;
       });
@@ -277,6 +301,8 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
       });
 
       if (mounted) {
+        if (!mounted || !_accountCurrent) return;
+        if (!mounted || !_accountCurrent) return;
         setState(() {
           _attendeeHistoryByUid.addAll(computed);
         });
@@ -288,33 +314,25 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
   }
 
   Future<void> _loadAIInsights() async {
+    if (!mounted || !_accountCurrent) return;
     setState(() {
       _isLoadingAI = true;
     });
 
     try {
-      final aiHelper = AIAnalyticsHelper();
-      final insights = await aiHelper.getAIInsights(widget.eventId);
-
-      if (insights == null) {
-        // Generate new insights if none exist
-        final newInsights = await aiHelper.generateAIInsights(widget.eventId);
-        await aiHelper.saveAIInsights(widget.eventId, newInsights);
-        setState(() {
-          _aiInsights = newInsights;
-          _isLoadingAI = false;
-        });
-      } else {
-        setState(() {
-          _aiInsights = insights;
-          _isLoadingAI = false;
-        });
-      }
-    } catch (e) {
+      final insights = await AIAnalyticsHelper().generateAIInsights(
+        widget.eventId,
+      );
+      if (!mounted || !_accountCurrent) return;
+      if (!mounted || !_accountCurrent) return;
       setState(() {
+        _aiInsights = insights;
         _isLoadingAI = false;
       });
-      Logger.error('Error loading AI insights: $e');
+    } catch (error) {
+      if (!mounted || !_accountCurrent) return;
+      setState(() => _isLoadingAI = false);
+      Logger.error('Error loading AI insights: $error');
     }
   }
 
@@ -337,6 +355,14 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_accountChanged) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Analytics')),
+        body: const Center(
+          child: Text('Your account changed. Reopen analytics to continue.'),
+        ),
+      );
+    }
     if (!_isAuthorized) {
       return AppScaffoldWrapper(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -715,6 +741,8 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                 const SizedBox(height: 20),
                 ElevatedButton.icon(
                   onPressed: () {
+                    if (!mounted || !_accountCurrent) return;
+                    if (!mounted || !_accountCurrent) return;
                     setState(() {}); // Retry by rebuilding
                   },
                   icon: const Icon(Icons.refresh),
@@ -1458,6 +1486,8 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                 const SizedBox(height: 20),
                 ElevatedButton.icon(
                   onPressed: () {
+                    if (!mounted || !_accountCurrent) return;
+                    if (!mounted || !_accountCurrent) return;
                     setState(() {}); // Retry by rebuilding
                   },
                   icon: const Icon(Icons.refresh),
@@ -2290,7 +2320,8 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
 
           // Sentiment Analysis
           _aiInsightCard(
-            title: 'Sentiment Analysis',
+            title:
+                'Comment keyword summary (${_aiInsights!.feedbackSampleSize} sampled)',
             icon: Icons.sentiment_satisfied,
             color: _getSentimentColor(
               _aiInsights!.sentimentAnalysis['overallSentiment'] ?? 'neutral',
@@ -2442,7 +2473,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Confidence: ${((optimization['confidence'] ?? 0) * 100).toStringAsFixed(1)}%',
+                          'Confidence: ${analyticsConfidenceLabel(optimization)}',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey[600],
@@ -2846,6 +2877,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
   }
 
   Future<void> _exportData() async {
+    final origin = artifactShareOrigin(context);
     try {
       // Get analytics data
       final analyticsDoc = await FirebaseFirestore.instance
@@ -2854,7 +2886,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
           .get();
 
       if (!analyticsDoc.exists) {
-        if (!mounted) return;
+        if (!mounted || !_accountCurrent) return;
         ShowToast().showSnackBar('No data to export', context);
         return;
       }
@@ -2920,7 +2952,7 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
               optimization['title'] ?? 'Unknown',
               optimization['description'] ?? 'No description',
               optimization['impact'] ?? 'Unknown',
-              '${((optimization['confidence'] ?? 0) * 100).toStringAsFixed(1)}%',
+              analyticsConfidenceLabel(optimization),
             ]);
           }
         }
@@ -2950,26 +2982,16 @@ class _EventAnalyticsScreenState extends State<EventAnalyticsScreen>
         }
       }
 
-      // Convert to CSV format manually
-      final csvString = csvData.map((row) => row.join(',')).join('\n');
-
-      // Save to temporary file
-      final directory = await getTemporaryDirectory();
-      final file = File(
-        '${directory.path}/event_analytics_${widget.eventId}.csv',
+      final outcome = await downloadArtifact(
+        Uint8List.fromList(utf8.encode(analyticsCsv(csvData))),
+        'event_analytics_${widget.eventId}.csv',
+        'text/csv',
+        sharePositionOrigin: origin,
       );
-      await file.writeAsString(csvString);
-
-      // Share file
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        subject: 'Event Analytics - ${widget.eventId}',
-        text: 'Event analytics data exported from Attendus app',
-      );
-      if (!mounted) return;
-      ShowToast().showSnackBar('Data exported successfully', context);
+      if (!mounted || !_accountCurrent) return;
+      ShowToast().showSnackBar(outcome.message, context);
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || !_accountCurrent) return;
       ShowToast().showSnackBar('Error exporting data: $e', context);
     }
   }

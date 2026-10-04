@@ -1,8 +1,7 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/models/live_quiz_model.dart';
 import 'package:attendus/models/quiz_question_model.dart';
 import 'package:attendus/models/quiz_participant_model.dart';
@@ -43,6 +42,7 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
   // UI State
   bool _isJoining = true;
   bool _hasAnswered = false;
+  bool _submittingAnswer = false;
   bool _showingResults = false;
   bool _wasAnswerCorrect = false;
   dynamic _selectedAnswer;
@@ -70,7 +70,7 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
   // Streams
   StreamSubscription<LiveQuizModel>? _quizSubscription;
   StreamSubscription<List<QuizParticipantModel>>? _participantsSubscription;
-  StreamSubscription<DocumentSnapshot>? _participantDocSubscription;
+  StreamSubscription<QuizParticipantModel>? _participantDocSubscription;
 
   // Question Answer Controller
   final TextEditingController _textAnswerController = TextEditingController();
@@ -139,48 +139,8 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
   }
 
   /// Find existing participant record for this user
-  Future<QuizParticipantModel?> _findExistingParticipant() async {
-    try {
-      final userId = FirebaseAuth.instance.currentUser?.uid;
-
-      Logger.info(
-        'Checking for existing participant: userId=$userId, isAnonymous=${widget.isAnonymous}',
-      );
-
-      // Only search for authenticated users (anonymous users can't be tracked across sessions)
-      if (userId != null && !widget.isAnonymous) {
-        final participantsSnapshot = await FirebaseFirestore.instance
-            .collection(QuizParticipantModel.firebaseKey)
-            .where('quizId', isEqualTo: widget.quizId)
-            .where('userId', isEqualTo: userId)
-            .where('isActive', isEqualTo: true) // Only find active participants
-            .limit(1)
-            .get()
-            .timeout(const Duration(seconds: 5));
-
-        if (participantsSnapshot.docs.isNotEmpty) {
-          final participant = QuizParticipantModel.fromFirestore(
-            participantsSnapshot.docs.first,
-          );
-          Logger.info(
-            'Found existing participant for userId=$userId: ${participant.id}',
-          );
-          return participant;
-        } else {
-          Logger.info('No existing participant found for userId=$userId');
-        }
-      } else {
-        Logger.info(
-          'Skipping existing participant check (userId=$userId, isAnonymous=${widget.isAnonymous})',
-        );
-      }
-
-      return null;
-    } catch (e) {
-      Logger.error('Error finding existing participant: $e');
-      return null;
-    }
-  }
+  Future<QuizParticipantModel?> _findExistingParticipant() =>
+      _liveQuizService.getOwnParticipant(widget.quizId);
 
   void _initializeAnimations() {
     _fadeController = AnimationController(
@@ -291,24 +251,15 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
   }
 
   void _setupParticipantStream(String participantId) {
-    // Listen to real-time participant updates (score, rank, etc.)
     _participantDocSubscription?.cancel();
-    _participantDocSubscription = FirebaseFirestore.instance
-        .collection(QuizParticipantModel.firebaseKey)
-        .doc(participantId)
-        .snapshots()
+    _participantDocSubscription = _liveQuizService
+        .getParticipantStream(participantId)
         .listen(
-          (snapshot) {
-            if (snapshot.exists && mounted) {
-              final updatedParticipant = QuizParticipantModel.fromFirestore(
-                snapshot,
-              );
-              setState(() => _participant = updatedParticipant);
-            }
+          (participant) {
+            if (mounted) setState(() => _participant = participant);
           },
-          onError: (error) {
-            Logger.error('Participant stream error: $error');
-          },
+          onError: (Object error) =>
+              Logger.error('Participant stream error: $error'),
         );
   }
 
@@ -323,10 +274,13 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
   }
 
   void _setupQuizStream() {
+    _quizSubscription?.cancel();
     _quizSubscription = _liveQuizService
         .getQuizStream(widget.quizId)
         .listen(
           (quiz) {
+            if (!mounted) return;
+            final previousSession = _quiz?.session;
             // Update connection status
             if (mounted && !_isConnected) {
               setState(() => _isConnected = true);
@@ -334,10 +288,22 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
 
             final previousQuestionIndex = _quiz?.currentQuestionIndex;
             setState(() => _quiz = quiz);
+            if (previousSession != null && previousSession != quiz.session) {
+              _resetAnswerState();
+              _participantDocSubscription?.cancel();
+              setState(() {
+                _participant = null;
+                _participantId = null;
+                _isJoining = true;
+              });
+              _initializeQuizAccess();
+            }
 
             if (quiz.isLive && quiz.hasCurrentQuestion) {
               // Only reload question if it changed
-              if (previousQuestionIndex != quiz.currentQuestionIndex) {
+              if (previousQuestionIndex != quiz.currentQuestionIndex ||
+                  previousSession != quiz.session ||
+                  _currentQuestion == null) {
                 _loadCurrentQuestion(quiz.currentQuestionIndex!);
                 // Reset answer state for new questions
                 _resetAnswerState();
@@ -347,6 +313,8 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
             } else if (quiz.isEnded) {
               // Quiz ended - show final results
               _countdownTimer?.cancel();
+            } else {
+              _countdownTimer?.cancel();
             }
           },
           onError: (error) {
@@ -355,24 +323,23 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
               setState(() => _isConnected = false);
             }
             _showError('Connection issue. Reconnecting...');
-            // Try to reconnect after a delay
-            Future.delayed(const Duration(seconds: 3), () {
-              if (mounted) {
-                _setupQuizStream();
-              }
-            });
           },
         );
   }
 
   Future<void> _loadCurrentQuestion(int questionIndex) async {
+    final session = _quiz?.session;
     try {
       // Optimized: Only load the current question, not all questions
       final question = await _liveQuizService
           .getCurrentQuestion(widget.quizId)
           .timeout(const Duration(seconds: 5), onTimeout: () => null);
 
-      if (question != null && mounted) {
+      if (question != null &&
+          mounted &&
+          _quiz?.session == session &&
+          _quiz?.currentQuestionIndex == questionIndex &&
+          question.orderIndex == questionIndex) {
         setState(() => _currentQuestion = question);
 
         // Check if participant has already answered this question
@@ -381,7 +348,9 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
             _participantId!,
             question.id,
           );
-          if (mounted) {
+          if (mounted &&
+              _currentQuestion?.id == question.id &&
+              _quiz?.session == session) {
             setState(() => _hasAnswered = hasAnswered);
           }
         }
@@ -391,7 +360,9 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
       _showError('Error loading question. Retrying...');
       // Retry once after a short delay
       await Future.delayed(const Duration(seconds: 2));
-      if (mounted) {
+      if (mounted &&
+          _quiz?.session == session &&
+          _quiz?.currentQuestionIndex == questionIndex) {
         _loadCurrentQuestion(questionIndex);
       }
     }
@@ -399,6 +370,7 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
 
   void _resetAnswerState() {
     setState(() {
+      _currentQuestion = null;
       _hasAnswered = false;
       _showingResults = false;
       _wasAnswerCorrect = false;
@@ -414,14 +386,22 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
     if (_quiz == null || !_quiz!.hasCurrentQuestion) return;
 
     _countdownTimer?.cancel();
-    _questionStartTime = DateTime.now();
+    _questionStartTime = _quiz!.currentQuestionStartedAt;
 
-    final timeLimit = _currentQuestion?.timeLimit ?? _quiz!.timePerQuestion;
+    final timeLimit = _liveQuizService.remainingTime(widget.quizId).inSeconds;
     setState(() => _timeRemaining = timeLimit);
 
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       if (_timeRemaining > 0 && !_showingResults) {
-        setState(() => _timeRemaining--);
+        setState(
+          () => _timeRemaining = _liveQuizService
+              .remainingTime(widget.quizId)
+              .inSeconds,
+        );
       } else {
         timer.cancel();
         if (_hasAnswered && !_showingResults) {
@@ -457,31 +437,41 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
     });
   }
 
-  void _showAnswerResults() {
-    if (_currentQuestion == null) return;
-
-    // Check if answer was correct and calculate points
-    _wasAnswerCorrect = _currentQuestion!.isAnswerCorrect(_selectedAnswer);
-    _correctAnswer = _getCorrectAnswerForDisplay();
-    _explanation = _currentQuestion!.explanation;
-
-    // Calculate points earned (this will be updated by the service, but we show immediate feedback)
-    if (_wasAnswerCorrect) {
-      _pointsEarned = _currentQuestion!.points;
-      HapticFeedback.heavyImpact();
-    } else {
-      _pointsEarned = 0;
-      HapticFeedback.mediumImpact();
-    }
-
-    setState(() => _showingResults = true);
-
-    // Show results for 3 seconds before moving to next question
-    Timer(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() => _showingResults = false);
+  Future<void> _showAnswerResults() async {
+    final question = _currentQuestion;
+    final participantId = _participantId;
+    final session = _quiz?.session;
+    if (question == null || participantId == null) return;
+    try {
+      final response = await _liveQuizService.getParticipantResponse(
+        participantId,
+        question.id,
+      );
+      if (!mounted ||
+          _currentQuestion?.id != question.id ||
+          _quiz?.session != session ||
+          response == null ||
+          !response.scoringAvailable) {
+        return;
       }
-    });
+      setState(() {
+        _wasAnswerCorrect = response.isCorrect;
+        _pointsEarned = response.totalPoints;
+        _showingResults = true;
+        _correctAnswer = null;
+        _explanation = null;
+      });
+      if (_wasAnswerCorrect) HapticFeedback.heavyImpact();
+      Timer(const Duration(seconds: 3), () {
+        if (mounted &&
+            _currentQuestion?.id == question.id &&
+            _quiz?.session == session) {
+          setState(() => _showingResults = false);
+        }
+      });
+    } catch (error) {
+      Logger.error('Answer result unavailable: $error');
+    }
   }
 
   dynamic _getCorrectAnswerForDisplay() {
@@ -499,13 +489,17 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
   }
 
   Future<void> _submitAnswer() async {
-    if (_hasAnswered ||
+    if (_submittingAnswer ||
+        _hasAnswered ||
         _participantId == null ||
         _currentQuestion == null ||
         _selectedAnswer == null) {
       return;
     }
 
+    final questionId = _currentQuestion!.id;
+    final session = _currentQuestion!.session;
+    setState(() => _submittingAnswer = true);
     try {
       HapticFeedback.lightImpact();
 
@@ -520,8 +514,14 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
         questionIndex: _currentQuestion!.orderIndex,
         answer: _selectedAnswer,
         timeToAnswer: timeToAnswer,
+        session: _currentQuestion!.session,
       );
 
+      if (!mounted ||
+          _currentQuestion?.id != questionId ||
+          _currentQuestion?.session != session) {
+        return;
+      }
       if (success) {
         setState(() => _hasAnswered = true);
 
@@ -536,7 +536,9 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
         _showError('Failed to submit answer');
       }
     } catch (e) {
-      _showError('Error submitting answer: $e');
+      if (mounted) _showError('Error submitting answer: $e');
+    } finally {
+      if (mounted) setState(() => _submittingAnswer = false);
     }
   }
 
@@ -1450,7 +1452,10 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
     }
 
     final canSubmit =
-        _selectedAnswer != null && _timeRemaining > 0 && !_hasAnswered;
+        _selectedAnswer != null &&
+        _timeRemaining > 0 &&
+        !_hasAnswered &&
+        !_submittingAnswer;
 
     return Container(
       width: double.infinity,
@@ -2022,7 +2027,7 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
           ),
           const SizedBox(height: 12),
           Text(
-            '${_pointsEarned} Points',
+            '$_pointsEarned Points',
             style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.bold,
@@ -2115,8 +2120,9 @@ class _QuizParticipantScreenState extends State<QuizParticipantScreen>
   }
 
   Widget _buildSelectedAnswerPreview() {
-    if (_currentQuestion == null || _selectedAnswer == null)
+    if (_currentQuestion == null || _selectedAnswer == null) {
       return const SizedBox();
+    }
 
     return Container(
       width: double.infinity,

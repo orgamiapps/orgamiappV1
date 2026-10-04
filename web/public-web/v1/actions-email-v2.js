@@ -1,0 +1,343 @@
+"use strict";
+
+(() => {
+  const configNode = document.getElementById("attendus-public-config");
+  if (!configNode) return;
+  let config;
+  try { config = JSON.parse(configNode.textContent || "{}"); } catch (_) { return; }
+  if (config.event?.locationType === "online" && config.event.date) {
+    const visitorZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (visitorZone !== config.event.timeZone) {
+      const details = document.querySelector("dl.details");
+      if (details) {
+        const note = document.createElement("div");
+        const label = document.createElement("dt"); label.textContent = "Your time";
+        const value = document.createElement("dd"); value.textContent = new Intl.DateTimeFormat(undefined, {dateStyle: "full", timeStyle: "long"}).format(new Date(config.event.date));
+        note.append(label, value);
+        details.append(note);
+      }
+    }
+  }
+  let firebaseContext;
+  let firebasePending;
+  let registrationInProgress = false;
+  const registrationAttempts = new Map();
+  let lastTrigger;
+
+  const status = (message) => {
+    const node = document.getElementById("public-action-status");
+    if (node) node.textContent = message;
+  };
+  const idempotencyKey = (prefix) => {
+    const bytes = new Uint8Array(16); crypto.getRandomValues(bytes);
+    return `${prefix}:${Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("")}`;
+  };
+  function dialog(title, className = "") {
+    const node = document.createElement("dialog");
+    node.className = `public-dialog ${className}`;
+    node.setAttribute("aria-labelledby", "public-dialog-title");
+    node.innerHTML = `<div class="dialog-inner"><div class="dialog-header"><h2 id="public-dialog-title"></h2><button class="icon-button" type="button" aria-label="Close">&times;</button></div><div class="dialog-content"></div><p class="dialog-status" role="status" aria-live="polite"></p></div>`;
+    node.querySelector("h2").textContent = title;
+    node.querySelector(".icon-button").addEventListener("click", () => node.close());
+    node.addEventListener("cancel", (event) => { event.preventDefault(); node.close(); });
+    // Firefox can deliver Escape to a focused form input without dispatching
+    // the dialog's native cancel event. Keep keyboard dismissal deterministic.
+    node.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
+      event.preventDefault(); node.close();
+    });
+    node.addEventListener("close", () => { node.remove(); lastTrigger?.focus(); });
+    document.body.append(node); node.showModal(); return node;
+  }
+  function dialogStatus(node, message, error = false) {
+    const output = node.querySelector(".dialog-status");
+    output.textContent = message; output.classList.toggle("error", error);
+  }
+  async function firebase() {
+    if (firebaseContext) return firebaseContext;
+    if (firebasePending) return firebasePending;
+    firebasePending = initializeFirebase();
+    try { return await firebasePending; } finally { firebasePending = null; }
+  }
+  async function initializeFirebase() {
+    const local = config.firebase?.projectId === "demo-attendus-admin" &&
+      ["localhost", "127.0.0.1"].includes(location.hostname) &&
+      config.emulators?.host === "127.0.0.1" && config.emulators.authPort === 9190 &&
+      config.emulators.functionsPort === 5101;
+    if (config.emulators && !local) throw new Error("Invalid local registration configuration.");
+    if (!local && !config.appCheckSiteKey) throw new Error("Secure registration is not configured.");
+    const version = "11.10.0";
+    const [appModule, authModule, functionsModule, appCheckModule] = await Promise.all([
+      import(`https://www.gstatic.com/firebasejs/${version}/firebase-app.js`),
+      import(`https://www.gstatic.com/firebasejs/${version}/firebase-auth.js`),
+      import(`https://www.gstatic.com/firebasejs/${version}/firebase-functions.js`),
+      import(`https://www.gstatic.com/firebasejs/${version}/firebase-app-check.js`),
+    ]);
+    const existing = appModule.getApps().find((candidate) => candidate.name === "attendus-public-web");
+    const app = existing || appModule.initializeApp(config.firebase, "attendus-public-web");
+    const auth = authModule.getAuth(app);
+    const functions = functionsModule.getFunctions(app, "us-central1");
+    if (local && !existing) {
+      authModule.connectAuthEmulator(auth, "http://127.0.0.1:9190", {disableWarnings: true});
+      functionsModule.connectFunctionsEmulator(functions, "127.0.0.1", 5101);
+    } else if (!local && !existing) {
+      appCheckModule.initializeAppCheck(app, {provider:
+        new appCheckModule.ReCaptchaEnterpriseProvider(config.appCheckSiteKey),
+      isTokenAutoRefreshEnabled: true});
+    }
+    await auth.authStateReady();
+    if (!auth.currentUser) await authModule.signInAnonymously(auth);
+    firebaseContext = {auth, authModule,
+      functions, functionsModule};
+    return firebaseContext;
+  }
+  async function registrationKey(uid, payload) {
+    const canonical = JSON.stringify({...payload, answers: Object.entries(payload.answers || {}).sort()});
+    const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
+    const fingerprint = Array.from(new Uint8Array(bytes), (value) => value.toString(16).padStart(2, "0")).join("");
+    const storageKey = `attendus-registration:${uid}:${fingerprint}`;
+    let key = registrationAttempts.get(storageKey);
+    try { key ||= sessionStorage.getItem(storageKey); } catch (_) { /* Private-mode storage can be unavailable. */ }
+    if (!key) key = idempotencyKey("registration");
+    registrationAttempts.set(storageKey, key);
+    try { sessionStorage.setItem(storageKey, key); } catch (_) { /* Keep the in-memory retry identity. */ }
+    return key;
+  }
+  async function call(name, data, context) {
+    return (await context.functionsModule.httpsCallable(context.functions, name)(data)).data;
+  }
+  function eventSummary() {
+    const event = config.event || {};
+    const date = event.date ? new Intl.DateTimeFormat("en-US", {dateStyle: "medium",
+      timeStyle: "short"}).format(new Date(event.date)) : "";
+    return `<section class="checkout-summary" aria-label="Event summary"><strong></strong><span class="summary-date"></span><span class="summary-location"></span></section>`;
+  }
+  function registrationForm(node, action, context) {
+    const content = node.querySelector(".dialog-content");
+    const paid = config.ticketState === "paid_ticket";
+    const registrationQuestions = config.event?.questions || [];
+    content.innerHTML = `${eventSummary()}<form class="registration-form"><label>Full name <input name="fullName" autocomplete="name" maxlength="160" required></label><label>Email address <input name="email" type="email" autocomplete="email" maxlength="254" required></label><fieldset class="registration-questions" hidden><legend>A few details from the organizer</legend></fieldset><div class="checkout-terms"><span>${paid ? `Ticket: $${Number(config.event?.price || 0).toFixed(2)} USD` : action === "rsvp" ? "RSVP · Free" : "Ticket · Free"}</span><small>${registrationQuestions.length ? "Required questions must be completed before confirmation." : "Any check-in questions are completed separately when you arrive."}</small></div><button class="cta continue" type="submit">${paid ? "Continue to payment" : config.event?.approvalMode === "manual" ? "Request a place" : action === "rsvp" ? "Confirm RSVP" : "Get ticket"}</button></form>`;
+    content.querySelector(".checkout-summary strong").textContent = config.event?.title || "Event";
+    content.querySelector(".summary-date").textContent = config.event?.date ?
+      new Intl.DateTimeFormat("en-US", {dateStyle: "medium", timeStyle: "short"})
+          .format(new Date(config.event.date)) : "";
+    content.querySelector(".summary-location").textContent = config.event?.location || "";
+    const user = context.auth.currentUser;
+    if (user?.displayName) content.querySelector("[name=fullName]").value = user.displayName;
+    if (user?.email) content.querySelector("[name=email]").value = user.email;
+    const questionSet = content.querySelector(".registration-questions");
+    for (const question of registrationQuestions) {
+      const wrapper = document.createElement("div"); wrapper.className = "registration-question";
+      const legend = document.createElement(question.type === "multiple_choice" ? "fieldset" : "label");
+      if (question.type === "multiple_choice") {
+        const title = document.createElement("legend");
+        title.textContent = `${question.prompt}${question.required ? " (required)" : ""}`;
+        legend.append(title);
+        for (const option of question.options || []) {
+          const label = document.createElement("label"); label.className = "choice-option";
+          const input = document.createElement("input"); input.type = "checkbox";
+          input.name = `question:${question.id}`; input.value = option;
+          label.append(input, document.createTextNode(option)); legend.append(label);
+        }
+      } else if (question.type === "acknowledgement") {
+        legend.className = "choice-option acknowledgement";
+        const input = document.createElement("input"); input.type = "checkbox";
+        input.name = `question:${question.id}`; input.value = "true"; input.required = question.required;
+        legend.append(input, document.createTextNode(question.prompt));
+      } else if (question.type === "single_choice") {
+        legend.textContent = question.prompt;
+        const select = document.createElement("select"); select.name = `question:${question.id}`;
+        select.required = question.required;
+        const empty = document.createElement("option"); empty.value = ""; empty.textContent = "Choose an option";
+        select.append(empty);
+        for (const option of question.options || []) {
+          const item = document.createElement("option"); item.value = option; item.textContent = option;
+          select.append(item);
+        }
+        legend.append(select);
+      } else {
+        legend.textContent = question.prompt;
+        const input = document.createElement(question.type === "long_text" ? "textarea" : "input");
+        input.name = `question:${question.id}`; input.required = question.required;
+        if (input instanceof HTMLTextAreaElement) input.rows = 3;
+        else input.type = "text";
+        legend.append(input);
+      }
+      wrapper.append(legend); questionSet.append(wrapper);
+    }
+    questionSet.hidden = registrationQuestions.length === 0;
+    return content.querySelector("form");
+  }
+  function answersFrom(form) {
+    const data = new FormData(form); const result = {};
+    for (const question of config.event?.questions || []) {
+      const name = `question:${question.id}`;
+      if (question.type === "multiple_choice") result[question.id] = data.getAll(name).map(String);
+      else if (question.type === "acknowledgement") result[question.id] = data.get(name) === "true";
+      else result[question.id] = String(data.get(name) || "");
+    }
+    return result;
+  }
+  function loadStripe() {
+    if (window.Stripe) return Promise.resolve(window.Stripe);
+    return new Promise((resolve, reject) => {
+      const script = document.createElement("script"); script.src = "https://js.stripe.com/v3/";
+      script.onload = () => resolve(window.Stripe);
+      script.onerror = () => reject(new Error("Secure payment could not be loaded."));
+      document.head.append(script);
+    });
+  }
+  async function payment(node, registration, context) {
+    if (!config.paidTicketCheckoutEnabled || !config.stripePublishableKey) {
+      throw new Error("Paid checkout is temporarily unavailable.");
+    }
+    const Stripe = await loadStripe(); const stripe = Stripe(config.stripePublishableKey);
+    const elements = stripe.elements({clientSecret: registration.clientSecret});
+    const content = node.querySelector(".dialog-content");
+    content.innerHTML = `<div class="payment-heading"><strong>Complete payment</strong><span>$${(registration.amount / 100).toFixed(2)} USD</span></div><div id="payment-element"></div><button class="cta pay" type="button">Pay securely</button>`;
+    elements.create("payment").mount("#payment-element");
+    await new Promise((resolve, reject) => content.querySelector(".pay").addEventListener("click", async () => {
+      dialogStatus(node, "Confirming payment…");
+      const result = await stripe.confirmPayment({elements, redirect: "if_required",
+        confirmParams: {return_url: `${location.origin}/event/${encodeURIComponent(config.eventId || "")}`}});
+      if (result.error) { dialogStatus(node, result.error.message || "Payment failed.", true); reject(result.error); }
+      else resolve();
+    }, {once: true}));
+    for (let index = 0; index < 20; index++) {
+      const result = await call("getPublicRegistrationStatusV2", {flowId: registration.flowId}, context);
+      if (result.status === "confirmed") return result;
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+    throw new Error("Payment is processing. Your confirmation will arrive shortly.");
+  }
+  async function upgradeAccount(node, context, email, fullName,
+      registrationId, claimToken) {
+    const area = node.querySelector(".account-upgrade");
+    area.hidden = false;
+    const accountReady = () => {
+      const follow = area.querySelector(".follow-organizer"); follow.hidden = false;
+      follow.addEventListener("click", async () => {
+        try {
+          await call("followPublicEventOrganizerV1", {eventId: config.eventId}, context);
+          follow.textContent = "Following organizer"; follow.disabled = true;
+        } catch (error) { dialogStatus(node, error.message || "Organizer could not be followed.", true); }
+      }, {once: true});
+    };
+    area.querySelector(".google-upgrade").addEventListener("click", async () => {
+      try {
+        const provider = new context.authModule.GoogleAuthProvider();
+        try {
+          await context.authModule.linkWithPopup(context.auth.currentUser, provider);
+        } catch (error) {
+          if (error.code !== "auth/credential-already-in-use" &&
+              error.code !== "auth/email-already-in-use") throw error;
+          await context.authModule.signInWithPopup(context.auth, provider);
+        }
+        if (registrationId) await call("claimPublicRegistrationV1", {registrationId, claimToken}, context);
+        dialogStatus(node, "Account created. Your ticket is saved.");
+        accountReady();
+      } catch (error) { dialogStatus(node, error.message || "Account could not be linked.", true); }
+    });
+    const form = area.querySelector(".credential-upgrade");
+    form.querySelector(".upgrade-contact").textContent = "Create with this email";
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        const password = form.querySelector("[name=password]").value;
+        if (password.length < 8) throw new Error("Use a password of at least 8 characters.");
+        const credential = context.authModule.EmailAuthProvider.credential(email, password);
+        let linked;
+        let created = false;
+        try {
+          linked = await context.authModule.linkWithCredential(context.auth.currentUser, credential);
+          created = true;
+        } catch (error) {
+          if (error.code !== "auth/email-already-in-use" &&
+              error.code !== "auth/credential-already-in-use") throw error;
+          linked = await context.authModule.signInWithEmailAndPassword(context.auth,
+              email, password);
+        }
+        if (created) await context.authModule.updateProfile(linked.user, {displayName: fullName});
+        if (registrationId) await call("claimPublicRegistrationV1", {registrationId, claimToken}, context);
+        dialogStatus(node, "Account created. Your ticket is saved.");
+        accountReady();
+      } catch (error) { dialogStatus(node, error.message || "Account could not be created.", true); }
+    });
+  }
+  function showConfirmation(node, result, email, fullName, context) {
+    const content = node.querySelector(".dialog-content");
+    const pending = ["pending", "confirmation_pending"].includes(result.status); const waitlisted = result.status === "waitlisted";
+    const heading = result.status === "confirmation_pending" ? "Check your email" : pending ? "Request received" : waitlisted ? "You're on the waitlist" : "You're confirmed";
+    const summary = result.status === "confirmation_pending" ? "Use the secure link in your email to view your registration status." : pending ? "The organizer will review your request. We’re sending a secure status link to your email." : waitlisted ? "The event is currently full. We’ll email you if a place becomes available." : `Your ${result.kind === "rsvp" ? "RSVP" : "ticket"} is ready. We’re sending a secure confirmation to your email.`;
+    content.innerHTML = `<div class="confirmation"><div class="success-mark" aria-hidden="true">✓</div><h3>${heading}</h3><p>${summary}</p><p class="delivery-state" role="status">Email delivery: ${result.deliveryStatus === "pending" ? "sending" : result.deliveryStatus || "sending"}</p>${result.ticketId ? `<div class="ticket-reference"><span>Ticket</span><strong>${result.ticketCode || result.ticketId.slice(-10).toUpperCase()}</strong>${result.ticketQrSvg ? `<div class="ticket-qr" role="img" aria-label="QR ticket code ${result.ticketCode}">${result.ticketQrSvg}</div>` : ""}</div>` : ""}<div class="confirmation-actions">${result.manageUrl ? `<a class="secondary-button" href="${result.manageUrl}">Manage registration</a>` : ""}${pending || waitlisted ? "" : `<button class="secondary-button add-calendar" type="button">Add to calendar</button>`}</div><section class="account-upgrade" hidden><h3>Save your registrations</h3><p>Create an optional account to manage tickets and follow organizers.</p><button class="secondary-button google-upgrade" type="button">Continue with Google</button><form class="credential-upgrade"><label>Password <input name="password" type="password" minlength="8" autocomplete="new-password"></label><button class="secondary-button upgrade-contact" type="submit"></button></form><button class="secondary-button follow-organizer" type="button" hidden>Follow organizer</button></section><button class="link-button show-account" type="button">Create an account (optional)</button></div>`;
+    content.querySelector(".add-calendar")?.addEventListener("click", () => {
+      const event = config.event || {}; const start = new Date(event.date);
+      const end = new Date(event.end);
+      if (!event.end || !Number.isFinite(end.getTime())) { dialogStatus(node, "The organizer needs to confirm the event end time.", true); return; }
+      const compact = (date) => date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+      location.href = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(event.title || "Event")}&dates=${compact(start)}/${compact(end)}&location=${encodeURIComponent(event.location || "")}`;
+    });
+    content.querySelector(".show-account").addEventListener("click", (event) => {
+      event.currentTarget.hidden = true; upgradeAccount(node, context, email,
+          fullName, result.registrationId, result.claimToken);
+    }, {once: true});
+    if (context.auth.currentUser?.isAnonymous === false) {
+      content.querySelector(".show-account").hidden = true;
+    }
+    dialogStatus(node, pending ? "Request submitted." : waitlisted ? "Waitlist request complete." : "Confirmation complete.");
+    status(pending ? "Registration request submitted." : waitlisted ? "Added to waitlist." : "Registration confirmed.");
+  }
+  async function perform(eventId, action) {
+    if (config.ticketState === "paid_ticket" && !config.paidTicketCheckoutEnabled) {
+      const unavailable = dialog("Paid checkout is temporarily unavailable");
+      dialogStatus(unavailable, "Please contact the organizer for other ways to attend.");
+      return;
+    }
+    const context = await firebase();
+    const node = dialog(action === "rsvp" ? "Confirm your RSVP" : "Get your ticket", "registration-dialog");
+    const form = registrationForm(node, action, context);
+    await new Promise((resolve, reject) => {
+      node.addEventListener("close", () => reject(new Error("Registration cancelled.")), {once: true});
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!form.reportValidity()) return;
+        const data = new FormData(form);
+        const fullName = String(data.get("fullName") || "").trim();
+        const email = String(data.get("email") || "").trim();
+        form.querySelector("button").disabled = true; dialogStatus(node, "Securing your place…");
+        try {
+          const callable = config.ticketState === "paid_ticket" ?
+            "startPublicRegistrationV2" : "startPublicRegistrationV3";
+          const uid = context.auth.currentUser?.uid;
+          const payload = {eventId, fullName, email, answers: answersFrom(form)};
+          const key = await registrationKey(uid, payload);
+          if (!uid || context.auth.currentUser?.uid !== uid) throw new Error("Account changed. Review and submit again.");
+          const result = await call(callable, {...payload, idempotencyKey: key}, context);
+          if (context.auth.currentUser?.uid !== uid) throw new Error("Account changed. Reload your registration.");
+          if (result.status === "confirmation_pending") {
+            showConfirmation(node, result, email, fullName, context); resolve(); return;
+          }
+          const completed = result.status === "payment_pending" ?
+            {...result, ...await payment(node, result, context)} : result;
+          showConfirmation(node, completed, email, fullName, context); resolve();
+        } catch (error) {
+          form.querySelector("button").disabled = false;
+          dialogStatus(node, error.message || "Registration could not be completed.", true);
+        }
+      });
+    });
+  }
+  for (const trigger of document.querySelectorAll("[data-public-action]")) {
+    trigger.addEventListener("click", async (event) => {
+      if (!config.inlineRegistrationEnabled || !config.accountlessRegistrationEnabled) return;
+      event.preventDefault();
+      if (registrationInProgress || document.querySelector("dialog[open]")) return;
+      registrationInProgress = true;
+      lastTrigger = trigger; config.eventId = trigger.dataset.eventId;
+      trigger.setAttribute("aria-busy", "true"); status("Preparing secure registration.");
+      try { await perform(trigger.dataset.eventId, trigger.dataset.publicAction); }
+      catch (error) { if (error.message !== "Registration cancelled.") status(error.message); }
+      finally { registrationInProgress = false; trigger.removeAttribute("aria-busy"); }
+    });
+  }
+})();

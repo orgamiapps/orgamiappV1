@@ -40,7 +40,7 @@ A new **Premium Features** screen has been added to centralize all premium-only 
 - **Analytics Dashboard** - Comprehensive insights across all your events
 
 #### 📢 Communication
-- **Send Notifications** - Send SMS and in-app notifications to attendees
+- **Send Notifications** - Send in-app notifications to attendees
 
 ## Visual Guide
 
@@ -197,4 +197,3 @@ The Premium Features screen provides:
 - 🚀 Room for future features
 
 Enjoy your premium features!
-

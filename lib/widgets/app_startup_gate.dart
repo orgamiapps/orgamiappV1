@@ -135,7 +135,7 @@ class _StartupStatusScreen extends StatelessWidget {
                     'attendus_logo_only.png',
                     width: 88,
                     height: 88,
-                    errorBuilder: (_, __, ___) => Icon(
+                    errorBuilder: (_, _, _) => Icon(
                       Icons.event_available,
                       size: 72,
                       color: theme.colorScheme.primary,

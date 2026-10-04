@@ -1,3 +1,4 @@
+import 'package:attendus/screens/Events/Attendance/attendance_wallet_pass_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:attendus/controller/customer_controller.dart';
@@ -650,8 +651,31 @@ class _MyTicketsScreenState extends State<MyTicketsScreen>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) =>
-          _TicketModalView(ticket: ticket, event: _eventCache[ticket.eventId]),
+      builder: (context) => Column(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: FilledButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => AttendanceWalletPassScreen(
+                    eventId: ticket.eventId,
+                    ticketId: ticket.id,
+                  ),
+                ),
+              ),
+              icon: const Icon(Icons.wallet_outlined),
+              label: const Text('My event pass'),
+            ),
+          ),
+          Expanded(
+            child: _TicketModalView(
+              ticket: ticket,
+              event: _eventCache[ticket.eventId],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

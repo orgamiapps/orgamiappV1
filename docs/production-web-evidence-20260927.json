@@ -1,0 +1,125 @@
+{
+  "generatedAt": "2026-09-27T22:17:55.8251468Z",
+  "productionWebsiteDeployed": true,
+  "evidence": [
+    {
+      "sha256": "8c8298f9ed928a88ed8a3fa9477cd89b2bbd85135c9dad35aeb882ab1a11b5da",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\after.json"
+    },
+    {
+      "sha256": "c1129bcf210abd797dafb1b9fcebd8c429aadd9d701a6b9eab1cca9531c8eb4b",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\assetlinks.json"
+    },
+    {
+      "sha256": "600e6d1a067cd6d3169d92fe7aaf8af94ee36a1b34bf4a58f07dc9c0b754e4ca",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\assets-local.log"
+    },
+    {
+      "sha256": "ffa95264dc718898fb990461f7df70bc1bc275036a1b1813e92ec0b417dcc803",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\backend-targets.txt"
+    },
+    {
+      "sha256": "ea3eb8e47b68e431b1b8cfe7fe10a4b0cb312bf6301e5d842a35c2eb48b54bd9",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\baseline.cjs"
+    },
+    {
+      "sha256": "708e278f80beb90bd2f9d4c5df8237ab1e94eca046548df3710a5d4cae9d9971",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\baseline.json"
+    },
+    {
+      "sha256": "44d5bcd15b64fae035aed06801358b8ccf7e8fc4736d6bafeeccc8a3bc608907",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\build.log"
+    },
+    {
+      "sha256": "736064bb6b878820591786c9b797d35af2952f4e0f0078c1a866d5e07c16c90a",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\bundle.log"
+    },
+    {
+      "sha256": "cbcb0622905ebbc0cde90eba4a4af0e06f18da276c587aa068f707e5d6e821d3",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\candidate.json"
+    },
+    {
+      "sha256": "5f1fbf6345d4a2417809dfa59886d025db0817566999e6233a49053970384ef9",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\check-callables.cjs"
+    },
+    {
+      "sha256": "e21f60c83cd961e6f8c302e4753f5c92713f189462f45634a87b6a1d3be77f36",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\client-callable-check.json"
+    },
+    {
+      "sha256": "2c0c6ac16f611e59e849c8351515ece1545bee72090d468754f036d6554a4df9",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\dependencies-deploy.log"
+    },
+    {
+      "sha256": "717e3eb7e188dfe4dcf7d7f9a3395235a0bce5b8ced5a697c8bd1214c2003bdc",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\diff-check.log"
+    },
+    {
+      "sha256": "b80bea240e53a9d73de1f519a1856bb4abd5d35a220781b4be2236529953e543",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\expose-exports.cjs"
+    },
+    {
+      "sha256": "7b44b50de3dac2a0e07fe336b201856ef336eb42625fc0ecc82794be4523bba9",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\freeze.cjs"
+    },
+    {
+      "sha256": "218eda67412895ef4a7fc8f94863f3e2e46360ea839bdbc1968497bc64366920",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\guard.json"
+    },
+    {
+      "sha256": "4c820b55c6daca3f8a9a4eb3904aded67b03f11e03d66a4f9344496b5d64ed4b",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\hosting-deploy.log"
+    },
+    {
+      "sha256": "9387231df631e4cec969e3342260ad39283be9c4e1ab7a163e8f23c723539320",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\lint.log"
+    },
+    {
+      "sha256": "c1129bcf210abd797dafb1b9fcebd8c429aadd9d701a6b9eab1cca9531c8eb4b",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\live-assetlinks.json"
+    },
+    {
+      "sha256": "e784c0ddd9ac5cd7865259e8ea4c1423a41a016d6941bd4df6a604ef2f1a38c0",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\live-assets.log"
+    },
+    {
+      "sha256": "2abf0f6cc50f839f52bab9c8fdb6a1bd3c3dcf577cc82e0e967067e79318b2b3",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\manifest-tests.log"
+    },
+    {
+      "sha256": "4e63be37021450a916c64207243cf844bbecd239b655e888c5867e82a6730d36",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\package.log"
+    },
+    {
+      "sha256": "05f24d08ae900228ae5fef4595563b9042517e8fd2f13300c32edf1fa8310ab3",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\pre-hosting.log"
+    },
+    {
+      "sha256": "666975746dd3202b41c8ed863f676beb2e9ac037b79b8c8f93cf9eb3a0f87ce5",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\retain.log"
+    },
+    {
+      "sha256": "4109df8c7929480e9a946a4adc63396103ee5c1b41665bd9eabda7efcd32b45c",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\runtime-exports.json"
+    },
+    {
+      "sha256": "88b6d26ea2d39f5cad45beab3c0a1c113d27aeac8486e7745e8b89b1a45c10c8",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\smoke.cjs"
+    },
+    {
+      "sha256": "df6147cacf9fadedfa7d710c33349976614aa7b6050cb2fe7ce0f8ef960e556e",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\staging-error-logs.json"
+    },
+    {
+      "sha256": "61884e5ef2c6cd77f82b462088f62e19a05e03a63f6b8494b71cf0f30078a08e",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\unauthenticated-smoke.json"
+    },
+    {
+      "sha256": "eef9a677bc35b45779a9d3b220ab41942545adcd33f8776265f13f9cfd162de4",
+      "path": "C:\\Users\\block\\Downloads\\orgamiappV1-main\\orgamiappV1-main\\build\\production-web-20260927\\verify.cjs"
+    }
+  ],
+  "observed": false,
+  "deviceQualified": false,
+  "launchComplete": false
+}

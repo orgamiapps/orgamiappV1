@@ -1,0 +1,17 @@
+name: Attendus CI
+'on':
+  pull_request: null
+  push:
+    branches:
+    - main
+    - codex/**
+  workflow_dispatch: null
+permissions:
+  contents: read
+concurrency:
+  group: attendus-ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  quality:
+    uses: ./.github/workflows/quality.yml
+    secrets: inherit

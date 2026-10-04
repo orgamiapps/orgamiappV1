@@ -60,7 +60,7 @@
 │  │      Send      │  │                 │      │
 │  │ Notifications  │  │                 │      │
 │  │                │  │                 │      │
-│  │  SMS & In-App  │  │                 │      │
+│  │ In-App Alerts  │  │                 │      │
 │  │     Alerts     │  │                 │      │
 │  └─────────────────┘  └─────────────────┘      │
 │                                                 │
@@ -177,7 +177,7 @@
 │  │  Send               │    │                  │  │
 │  │  Notifications      │    │                  │  │
 │  │                     │    │                  │  │
-│  │  SMS & In-App       │    │                  │  │
+│  │ In-App Alerts       │    │                  │  │
 │  │  Alerts             │    │                  │  │
 │  │                     │    │                  │  │
 │  └─────────────────────┘    └──────────────────┘  │
@@ -365,4 +365,3 @@ The Premium Features screen provides:
 - **Consistent Design:** Matches app design language
 - **Easy Navigation:** One tap to access premium tools
 - **Future Ready:** Easy to add more features
-

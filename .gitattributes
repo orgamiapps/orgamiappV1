@@ -1,2 +1,3 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+/web/public-web/v1/assets/** text eol=lf

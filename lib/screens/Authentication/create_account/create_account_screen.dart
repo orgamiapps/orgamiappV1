@@ -23,6 +23,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   bool _socialSigningIn = false;
 
   void _goTo(int index) {
+    if (!mounted) return;
     setState(() => _currentPage = index);
     _pageController.animateToPage(
       index,
@@ -37,6 +38,12 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     } else if (Navigator.canPop(context)) {
       Navigator.pop(context);
     }
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   @override
@@ -67,6 +74,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                                 StepBasicInfo(
                                   onNext: () => _goTo(1),
                                   onSocialSignIn: (isSigning) {
+                                    if (!mounted) return;
                                     setState(
                                       () => _socialSigningIn = isSigning,
                                     );

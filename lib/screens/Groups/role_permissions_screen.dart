@@ -23,6 +23,13 @@ class RolePermissionsScreen extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
+          if (snapshot.hasError) {
+            return const Center(
+              child: Text(
+                'Could not load members. Reopen this screen to retry.',
+              ),
+            );
+          }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
             return const Center(child: Text('No members'));
           }
@@ -31,9 +38,10 @@ class RolePermissionsScreen extends StatelessWidget {
             itemBuilder: (context, i) {
               final doc = snapshot.data!.docs[i];
               final data = doc.data() as Map<String, dynamic>;
-              final userId = (data['userId'] ?? '').toString();
+              final userId = (data['userId'] ?? doc.id).toString();
               final role = (data['role'] ?? 'Member').toString();
-              final List<dynamic> perms = (data['permissions'] as List<dynamic>?) ?? [];
+              final List<dynamic> perms =
+                  (data['permissions'] as List<dynamic>?) ?? [];
               return _MemberTile(
                 organizationId: organizationId,
                 userId: userId,
@@ -53,14 +61,23 @@ class _MemberTile extends StatefulWidget {
   final String userId;
   final String role;
   final List<String> permissions;
-  const _MemberTile({required this.organizationId, required this.userId, required this.role, required this.permissions});
+  const _MemberTile({
+    required this.organizationId,
+    required this.userId,
+    required this.role,
+    required this.permissions,
+  });
 
   @override
   State<_MemberTile> createState() => _MemberTileState();
 }
 
 class _MemberTileState extends State<_MemberTile> {
-  late String _role = widget.role;
+  late String _role = switch (widget.role.toLowerCase()) {
+    'admin' => 'Admin',
+    'owner' => 'Owner',
+    _ => 'Member',
+  };
   late final OrganizationHelper _helper = OrganizationHelper();
   final Map<String, bool> _permMap = {
     'CreateEditEvents': false,
@@ -80,9 +97,27 @@ class _MemberTileState extends State<_MemberTile> {
 
   Future<void> _save() async {
     setState(() => _saving = true);
-    final selected = _permMap.entries.where((e) => e.value).map((e) => e.key).toList();
-    await _helper.updateMemberPermissions(widget.organizationId, widget.userId, permissions: selected, role: _role);
-    if (mounted) setState(() => _saving = false);
+    final selected = _permMap.entries
+        .where((e) => e.value)
+        .map((e) => e.key)
+        .toList();
+    final saved = await _helper.updateMemberPermissions(
+      widget.organizationId,
+      widget.userId,
+      permissions: selected,
+      role: _role,
+    );
+    if (!mounted) return;
+    setState(() => _saving = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          saved
+              ? 'Permissions saved.'
+              : 'Could not save permissions. Check your access and retry.',
+        ),
+      ),
+    );
   }
 
   @override
@@ -102,10 +137,20 @@ class _MemberTileState extends State<_MemberTile> {
                 DropdownButton<String>(
                   value: _role,
                   items: const [
+                    DropdownMenuItem(
+                      value: 'Owner',
+                      enabled: false,
+                      child: Text('Owner'),
+                    ),
                     DropdownMenuItem(value: 'Admin', child: Text('Admin')),
                     DropdownMenuItem(value: 'Member', child: Text('Member')),
                   ],
-                  onChanged: (v) => setState(() => _role = v ?? 'Member'),
+                  onChanged: _role == 'Owner'
+                      ? null
+                      : (v) {
+                          if (v == 'Owner') return;
+                          setState(() => _role = v ?? 'Member');
+                        },
                 ),
               ],
             ),
@@ -126,7 +171,11 @@ class _MemberTileState extends State<_MemberTile> {
               child: ElevatedButton.icon(
                 onPressed: _saving ? null : _save,
                 icon: _saving
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Icon(Icons.save),
                 label: const Text('Save'),
               ),

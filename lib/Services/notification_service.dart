@@ -1,5 +1,6 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
+import 'package:attendus/firebase/firebase_messaging_helper.dart';
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notifications =
@@ -12,9 +13,9 @@ class NotificationService {
           AndroidInitializationSettings('@mipmap/ic_launcher');
       const DarwinInitializationSettings initializationSettingsIOS =
           DarwinInitializationSettings(
-            requestAlertPermission: true,
-            requestBadgePermission: true,
-            requestSoundPermission: true,
+            requestAlertPermission: false,
+            requestBadgePermission: false,
+            requestSoundPermission: false,
           );
       const InitializationSettings initializationSettings =
           InitializationSettings(
@@ -88,9 +89,6 @@ class NotificationService {
 
   // Handle notification tap
   static void onNotificationTapped(NotificationResponse response) {
-    if (kDebugMode) {
-      debugPrint('Notification tapped: ${response.payload}');
-    }
-    // Handle navigation based on payload
+    FirebaseMessagingHelper().handleLocalNotificationTap(response);
   }
 }

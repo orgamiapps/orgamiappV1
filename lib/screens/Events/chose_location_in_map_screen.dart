@@ -1,3 +1,4 @@
+import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
@@ -42,7 +43,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
   late final double _screenHeight = MediaQuery.of(context).size.height;
   late GoogleMapController mapController;
   LatLng? selectedLocation;
-  double radius = 10.0; // Default radius
+  double radius = 30.0; // Meters
 
   Set<Marker> markers = {};
   Set<Circle> circles = {};
@@ -211,7 +212,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
         Circle(
           circleId: const CircleId('radius-circle'),
           center: latLng,
-          radius: radius * 0.3048, // Convert feet to meters
+          radius: radius,
           fillColor: const Color(0xFF667EEA).withValues(alpha: 0.2),
           strokeColor: const Color(0xFF667EEA),
           strokeWidth: 2,
@@ -231,7 +232,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
           Circle(
             circleId: const CircleId('radius-circle'),
             center: selectedLocation!,
-            radius: radius * 0.3048, // Convert feet to meters
+            radius: radius,
             fillColor: const Color(0xFF667EEA).withValues(alpha: 0.2),
             strokeColor: const Color(0xFF667EEA),
             strokeWidth: 2,
@@ -385,6 +386,9 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (widget.eventModel != null) {
+      return EventCreationExperienceGate(event: widget.eventModel);
+    }
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
@@ -594,7 +598,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
                 ),
                 const SizedBox(width: 12),
                 const Text(
-                  'Select Radius (Feet)',
+                  'Select Radius (Meters)',
                   style: TextStyle(
                     color: Color(0xFF1A1A1A),
                     fontWeight: FontWeight.w600,
@@ -613,7 +617,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    '${radius.round()} Feet',
+                    '${radius.round()} m',
                     style: const TextStyle(
                       color: Color(0xFF667EEA),
                       fontWeight: FontWeight.bold,
@@ -638,8 +642,8 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
               ),
               child: Slider(
                 value: radius,
-                min: 10,
-                max: 1000,
+                min: 5,
+                max: 500,
                 divisions: 99,
                 onChanged: _updateRadius,
               ),
@@ -674,7 +678,7 @@ class _ChoseLocationInMapScreenState extends State<ChoseLocationInMapScreen>
                       : () {
                           if (kDebugMode) {
                             debugPrint('Selected Location: $selectedLocation');
-                            debugPrint('Selected Radius: $radius feet');
+                            debugPrint('Selected Radius: $radius meters');
                           }
 
                           // If editing an existing event, save the location

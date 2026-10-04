@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
 import 'package:attendus/Services/onnx_nlp_service.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
@@ -87,12 +86,6 @@ void main() {
       // Verify it's actually this weekend
       final start = DateTime.parse(dateRange['start']!);
       final end = DateTime.parse(dateRange['end']!);
-      final now = DateTime.now();
-
-      // Calculate next Saturday
-      final daysToSaturday = 6 - now.weekday;
-      final saturday = now.add(Duration(days: daysToSaturday));
-
       // Check dates are within weekend range
       expect(start.weekday, equals(6)); // Saturday
       expect(end.difference(start).inDays, equals(2)); // 2 day span
@@ -167,7 +160,6 @@ void main() {
 
       // Verify it's next week
       final start = DateTime.parse(dateRange['start']!);
-      final nextWeek = DateTime.now().add(const Duration(days: 7));
       expect(start.isAfter(DateTime.now()), isTrue);
       expect(
         start.isBefore(DateTime.now().add(const Duration(days: 14))),

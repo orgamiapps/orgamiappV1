@@ -4,7 +4,8 @@ class OrganizationMembership {
   final String organizationId;
   final String userId;
   final String role; // e.g., Admin, Member, custom roles
-  final List<String> permissions; // CreateEditEvents, ApproveJoinRequests, ManageMembersRoles, ViewAnalytics
+  final List<String>
+  permissions; // CreateEditEvents, ApproveJoinRequests, ManageMembersRoles, ViewAnalytics
   final String status; // pending, approved, declined
   final DateTime joinedAt;
 

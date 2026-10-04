@@ -1,0 +1,190 @@
+name: Attendus web quality
+'on':
+  workflow_call: null
+permissions:
+  contents: read
+env:
+  FLUTTER_VERSION: 3.44.6
+  NODE_VERSION: 22
+jobs:
+  flutter-quality:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: subosito/flutter-action@v2
+      with:
+        flutter-version: ${{ env.FLUTTER_VERSION }}
+        cache: true
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+    - run: flutter pub get --enforce-lockfile
+    - name: Validate Firestore deployment verifier
+      run: node --check tools/verify_firestore_indexes.js
+    - name: Validate Firestore query contracts
+      run: node --test tools/check_firestore_query_contracts.test.js tools/verify_firestore_indexes.test.js
+    - run: node tools/check_firestore_query_contracts.js
+    - name: Validate Discovery category contract
+      run: node --test tools/check_discovery_category_catalog.test.js && node tools/check_discovery_category_catalog.js
+    - name: Validate public web routing and asset budget
+      run: node --test tools/check_public_web_contract.test.js && node tools/check_public_web_contract.js
+    - name: Check formatting
+      run: dart format --output=none --set-exit-if-changed lib test tools apps/attendus_admin/lib apps/attendus_admin/test
+        apps/attendus_admin/integration_test integration_test test_driver
+    - run: flutter analyze lib test tools integration_test test_driver
+    - run: flutter test --exclude-tags=emulator
+    - name: Analyze and test Attendus Admin
+      working-directory: apps/attendus_admin
+      run: 'flutter pub get --enforce-lockfile
+
+        flutter analyze
+
+        flutter test
+
+        '
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - run: python -m pip install PyYAML==6.0.3
+    - name: Validate native configuration and release gates
+      run: python -m unittest discover -s tools -p "test_*release*.py"
+  functions:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: npm
+        cache-dependency-path: functions/package-lock.json
+    - run: npm ci
+    - run: npm run lint
+    - run: npm test
+    - run: node ../tools/check_firestore_query_contracts.js
+    - run: node --test ../tools/check_function_manifest.test.js
+    - run: node --test ../tools/check_function_secrets.test.js
+    - run: node --test ../tools/test_push_service_worker.js
+    - run: node --test ../tools/test_web_bootstrap.js
+    - name: Reject critical and high production vulnerabilities
+      run: npm audit --omit=dev --audit-level=high
+    - name: Restore browser producer contract dependencies
+      run: npm ci
+      working-directory: tests/browser
+    - name: Verify web release provenance and deployment contracts
+      run: node --test ../tools/web_release_contract.test.js ../tools/bridge_web_assets.test.js ../tools/rehearse_web_backend.test.js ../tools/web_release_operations.test.js ../tools/seed_web_qualification.test.js ../tests/web_backend_tools.test.cjs
+        ../tests/web_browser_pilot.test.cjs ../tests/web_browser_replay.test.cjs ../tests/web_browser_communications.test.cjs ../tests/web_safari_producer.test.cjs ../tests/browser/*.test.cjs
+  firebase-emulators:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: npm
+        cache-dependency-path: functions/package-lock.json
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: 21
+    - run: npm ci
+      working-directory: functions
+    - name: Adversarial Firestore and Storage rules tests
+      run: npm run test:rules
+      working-directory: functions
+    - name: Messaging transactions and security contracts
+      run: npm run test:messaging
+      working-directory: functions
+    - name: Isolated Functions integration suites
+      run: npm run test:integration
+      working-directory: functions
+    - name: Launch integrity and worker concurrency
+      run: npm run test:launch
+      working-directory: functions
+    - name: Smart Arrival and provider-independent attendance integration
+      run: npm run test:attendance
+      working-directory: functions
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Scan full history with verified Gitleaks 8.30.1
+      shell: bash
+      run: |
+        set -euo pipefail
+        tool_dir="$RUNNER_TEMP/attendus-gitleaks-8.30.1"
+        mkdir -p "$tool_dir"
+        curl --fail --location --retry 3 --proto '=https' --tlsv1.2 \
+          https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+          --output "$tool_dir/gitleaks.tar.gz"
+        printf '%s  %s\n' '551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb' "$tool_dir/gitleaks.tar.gz" | sha256sum --check --strict
+        tar -xzf "$tool_dir/gitleaks.tar.gz" -C "$tool_dir" gitleaks
+        "$tool_dir/gitleaks" version
+        "$tool_dir/gitleaks" git --redact --config .gitleaks.toml --log-opts="--all" .
+  quality-complete:
+    needs:
+    - flutter-quality
+    - functions
+    - firebase-emulators
+    - secret-scan
+    - browser-journeys
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+    - name: Require every quality job
+      env:
+        RESULTS: ${{ toJSON(needs) }}
+      run: "python3 - <<'PY'\nimport json, os\nresults = json.loads(os.environ['RESULTS'])\nfailed = [name for name,\
+        \ result in results.items() if result['result'] != 'success']\nif failed:\n    raise SystemExit('Quality\
+        \ gates did not pass: ' + ', '.join(failed))\nprint('All quality gates passed for this source revision.')\n\
+        PY"
+  browser-journeys:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '21'
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - uses: subosito/flutter-action@v2
+      with:
+        flutter-version: 3.44.6
+        cache: true
+    - uses: browser-actions/setup-chrome@v2.2.0
+      id: chrome
+      with:
+        install-chromedriver: true
+        install-dependencies: true
+    - run: npm ci
+      working-directory: functions
+    - run: npm ci
+      working-directory: tests/browser
+    - run: npx playwright install --with-deps chromium firefox webkit
+      working-directory: tests/browser
+    - name: Public registration across browser engines
+      run: node functions/tools/run-integration-tests.js --project demo-attendus-admin --suite public-browser
+    - run: flutter pub get --enforce-lockfile
+    - name: Flutter form and real local Firebase journey
+      env:
+        CHROME_EXECUTABLE: ${{ steps.chrome.outputs.chrome-path }}
+        ATTENDUS_WEBDRIVER: ${{ steps.chrome.outputs.chromedriver-path }}
+      run: node functions/tools/run-integration-tests.js --project demo-attendus-admin --suite flutter-browser
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: browser-journey-evidence
+        path: 'tests/browser/test-results/
+
+          build/debugging-flutter-integration/
+
+          '

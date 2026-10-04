@@ -1,3 +1,4 @@
+import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:attendus/models/event_model.dart';
@@ -21,7 +22,7 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
   late final double _screenHeight = MediaQuery.of(context).size.height;
   late GoogleMapController mapController;
   LatLng? selectedLocation;
-  double radius = 10.0; // Default radius in feet
+  double radius = 30.0; // Meters
 
   Set<Marker> markers = {};
   Set<Circle> circles = {};
@@ -93,7 +94,7 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
         Circle(
           circleId: const CircleId('radius-circle'),
           center: latLng,
-          radius: radius * 0.3048, // Convert feet to meters
+          radius: radius,
           fillColor: const Color(0xFF667EEA).withValues(alpha: 0.2),
           strokeColor: const Color(0xFF667EEA),
           strokeWidth: 2,
@@ -160,7 +161,12 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      EventCreationExperienceGate(event: widget.eventModel);
+
+  // Retained while legacy layout references migrate to the canonical editor.
+  // ignore: unused_element
+  Widget _legacyLayout(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
@@ -520,7 +526,7 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
     final theme = Theme.of(context);
     return AttendUsMapControlPanel(
       title: 'Detection Distance',
-      subtitle: '${radius.toInt()} feet from the selected event location',
+      subtitle: '${radius.toInt()} meters from the selected event location',
       icon: Icons.radar,
       controls: [
         Slider(
@@ -540,8 +546,8 @@ class _GeofenceSetupScreenState extends State<GeofenceSetupScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('5 ft', style: theme.textTheme.bodySmall),
-            Text('100 ft', style: theme.textTheme.bodySmall),
+            Text('5 m', style: theme.textTheme.bodySmall),
+            Text('100 m', style: theme.textTheme.bodySmall),
           ],
         ),
       ],

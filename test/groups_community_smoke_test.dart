@@ -1,6 +1,7 @@
 import 'package:attendus/Utils/attendus_theme.dart';
 import 'package:attendus/screens/Groups/create_group_screen.dart';
 import 'package:attendus/screens/Groups/groups_list_screen.dart';
+import 'package:attendus/screens/Groups/groups_screen.dart';
 import 'package:attendus/screens/Groups/groups_tab.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,5 +26,10 @@ void main() {
   ) async {
     expect(const GroupsListScreen(), isA<GroupsListScreen>());
     expect(const GroupsTab(), isA<GroupsTab>());
+  });
+
+  test('groups shell header remains opt-out for embedded routes', () {
+    expect(const GroupsScreen().showShellHeader, isTrue);
+    expect(const GroupsScreen(showShellHeader: false).showShellHeader, isFalse);
   });
 }

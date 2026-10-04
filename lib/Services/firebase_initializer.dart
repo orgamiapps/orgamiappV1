@@ -7,6 +7,7 @@ import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Utils/app_constants.dart';
 import 'package:attendus/firebase_options.dart';
 import 'package:attendus/Utils/platform_helper.dart';
+import 'package:attendus/Utils/firebase_emulator_config.dart';
 
 /// Centralized, idempotent Firebase initialization with App Check.
 class FirebaseInitializer {
@@ -27,7 +28,7 @@ class FirebaseInitializer {
         PlatformHelper.getFirebaseTimeout(),
         onTimeout: () {
           Logger.warning(
-            'Firebase initialization timed out, continuing anyway',
+            'Firebase initialization timed out; startup can be retried',
           );
           throw TimeoutException('Firebase initialization timeout');
         },
@@ -35,6 +36,13 @@ class FirebaseInitializer {
 
       if (kDebugMode) {
         Logger.success('Firebase core initialized');
+      }
+
+      if (DefaultFirebaseOptions.environment == 'emulator') {
+        await FirebaseEmulatorConfig.connect(Firebase.app().options.projectId);
+        _completedSuccessfully = true;
+        _completer!.complete();
+        return;
       }
 
       // FlutterFire normally defaults to local persistence on web, but make
@@ -55,15 +63,17 @@ class FirebaseInitializer {
 
       try {
         if (kIsWeb) {
-          final siteKey = AppConstants.appCheckWebRecaptchaSiteKey.trim();
+          final siteKey = AppConstants.appCheckWebRecaptchaEnterpriseSiteKey
+              .trim();
           if (!AppConstants.enableWebAppCheck || siteKey.isEmpty) {
             Logger.info(
-              'Web App Check skipped. Configure ATTENDUS_RECAPTCHA_V3_SITE_KEY '
+              'Web App Check skipped. Configure '
+              'ATTENDUS_RECAPTCHA_ENTERPRISE_SITE_KEY '
               'and ATTENDUS_ENABLE_WEB_APP_CHECK=true before enabling enforcement.',
             );
           } else {
             await FirebaseAppCheck.instance
-                .activate(webProvider: ReCaptchaV3Provider(siteKey))
+                .activate(providerWeb: ReCaptchaEnterpriseProvider(siteKey))
                 .timeout(const Duration(seconds: 3));
             Logger.info('Firebase App Check activated for web');
           }
@@ -73,17 +83,19 @@ class FirebaseInitializer {
           return;
         }
 
-        final AndroidProvider androidProvider = kDebugMode
-            ? AndroidProvider.debug
-            : AndroidProvider.playIntegrity;
-        final AppleProvider appleProvider = kDebugMode
-            ? AppleProvider.debug
-            : AppleProvider.deviceCheck;
+        final AndroidAppCheckProvider androidProvider = kDebugMode
+            ? const AndroidDebugProvider()
+            : const AndroidPlayIntegrityProvider();
+        final AppleAppCheckProvider appleProvider = kDebugMode
+            ? const AppleDebugProvider()
+            : const AppleDeviceCheckProvider();
 
-        await FirebaseAppCheck.instance.activate(
-          androidProvider: androidProvider,
-          appleProvider: appleProvider,
-        );
+        await FirebaseAppCheck.instance
+            .activate(
+              providerAndroid: androidProvider,
+              providerApple: appleProvider,
+            )
+            .timeout(const Duration(seconds: 5));
 
         Logger.info(
           'Firebase App Check activated (${kDebugMode ? 'debug' : 'playIntegrity'})',

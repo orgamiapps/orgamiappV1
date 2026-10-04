@@ -1,3 +1,4 @@
+const {publicOrigin} = require("./public-web/origin");
 /**
  * Import function triggers from their respective submodules:
  *
@@ -8,40 +9,88 @@
  */
 
 const {setGlobalOptions} = require("firebase-functions");
-const {onDocumentCreated, onDocumentUpdated, onDocumentWritten} = require("firebase-functions/v2/firestore");
+const {
+  onDocumentCreated,
+  onDocumentDeleted,
+  onDocumentUpdated,
+  onDocumentWritten,
+} = require("firebase-functions/v2/firestore");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {defineSecret} = require("firebase-functions/params");
 const logger = require("firebase-functions/logger");
+const {
+  PLACES_RATE_LIMIT,
+  PLACES_RATE_WINDOW_MS,
+  enforceSharedPlacesRateLimit,
+} = require("./places/rate-limit");
+const {
+  createMaintainPublicCommunityPage,
+  createMaintainPublicEventPage,
+  createPublicWeb,
+} = require("./public-web/renderer");
+const {
+  createGetPublicTicketCheckoutStatus,
+  createPublicTicketCheckout,
+  createRegisterPublicEvent,
+  createReleaseExpiredTicketReservations,
+  createStripeWebhook,
+} = require("./public-web/checkout");
+const {
+  createCancelPublicRegistrationV1,
+  createAnonymizeExpiredGuestContacts,
+  createClaimPublicRegistrationV1,
+  createExportOrganizerEventRegistrationsV1,
+  createFollowPublicEventOrganizerV1,
+  createGetOrganizerEventRegistrationsV1,
+  createGetPublicRegistrationStatusV2,
+  createResendPublicRegistrationConfirmationV1,
+  createStartPublicRegistrationV2,
+  createUpdatePublicRegistrationEmailV1,
+} = require("./public-web/accountless");
+const {
+  createDeliverOutboundMessage,
+  createRetryOutboundMessages,
+} = require("./communications/delivery");
+const {createEventWizardFunctions} = require("./events/wizard");
+const {createStartPublicRegistrationV3} = require("./events/registration-v3");
+const {createLaunchOperations} = require("./events/launch-operations");
 
 const GOOGLE_PLACES_API_KEY = defineSecret("GOOGLE_PLACES_API_KEY");
 const placesRateWindows = new Map();
-const PLACES_RATE_LIMIT = 60;
-const PLACES_RATE_WINDOW_MS = 60 * 1000;
 
-function requirePlacesCaller(req) {
+async function requirePlacesCaller(req, {allowAnonymous = false} = {}) {
   const uid = req.auth?.uid;
   const provider = req.auth?.token?.firebase?.sign_in_provider;
-  if (!uid || provider === "anonymous") {
+  if (!uid || (provider === "anonymous" && !allowAnonymous)) {
     throw new HttpsError(
-      "unauthenticated",
-      "A signed-in account is required to search for locations.",
+        "unauthenticated",
+        "A signed-in account is required to search for locations.",
     );
   }
 
-  const now = Date.now();
-  const current = placesRateWindows.get(uid);
-  if (!current || now - current.startedAt >= PLACES_RATE_WINDOW_MS) {
-    placesRateWindows.set(uid, {startedAt: now, count: 1});
+  if (process.env.ATTENDUS_TEST_IN_MEMORY_RATE_LIMIT === "true") {
+    const now = Date.now();
+    const current = placesRateWindows.get(uid);
+    if (!current || now - current.startedAt >= PLACES_RATE_WINDOW_MS) {
+      placesRateWindows.set(uid, {startedAt: now, count: 1});
+      return uid;
+    }
+    if (current.count >= PLACES_RATE_LIMIT) {
+      throw new HttpsError(
+          "resource-exhausted",
+          "Too many location searches. Please wait a moment and try again.",
+      );
+    }
+    current.count += 1;
     return uid;
   }
-  if (current.count >= PLACES_RATE_LIMIT) {
-    throw new HttpsError(
-      "resource-exhausted",
-      "Too many location searches. Please wait a moment and try again.",
-    );
-  }
-  current.count += 1;
+  await enforceSharedPlacesRateLimit(
+      admin.firestore(),
+      uid,
+      Date.now(),
+      provider === "anonymous" ? 20 : PLACES_RATE_LIMIT,
+  );
   return uid;
 }
 
@@ -49,11 +98,32 @@ function placesKey() {
   const value = GOOGLE_PLACES_API_KEY.value().trim();
   if (!value) {
     throw new HttpsError(
-      "failed-precondition",
-      "Location search is not configured.",
+        "failed-precondition",
+        "Location search is not configured.",
     );
   }
   return value;
+}
+
+async function timeZoneForCoordinates(latitude, longitude) {
+  try {
+    const query = new URLSearchParams({
+      location: `${latitude},${longitude}`,
+      timestamp: String(Math.floor(Date.now() / 1000)),
+      key: placesKey(),
+    });
+    const body = await googleMapsRequest(
+        `https://maps.googleapis.com/maps/api/timezone/json?${query}`,
+    );
+    return body.status === "OK" ? String(body.timeZoneId || "") : "";
+  } catch (error) {
+    logger.warn("Time zone enrichment was unavailable", {
+      latitude,
+      longitude,
+      message: error.message,
+    });
+    return "";
+  }
 }
 
 async function googleMapsRequest(url, options = {}) {
@@ -66,8 +136,8 @@ async function googleMapsRequest(url, options = {}) {
   } catch (error) {
     logger.error("Google Maps request failed", {error: String(error)});
     throw new HttpsError(
-      "unavailable",
-      "The location service is temporarily unavailable.",
+        "unavailable",
+        "The location service is temporarily unavailable.",
     );
   }
 
@@ -84,8 +154,8 @@ async function googleMapsRequest(url, options = {}) {
     });
     if (response.status === 429) {
       throw new HttpsError(
-        "resource-exhausted",
-        "Location search quota was reached. Please try again shortly.",
+          "resource-exhausted",
+          "Location search quota was reached. Please try again shortly.",
       );
     }
     if (response.status === 400) {
@@ -93,13 +163,13 @@ async function googleMapsRequest(url, options = {}) {
     }
     if (response.status === 403) {
       throw new HttpsError(
-        "failed-precondition",
-        "Location search is not available. Check Maps billing and API configuration.",
+          "failed-precondition",
+          "Location search is not available. Check Maps billing and API configuration.",
       );
     }
     throw new HttpsError(
-      "unavailable",
-      "The location service could not complete the request.",
+        "unavailable",
+        "The location service could not complete the request.",
     );
   }
   return body;
@@ -118,348 +188,290 @@ function validateSessionToken(value) {
  * Input: {query, sessionToken, useCase: "event"|"groupCity", locationBias?}
  */
 exports.placesAutocomplete = onCall(
-  {
-    region: "us-central1",
-    timeoutSeconds: 15,
-    invoker: "public",
-    secrets: [GOOGLE_PLACES_API_KEY],
-  },
-  async (req) => {
-    requirePlacesCaller(req);
-    const query = typeof req.data?.query === "string" ? req.data.query.trim() : "";
-    const sessionToken = validateSessionToken(req.data?.sessionToken);
-    const useCase = req.data?.useCase;
-    if (useCase !== "event" && useCase !== "groupCity") {
-      throw new HttpsError(
-        "invalid-argument",
-        "A valid location search use case is required.",
-      );
-    }
-    if (query.length < 3 || query.length > 200) {
-      throw new HttpsError(
-        "invalid-argument",
-        "Enter at least three characters to search.",
-      );
-    }
+    {
+      region: "us-central1",
+      timeoutSeconds: 15,
+      invoker: "public",
+      enforceAppCheck: process.env.FUNCTIONS_EMULATOR !== "true",
+      secrets: [GOOGLE_PLACES_API_KEY],
+    },
+    async (req) => {
+      const query = typeof req.data?.query === "string" ? req.data.query.trim() : "";
+      const sessionToken = validateSessionToken(req.data?.sessionToken);
+      const useCase = req.data?.useCase;
+      if (useCase !== "event" && useCase !== "groupCity" &&
+          useCase !== "discoveryCity") {
+        throw new HttpsError(
+            "invalid-argument",
+            "A valid location search use case is required.",
+        );
+      }
+      await requirePlacesCaller(req, {allowAnonymous: useCase === "discoveryCity"});
+      if (query.length < 3 || query.length > 200) {
+        throw new HttpsError(
+            "invalid-argument",
+            "Enter at least three characters to search.",
+        );
+      }
 
-    const requestBody = {
-      input: query,
-      sessionToken,
-      includeQueryPredictions: false,
-      languageCode: "en",
-    };
-    if (useCase === "groupCity") {
-      requestBody.includedPrimaryTypes = ["(cities)"];
-      requestBody.includedRegionCodes = ["us"];
-    } else {
-      const bias = req.data?.locationBias;
-      const lat = Number(bias?.latitude);
-      const lng = Number(bias?.longitude);
-      if (bias !== undefined && (!Number.isFinite(lat) || !Number.isFinite(lng) ||
+      const requestBody = {
+        input: query,
+        sessionToken,
+        includeQueryPredictions: false,
+        languageCode: "en",
+      };
+      if (useCase === "groupCity" || useCase === "discoveryCity") {
+        requestBody.includedPrimaryTypes = useCase === "discoveryCity" && /\d/.test(query) ?
+          ["postal_code"] : ["(cities)"];
+        requestBody.includedRegionCodes = ["us"];
+      } else {
+        const bias = req.data?.locationBias;
+        const lat = Number(bias?.latitude);
+        const lng = Number(bias?.longitude);
+        if (bias !== undefined && (typeof bias?.latitude !== "number" || typeof bias?.longitude !== "number" || !Number.isFinite(lat) || !Number.isFinite(lng) ||
           lat < -90 || lat > 90 || lng < -180 || lng > 180)) {
-        throw new HttpsError("invalid-argument", "Invalid location bias.");
+          throw new HttpsError("invalid-argument", "Invalid location bias.");
+        }
+        if (bias !== undefined) {
+          requestBody.locationBias = {
+            circle: {
+              center: {latitude: lat, longitude: lng},
+              radius: 50000,
+            },
+          };
+        }
       }
-      if (bias !== undefined) {
-        requestBody.locationBias = {
-          circle: {
-            center: {latitude: lat, longitude: lng},
-            radius: 50000,
+
+      const body = await googleMapsRequest(
+          "https://places.googleapis.com/v1/places:autocomplete",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Goog-Api-Key": placesKey(),
+              "X-Goog-FieldMask": [
+                "suggestions.placePrediction.placeId",
+                "suggestions.placePrediction.text.text",
+                "suggestions.placePrediction.structuredFormat.mainText.text",
+                "suggestions.placePrediction.structuredFormat.secondaryText.text",
+              ].join(","),
+            },
+            body: JSON.stringify(requestBody),
           },
-        };
-      }
-    }
+      );
 
-    const body = await googleMapsRequest(
-      "https://places.googleapis.com/v1/places:autocomplete",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Goog-Api-Key": placesKey(),
-          "X-Goog-FieldMask": [
-            "suggestions.placePrediction.placeId",
-            "suggestions.placePrediction.text.text",
-            "suggestions.placePrediction.structuredFormat.mainText.text",
-            "suggestions.placePrediction.structuredFormat.secondaryText.text",
-          ].join(","),
-        },
-        body: JSON.stringify(requestBody),
-      },
-    );
-
-    const predictions = (body.suggestions || [])
-      .map((suggestion) => suggestion.placePrediction)
-      .filter((prediction) => prediction?.placeId)
-      .slice(0, 8)
-      .map((prediction) => ({
-        placeId: String(prediction.placeId),
-        description: String(prediction.text?.text || ""),
-        primaryText: String(prediction.structuredFormat?.mainText?.text || ""),
-        secondaryText: String(prediction.structuredFormat?.secondaryText?.text || ""),
-      }));
-    return {predictions};
-  },
+      const predictions = (body.suggestions || [])
+          .map((suggestion) => suggestion.placePrediction)
+          .filter((prediction) => prediction?.placeId)
+          .slice(0, 8)
+          .map((prediction) => ({
+            placeId: String(prediction.placeId),
+            description: String(prediction.text?.text || ""),
+            primaryText: String(prediction.structuredFormat?.mainText?.text || ""),
+            secondaryText: String(prediction.structuredFormat?.secondaryText?.text || ""),
+          }));
+      return {predictions};
+    },
 );
 
 /** Input: {placeId, sessionToken}. */
 exports.placeDetails = onCall(
-  {
-    region: "us-central1",
-    timeoutSeconds: 15,
-    invoker: "public",
-    secrets: [GOOGLE_PLACES_API_KEY],
-  },
-  async (req) => {
-    requirePlacesCaller(req);
-    const placeId = typeof req.data?.placeId === "string" ? req.data.placeId.trim() : "";
-    const sessionToken = validateSessionToken(req.data?.sessionToken);
-    if (!placeId || placeId.length > 256) {
-      throw new HttpsError("invalid-argument", "A valid place ID is required.");
-    }
-
-    const query = new URLSearchParams({sessionToken, languageCode: "en"});
-    const body = await googleMapsRequest(
-      `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?${query}`,
-      {
-        headers: {
-          "X-Goog-Api-Key": placesKey(),
-          "X-Goog-FieldMask": "id,displayName,formattedAddress,location,addressComponents",
-        },
-      },
-    );
-    const latitude = Number(body.location?.latitude);
-    const longitude = Number(body.location?.longitude);
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      throw new HttpsError("not-found", "That place has no map location.");
-    }
-
-    let city = "";
-    let regionCode = "";
-    for (const component of body.addressComponents || []) {
-      const types = component.types || [];
-      if (!city && ["locality", "postal_town", "administrative_area_level_2"]
-        .some((type) => types.includes(type))) {
-        city = String(component.longText || component.shortText || "");
+    {
+      region: "us-central1",
+      timeoutSeconds: 15,
+      invoker: "public",
+      enforceAppCheck: process.env.FUNCTIONS_EMULATOR !== "true",
+      secrets: [GOOGLE_PLACES_API_KEY],
+    },
+    async (req) => {
+      const useCase = req.data?.useCase || "event";
+      if (!["event", "groupCity", "discoveryCity"].includes(useCase)) {
+        throw new HttpsError("invalid-argument", "Invalid location use case.");
       }
-      if (types.includes("administrative_area_level_1")) {
-        regionCode = String(component.shortText || component.longText || "");
+      await requirePlacesCaller(req, {allowAnonymous: useCase === "discoveryCity"});
+      const placeId = typeof req.data?.placeId === "string" ? req.data.placeId.trim() : "";
+      const sessionToken = validateSessionToken(req.data?.sessionToken);
+      if (!placeId || placeId.length > 256) {
+        throw new HttpsError("invalid-argument", "A valid place ID is required.");
       }
-    }
-    return {
-      placeId: String(body.id || placeId),
-      displayName: String(body.displayName?.text || ""),
-      formattedAddress: String(body.formattedAddress || ""),
-      city,
-      regionCode,
-      latitude,
-      longitude,
-    };
-  },
+
+      const query = new URLSearchParams({sessionToken, languageCode: "en"});
+      const body = await googleMapsRequest(
+          `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?${query}`,
+          {
+            headers: {
+              "X-Goog-Api-Key": placesKey(),
+              "X-Goog-FieldMask": "id,displayName,formattedAddress,location,addressComponents",
+            },
+          },
+      );
+      const latitude = Number(body.location?.latitude);
+      const longitude = Number(body.location?.longitude);
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        throw new HttpsError("not-found", "That place has no map location.");
+      }
+
+      let city = "";
+      let regionCode = "";
+      let countryCode = "";
+      let streetNumber = "";
+      let route = "";
+      let postalCode = "";
+      for (const component of body.addressComponents || []) {
+        const types = component.types || [];
+        if (!city && ["locality", "postal_town", "administrative_area_level_2"]
+            .some((type) => types.includes(type))) {
+          city = String(component.longText || component.shortText || "");
+        }
+        if (types.includes("administrative_area_level_1")) {
+          regionCode = String(component.shortText || component.longText || "");
+        }
+        if (types.includes("country")) {
+          countryCode = String(component.shortText || component.longText || "");
+        }
+        if (types.includes("street_number")) {
+          streetNumber = String(component.longText || component.shortText || "");
+        }
+        if (types.includes("route")) {
+          route = String(component.longText || component.shortText || "");
+        }
+        if (types.includes("postal_code")) {
+          postalCode = String(component.longText || component.shortText || "");
+        }
+      }
+      if (useCase === "discoveryCity" && countryCode !== "US") {
+        throw new HttpsError("invalid-argument", "Choose a location in the United States.");
+      }
+      const eventTimeZone = useCase === "event" ?
+        await timeZoneForCoordinates(latitude, longitude) : "";
+      return {
+        placeId: String(body.id || placeId),
+        displayName: String(body.displayName?.text || ""),
+        formattedAddress: String(body.formattedAddress || ""),
+        city,
+        regionCode,
+        countryCode,
+        streetAddress: [streetNumber, route].filter(Boolean).join(" "),
+        postalCode,
+        eventTimeZone,
+        latitude,
+        longitude,
+      };
+    },
 );
 
 /** Input: {latitude, longitude}. */
 exports.reverseGeocode = onCall(
-  {
-    region: "us-central1",
-    timeoutSeconds: 15,
-    invoker: "public",
-    secrets: [GOOGLE_PLACES_API_KEY],
-  },
-  async (req) => {
-    requirePlacesCaller(req);
-    const latitude = Number(req.data?.latitude);
-    const longitude = Number(req.data?.longitude);
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude) ||
-        latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-      throw new HttpsError("invalid-argument", "Valid coordinates are required.");
-    }
-    const query = new URLSearchParams({
-      latlng: `${latitude},${longitude}`,
-      key: placesKey(),
-    });
-    const body = await googleMapsRequest(
-      `https://maps.googleapis.com/maps/api/geocode/json?${query}`,
-    );
-    if (body.status !== "OK" || !body.results?.length) {
-      if (body.status === "ZERO_RESULTS") {
-        throw new HttpsError("not-found", "No address was found for that pin.");
+    {
+      region: "us-central1",
+      timeoutSeconds: 15,
+      invoker: "public",
+      enforceAppCheck: process.env.FUNCTIONS_EMULATOR !== "true",
+      secrets: [GOOGLE_PLACES_API_KEY],
+    },
+    async (req) => {
+      const useCase = req.data?.useCase || "event";
+      if (!["event", "discoveryCity"].includes(useCase)) {
+        throw new HttpsError("invalid-argument", "Invalid location use case.");
       }
-      logger.error("Reverse geocoding failed", {
-        status: body.status,
-        message: body.error_message,
+      await requirePlacesCaller(req, {allowAnonymous: useCase === "discoveryCity"});
+      const latitude = Number(req.data?.latitude);
+      const longitude = Number(req.data?.longitude);
+      if (typeof req.data?.latitude !== "number" || typeof req.data?.longitude !== "number" || !Number.isFinite(latitude) || !Number.isFinite(longitude) ||
+        latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+        throw new HttpsError("invalid-argument", "Valid coordinates are required.");
+      }
+      const query = new URLSearchParams({
+        latlng: `${latitude},${longitude}`,
+        key: placesKey(),
       });
-      throw new HttpsError(
-        "failed-precondition",
-        "Address lookup is not configured or unavailable.",
+      const body = await googleMapsRequest(
+          `https://maps.googleapis.com/maps/api/geocode/json?${query}`,
       );
-    }
-    return {
-      placeId: String(body.results[0].place_id || ""),
-      formattedAddress: String(body.results[0].formatted_address || ""),
-      latitude,
-      longitude,
-    };
-  },
+      if (body.status !== "OK" || !body.results?.length) {
+        if (body.status === "ZERO_RESULTS") {
+          throw new HttpsError("not-found", "No address was found for that pin.");
+        }
+        logger.error("Reverse geocoding failed", {
+          status: body.status,
+          message: body.error_message,
+        });
+        throw new HttpsError(
+            "failed-precondition",
+            "Address lookup is not configured or unavailable.",
+        );
+      }
+      let city = "";
+      let regionCode = "";
+      let countryCode = "";
+      let streetNumber = "";
+      let route = "";
+      let postalCode = "";
+      for (const component of body.results[0].address_components || []) {
+        const types = component.types || [];
+        if (!city && ["locality", "postal_town", "administrative_area_level_2"]
+            .some((type) => types.includes(type))) {
+          city = String(component.long_name || component.short_name || "");
+        }
+        if (types.includes("administrative_area_level_1")) {
+          regionCode = String(component.short_name || component.long_name || "");
+        }
+        if (types.includes("country")) {
+          countryCode = String(component.short_name || component.long_name || "");
+        }
+        if (types.includes("street_number")) {
+          streetNumber = String(component.long_name || component.short_name || "");
+        }
+        if (types.includes("route")) {
+          route = String(component.long_name || component.short_name || "");
+        }
+        if (types.includes("postal_code")) {
+          postalCode = String(component.long_name || component.short_name || "");
+        }
+      }
+      if (useCase === "discoveryCity" && countryCode !== "US") {
+        throw new HttpsError("invalid-argument", "Discovery is currently available in the United States.");
+      }
+      const eventTimeZone = useCase === "event" ?
+        await timeZoneForCoordinates(latitude, longitude) : "";
+      return {
+        placeId: String(body.results[0].place_id || ""),
+        formattedAddress: String(body.results[0].formatted_address || ""),
+        city,
+        regionCode,
+        countryCode,
+        streetAddress: [streetNumber, route].filter(Boolean).join(" "),
+        postalCode,
+        eventTimeZone,
+        latitude,
+        longitude,
+      };
+    },
 );
 
 // Initialize Firebase Admin SDK
-const admin = require("firebase-admin");
-admin.initializeApp();
+const admin = require("./firebase-admin-compat");
+const {
+  createProcessUserAnalyticsRecompute,
+  processUserAnalyticsRecompute,
+  requestUserAnalyticsRecompute,
+} = require("./analytics/user-analytics");
+exports.processUserAnalyticsRecomputeV2 =
+  createProcessUserAnalyticsRecompute(admin);
 
 // Separate, secured Windows administrator API. The desktop client uses Firebase
 // Auth ID tokens over HTTPS and never receives Admin SDK or Stripe credentials.
 const {createAdminApi} = require("./admin/api");
 const {createMetricsAggregator} = require("./admin/metrics");
+const {createAdminDispatchHandlers} = require("./notifications/admin-dispatch");
 exports.adminApi = createAdminApi(admin);
 exports.aggregateAdminMetricsDaily = createMetricsAggregator(admin);
-// Optional Twilio setup for SMS sending
-let twilioClient = null;
-try {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  if (accountSid && authToken) {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const twilio = require('twilio');
-    twilioClient = twilio(accountSid, authToken);
-    logger.info('Twilio client initialized');
-  } else {
-    logger.info('Twilio not configured; SMS sending will be skipped');
-  }
-} catch (e) {
-  logger.error('Failed to initialize Twilio', e);
-}
+const adminDispatch = createAdminDispatchHandlers({admin});
 
-/**
- * Callable: sendCustomNotifications
- * Input: { userIds: string[], title: string, body: string, type?: string, data?: object }
- * Behavior: Saves to users/{uid}/notifications and sends FCM if token exists.
- */
-exports.sendCustomNotifications = onCall({ region: 'us-central1' }, async (req) => {
-  try {
-    const caller = req.auth?.uid || 'anonymous';
-    const { userIds, title, body, type = 'custom', data = {} } = req.data || {};
-    if (!Array.isArray(userIds) || userIds.length === 0 || !title || !body) {
-      throw new Error("INVALID_ARGUMENT: { userIds[], title, body } required");
-    }
-
-    const db = admin.firestore();
-    const messaging = admin.messaging();
-    const now = admin.firestore.Timestamp.now();
-
-    const results = [];
-    let sentCount = 0;
-    for (const userId of userIds) {
-      try {
-        // Save to Firestore first
-        const notificationRef = await db.collection('users').doc(userId).collection('notifications').add({
-          title,
-          body,
-          type,
-          createdAt: now,
-          isRead: false,
-          data,
-          createdBy: caller,
-        });
-
-        // Attempt to push via FCM
-        const userDoc = await db.collection('users').doc(userId).get();
-        const token = userDoc.exists ? userDoc.data().fcmToken : null;
-        if (token) {
-          const message = {
-            token,
-            notification: { title, body },
-            data: {
-              type: String(type),
-              notificationId: notificationRef.id,
-              click_action: 'FLUTTER_NOTIFICATION_CLICK',
-              ...Object.entries(data || {}).reduce((acc, [k, v]) => {
-                acc[String(k)] = String(v);
-                return acc;
-              }, {}),
-            },
-            android: { notification: { channelId: 'orgami_channel', priority: 'high', defaultSound: true, defaultVibrateTimings: true } },
-            apns: { payload: { aps: { sound: 'default', badge: 1 } } },
-          };
-          await messaging.send(message);
-        }
-        sentCount++;
-        results.push({ userId, status: 'ok' });
-      } catch (e) {
-        logger.error('Failed notifying user', { userId, error: e });
-        results.push({ userId, status: 'error', error: String(e?.message || e) });
-      }
-    }
-
-    // Write a history record
-    await db.collection('notification_history').add({
-      type: 'in_app',
-      title,
-      message: body,
-      totalRecipients: userIds.length,
-      successCount: sentCount,
-      timestamp: now,
-      meta: { createdBy: caller, type },
-    });
-    return { status: 'ok', results };
-  } catch (err) {
-    logger.error('sendCustomNotifications failed', err);
-    throw new Error(`INTERNAL: ${err.message}`);
-  }
-});
-
-/**
- * Callable: sendBulkSms
- * Input: { phoneNumbers: string[], message: string, meta?: { eventId?, label? } }
- * Uses Twilio if configured; otherwise no-ops and records history entry.
- */
-exports.sendBulkSms = onCall({ region: 'us-central1' }, async (req) => {
-  try {
-    const { phoneNumbers, message, meta = {} } = req.data || {};
-    if (!Array.isArray(phoneNumbers) || phoneNumbers.length === 0 || !message) {
-      throw new Error('INVALID_ARGUMENT: { phoneNumbers[], message } required');
-    }
-
-    const db = admin.firestore();
-    const fromNumber = process.env.TWILIO_FROM_NUMBER;
-
-    let sent = 0;
-    let failed = 0;
-    const failures = [];
-
-    if (twilioClient && fromNumber) {
-      // Best-effort sequential send to stay within free-tier limits; batch if needed later
-      for (const to of phoneNumbers) {
-        try {
-          await twilioClient.messages.create({ to, from: fromNumber, body: message });
-          sent++;
-        } catch (e) {
-          failed++;
-          failures.push({ to, error: String(e?.message || e) });
-        }
-      }
-    } else {
-      // No-op fallback in dev; treat as unsent but not erroring loudly
-      logger.info('Twilio not configured; skipping actual SMS send');
-    }
-
-    // Record a history doc for observability
-    await db.collection('notification_history').add({
-      type: 'sms',
-      message,
-      totalRecipients: phoneNumbers.length,
-      successCount: sent,
-      failureCount: failed,
-      failures: failures.slice(0, 10),
-      meta,
-      timestamp: admin.firestore.Timestamp.now(),
-    });
-
-    return { status: 'ok', total: phoneNumbers.length, sent, failed };
-  } catch (err) {
-    logger.error('sendBulkSms failed', err);
-    throw new Error(`INTERNAL: ${err.message}`);
-  }
-});
+exports.sendCustomNotifications = onCall(
+    {region: "us-central1", enforceAppCheck: true, maxInstances: 5},
+    adminDispatch.sendCustomNotifications,
+);
 
 // For cost control, you can set the maximum number of containers that can be
 // running at the same time. This helps mitigate the impact of unexpected
@@ -495,37 +507,49 @@ exports.dispatchPendingPush = onDocumentCreated("pendingPushNotifications/{docId
     const token = data.fcmToken;
     const title = data.title || "Attendus";
     const body = data.body || "New notification";
-    if (!token || typeof token !== 'string' || token.length < 10) {
-      logger.warn("No valid fcmToken, removing pending push", { id: snap.id });
+    const isolation = await require("./communications/qualification-isolation").interceptQualification(admin.firestore(), {
+      actorUid: data.senderId, recipientUid: data.receiverId, conversationId: data.conversationId, eventId: data.eventId,
+    }, `pending:${snap.id}`, {title, body, type: data.type || "message", conversationId: data.conversationId || null});
+    if (isolation.mode !== "normal") {
+      await snap.ref.set({status: `qualification_${isolation.mode}`, updatedAt: admin.firestore.FieldValue.serverTimestamp()}, {merge: true});
+      return;
+    }
+    if (!token || typeof token !== "string" || token.length < 10) {
+      logger.warn("No valid fcmToken, removing pending push", {id: snap.id});
       await snap.ref.delete();
       return;
     }
 
     const message = {
       token,
-      notification: { title, body },
+      notification: {title, body},
       data: {
-        type: String(data.type || 'message'),
-        conversationId: String(data.conversationId || ''),
-        senderId: String(data.senderId || ''),
-        receiverId: String(data.receiverId || ''),
+        type: String(data.type || "message"),
+        conversationId: String(data.conversationId || ""),
+        senderId: String(data.senderId || ""),
+        receiverId: String(data.receiverId || ""),
+        recipientUid: String(data.receiverId || ""),
       },
       android: {
-        priority: 'high',
-        notification: { channelId: 'attendus_channel' },
+        priority: "high",
+        notification: {channelId: "attendus_channel"},
       },
       apns: {
-        payload: { aps: { sound: 'default' } },
+        payload: {aps: {sound: "default"}},
       },
     };
 
+    if (!await require("./notifications/push-tokens").canDeliverPush(admin.firestore(), data.receiverId, token)) {
+      await snap.ref.delete();
+      return;
+    }
     const id = await admin.messaging().send(message);
-    logger.info("Push sent", { fcmMessageId: id, to: data.receiverId });
+    logger.info("Push sent", {fcmMessageId: id, to: data.receiverId});
 
     await snap.ref.delete();
   } catch (err) {
-    logger.error("Failed to dispatch push", { id: snap.id, error: err });
-    await snap.ref.set({ status: 'error', error: String(err && err.message || err), updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    logger.error("Failed to dispatch push", {id: snap.id, error: err});
+    await snap.ref.set({status: "error", error: String(err && err.message || err), updatedAt: admin.firestore.FieldValue.serverTimestamp()}, {merge: true});
   }
 });
 
@@ -538,1242 +562,148 @@ exports.dispatchPendingPush = onDocumentCreated("pendingPushNotifications/{docId
  * - Apple Wallet: Generates a PKPass file and returns a download URL
  * - Google Wallet: Creates a JWT Save URL for Google Pay
  */
-exports.generateUserBadgePass = onCall({ region: "us-central1" }, async (req) => {
-  try {
-    const { uid, platform } = req.data || {};
-    if (!uid || !platform) {
-      throw new Error("INVALID_ARGUMENT: { uid, platform } required");
-    }
-
-    // Get user data from Firestore
-    const userData = await getUserData(uid);
-    if (!userData) {
-      throw new Error("USER_NOT_FOUND: Unable to find user data");
-    }
-
-    let url;
-    if (platform === 'apple') {
-      url = await generateApplePassUrl(uid, userData);
-    } else if (platform === 'google') {
-      url = await generateGoogleSaveUrl(uid, userData);
-    } else {
-      throw new Error("INVALID_ARGUMENT: platform must be 'apple' or 'google'");
-    }
-
-    logger.info("Generated wallet link", { uid, platform });
-    return { url };
-  } catch (err) {
-    logger.error("generateUserBadgePass failed", err);
-    throw new Error(`INTERNAL: Failed to generate wallet pass link: ${err.message}`);
+exports.generateUserBadgePass = onCall({region: "us-central1",
+  enforceAppCheck: process.env.FUNCTIONS_EMULATOR !== "true",
+  secrets: [require("./attendance/arrival").SIGNING_KEY],
+}, async (req) => {
+  const attendance = require("./attendance/v2");
+  const uid = attendance.requireFullAccount(req);
+  if (req.data?.uid && req.data.uid !== uid) {
+    throw new HttpsError("permission-denied", "You can only request your own pass.");
   }
+  await attendance.enforceRateLimit(admin.firestore(), uid, "attendance_pass_issue");
+  const arrival = require("./attendance/arrival");
+  const pass = await arrival.issuePass(admin.firestore(), uid, {kind: "identity"}, {fullAccount: true});
+  const response = await arrival.passResponse(admin.firestore(), pass);
+  const url = req.data?.platform === "apple" ? response.appleWalletUrl : response.googleWalletUrl;
+  if (!url) throw new HttpsError("failed-precondition", "Wallet delivery is not configured.");
+  return {url};
 });
-
-// ---- Helper function to get user data ----
-async function getUserData(uid) {
-  try {
-    const db = admin.firestore();
-    
-    // Get user badge data
-    const badgeDoc = await db.collection('UserBadges').doc(uid).get();
-    if (!badgeDoc.exists) {
-      return null;
-    }
-    
-    return badgeDoc.data();
-  } catch (error) {
-    logger.error('Error getting user data:', error);
-    return null;
-  }
-}
-
-// ---- Apple Wallet (PKPass) Implementation ----
-// Generates a PKPass file and uploads it to Firebase Storage
-const archiver = require('archiver');
-const { v4: uuidv4 } = require('uuid');
-
-async function generateApplePassUrl(uid, userData) {
-  try {
-    const bucket = admin.storage().bucket();
-    const passId = uuidv4();
-    const fileName = `passes/${passId}.pkpass`;
-    
-    // Create pass.json content
-    const passData = {
-      formatVersion: 1,
-      passTypeIdentifier: 'pass.com.attendus.badge',
-      serialNumber: uid,
-      teamIdentifier: 'ATTENDUS',
-      organizationName: 'Attendus',
-      description: 'Attendus Member Badge',
-      logoText: 'Attendus',
-      foregroundColor: 'rgb(255, 255, 255)',
-      backgroundColor: 'rgb(70, 144, 226)',
-      generic: {
-        primaryFields: [
-          {
-            key: 'level',
-            label: 'Badge Level',
-            value: userData.badgeLevel || 'Member'
-          }
-        ],
-        secondaryFields: [
-          {
-            key: 'name',
-            label: 'Name',
-            value: userData.userName || 'Attendus Member'
-          },
-          {
-            key: 'member-since',
-            label: 'Member Since',
-            value: userData.memberSince ? new Date(userData.memberSince.toDate()).getFullYear().toString() : '2024'
-          }
-        ],
-        auxiliaryFields: [
-          {
-            key: 'events-created',
-            label: 'Events Created',
-            value: userData.eventsCreated?.toString() || '0'
-          },
-          {
-            key: 'events-attended',
-            label: 'Events Attended', 
-            value: userData.eventsAttended?.toString() || '0'
-          }
-        ]
-      },
-      barcodes: [
-        {
-          message: userData.badgeQrData || `attendus-badge-${uid}`,
-          format: 'PKBarcodeFormatQR',
-          messageEncoding: 'iso-8859-1'
-        }
-      ]
-    };
-
-    // Create a zip archive for the pass
-    const archive = archiver('zip', { zlib: { level: 9 } });
-    const file = bucket.file(fileName);
-    const stream = file.createWriteStream({
-      metadata: {
-        contentType: 'application/vnd.apple.pkpass',
-        cacheControl: 'public, max-age=3600'
-      }
-    });
-
-    archive.pipe(stream);
-    
-    // Add pass.json to the archive
-    archive.append(JSON.stringify(passData, null, 2), { name: 'pass.json' });
-    
-    // Add a simple manifest.json (for basic pass structure)
-    const manifest = {
-      'pass.json': 'placeholder-checksum'
-    };
-    archive.append(JSON.stringify(manifest), { name: 'manifest.json' });
-    
-    // Finalize the archive
-    await archive.finalize();
-    
-    // Wait for upload to complete
-    await new Promise((resolve, reject) => {
-      stream.on('error', reject);
-      stream.on('finish', resolve);
-    });
-
-    // Generate a signed URL for the pass
-    const [url] = await file.getSignedUrl({
-      action: 'read',
-      expires: Date.now() + 3600000, // 1 hour
-    });
-
-    return url;
-    
-  } catch (error) {
-    logger.error('Error generating Apple pass:', error);
-    // Return a fallback URL that will show a helpful error message
-    return `data:text/plain,Error generating Apple Wallet pass. Please try again later.`;
-  }
-}
-
-// ---- Google Wallet Implementation ----
-// Creates a proper Google Wallet generic pass using the Google Wallet API
-const jwt = require('jsonwebtoken');
-const { GoogleAuth } = require('google-auth-library');
-
-async function generateGoogleSaveUrl(uid, userData) {
-  try {
-    const badgeLevel = userData.badgeLevel || 'Member';
-    const userName = userData.userName || 'Attendus Member';
-    const eventsCreated = userData.eventsCreated || 0;
-    const eventsAttended = userData.eventsAttended || 0;
-    const memberSince = userData.memberSince ? new Date(userData.memberSince.toDate()).getFullYear() : 2024;
-
-    // First, let's create the generic pass class and object
-    await createGoogleWalletClass();
-    
-    // Create object ID using a clean format
-    const objectId = `attendus-badge-${uid}`.replace(/[^a-zA-Z0-9-_.~]/g, '');
-    const issuerId = process.env.GOOGLE_WALLET_ISSUER_ID || '3388000000022295094';
-    const classId = `${issuerId}.attendus_member_badge_class`;
-    const fullObjectId = `${issuerId}.${objectId}`;
-
-    // Create the generic object for this specific user
-    await createGoogleWalletObject(fullObjectId, classId, userData);
-
-    // Create JWT for Save to Google Pay
-    const iat = Math.floor(Date.now() / 1000);
-    const exp = iat + 3600; // 1 hour expiry
-
-    const payload = {
-      iss: process.env.GOOGLE_CLIENT_EMAIL || admin.credential.cert().client_email,
-      aud: 'google',
-      typ: 'savetowallet',
-      iat: iat,
-      exp: exp,
-      payload: {
-        genericObjects: [
-          {
-            id: fullObjectId
-          }
-        ]
-      }
-    };
-
-    // Get the private key from service account
-    const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n') || 
-                      admin.credential.cert().private_key;
-    
-    if (!privateKey) {
-      throw new Error('Google Wallet private key not configured');
-    }
-
-    const token = jwt.sign(payload, privateKey, {
-      algorithm: 'RS256',
-      header: { 
-        typ: 'JWT',
-        alg: 'RS256'
-      }
-    });
-
-    const saveUrl = `https://pay.google.com/gp/v/save/${token}`;
-    logger.info('Generated Google Wallet save URL', { uid, saveUrl: saveUrl.substring(0, 100) + '...' });
-    
-    return saveUrl;
-    
-  } catch (error) {
-    logger.error('Error generating Google Wallet pass:', error);
-    // Fallback to a more helpful error message
-    return `data:text/plain,Google Wallet integration requires additional setup. Please contact support for assistance.`;
-  }
-}
-
-// Create Google Wallet generic pass class
-async function createGoogleWalletClass() {
-  try {
-    const issuerId = process.env.GOOGLE_WALLET_ISSUER_ID || '3388000000022295094';
-    const classId = `${issuerId}.attendus_member_badge_class`;
-
-    // Initialize Google Auth
-    const auth = new GoogleAuth({
-      scopes: ['https://www.googleapis.com/auth/wallet_object.issuer']
-    });
-
-    const authClient = await auth.getClient();
-    const { google } = require('googleapis');
-    
-    const walletobjects = google.walletobjects({
-      version: 'v1',
-      auth: authClient
-    });
-
-    const genericClass = {
-      id: classId,
-      classTemplateInfo: {
-        cardTemplateOverride: {
-          cardRowTemplateInfos: [
-            {
-              oneItem: {
-                item: {
-                  firstValue: {
-                    fields: [
-                      {
-                        fieldPath: 'object.textModulesData["scan_instruction"]'
-                      }
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              twoItems: {
-                startItem: {
-                  firstValue: {
-                    fields: [
-                      {
-                        fieldPath: 'object.textModulesData["level"]'
-                      }
-                    ]
-                  }
-                },
-                endItem: {
-                  firstValue: {
-                    fields: [
-                      {
-                        fieldPath: 'object.textModulesData["validity"]'
-                      }
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              oneItem: {
-                item: {
-                  firstValue: {
-                    fields: [
-                      {
-                        fieldPath: 'object.textModulesData["member_info"]'
-                      }
-                    ]
-                  }
-                }
-              }
-            },
-            {
-              oneItem: {
-                item: {
-                  firstValue: {
-                    fields: [
-                      {
-                        fieldPath: 'object.textModulesData["stats"]'
-                      }
-                    ]
-                  }
-                }
-              }
-            }
-          ]
-        }
-      }
-    };
-
-    // Try to create the class (it's okay if it already exists)
-    try {
-      await walletobjects.genericclass.insert({
-        resource: genericClass
-      });
-      logger.info('Google Wallet class created successfully');
-    } catch (error) {
-      if (error.code === 409) {
-        logger.info('Google Wallet class already exists');
-      } else {
-        throw error;
-      }
-    }
-  } catch (error) {
-    logger.error('Error creating Google Wallet class:', error);
-    // Don't throw here, let the main function handle it
-  }
-}
-
-// Create Google Wallet generic object for specific user
-async function createGoogleWalletObject(objectId, classId, userData) {
-  try {
-    const auth = new GoogleAuth({
-      scopes: ['https://www.googleapis.com/auth/wallet_object.issuer']
-    });
-
-    const authClient = await auth.getClient();
-    const { google } = require('googleapis');
-    
-    const walletobjects = google.walletobjects({
-      version: 'v1',
-      auth: authClient
-    });
-
-    const badgeLevel = userData.badgeLevel || 'Member';
-    const userName = userData.userName || 'Attendus Member';
-    const eventsCreated = userData.eventsCreated || 0;
-    const eventsAttended = userData.eventsAttended || 0;
-    const memberSince = userData.memberSince ? new Date(userData.memberSince.toDate()).getFullYear() : 2024;
-
-    const genericObject = {
-      id: objectId,
-      classId: classId,
-      logo: {
-        sourceUri: {
-          uri: 'https://firebasestorage.googleapis.com/v0/b/orgami-66nxok.appspot.com/o/app_assets%2FinAppLogo.png?alt=media'
-        }
-      },
-      cardTitle: {
-        defaultValue: {
-          language: 'en-US',
-          value: 'Attendus'
-        }
-      },
-      header: {
-        defaultValue: {
-          language: 'en-US',
-          value: 'EVENT BADGE'
-        }
-      },
-      subheader: {
-        defaultValue: {
-          language: 'en-US',
-          value: userName
-        }
-      },
-      // Use silver gradient colors to match the professional badge
-      hexBackgroundColor: '#C0C0C0',
-      textModulesData: [
-        {
-          id: 'scan_instruction',
-          header: 'SCAN TO ACTIVATE',
-          body: 'Valid for all your tickets'
-        },
-        {
-          id: 'level',
-          header: 'Badge Level',
-          body: badgeLevel
-        },
-        {
-          id: 'member_info',
-          header: 'Member Details',
-          body: `${userName} • Since ${memberSince}`
-        },
-        {
-          id: 'stats',
-          header: 'Activity Stats',
-          body: `${eventsCreated} Events Created • ${eventsAttended} Attended`
-        },
-        {
-          id: 'validity',
-          header: 'Valid',
-          body: memberSince.toString()
-        }
-      ],
-      linksModuleData: {
-        uris: [
-          {
-            uri: 'https://attendus.app',
-            description: 'Attendus App',
-            id: 'app_link'
-          }
-        ]
-      },
-      barcode: {
-        type: 'QR_CODE',
-        value: userData.badgeQrData || `attendus://user/${userData.uid || 'unknown'}`,
-        alternateText: `Attendus Member: ${userName}`,
-        renderEncoding: 'UTF_8'
-      },
-      heroImage: {
-        sourceUri: {
-          uri: 'https://firebasestorage.googleapis.com/v0/b/orgami-66nxok.appspot.com/o/app_assets%2FinAppLogo.png?alt=media'
-        },
-        contentDescription: {
-          defaultValue: {
-            language: 'en-US',
-            value: 'Attendus Professional Badge'
-          }
-        }
-      }
-    };
-
-    // Try to create the object, or update if it exists
-    try {
-      await walletobjects.genericobject.insert({
-        resource: genericObject
-      });
-      logger.info('Google Wallet object created successfully');
-    } catch (error) {
-      if (error.code === 409) {
-        // Object exists, try to update it
-        await walletobjects.genericobject.update({
-          resourceId: objectId,
-          resource: genericObject
-        });
-        logger.info('Google Wallet object updated successfully');
-      } else {
-        throw error;
-      }
-    }
-  } catch (error) {
-    logger.error('Error creating Google Wallet object:', error);
-    throw error;
-  }
-}
 
 /**
  * Aggregate attendance data when a new attendance record is created
  * Updates event_analytics collection with aggregated data
  */
-exports.aggregateAttendanceData = onDocumentCreated("Attendance/{docId}",
-    async (event) => {
-      try {
-        const attendanceData = event.data.data();
-        const eventId = attendanceData.eventId;
-        const customerUid = attendanceData.customerUid;
-        const attendanceDateTime = attendanceData.attendanceDateTime.toDate();
-
-        logger.info("Processing attendance for event:", eventId);
-
-        // Get hour bucket for hourlySignIns (e.g., '10:00')
-        const hour = attendanceDateTime.getHours();
-        const hourStr = hour.toString().padStart(2, "0");
-        const hourBucket = `${hourStr}:00`;
-
-        // Use a transaction to ensure atomic updates
-        const db = admin.firestore();
-        await db.runTransaction(async (transaction) => {
-          const analyticsRef = db.collection("event_analytics").doc(eventId);
-          const analyticsDoc = await transaction.get(analyticsRef);
-
-          // Get current analytics data or initialize if doesn't exist
-          const analyticsData = analyticsDoc.exists ? analyticsDoc.data() : {
-            totalAttendees: 0,
-            hourlySignIns: {},
-            repeatAttendees: 0,
-            dropoutRate: 0,
-            lastUpdated: admin.firestore.Timestamp.now(),
-          };
-
-          // Increment total attendees
-          analyticsData.totalAttendees += 1;
-
-          // Update hourly sign-ins
-          if (!analyticsData.hourlySignIns[hourBucket]) {
-            analyticsData.hourlySignIns[hourBucket] = 0;
-          }
-          analyticsData.hourlySignIns[hourBucket] += 1;
-
-          // Count repeat attendees (same customerUid across host's events)
-          if (customerUid && customerUid !== "manual") {
-            // Get all events by the same host
-            const eventsQuery = await db.collection("Events")
-                .where("customerUid", "==", attendanceData.customerUid)
-                .get();
-
-            const hostEventIds = eventsQuery.docs.map((doc) => doc.id);
-
-            // Count past sign-ins by this customerUid across host's events
-            const pastAttendancesQuery = await db.collection("Attendance")
-                .where("customerUid", "==", customerUid)
-                .where("eventId", "in", hostEventIds)
-                .get();
-
-            // Count unique events this customer has attended
-            // (excluding current event)
-            const attendedEvents = new Set();
-            pastAttendancesQuery.docs.forEach((doc) => {
-              const data = doc.data();
-              if (data.eventId !== eventId) {
-                attendedEvents.add(data.eventId);
-              }
-            });
-
-            analyticsData.repeatAttendees = attendedEvents.size;
-          }
-
-          // Calculate dropout rate
-          // Get pre-registered count for this event
-          const preRegisteredQuery = await db.collection("Attendance")
-              .where("eventId", "==", eventId)
-              .where("customerUid", "==", "pre-registered")
-              .get();
-
-          const preRegisteredCount = preRegisteredQuery.size;
-
-          if (preRegisteredCount > 0) {
-            analyticsData.dropoutRate = ((preRegisteredCount -
-                analyticsData.totalAttendees) / preRegisteredCount) * 100;
-          } else {
-            analyticsData.dropoutRate = 0;
-          }
-
-          // Update lastUpdated timestamp
-          analyticsData.lastUpdated = admin.firestore.Timestamp.now();
-
-          // Write the updated analytics data
-          transaction.set(analyticsRef, analyticsData, {merge: true});
-
-          logger.info("Successfully updated analytics for event:", eventId);
-        });
-
-        logger.info("Attendance aggregation completed for event:", eventId);
-      } catch (error) {
-        logger.error("Error in aggregateAttendanceData function:", error);
-        throw error;
-      }
-    });
-
 /**
  * Trigger AI insights generation when analytics data is updated
  * This function runs when event_analytics documents are updated
  */
-exports.triggerAIInsights = onDocumentUpdated("event_analytics/{docId}",
-    async (event) => {
-      try {
-        const eventId = event.params.docId;
-        const beforeData = event.data.before.data();
-        const afterData = event.data.after.data();
-
-        logger.info("Checking if AI insights should be generated for event:", eventId);
-
-        // Only trigger if there's significant new data
-        const beforeAttendees = (beforeData && beforeData.totalAttendees) || 0;
-        const afterAttendees = (afterData && afterData.totalAttendees) || 0;
-
-        if (afterAttendees > beforeAttendees && afterAttendees >= 5) {
-          logger.info("Generating AI insights for event:", eventId);
-          
-          // Trigger AI insights generation
-          await generateAIInsights(eventId);
-        } else {
-          logger.info("Insufficient new data for AI insights generation");
-        }
-      } catch (error) {
-        logger.error("Error in triggerAIInsights function:", error);
-        throw error;
-      }
-    });
-
-/**
- * Generate AI insights for an event
- */
-async function generateAIInsights(eventId) {
-  try {
-    const db = admin.firestore();
-    
-    // Get analytics data
-    const analyticsDoc = await db.collection("event_analytics").doc(eventId).get();
-    if (!analyticsDoc.exists) {
-      logger.info("No analytics data found for event:", eventId);
-      return;
-    }
-
-    const analyticsData = analyticsDoc.data();
-
-    // Get comments for sentiment analysis
-    const commentsQuery = await db.collection("Comments")
-        .where("eventId", "==", eventId)
-        .get();
-
-    const comments = commentsQuery.docs.map(doc => doc.data());
-
-    // Get attendees for detailed analysis
-    const attendeesQuery = await db.collection("Attendance")
-        .where("eventId", "==", eventId)
-        .get();
-
-    const attendees = attendeesQuery.docs.map(doc => doc.data());
-
-    // Perform AI analysis
-    const peakHoursAnalysis = analyzePeakHours(analyticsData.hourlySignIns || {});
-    const sentimentAnalysis = analyzeSentiment(comments);
-    const optimizations = generateOptimizations(analyticsData, peakHoursAnalysis, sentimentAnalysis);
-    const dropoutAnalysis = analyzeDropoutPatterns(analyticsData, attendees);
-    const repeatAttendeeAnalysis = analyzeRepeatAttendees(analyticsData, attendees);
-
-    // Save AI insights
-    const aiInsights = {
-      peakHoursAnalysis,
-      sentimentAnalysis,
-      optimizationPredictions: optimizations,
-      dropoutAnalysis,
-      repeatAttendeeAnalysis,
-      lastUpdated: admin.firestore.Timestamp.now(),
-    };
-
-    await db.collection("ai_insights").doc(eventId).set(aiInsights);
-    logger.info("AI insights generated and saved for event:", eventId);
-
-  } catch (error) {
-    logger.error("Error generating AI insights:", error);
-    throw error;
-  }
-}
-
-/**
- * Analyze peak hours from hourly sign-ins data
- */
-function analyzePeakHours(hourlySignIns) {
-  if (!hourlySignIns || Object.keys(hourlySignIns).length === 0) {
-    return {
-      peakHour: null,
-      peakCount: 0,
-      recommendation: "Insufficient data for peak hour analysis",
-      confidence: 0.0,
-    };
-  }
-
-  const sortedHours = Object.entries(hourlySignIns)
-    .sort((a, b) => a[0].localeCompare(b[0]));
-
-  let peakHour = '';
-  let peakCount = 0;
-  let totalSignIns = 0;
-
-  for (const [hour, count] of sortedHours) {
-    const countNum = parseInt(count);
-    totalSignIns += countNum;
-    if (countNum > peakCount) {
-      peakCount = countNum;
-      peakHour = hour;
-    }
-  }
-
-  const confidence = totalSignIns > 0 ? peakCount / totalSignIns : 0.0;
-
-  let recommendation = '';
-  if (peakHour) {
-    const hour = parseInt(peakHour.split(':')[0]);
-    if (hour >= 9 && hour <= 11) {
-      recommendation = "Morning events (9-11 AM) show highest engagement. Consider scheduling future events during this time.";
-    } else if (hour >= 12 && hour <= 14) {
-      recommendation = "Lunch time (12-2 PM) is your peak period. Lunch-and-learn events could be highly successful.";
-    } else if (hour >= 17 && hour <= 19) {
-      recommendation = "Evening hours (5-7 PM) are most popular. After-work events align well with attendee preferences.";
-    } else {
-      recommendation = `Peak attendance at ${peakHour}. Consider this timing for future events.`;
-    }
-  }
-
-  return {
-    peakHour,
-    peakCount,
-    recommendation,
-    confidence,
-    totalSignIns,
-    hourlyDistribution: hourlySignIns,
-  };
-}
-
-/**
- * Analyze sentiment from comments
- */
-function analyzeSentiment(comments) {
-  if (!comments || comments.length === 0) {
-    return {
-      positiveRatio: 0.0,
-      negativeRatio: 0.0,
-      neutralRatio: 1.0,
-      overallSentiment: "neutral",
-      recommendation: "No comments available for sentiment analysis",
-      confidence: 0.0,
-    };
-  }
-
-  const positiveKeywords = [
-    'great', 'awesome', 'amazing', 'excellent', 'fantastic', 'wonderful',
-    'good', 'nice', 'love', 'enjoy', 'happy', 'satisfied', 'impressed',
-    'outstanding', 'brilliant', 'perfect', 'best', 'favorite', 'recommend'
-  ];
-
-  const negativeKeywords = [
-    'bad', 'terrible', 'awful', 'horrible', 'disappointing', 'poor',
-    'worst', 'hate', 'dislike', 'boring', 'waste', 'useless', 'frustrated',
-    'angry', 'annoyed', 'confused', 'difficult', 'problem', 'issue'
-  ];
-
-  let positiveCount = 0;
-  let negativeCount = 0;
-  let neutralCount = 0;
-
-  for (const comment of comments) {
-    const text = (comment.text || '').toLowerCase();
-    if (!text) continue;
-
-    let positiveScore = 0;
-    let negativeScore = 0;
-
-    for (const keyword of positiveKeywords) {
-      if (text.includes(keyword)) positiveScore++;
-    }
-
-    for (const keyword of negativeKeywords) {
-      if (text.includes(keyword)) negativeScore++;
-    }
-
-    if (positiveScore > negativeScore) {
-      positiveCount++;
-    } else if (negativeScore > positiveScore) {
-      negativeCount++;
-    } else {
-      neutralCount++;
-    }
-  }
-
-  const total = positiveCount + negativeCount + neutralCount;
-  const positiveRatio = total > 0 ? positiveCount / total : 0.0;
-  const negativeRatio = total > 0 ? negativeCount / total : 0.0;
-  const neutralRatio = total > 0 ? neutralCount / total : 0.0;
-
-  let overallSentiment = "neutral";
-  if (positiveRatio > 0.6) {
-    overallSentiment = "positive";
-  } else if (negativeRatio > 0.6) {
-    overallSentiment = "negative";
-  }
-
-  let recommendation = '';
-  if (overallSentiment === "positive") {
-    recommendation = "Excellent feedback! Attendees are highly satisfied. Consider expanding similar event formats.";
-  } else if (overallSentiment === "negative") {
-    recommendation = "Address attendee concerns. Consider gathering more detailed feedback to improve future events.";
-  } else {
-    recommendation = "Mixed feedback received. Consider implementing feedback surveys to better understand attendee needs.";
-  }
-
-  return {
-    positiveRatio,
-    negativeRatio,
-    neutralRatio,
-    overallSentiment,
-    recommendation,
-    confidence: total > 0 ? 0.8 : 0.0,
-    totalComments: total,
-    positiveCount,
-    negativeCount,
-    neutralCount,
-  };
-}
-
-/**
- * Generate optimization predictions
- */
-function generateOptimizations(analyticsData, peakHoursAnalysis, sentimentAnalysis) {
-  const optimizations = [];
-
-  const totalAttendees = analyticsData.totalAttendees || 0;
-  const dropoutRate = analyticsData.dropoutRate || 0.0;
-  const repeatAttendees = analyticsData.repeatAttendees || 0;
-
-  // Peak hours optimization
-  if (peakHoursAnalysis.peakHour) {
-    const hour = parseInt(peakHoursAnalysis.peakHour.split(':')[0]);
-    
-    if (hour >= 9 && hour <= 11) {
-      optimizations.push({
-        type: "timing",
-        title: "Optimize Event Timing",
-        description: "Shift events to morning hours (9-11 AM) for +35% attendance",
-        impact: "High",
-        confidence: peakHoursAnalysis.confidence || 0.0,
-        implementation: "Schedule future events during peak morning hours",
-      });
-    } else if (hour >= 17 && hour <= 19) {
-      optimizations.push({
-        type: "timing",
-        title: "Evening Event Strategy",
-        description: "Leverage evening peak (5-7 PM) for +25% attendance",
-        impact: "Medium",
-        confidence: peakHoursAnalysis.confidence || 0.0,
-        implementation: "Focus on after-work events and networking sessions",
-      });
-    }
-  }
-
-  // Weekend optimization
-  if (totalAttendees > 0) {
-    optimizations.push({
-      type: "scheduling",
-      title: "Weekend Events",
-      description: "Shift to weekends for +40% attendance potential",
-      impact: "High",
-      confidence: 0.7,
-      implementation: "Schedule events on Saturdays or Sundays",
-    });
-  }
-
-  // Dropout rate optimization
-  if (dropoutRate > 20) {
-    optimizations.push({
-      type: "engagement",
-      title: "Reduce Dropout Rate",
-      description: "Implement reminder system to reduce dropout by 30%",
-      impact: "Medium",
-      confidence: 0.8,
-      implementation: "Send SMS/email reminders 24h and 1h before events",
-    });
-  }
-
-  // Repeat attendee optimization
-  if (repeatAttendees > 0 && totalAttendees > 0) {
-    const repeatRate = (repeatAttendees / totalAttendees) * 100;
-    if (repeatRate < 30) {
-      optimizations.push({
-        type: "retention",
-        title: "Increase Repeat Attendance",
-        description: "Implement loyalty program for +50% repeat attendance",
-        impact: "High",
-        confidence: 0.6,
-        implementation: "Create member benefits and early access programs",
-      });
-    }
-  }
-
-  // Sentiment-based optimizations
-  if (sentimentAnalysis.overallSentiment === "negative") {
-    optimizations.push({
-      type: "feedback",
-      title: "Improve Event Quality",
-      description: "Address feedback to improve satisfaction by 40%",
-      impact: "High",
-      confidence: 0.9,
-      implementation: "Conduct post-event surveys and implement feedback",
-    });
-  }
-
-  return optimizations;
-}
-
-/**
- * Analyze dropout patterns
- */
-function analyzeDropoutPatterns(analyticsData, attendees) {
-  const dropoutRate = analyticsData.dropoutRate || 0.0;
-  const totalAttendees = analyticsData.totalAttendees || 0;
-
-  let recommendation = '';
-  if (dropoutRate > 50) {
-    recommendation = "High dropout rate detected. Consider improving event marketing and reminder systems.";
-  } else if (dropoutRate > 25) {
-    recommendation = "Moderate dropout rate. Implement better engagement strategies.";
-  } else {
-    recommendation = "Low dropout rate. Your event planning is effective!";
-  }
-
-  return {
-    dropoutRate,
-    recommendation,
-    severity: dropoutRate > 50 ? "High" : dropoutRate > 25 ? "Medium" : "Low",
-    totalAttendees,
-    confidence: 0.8,
-  };
-}
-
-/**
- * Analyze repeat attendee patterns
- */
-function analyzeRepeatAttendees(analyticsData, attendees) {
-  const repeatAttendees = analyticsData.repeatAttendees || 0;
-  const totalAttendees = analyticsData.totalAttendees || 0;
-
-  const repeatRate = totalAttendees > 0 ? (repeatAttendees / totalAttendees) * 100 : 0.0;
-
-  let recommendation = '';
-  if (repeatRate > 50) {
-    recommendation = "Excellent repeat attendance! Your events have strong community building.";
-  } else if (repeatRate > 25) {
-    recommendation = "Good repeat attendance. Consider loyalty programs to increase retention.";
-  } else {
-    recommendation = "Low repeat attendance. Focus on building community and improving event quality.";
-  }
-
-  return {
-    repeatRate,
-    repeatAttendees,
-    totalAttendees,
-    recommendation,
-    confidence: 0.8,
-  };
-}
+exports.triggerAIInsights = require("./analytics/insights").createTriggerAIInsights(admin);
+exports.triggerAIInsightsV2 = require("./analytics/insights").createTriggerAIInsightsV2(admin);
 
 /**
  * Aggregate user analytics when event_analytics changes
  * This maintains a single user_analytics/{userId} document with all aggregated data
  * Dramatically reduces client-side queries from N+1 to 1
  */
-exports.aggregateUserAnalytics = onDocumentWritten("event_analytics/{eventId}",
-    async (event) => {
-      try {
-        const eventId = event.params.eventId;
-        const db = admin.firestore();
-
-        // Get the event to find the creator
-        const eventDoc = await db.collection("Events").doc(eventId).get();
-        if (!eventDoc.exists) {
-          logger.info("Event not found, skipping user analytics update:", eventId);
-          return;
-        }
-
-        const eventData = eventDoc.data();
-        const userId = eventData.customerUid;
-        if (!userId) {
-          logger.info("No userId found for event:", eventId);
-          return;
-        }
-
-        logger.info("Updating user analytics for user:", userId);
-
-        // Get all events by this user
-        const userEventsQuery = await db.collection("Events")
-            .where("customerUid", "==", userId)
-            .get();
-
-        const userEvents = userEventsQuery.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-
-        // Get analytics for all user events in parallel
-        const eventAnalyticsPromises = userEvents.map(evt => 
-          db.collection("event_analytics").doc(evt.id).get()
-        );
-        const eventAnalyticsDocs = await Promise.all(eventAnalyticsPromises);
-
-        // Build aggregated analytics
-        let totalAttendees = 0;
-        let topPerformingEvent = null;
-        let maxAttendees = -1;
-        const eventCategories = {};
-        const monthlyTrends = {};
-        const eventAnalytics = {};
-
-        userEvents.forEach((evt, index) => {
-          const analyticsDoc = eventAnalyticsDocs[index];
-          const analytics = analyticsDoc.exists ? analyticsDoc.data() : {};
-          
-          const attendees = analytics.totalAttendees || 0;
-          const repeatAttendees = analytics.repeatAttendees || 0;
-
-          totalAttendees += attendees;
-
-          // Store individual event analytics
-          eventAnalytics[evt.id] = {
-            attendees: attendees,
-            repeatAttendees: repeatAttendees,
-          };
-
-          // Track top performing event
-          if (attendees > maxAttendees) {
-            maxAttendees = attendees;
-            topPerformingEvent = {
-              id: evt.id,
-              title: evt.title || "Untitled Event",
-              attendees: attendees,
-              date: evt.selectedDateTime || null,
-            };
-          }
-
-          // Track event categories
-          const category = (evt.categories && evt.categories.length > 0) 
-              ? evt.categories[0] 
-              : "Other";
-          eventCategories[category] = (eventCategories[category] || 0) + 1;
-
-          // Track monthly trends
-          if (evt.selectedDateTime) {
-            const date = evt.selectedDateTime.toDate ? evt.selectedDateTime.toDate() : new Date(evt.selectedDateTime);
-            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-            monthlyTrends[monthKey] = (monthlyTrends[monthKey] || 0) + attendees;
-          }
-        });
-
-        // Calculate retention rate across all user's events
-        let retentionRate = 0;
-        try {
-          // Get attendance records for up to 60 most recent events
-          const recentEvents = userEvents
-              .sort((a, b) => {
-                const dateA = a.selectedDateTime?.toDate ? a.selectedDateTime.toDate() : new Date(a.selectedDateTime);
-                const dateB = b.selectedDateTime?.toDate ? b.selectedDateTime.toDate() : new Date(b.selectedDateTime);
-                return dateB - dateA;
-              })
-              .slice(0, 60);
-
-          const eventIds = recentEvents.map(evt => evt.id);
-          
-          if (eventIds.length > 0) {
-            // Use batched queries (Firestore allows 10 items per 'in' query)
-            const batchSize = 10;
-            const attendanceSnapshots = [];
-            
-            for (let i = 0; i < eventIds.length; i += batchSize) {
-              const batch = eventIds.slice(i, i + batchSize);
-              const snapshot = await db.collection("Attendance")
-                  .where("eventId", "in", batch)
-                  .get();
-              attendanceSnapshots.push(...snapshot.docs);
-            }
-
-            // Count unique attendees and repeat attendees
-            const attendeeCountsByUser = {};
-            attendanceSnapshots.forEach(doc => {
-              const data = doc.data();
-              const uid = data.customerUid;
-              if (uid && uid !== "manual") {
-                attendeeCountsByUser[uid] = (attendeeCountsByUser[uid] || 0) + 1;
-              }
-            });
-
-            const uniqueAttendeeCount = Object.keys(attendeeCountsByUser).length;
-            const repeatAttendeeCount = Object.values(attendeeCountsByUser)
-                .filter(count => count > 1)
-                .length;
-
-            retentionRate = uniqueAttendeeCount > 0 
-                ? (repeatAttendeeCount / uniqueAttendeeCount) * 100.0 
-                : 0.0;
-          }
-        } catch (retentionError) {
-          logger.error("Error calculating retention rate:", retentionError);
-          retentionRate = 0;
-        }
-
-        // Calculate average attendance
-        const averageAttendance = userEvents.length > 0 
-            ? totalAttendees / userEvents.length 
-            : 0;
-
-        // Build the user analytics document
-        const userAnalytics = {
-          totalEvents: userEvents.length,
-          totalAttendees: totalAttendees,
-          averageAttendance: averageAttendance,
-          topPerformingEvent: topPerformingEvent,
-          eventCategories: eventCategories,
-          monthlyTrends: monthlyTrends,
-          retentionRate: retentionRate,
-          eventAnalytics: eventAnalytics,
-          lastUpdated: admin.firestore.Timestamp.now(),
-        };
-
-        // Save to user_analytics collection
-        await db.collection("user_analytics").doc(userId).set(userAnalytics);
-
-        logger.info("User analytics updated successfully for user:", userId);
-      } catch (error) {
-        logger.error("Error in aggregateUserAnalytics:", error);
-        // Don't throw - we don't want to fail the triggering write
-      }
+exports.aggregateUserAnalyticsV2 = onDocumentWritten({
+  document: "event_analytics/{eventId}",
+  region: "us-central1",
+  retry: true,
+}, async (event) => {
+  try {
+    const eventId = event.params.eventId;
+    const eventDocument = await admin.firestore()
+        .collection("Events").doc(eventId).get();
+    if (!eventDocument.exists) {
+      logger.info("Event not found, skipping user analytics request", {eventId});
+      return {skipped: true, reason: "event_not_found"};
+    }
+    const userId = eventDocument.get("customerUid");
+    if (!userId) {
+      logger.info("Event has no analytics owner", {eventId});
+      return {skipped: true, reason: "missing_owner"};
+    }
+    const generation = await requestUserAnalyticsRecompute(
+        admin,
+        userId,
+        "event_analytics_write",
+    );
+    return {requested: true, generation};
+  } catch (error) {
+    logger.error("Error requesting aggregate user analytics", {
+      eventId: event.params.eventId,
+      error: String(error),
     });
+    throw error;
+  }
+});
 
 /**
  * Initialize user analytics when a new event is created
  */
-exports.updateUserAnalyticsOnEventCreate = onDocumentCreated("Events/{eventId}",
-    async (event) => {
-      try {
-        const eventData = event.data.data();
-        const userId = eventData.customerUid;
-        
-        if (!userId) {
-          return;
-        }
+exports.updateUserAnalyticsOnEventCreateV2 = onDocumentCreated({
+  document: "Events/{eventId}",
+  region: "us-central1",
+  retry: true,
+}, async (event) => {
+  const eventData = event.data?.data();
+  if (!eventData) return {skipped: true, reason: "missing_event_snapshot"};
+  const userId = eventData.customerUid;
+  if (!userId) return {skipped: true, reason: "missing_owner"};
 
-        logger.info("Initializing user analytics for new event, user:", userId);
-
-        const db = admin.firestore();
-        
-        // Check if user analytics already exists
-        const userAnalyticsDoc = await db.collection("user_analytics").doc(userId).get();
-        
-        if (!userAnalyticsDoc.exists) {
-          // Initialize with minimal data
-          const eventId = event.params.eventId;
-          const category = (eventData.categories && eventData.categories.length > 0)
-              ? eventData.categories[0]
-              : "Other";
-          
-          const monthKey = eventData.selectedDateTime 
-              ? (() => {
-                const date = eventData.selectedDateTime.toDate ? eventData.selectedDateTime.toDate() : new Date(eventData.selectedDateTime);
-                return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-              })()
-              : null;
-
-          const initialAnalytics = {
-            totalEvents: 1,
-            totalAttendees: 0,
-            averageAttendance: 0,
-            topPerformingEvent: {
-              id: eventId,
-              title: eventData.title || "Untitled Event",
-              attendees: 0,
-              date: eventData.selectedDateTime || null,
-            },
-            eventCategories: { [category]: 1 },
-            monthlyTrends: monthKey ? { [monthKey]: 0 } : {},
-            retentionRate: 0,
-            eventAnalytics: {
-              [eventId]: {
-                attendees: 0,
-                repeatAttendees: 0,
-              },
-            },
-            lastUpdated: admin.firestore.Timestamp.now(),
-          };
-
-          await db.collection("user_analytics").doc(userId).set(initialAnalytics);
-          logger.info("User analytics initialized for user:", userId);
-        } else {
-          // User analytics exists, trigger a full recalculation
-          // Create a temporary event_analytics document to trigger aggregation
-          await db.collection("event_analytics").doc(event.params.eventId).set({
-            totalAttendees: 0,
-            lastUpdated: admin.firestore.Timestamp.now(),
-          }, { merge: true });
-        }
-      } catch (error) {
-        logger.error("Error in updateUserAnalyticsOnEventCreate:", error);
-        // Don't throw - we don't want to fail event creation
+  try {
+    const db = admin.firestore();
+    const eventAnalyticsReference = db.collection("event_analytics")
+        .doc(event.params.eventId);
+    await db.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(eventAnalyticsReference);
+      if (!snapshot.exists) {
+        transaction.create(eventAnalyticsReference, {
+          totalAttendees: 0,
+          lastUpdated: admin.firestore.Timestamp.now(),
+        });
       }
     });
+    const generation = await requestUserAnalyticsRecompute(
+        admin,
+        userId,
+        "event_create",
+    );
+    return {requested: true, generation};
+  } catch (error) {
+    logger.error("Error initializing analytics for new event", {
+      eventId: event.params.eventId,
+      userId,
+      error: String(error),
+    });
+    throw error;
+  }
+});
 
 /**
  * Update user analytics when an event is deleted
  */
-exports.updateUserAnalyticsOnEventDelete = onDocumentWritten("Events/{eventId}",
-    async (event) => {
-      try {
-        // Only handle deletions
-        if (event.data.after.exists) {
-          return;
-        }
+exports.updateUserAnalyticsOnEventDeleteV2 = onDocumentDeleted({
+  document: "Events/{eventId}",
+  region: "us-central1",
+  retry: true,
+}, async (event) => {
+  const eventData = event.data.data();
+  const userId = eventData.customerUid;
+  const eventId = event.params.eventId;
+  if (!userId) return {skipped: true, reason: "missing_owner"};
 
-        const eventData = event.data.before.data();
-        const userId = eventData.customerUid;
-        const eventId = event.params.eventId;
-
-        if (!userId) {
-          return;
-        }
-
-        logger.info("Updating user analytics after event deletion, user:", userId);
-
-        const db = admin.firestore();
-
-        // Delete the event analytics document
-        await db.collection("event_analytics").doc(eventId).delete().catch(() => {
-          // Ignore if doesn't exist
+  try {
+    await admin.firestore().collection("event_analytics").doc(eventId)
+        .delete().catch((error) => {
+          if (error.code !== 5 && error.code !== "not-found") throw error;
         });
-
-        // Recalculate user analytics
-        const userEventsQuery = await db.collection("Events")
-            .where("customerUid", "==", userId)
-            .get();
-
-        if (userEventsQuery.empty) {
-          // No more events, delete user analytics
-          await db.collection("user_analytics").doc(userId).delete();
-          logger.info("User analytics deleted (no events remaining) for user:", userId);
-          return;
-        }
-
-        // Trigger recalculation by updating one of the remaining event analytics
-        const firstEventId = userEventsQuery.docs[0].id;
-        await db.collection("event_analytics").doc(firstEventId).set({
-          lastUpdated: admin.firestore.Timestamp.now(),
-        }, { merge: true });
-
-        logger.info("User analytics update triggered after event deletion");
-      } catch (error) {
-        logger.error("Error in updateUserAnalyticsOnEventDelete:", error);
-        // Don't throw
-      }
+    const generation = await requestUserAnalyticsRecompute(
+        admin,
+        userId,
+        "event_delete",
+    );
+    return {requested: true, generation};
+  } catch (error) {
+    logger.error("Error requesting analytics after event deletion", {
+      eventId,
+      userId,
+      error: String(error),
     });
+    throw error;
+  }
+});
 
 /**
  * Send scheduled notifications
@@ -1782,19 +712,19 @@ exports.updateUserAnalyticsOnEventDelete = onDocumentWritten("Events/{eventId}",
 exports.sendScheduledNotifications = onSchedule({
   schedule: "every 1 minutes",
   region: "us-central1",
-}, async (event) => {
+}, async (_event) => {
   try {
     logger.info("Checking for scheduled notifications...");
-    
+
     const db = admin.firestore();
     const now = admin.firestore.Timestamp.now();
-    
+
     // Get notifications that are due to be sent
     const scheduledNotifications = await db.collection("scheduledNotifications")
-      .where("scheduledTime", "<=", now)
-      .where("sent", "==", false)
-      .limit(100)
-      .get();
+        .where("scheduledTime", "<=", now)
+        .where("sent", "==", false)
+        .limit(100)
+        .get();
 
     if (scheduledNotifications.empty) {
       logger.info("No scheduled notifications to send");
@@ -1806,7 +736,7 @@ exports.sendScheduledNotifications = onSchedule({
 
     for (const doc of scheduledNotifications.docs) {
       const notification = doc.data();
-      
+
       try {
         // Get user's FCM token
         const userDoc = await db.collection("users").doc(notification.userId).get();
@@ -1865,9 +795,9 @@ exports.sendScheduledNotifications = onSchedule({
 
         // Save to user's notifications collection
         const userNotificationRef = db.collection("users")
-          .doc(notification.userId)
-          .collection("notifications")
-          .doc();
+            .doc(notification.userId)
+            .collection("notifications")
+            .doc();
 
         batch.set(userNotificationRef, {
           title: notification.title,
@@ -1879,10 +809,9 @@ exports.sendScheduledNotifications = onSchedule({
           isRead: false,
           data: notification.data || {},
         });
-
       } catch (error) {
         logger.error(`Error sending notification ${doc.id}:`, error);
-        
+
         // Mark as failed
         batch.update(doc.ref, {
           sent: false,
@@ -1894,7 +823,6 @@ exports.sendScheduledNotifications = onSchedule({
 
     await batch.commit();
     logger.info(`Processed ${scheduledNotifications.docs.length} scheduled notifications`);
-
   } catch (error) {
     logger.error("Error in sendScheduledNotifications:", error);
   }
@@ -1990,134 +918,48 @@ exports.deleteUserAccount = onCall({region: "us-central1"}, async (request) => {
 });
 
 /**
- * Send event reminder notifications
- * Triggered when a new event is created or updated
- */
-exports.sendEventReminders = onDocumentCreated("Events/{eventId}", async (event) => {
-  try {
-    const eventData = event.data.data();
-    const eventId = event.data.id;
-    
-    if (!eventData || !eventData.eventDateTime) {
-      return;
-    }
-
-    const eventTime = eventData.eventDateTime.toDate();
-    const now = new Date();
-    
-    // Only schedule reminders for future events
-    if (eventTime <= now) {
-      return;
-    }
-
-    logger.info(`Scheduling reminders for event ${eventId}`);
-
-    const db = admin.firestore();
-    
-    // Get all users who should receive notifications
-    const usersSnapshot = await db.collection("users").get();
-    
-    for (const userDoc of usersSnapshot.docs) {
-      const userData = userDoc.data();
-      const userId = userDoc.id;
-      
-      // Check user's notification settings
-      const settingsDoc = await db.collection("users")
-        .doc(userId)
-        .collection("notificationSettings")
-        .doc("settings")
-        .get();
-
-      let shouldSendReminder = true;
-      let reminderTime = 60; // Default 1 hour
-
-      if (settingsDoc.exists) {
-        const settings = settingsDoc.data();
-        shouldSendReminder = settings.eventReminders !== false;
-        reminderTime = settings.reminderTime || 60;
-      }
-
-      if (!shouldSendReminder) {
-        continue;
-      }
-
-      // Check if user has a ticket for this event or is the creator
-      const hasTicket = await checkUserHasTicket(userId, eventId, db);
-      const isCreator = eventData.customerUid === userId;
-
-      if (!hasTicket && !isCreator) {
-        continue; // Skip if user has no ticket and is not the creator
-      }
-
-      // Calculate reminder time
-      const reminderDateTime = new Date(eventTime.getTime() - (reminderTime * 60 * 1000));
-      
-      // Only schedule if reminder time is in the future
-      if (reminderDateTime > now) {
-        await db.collection("scheduledNotifications").add({
-          type: "event_reminder",
-          eventId: eventId,
-          eventTitle: eventData.eventTitle || "Event",
-          eventTime: eventData.eventDateTime,
-          scheduledTime: admin.firestore.Timestamp.fromDate(reminderDateTime),
-          title: "Event Reminder",
-          body: `Your event "${eventData.eventTitle || "Event"}" starts in ${reminderTime} minutes`,
-          userId: userId,
-          createdAt: admin.firestore.Timestamp.now(),
-          sent: false,
-        });
-      }
-    }
-
-    logger.info(`Scheduled reminders for event ${eventId}`);
-
-  } catch (error) {
-    logger.error("Error scheduling event reminders:", error);
-  }
-});
-
-/**
  * Send new event notifications to users within specified distance and group members
  * Triggered when a new event is created
  */
 exports.sendNewEventNotifications = onDocumentCreated("Events/{eventId}", async (event) => {
   try {
-    const eventData = event.data.data();
+    const currentEvent = await event.data.ref.get();
+    const eventData = currentEvent.data();
     const eventId = event.data.id;
-    
-    if (!eventData) {
+
+    if (!currentEvent.exists || !["active", "scheduled"].includes(eventData?.status)) {
       return;
     }
 
     logger.info(`Sending new event notifications for event ${eventId}`);
 
     const db = admin.firestore();
-    
+
     // Check if this is a group/organization event
     if (eventData.organizationId) {
       await notifyGroupMembersOfNewEvent(eventData.organizationId, eventId, eventData, db);
     }
-    
+
     // Continue with location-based notifications if location is provided
-    if (!eventData.eventLocation) {
+    if (!require("./notifications/legacy-delivery").canNotifyNearby(eventData)) {
       return;
     }
-    
+
     const eventLocation = eventData.eventLocation;
-    
+
     // Get all users
     const usersSnapshot = await db.collection("users").get();
-    
+
     for (const userDoc of usersSnapshot.docs) {
       const userData = userDoc.data();
       const userId = userDoc.id;
-      
+
       // Check user's notification settings
       const settingsDoc = await db.collection("users")
-        .doc(userId)
-        .collection("notificationSettings")
-        .doc("settings")
-        .get();
+          .doc(userId)
+          .collection("notificationSettings")
+          .doc("settings")
+          .get();
 
       let shouldSendNewEventNotification = true;
       let distance = 15; // Default 15 miles
@@ -2136,8 +978,8 @@ exports.sendNewEventNotifications = onDocumentCreated("Events/{eventId}", async 
       if (userData.location && eventLocation) {
         const userLocation = userData.location;
         const distanceInKm = calculateDistance(
-          userLocation.latitude, userLocation.longitude,
-          eventLocation.latitude, eventLocation.longitude
+            userLocation.latitude, userLocation.longitude,
+            eventLocation.latitude, eventLocation.longitude,
         );
 
         if (distanceInKm <= distance) {
@@ -2148,13 +990,12 @@ exports.sendNewEventNotifications = onDocumentCreated("Events/{eventId}", async 
             body: `"${eventData.eventTitle || "Event"}" is happening near you!`,
             eventId: eventId,
             eventTitle: eventData.eventTitle || "Event",
-          }, db);
+          }, db, `new-event:${eventId}`, {path: currentEvent.ref.path, fields: {private: false, status: eventData.status}});
         }
       }
     }
 
     logger.info(`Sent new event notifications for event ${eventId}`);
-
   } catch (error) {
     logger.error("Error sending new event notifications:", error);
   }
@@ -2168,7 +1009,7 @@ exports.sendTicketUpdateNotifications = onDocumentCreated("Tickets/{ticketId}", 
   try {
     const ticketData = event.data.data();
     const ticketId = event.data.id;
-    
+
     if (!ticketData) {
       return;
     }
@@ -2179,13 +1020,13 @@ exports.sendTicketUpdateNotifications = onDocumentCreated("Tickets/{ticketId}", 
     logger.info(`Sending ticket update notification for ticket ${ticketId}`);
 
     const db = admin.firestore();
-    
+
     // Check user's notification settings
     const settingsDoc = await db.collection("users")
-      .doc(userId)
-      .collection("notificationSettings")
-      .doc("settings")
-      .get();
+        .doc(userId)
+        .collection("notificationSettings")
+        .doc("settings")
+        .get();
 
     let shouldSendTicketNotification = true;
 
@@ -2202,9 +1043,8 @@ exports.sendTicketUpdateNotifications = onDocumentCreated("Tickets/{ticketId}", 
         body: `You've successfully registered for "${ticketData.eventTitle || "Event"}"`,
         eventId: eventId,
         eventTitle: ticketData.eventTitle || "Event",
-      }, db);
+      }, db, `ticket-created:${ticketId}`);
     }
-
   } catch (error) {
     logger.error("Error sending ticket update notification:", error);
   }
@@ -2218,245 +1058,64 @@ exports.sendEventUpdateNotifications = onDocumentUpdated("Events/{eventId}", asy
   try {
     const beforeData = event.data.before.data();
     const afterData = event.data.after.data();
-    const eventId = event.data.id;
-    
+    const eventId = event.params.eventId;
+
     if (!beforeData || !afterData) {
       return;
     }
+    if (beforeData.status === "pending_approval" && ["scheduled", "active"].includes(afterData.status)) {
+      await exports.sendNewEventNotifications.run({data: event.data.after, params: event.params, id: event.id});
+    }
 
     // Check if important fields have changed
-    const hasLocationChanged = JSON.stringify(beforeData.eventLocation) !== JSON.stringify(afterData.eventLocation);
-    const hasDateTimeChanged = beforeData.eventDateTime.toDate().getTime() !== afterData.eventDateTime.toDate().getTime();
-    const hasTitleChanged = beforeData.eventTitle !== afterData.eventTitle;
+    const beforeLocation = beforeData.location || beforeData.eventLocation;
+    const afterLocation = afterData.location || afterData.eventLocation;
+    const beforeDateTime = beforeData.selectedDateTime || beforeData.eventDateTime;
+    const afterDateTime = afterData.selectedDateTime || afterData.eventDateTime;
+    const beforeTitle = beforeData.title || beforeData.eventTitle;
+    const afterTitle = afterData.title || afterData.eventTitle;
+    const hasLocationChanged = JSON.stringify(beforeLocation) !== JSON.stringify(afterLocation);
+    const hasDateTimeChanged = beforeDateTime?.toDate().getTime() !==
+      afterDateTime?.toDate().getTime();
+    const hasTitleChanged = beforeTitle !== afterTitle;
+    const hasScheduleChanged = beforeData.eventDurationMinutes !== afterData.eventDurationMinutes || beforeData.eventTimeZone !== afterData.eventTimeZone;
 
-    if (!hasLocationChanged && !hasDateTimeChanged && !hasTitleChanged) {
+    if (!hasLocationChanged && !hasDateTimeChanged && !hasTitleChanged && !hasScheduleChanged) {
       return; // No important changes
     }
 
-    logger.info(`Sending event update notifications for event ${eventId}`);
-
     const db = admin.firestore();
-    
-    // Get all users who have tickets for this event
-    const ticketsSnapshot = await db.collection("Tickets")
-      .where("eventId", "==", eventId)
-      .get();
-
-    for (const ticketDoc of ticketsSnapshot.docs) {
-      const ticketData = ticketDoc.data();
-      const userId = ticketData.customerUid;
-      
-      // Check user's notification settings
-      const settingsDoc = await db.collection("users")
-        .doc(userId)
-        .collection("settings")
-        .doc("notifications")
-        .get();
-
-      // respect user toggle for event changes (fallback to true)
-      const settings = settingsDoc.exists ? settingsDoc.data() : {};
-      const shouldSendEventChange = settings.eventChanges !== false;
-      if (!shouldSendEventChange) continue;
-
-      let updateMessage = "Event details have been updated";
-      if (hasLocationChanged) {
-        updateMessage = "Event location has changed";
-      } else if (hasDateTimeChanged) {
-        updateMessage = "Event date/time has changed";
-      } else if (hasTitleChanged) {
-        updateMessage = "Event title has been updated";
-      }
-
-      await sendNotificationToUser(userId, {
-        type: "event_changes",
-        title: "Event Updated",
-        body: `${updateMessage}: "${afterData.eventTitle || "Event"}"`,
-        eventId: eventId,
-        eventTitle: afterData.eventTitle || "Event",
-      }, db);
-    }
-
-    logger.info(`Sent event update notifications for event ${eventId}`);
-
+    const revisionJob = db.collection("EventAnnouncements").doc(`reschedule_${eventId}_${afterData.eventRevision || 0}`);
+    const legacyId = require("./events/roster").key(`${eventId}:${event.id}`);
+    await db.runTransaction(async (transaction) => {
+      const job = db.collection("EventAnnouncements").doc(`legacy_change_${legacyId}`);
+      const [modern, previous] = await Promise.all([transaction.get(revisionJob), transaction.get(job)]);
+      if ((modern.exists && beforeData.eventRevision !== afterData.eventRevision) || previous.exists) return;
+      transaction.create(job, {
+        eventId, actorUid: afterData.customerUid, audience: "active",
+        title: `Event updated: ${afterTitle || "Event"}`,
+        body: `The organizer updated the event. Review the current details at ${publicOrigin()}/event/${eventId}`,
+        templateId: hasLocationChanged || hasDateTimeChanged || hasScheduleChanged ? "event_rescheduled" : "event_announcement",
+        eventSnapshot: require("./events/lifecycle-snapshot").lifecycleSnapshot(afterData),
+        status: "queued", createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
   } catch (error) {
     logger.error("Error sending event update notifications:", error);
   }
 });
 
 // Organizer feedback received (notify event creator)
-exports.notifyOrganizerOnFeedback = onDocumentCreated("event_feedback/{docId}", async (event) => {
-  try {
-    const feedback = event.data.data();
-    const eventId = feedback.eventId;
-    const db = admin.firestore();
-
-    const eventDoc = await db.collection("Events").doc(eventId).get();
-    if (!eventDoc.exists) return;
-    const eventData = eventDoc.data();
-    const creatorId = eventData.customerUid || eventData.createdBy;
-    if (!creatorId) return;
-
-    // respect organizerFeedback toggle
-    const settingsDoc = await db.collection("users").doc(creatorId).collection("settings").doc("notifications").get();
-    const settings = settingsDoc.exists ? settingsDoc.data() : {};
-    if (settings.organizerFeedback === false) return;
-
-    await sendNotificationToUser(creatorId, {
-      type: "organizer_feedback",
-      title: "New feedback received",
-      body: `Your event "${eventData.title || eventData.eventTitle || "Event"}" received new feedback`,
-      eventId: eventId,
-      eventTitle: eventData.title || eventData.eventTitle || "Event",
-    }, db);
-  } catch (error) {
-    logger.error("Error notifying organizer on feedback:", error);
-  }
-});
-
-// Organization: notify admins on new join request
-exports.notifyOrgAdminsOnJoinRequest = onDocumentCreated("Organizations/{orgId}/JoinRequests/{userId}", async (event) => {
-  try {
-    const orgId = event.params.orgId;
-    const db = admin.firestore();
-    // Find admin members
-    const membersSnap = await db.collection("Organizations").doc(orgId).collection("Members")
-      .where("role", "in", ["Admin", "Owner"]).get();
-    for (const m of membersSnap.docs) {
-      const adminId = m.id;
-      const settingsDoc = await db.collection("users").doc(adminId).collection("settings").doc("notifications").get();
-      const settings = settingsDoc.exists ? settingsDoc.data() : {};
-      if (settings.organizationUpdates === false) continue;
-      await sendNotificationToUser(adminId, {
-        type: "org_update",
-        title: "New join request",
-        body: "A user requested to join your organization",
-        data: { organizationId: orgId },
-      }, db);
-    }
-  } catch (error) {
-    logger.error("Error notifying org admins on join request:", error);
-  }
-});
-
-// Organization: notify requester on approval/decline and members on role changes
-exports.notifyOrgMembershipChanges = onDocumentWritten("Organizations/{orgId}/Members/{userId}", async (event) => {
-  try {
-    const orgId = event.params.orgId;
-    const userId = event.params.userId;
-    const db = admin.firestore();
-
-    const afterExists = event.data.after.exists;
-    const beforeData = event.data.before.exists ? event.data.before.data() : null;
-    const afterData = afterExists ? event.data.after.data() : null;
-
-    // Get organization name for better notification messages
-    let orgName = "the group";
-    try {
-      const orgDoc = await db.collection("Organizations").doc(orgId).get();
-      if (orgDoc.exists) {
-        orgName = orgDoc.data().name || "the group";
-      }
-    } catch (e) {
-      logger.warn("Could not fetch org name:", e);
-    }
-
-    // NEW MEMBER APPROVAL: When a member document is created with approved status
-    // This happens when an admin approves a join request
-    if (afterExists && !beforeData && afterData.status === "approved") {
-      const settingsDoc = await db.collection("users").doc(userId).collection("settings").doc("notifications").get();
-      const settings = settingsDoc.exists ? settingsDoc.data() : {};
-      if (settings.organizationUpdates !== false) {
-        await sendNotificationToUser(userId, {
-          type: "org_update",
-          title: "Join Request Approved! 🎉",
-          body: `Your request to join ${orgName} has been approved`,
-          data: { organizationId: orgId, organizationName: orgName },
-        }, db);
-      }
-    }
-
-    // EXISTING MEMBER STATUS UPDATE: If status changed on an existing member
-    if (afterExists && beforeData && beforeData.status !== afterData.status) {
-      const settingsDoc = await db.collection("users").doc(userId).collection("settings").doc("notifications").get();
-      const settings = settingsDoc.exists ? settingsDoc.data() : {};
-      if (settings.organizationUpdates !== false) {
-        const approved = afterData.status === "approved";
-        await sendNotificationToUser(userId, {
-          type: "org_update",
-          title: approved ? "Join request approved" : "Join request updated",
-          body: approved ? `You have been approved to join ${orgName}` : `Your status in ${orgName} is now ${afterData.status}`,
-          data: { organizationId: orgId, organizationName: orgName },
-        }, db);
-      }
-    }
-
-    // ROLE CHANGE: If role changes, notify the user
-    if (afterExists && beforeData && beforeData.role !== afterData.role) {
-      const settingsDoc = await db.collection("users").doc(userId).collection("settings").doc("notifications").get();
-      const settings = settingsDoc.exists ? settingsDoc.data() : {};
-      if (settings.organizationUpdates !== false) {
-        await sendNotificationToUser(userId, {
-          type: "org_update",
-          title: "Role Changed",
-          body: `Your role in ${orgName} is now ${afterData.role}`,
-          data: { organizationId: orgId, organizationName: orgName },
-        }, db);
-      }
-    }
-  } catch (error) {
-    logger.error("Error notifying org membership changes:", error);
-  }
-});
+const communityNotifications = require("./community/notifications").createCommunityNotifications(admin);
+exports.notifyOrganizerOnFeedback = communityNotifications.notifyOrganizerOnFeedback;
+exports.notifyOrgAdminsOnJoinRequest = communityNotifications.notifyOrgAdminsOnJoinRequest;
+exports.notifyOrgMembershipChanges = communityNotifications.notifyOrgMembershipChanges;
+exports.notifyOrgJoinRequestDecision = communityNotifications.notifyOrgJoinRequestDecision;
 
 // Messaging: mentions-only notifications (basic @username detection)
-exports.sendMentionNotifications = onDocumentCreated("Messages/{messageId}", async (event) => {
-  try {
-    const msg = event.data.data();
-    const db = admin.firestore();
-    const content = (msg.content || "").toString();
-    const receiverId = msg.receiverId;
-    const senderId = msg.senderId;
-    if (!content.includes("@")) return;
-
-    // Very basic: if content contains receiver's @username, notify as mention
-    const receiverDoc = await db.collection("Customers").doc(receiverId).get();
-    if (!receiverDoc.exists) return;
-    const username = receiverDoc.data().username;
-    if (!username || !content.includes(`@${username}`)) return;
-
-    const settingsDoc = await db.collection("users").doc(receiverId).collection("settings").doc("notifications").get();
-    const settings = settingsDoc.exists ? settingsDoc.data() : {};
-    if (settings.messageMentions === false) return;
-
-    const conversationId = `${Math.min(senderId, receiverId)}_${Math.max(senderId, receiverId)}`;
-    await sendNotificationToUser(receiverId, {
-      type: "message_mention",
-      title: "You were mentioned",
-      body: content.length > 50 ? content.substring(0,50) + "..." : content,
-      data: { conversationId },
-    }, db);
-  } catch (error) {
-    logger.error("Error sending mention notifications:", error);
-  }
-});
-
-/**
- * Helper function to check if user has a ticket for an event
- */
-async function checkUserHasTicket(userId, eventId, db) {
-  try {
-    const ticketQuery = await db.collection("Tickets")
-      .where("customerUid", "==", userId)
-      .where("eventId", "==", eventId)
-      .limit(1)
-      .get();
-    
-    return !ticketQuery.empty;
-  } catch (error) {
-    logger.error("Error checking user ticket:", error);
-    return false;
-  }
-}
+// Kept during rollout so older deployments do not require destructive deletion.
+// Message and mention delivery now share the deduplicated recipient pipeline.
+exports.sendMentionNotifications = onDocumentCreated("Messages/{messageId}", async () => {});
 
 /**
  * Helper function to notify group members of new event
@@ -2464,54 +1123,54 @@ async function checkUserHasTicket(userId, eventId, db) {
 async function notifyGroupMembersOfNewEvent(organizationId, eventId, eventData, db) {
   try {
     logger.info(`Notifying group members about new event ${eventId} in organization ${organizationId}`);
-    
+
     // Get all members of the organization
     const membersSnapshot = await db.collection("Organizations")
-      .doc(organizationId)
-      .collection("Members")
-      .where("status", "==", "approved")
-      .get();
-    
+        .doc(organizationId)
+        .collection("Members")
+        .where("status", "==", "approved")
+        .get();
+
     if (membersSnapshot.empty) {
       logger.info(`No approved members found for organization ${organizationId}`);
       return;
     }
-    
+
     // Get organization details for better notification message
     const orgDoc = await db.collection("Organizations").doc(organizationId).get();
     const orgName = orgDoc.exists ? (orgDoc.data().name || "your group") : "your group";
-    
+
     logger.info(`Found ${membersSnapshot.docs.length} members to notify`);
-    
+
     // Notify each member (except the event creator)
     for (const memberDoc of membersSnapshot.docs) {
       const memberId = memberDoc.id;
-      
+
       // Skip the event creator
       if (memberId === eventData.customerUid || memberId === eventData.createdBy) {
         continue;
       }
-      
+
       // Check user's notification settings
       const settingsDoc = await db.collection("users")
-        .doc(memberId)
-        .collection("notificationSettings")
-        .doc("settings")
-        .get();
-      
+          .doc(memberId)
+          .collection("notificationSettings")
+          .doc("settings")
+          .get();
+
       let shouldSendGroupEventNotification = true;
-      
+
       if (settingsDoc.exists) {
         const settings = settingsDoc.data();
         // Check if user has disabled new event notifications or organization updates
         shouldSendGroupEventNotification = settings.newEvents !== false && settings.organizationUpdates !== false;
       }
-      
+
       if (!shouldSendGroupEventNotification) {
         logger.info(`User ${memberId} has disabled group event notifications`);
         continue;
       }
-      
+
       // Send notification
       await sendNotificationToUser(memberId, {
         type: "group_event",
@@ -2523,13 +1182,15 @@ async function notifyGroupMembersOfNewEvent(organizationId, eventId, eventData, 
           organizationId: organizationId,
           organizationName: orgName,
         },
-      }, db);
-      
+      }, db, `group-event:${eventId}`, [
+        {path: memberDoc.ref.path, fields: {status: "approved"}},
+        {path: `Events/${eventId}`, fields: {organizationId, status: eventData.status}},
+      ]);
+
       logger.info(`Notified member ${memberId} about new group event`);
     }
-    
+
     logger.info(`Completed notifying group members about event ${eventId}`);
-    
   } catch (error) {
     logger.error("Error notifying group members of new event:", error);
   }
@@ -2552,81 +1213,10 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 /**
  * Helper function to send notification to user
  */
-async function sendNotificationToUser(userId, notificationData, db) {
-  try {
-    // Always save to user's notifications collection first (even if no FCM token)
-    const notificationRef = await db.collection("users")
-      .doc(userId)
-      .collection("notifications")
-      .add({
-        title: notificationData.title,
-        body: notificationData.body,
-        type: notificationData.type,
-        eventId: notificationData.eventId || null,
-        eventTitle: notificationData.eventTitle || null,
-        createdAt: admin.firestore.Timestamp.now(),
-        isRead: false,
-        data: notificationData.data || {},
-      });
-    
-    logger.info(`Saved notification ${notificationRef.id} for user ${userId}`);
-
-    // Get user's FCM token
-    const userDoc = await db.collection("users").doc(userId).get();
-    if (!userDoc.exists) {
-      logger.warn(`User ${userId} not found, notification saved but push not sent`);
-      return;
-    }
-
-    const userData = userDoc.data();
-    const fcmToken = userData.fcmToken;
-
-    if (!fcmToken) {
-      logger.warn(`No FCM token for user ${userId}, notification saved but push not sent`);
-      return;
-    }
-
-    // Send push notification
-    const messaging = admin.messaging();
-    const message = {
-      token: fcmToken,
-      notification: {
-        title: notificationData.title,
-        body: notificationData.body,
-      },
-      data: {
-        type: notificationData.type,
-        eventId: notificationData.eventId || "",
-        eventTitle: notificationData.eventTitle || "",
-        conversationId: (notificationData.data && notificationData.data.conversationId) ? notificationData.data.conversationId : "",
-        organizationId: (notificationData.data && notificationData.data.organizationId) ? notificationData.data.organizationId : "",
-        notificationId: notificationRef.id,
-        click_action: "FLUTTER_NOTIFICATION_CLICK",
-      },
-      android: {
-        notification: {
-          channelId: "orgami_channel",
-          priority: "high",
-          defaultSound: true,
-          defaultVibrateTimings: true,
-        },
-      },
-      apns: {
-        payload: {
-          aps: {
-            sound: "default",
-            badge: 1,
-          },
-        },
-      },
-    };
-
-    await messaging.send(message);
-    logger.info(`Sent push notification to user ${userId}`);
-
-  } catch (error) {
-    logger.error(`Error sending notification to user ${userId}:`, error);
-  }
+const sendLegacyNotification = require("./notifications/legacy-delivery").createLegacyNotificationSender(admin);
+async function sendNotificationToUser(userId, notificationData, db, sourceKey, condition = null) {
+  return sendLegacyNotification(userId, notificationData, db,
+      sourceKey || JSON.stringify([notificationData.type, notificationData.eventId || "", notificationData.title, notificationData.body, notificationData.data || {}]), condition);
 }
 
 /**
@@ -2636,38 +1226,38 @@ async function sendNotificationToUser(userId, notificationData, db) {
 exports.sendPostEventFeedbackNotifications = onSchedule({
   schedule: "every 1 hours",
   timeZone: "UTC",
-}, async (event) => {
+}, async (_event) => {
   try {
     const db = admin.firestore();
     const now = new Date();
-    
+
     // Get all events that ended 1 hour ago
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-    
+
     const eventsQuery = await db.collection("Events")
-      .where("selectedDateTime", "<=", oneHourAgo)
-      .get();
+        .where("selectedDateTime", "<=", oneHourAgo)
+        .get();
 
     logger.info(`Found ${eventsQuery.docs.length} events that ended 1 hour ago`);
 
     for (const eventDoc of eventsQuery.docs) {
       const eventData = eventDoc.data();
       const eventId = eventDoc.id;
-      const eventEndTime = new Date(eventData.selectedDateTime.toDate().getTime() + 
+      const eventEndTime = new Date(eventData.selectedDateTime.toDate().getTime() +
         (eventData.eventDuration || 2) * 60 * 60 * 1000); // Add event duration
-      
+
       // Check if it's been exactly 1 hour since event ended
       const timeSinceEventEnd = now.getTime() - eventEndTime.getTime();
       const oneHourInMs = 60 * 60 * 1000;
-      
+
       if (Math.abs(timeSinceEventEnd - oneHourInMs) > 5 * 60 * 1000) { // Within 5 minutes
         continue;
       }
 
       // Get all attendees for this event
       const attendeesQuery = await db.collection("Attendance")
-        .where("eventId", "==", eventId)
-        .get();
+          .where("eventId", "==", eventId)
+          .get();
 
       logger.info(`Found ${attendeesQuery.docs.length} attendees for event ${eventId}`);
 
@@ -2681,9 +1271,9 @@ exports.sendPostEventFeedbackNotifications = onSchedule({
 
         // Check if user has already submitted feedback
         const feedbackQuery = await db.collection("event_feedback")
-          .where("eventId", "==", eventId)
-          .where("userId", "==", userId)
-          .get();
+            .where("eventId", "==", eventId)
+            .where("userId", "==", userId)
+            .get();
 
         if (!feedbackQuery.empty) {
           logger.info(`User ${userId} already submitted feedback for event ${eventId}`);
@@ -2698,7 +1288,7 @@ exports.sendPostEventFeedbackNotifications = onSchedule({
 
         const userData = userDoc.data();
         const notificationSettings = userData.notificationSettings || {};
-        
+
         if (notificationSettings.eventFeedback === false) {
           logger.info(`User ${userId} has disabled event feedback notifications`);
           continue;
@@ -2730,253 +1320,47 @@ exports.sendPostEventFeedbackNotifications = onSchedule({
 /**
  * Cloud Function to aggregate feedback data when new feedback is submitted
  */
-exports.aggregateFeedbackData = onDocumentCreated("event_feedback/{docId}",
-    async (event) => {
-      try {
-        const feedbackData = event.data.data();
-        const eventId = feedbackData.eventId;
-        const rating = feedbackData.rating;
-        const isAnonymous = feedbackData.isAnonymous;
-
-        logger.info("Processing feedback for event:", eventId);
-
-        // Use a transaction to ensure atomic updates
-        const db = admin.firestore();
-        await db.runTransaction(async (transaction) => {
-          const analyticsRef = db.collection("event_analytics").doc(eventId);
-          const analyticsDoc = await transaction.get(analyticsRef);
-
-          // Get current analytics data or initialize if doesn't exist
-          const analyticsData = analyticsDoc.exists ? analyticsDoc.data() : {
-            totalAttendees: 0,
-            hourlySignIns: {},
-            repeatAttendees: 0,
-            dropoutRate: 0,
-            lastUpdated: admin.firestore.Timestamp.now(),
-          };
-
-          // Initialize feedback analytics if doesn't exist
-          if (!analyticsData.feedbackAnalytics) {
-            analyticsData.feedbackAnalytics = {
-              averageRating: 0,
-              totalRatings: 0,
-              ratingDistribution: {},
-              sentiment: "neutral",
-              commentSummaries: [],
-              anonymousCount: 0,
-              namedCount: 0,
-            };
-          }
-
-          const feedbackAnalytics = analyticsData.feedbackAnalytics;
-
-          // Update rating statistics
-          const totalRatings = feedbackAnalytics.totalRatings + 1;
-          const totalRatingSum = (feedbackAnalytics.averageRating * feedbackAnalytics.totalRatings) + rating;
-          feedbackAnalytics.averageRating = totalRatingSum / totalRatings;
-          feedbackAnalytics.totalRatings = totalRatings;
-
-          // Update rating distribution
-          if (!feedbackAnalytics.ratingDistribution[rating]) {
-            feedbackAnalytics.ratingDistribution[rating] = 0;
-          }
-          feedbackAnalytics.ratingDistribution[rating] += 1;
-
-          // Update anonymous/named counts
-          if (isAnonymous) {
-            feedbackAnalytics.anonymousCount += 1;
-          } else {
-            feedbackAnalytics.namedCount += 1;
-          }
-
-          // Update sentiment based on average rating
-          if (feedbackAnalytics.averageRating >= 4.0) {
-            feedbackAnalytics.sentiment = "positive";
-          } else if (feedbackAnalytics.averageRating >= 3.0) {
-            feedbackAnalytics.sentiment = "neutral";
-          } else {
-            feedbackAnalytics.sentiment = "negative";
-          }
-
-          // Update comment summaries (simplified - in production you might use ML)
-          if (feedbackData.comment) {
-            const commentSummary = feedbackData.comment.length > 100 
-                ? feedbackData.comment.substring(0, 100) + "..."
-                : feedbackData.comment;
-            
-            if (feedbackAnalytics.commentSummaries.length < 10) {
-              feedbackAnalytics.commentSummaries.push(commentSummary);
-            }
-          }
-
-          analyticsData.lastUpdated = admin.firestore.Timestamp.now();
-
-          // Update the document
-          transaction.set(analyticsRef, analyticsData, { merge: true });
-
-          logger.info(`Updated feedback analytics for event ${eventId}`);
-        });
-
-      } catch (error) {
-        logger.error("Error aggregating feedback data:", error);
-      }
-    });
-
 /**
  * Send push notifications for new messages
  * Triggered when a new message is created
  */
-exports.sendMessageNotifications = onDocumentCreated("Messages/{messageId}", async (event) => {
-  try {
-    const messageData = event.data.data();
-    const messageId = event.data.id;
-    
-    if (!messageData) {
-      return;
-    }
-
-    const senderId = messageData.senderId;
-    const receiverId = messageData.receiverId;
-    const content = messageData.content;
-
-    logger.info(`Sending message notification for message ${messageId}`);
-
-    const db = admin.firestore();
-    
-    // Get sender's info
-    const senderDoc = await db.collection("Customers").doc(senderId).get();
-    if (!senderDoc.exists) {
-      logger.warn(`Sender ${senderId} not found`);
-      return;
-    }
-
-    const senderData = senderDoc.data();
-    const senderName = senderData.name || "Someone";
-
-    // Get receiver's FCM token
-    const receiverDoc = await db.collection("users").doc(receiverId).get();
-    if (!receiverDoc.exists) {
-      logger.warn(`Receiver ${receiverId} not found`);
-      return;
-    }
-
-    const receiverData = receiverDoc.data();
-    const fcmToken = receiverData.fcmToken;
-
-    if (!fcmToken) {
-      logger.warn(`No FCM token for receiver ${receiverId}`);
-      return;
-    }
-
-    // Check receiver's notification settings (new schema in notificationSettings/settings)
-    let shouldSendMessageNotification = true;
-    try {
-      const settingsDocNew = await db.collection("users")
-        .doc(receiverId)
-        .collection("notificationSettings")
-        .doc("settings")
-        .get();
-      if (settingsDocNew.exists) {
-        const s = settingsDocNew.data();
-        if (s && s.messagesAll === false) {
-          shouldSendMessageNotification = false;
-        }
-      }
-    } catch (e) {
-      // Fallback to legacy settings location
-      const settingsDocLegacy = await db.collection("users")
-        .doc(receiverId)
-        .collection("settings")
-        .doc("notifications")
-        .get();
-      if (settingsDocLegacy.exists) {
-        const s = settingsDocLegacy.data();
-        shouldSendMessageNotification = s.messageNotifications !== false;
-      }
-    }
-
-    if (!shouldSendMessageNotification) {
-      logger.info(`User ${receiverId} has disabled message notifications`);
-      return;
-    }
-
-    // Send push notification
-    const messaging = admin.messaging();
-    const message = {
-      token: fcmToken,
-      notification: {
-        title: senderName,
-        body: content.length > 50 ? content.substring(0, 50) + "..." : content,
-      },
-      data: {
-        type: "new_message",
-        senderId: senderId,
-        senderName: senderName,
-        messageId: messageId,
-        conversationId: `${Math.min(senderId, receiverId)}_${Math.max(senderId, receiverId)}`,
-        click_action: "FLUTTER_NOTIFICATION_CLICK",
-      },
-      android: {
-        notification: {
-          channelId: "orgami_channel",
-          priority: "high",
-          defaultSound: true,
-          defaultVibrateTimings: true,
-        },
-      },
-      apns: {
-        payload: {
-          aps: {
-            sound: "default",
-            badge: 1,
-          },
-        },
-      },
-    };
-
-    await messaging.send(message);
-    logger.info(`Sent message notification to user ${receiverId}`);
-
-    // Save to receiver's notifications collection
-    await db.collection("users")
-      .doc(receiverId)
-      .collection("notifications")
-      .add({
-        title: senderName,
-        body: content,
-        type: "new_message",
-        senderId: senderId,
-        senderName: senderName,
-        messageId: messageId,
-        conversationId: `${Math.min(senderId, receiverId)}_${Math.max(senderId, receiverId)}`,
-        createdAt: admin.firestore.Timestamp.now(),
-        isRead: false,
-      });
-
-  } catch (error) {
-    logger.error("Error sending message notification:", error);
-  }
+exports.sendMessageNotifications = onDocumentCreated({document: "Messages/{messageId}", retry: true}, async (event) => {
+  await require("./messaging/notifications").deliverMessageNotifications(admin.firestore(), admin.messaging(), event);
 });
+
+// These operations require Firebase Auth. App Check remains governed by the
+// existing client rollout; enabling enforcement before web activation blocks users.
+exports.getOrCreateDirectConversationV2 = onCall({region: "us-central1", maxInstances: 20}, (request) =>
+  require("./messaging/service").getOrCreateDirect(admin.firestore(), request));
+exports.sendConversationMessageV2 = onCall({region: "us-central1", maxInstances: 40}, (request) =>
+  require("./messaging/service").sendMessage(admin.firestore(), request));
+exports.markConversationReadV2 = onCall({region: "us-central1", maxInstances: 20}, (request) =>
+  require("./messaging/service").markRead(admin.firestore(), request));
 
 /**
  * Callable function to submit UGC reports (users/messages/comments/events)
  * Body: { type: 'user'|'message'|'comment'|'event', targetUserId?, contentId?, reason?, details? }
  */
-exports.submitUserReport = onCall({region: "us-central1"}, async (request) => {
+exports.submitUserReport = onCall({region: "us-central1", enforceAppCheck: process.env.FUNCTIONS_EMULATOR !== "true"}, async (request) => {
   const uid = request.auth && request.auth.uid;
-  if (!uid) {
-    throw new Error("UNAUTHENTICATED: User must be signed in to report.");
+  if (!uid || request.auth.token?.firebase?.sign_in_provider === "anonymous") {
+    throw new HttpsError("unauthenticated", "Sign in to submit a report.");
   }
 
-  const { type, targetUserId, contentId, reason, details } = request.data || {};
-  if (!type) {
-    throw new Error("INVALID_ARGUMENT: 'type' is required");
+  const {type, targetUserId, contentId, reason, details} = request.data || {};
+  if (!["user", "message", "comment", "event"].includes(type) ||
+      (!targetUserId && !contentId) || String(reason || "").length > 1000 || String(details || "").length > 4000) {
+    throw new HttpsError("invalid-argument", "A valid report subject and bounded reason are required.");
   }
 
   const db = admin.firestore();
+  await require("./public-web/accountless").enforceRateLimit(db, uid, "user_report");
   const doc = {
     type: String(type),
     reporterUserId: uid,
+    reporterUid: uid,
+    targetUid: targetUserId ? String(targetUserId) : null,
+    eventId: type === "event" && contentId ? String(contentId) : null,
     targetUserId: targetUserId ? String(targetUserId) : null,
     contentId: contentId ? String(contentId) : null,
     reason: reason ? String(reason) : null,
@@ -2984,14 +1368,18 @@ exports.submitUserReport = onCall({region: "us-central1"}, async (request) => {
     status: "open",
     createdAt: admin.firestore.Timestamp.now(),
   };
-  await db.collection("reports").add(doc);
-  return { status: "ok" };
+  const report = db.collection("reports").doc();
+  await db.runTransaction(async (transaction) => {
+    await require("./account/mutation-guard").requireActiveAccounts(db, transaction, uid);
+    transaction.create(report, doc);
+  });
+  return {status: "ok", reportId: report.id};
 });
 
 /**
  * Admin-only function: set admin claim by email (call after securing your own admin)
  */
-exports.setAdminByEmail = onCall({ region: "us-central1" }, async (req) => {
+exports.setAdminByEmail = onCall({region: "us-central1"}, async (req) => {
   const caller = req.auth?.token;
   if (!caller || caller.admin !== true) {
     throw new HttpsError("permission-denied", "Administrators only");
@@ -3005,8 +1393,8 @@ exports.setAdminByEmail = onCall({ region: "us-central1" }, async (req) => {
   if (!email || typeof enabled !== "boolean" || confirmed !== true ||
       typeof reason !== "string" || reason.trim().length < 10 || reason.length > 500) {
     throw new HttpsError(
-      "invalid-argument",
-      "{ email, enabled, confirmed: true, reason (10-500 chars) } required",
+        "invalid-argument",
+        "{ email, enabled, confirmed: true, reason (10-500 chars) } required",
     );
   }
   const user = await admin.auth().getUserByEmail(email);
@@ -3025,7 +1413,7 @@ exports.setAdminByEmail = onCall({ region: "us-central1" }, async (req) => {
     after: {admin: enabled},
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
-  return { status: "ok" };
+  return {status: "ok"};
 });
 
 // ============================================================================
@@ -3035,15 +1423,15 @@ exports.setAdminByEmail = onCall({ region: "us-central1" }, async (req) => {
 // Initialize Stripe with your secret key
 // You need to set this in Firebase Functions config:
 // firebase functions:config:set stripe.secret_key="your_stripe_secret_key"
-const Stripe = require('stripe');
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_YOUR_TEST_KEY', {
-  apiVersion: '2023-10-16',
+const Stripe = require("stripe");
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_YOUR_TEST_KEY", {
+  apiVersion: "2023-10-16",
 });
 
 /**
  * Create a payment intent for ticket purchase
  */
-exports.createTicketPaymentIntent = onCall({ region: "us-central1" }, async (req) => {
+exports.createTicketPaymentIntent = onCall({region: "us-central1"}, async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new Error("UNAUTHENTICATED");
 
@@ -3051,7 +1439,7 @@ exports.createTicketPaymentIntent = onCall({ region: "us-central1" }, async (req
     eventId,
     ticketId,
     amount,
-    currency = 'usd',
+    currency = "usd",
     customerUid,
     customerName,
     customerEmail,
@@ -3075,7 +1463,7 @@ exports.createTicketPaymentIntent = onCall({ region: "us-central1" }, async (req
       currency: currency,
       metadata: {
         eventId: eventId,
-        ticketId: ticketId || '',
+        ticketId: ticketId || "",
         customerUid: customerUid,
         customerName: customerName,
         customerEmail: customerEmail,
@@ -3100,21 +1488,21 @@ exports.createTicketPaymentIntent = onCall({ region: "us-central1" }, async (req
       amount: amount / 100, // Store in dollars
       currency: currency,
       paymentIntentId: paymentIntent.id,
-      status: 'pending',
+      status: "pending",
       createdAt: admin.firestore.Timestamp.now(),
       metadata: {
         stripeCustomerId: paymentIntent.customer || null,
       },
     };
 
-    await db.collection('TicketPayments').doc(paymentIntent.id).set(paymentDoc);
+    await db.collection("TicketPayments").doc(paymentIntent.id).set(paymentDoc);
 
     return {
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
     };
   } catch (error) {
-    logger.error('Error creating payment intent:', error);
+    logger.error("Error creating payment intent:", error);
     throw new Error(`INTERNAL: ${error.message}`);
   }
 });
@@ -3134,226 +1522,16 @@ exports.createTicketPaymentIntent = onCall({ region: "us-central1" }, async (req
  *   dateRange: { start?: string, end?: string }
  * }
  */
-function parseQuerySimple(query) {
-  const queryLower = (String(query) || '').toLowerCase();
-  
-  // Extract keywords (remove common words)
-  const commonWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'near', 'me', 'find', 'search', 'event', 'events']);
-  const keywords = queryLower
-    .split(/[^a-z0-9]+/)
-    .filter(word => word.length > 2 && !commonWords.has(word))
-    .slice(0, 5);
-
-  // Detect categories based on keywords
-  const categoryMap = {
-    'book': ['book club', 'reading'],
-    'read': ['book club', 'reading'],
-    'music': ['music', 'concert'],
-    'concert': ['music', 'concert'],
-    'sport': ['sports'],
-    'fitness': ['sports', 'fitness'],
-    'tech': ['tech', 'technology'],
-    'technology': ['tech', 'technology'],
-    'network': ['networking'],
-    'business': ['networking', 'business'],
-    'family': ['family'],
-    'kid': ['family'],
-    'art': ['art'],
-    'paint': ['art'],
-    'food': ['food'],
-    'cook': ['food'],
-    'game': ['gaming'],
-    'gaming': ['gaming'],
-    'education': ['education'],
-    'learn': ['education'],
-    'workshop': ['education']
-  };
-
-  const categories = [];
-  keywords.forEach(keyword => {
-    if (categoryMap[keyword]) {
-      categories.push(...categoryMap[keyword]);
-    }
-  });
-
-  // Remove duplicates
-  const uniqueCategories = [...new Set(categories)];
-
-  // Detect location intent
-  const nearMe = /near\s+me|around\s+me|close\s+by|nearby|local/i.test(query);
-  
-  // Extract radius if mentioned
-  let radiusKm = nearMe ? 25 : 0;
-  const radiusMatch = query.match(/(\d+)\s*(km|kilometers?|miles?)/i);
-  if (radiusMatch) {
-    const value = parseInt(radiusMatch[1]);
-    radiusKm = radiusMatch[2].toLowerCase().startsWith('m') ? value * 1.6 : value; // Convert miles to km
-  }
-
-  // Basic date parsing
-  const dateRange = {};
-  const now = new Date();
-  
-  if (/today/i.test(query)) {
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    dateRange.start = today.toISOString();
-    dateRange.end = new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString();
-  } else if (/tomorrow/i.test(query)) {
-    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-    dateRange.start = tomorrow.toISOString();
-    dateRange.end = new Date(tomorrow.getTime() + 24 * 60 * 60 * 1000).toISOString();
-  } else if (/this\s+week/i.test(query)) {
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
-    const endOfWeek = new Date(startOfWeek.getTime() + 7 * 24 * 60 * 60 * 1000);
-    dateRange.start = startOfWeek.toISOString();
-    dateRange.end = endOfWeek.toISOString();
-  } else if (/weekend/i.test(query)) {
-    const daysUntilSaturday = 6 - now.getDay();
-    const saturday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysUntilSaturday);
-    saturday.setHours(0, 0, 0, 0);
-    const sunday = new Date(saturday.getTime() + 2 * 24 * 60 * 60 * 1000);
-    dateRange.start = saturday.toISOString();
-    dateRange.end = sunday.toISOString();
-  }
-
-  return {
-    categories: uniqueCategories,
-    keywords,
-    nearMe,
-    radiusKm,
-    dateRange,
-  };
-}
-
-function kmDistance(lat1, lon1, lat2, lon2) {
-  const toRad = (v) => v * Math.PI / 180;
-  const R = 6371; // km
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-            Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
-/**
- * Callable function: aiSearchEvents
- * Input: { query: string, lat?: number, lng?: number, limit?: number }
- * Output: { events: Event[], intent: {...} }
- */
-exports.aiSearchEvents = onCall({ region: 'us-central1', timeoutSeconds: 20, memory: '512MiB' }, async (req) => {
-  const uid = req.auth?.uid || null;
-  const { query, lat, lng, limit } = req.data || {};
-  if (!query || typeof query !== 'string') {
-    throw new Error("INVALID_ARGUMENT: 'query' is required");
-  }
-
-  const db = admin.firestore();
-  const intent = parseQuerySimple(query);
-
-  // Build base timeframe: from now-3h to +60 days unless intent.dateRange provided
-  const now = new Date();
-  const start = intent.dateRange?.start ? new Date(intent.dateRange.start) : new Date(now.getTime() - 3 * 60 * 60 * 1000);
-  const end = intent.dateRange?.end ? new Date(intent.dateRange.end) : new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
-
-  // Fetch a reasonable pool of upcoming public events, then filter in memory
-  let q = db.collection('Events')
-    .where('private', '==', false)
-    .where('selectedDateTime', '>=', start)
-    .where('selectedDateTime', '<=', end)
-    .orderBy('selectedDateTime')
-    .limit(Math.min(Number(limit) || 200, 400));
-
-  const snap = await q.get();
-  let events = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-  // Category filter
-  const categories = (intent.categories || []).map(c => String(c).toLowerCase());
-  if (categories.length > 0) {
-    events = events.filter(ev => {
-      const evCats = Array.isArray(ev.categories) ? ev.categories.map(c => String(c).toLowerCase()) : [];
-      return evCats.some(c => categories.includes(c));
-    });
-  }
-
-  // Keyword filter (title/description/location)
-  const keywords = (intent.keywords || []).map(k => String(k).toLowerCase());
-  if (keywords.length > 0) {
-    events = events.filter(ev => {
-      const t = String(ev.title || '').toLowerCase();
-      const d = String(ev.description || '').toLowerCase();
-      const l = String(ev.location || '').toLowerCase();
-      return keywords.some(k => t.includes(k) || d.includes(k) || l.includes(k));
-    });
-  }
-
-  // Location filter
-  const useNearMe = intent.nearMe === true && typeof lat === 'number' && typeof lng === 'number';
-  const radiusKm = useNearMe ? (intent.radiusKm || 25) : 0;
-  if (useNearMe && radiusKm > 0) {
-    events = events
-      .map(ev => {
-        const evLat = typeof ev.latitude === 'number' ? ev.latitude : null;
-        const evLng = typeof ev.longitude === 'number' ? ev.longitude : null;
-        const dist = (evLat != null && evLng != null) ? kmDistance(lat, lng, evLat, evLng) : Infinity;
-        return { ...ev, _distanceKm: dist };
-      })
-      .filter(ev => ev._distanceKm <= radiusKm);
-  }
-
-  // Sort: featured first, then by (distance if applicable), then soonest date
-  events.sort((a, b) => {
-    const aFeat = a.isFeatured ? 1 : 0;
-    const bFeat = b.isFeatured ? 1 : 0;
-    if (aFeat !== bFeat) return bFeat - aFeat;
-    if (useNearMe) {
-      const ad = a._distanceKm ?? Infinity;
-      const bd = b._distanceKm ?? Infinity;
-      if (ad !== bd) return ad - bd;
-    }
-    const at = a.selectedDateTime && a.selectedDateTime.toDate ? a.selectedDateTime.toDate().getTime() : new Date(a.selectedDateTime).getTime();
-    const bt = b.selectedDateTime && b.selectedDateTime.toDate ? b.selectedDateTime.toDate().getTime() : new Date(b.selectedDateTime).getTime();
-    return at - bt;
-  });
-
-  // Trim and remove temp fields
-  const maxOut = Math.min(events.length, Number(limit) || 100);
-  const out = events.slice(0, maxOut).map(e => {
-    const clone = { ...e };
-    delete clone._distanceKm;
-    // Normalize Firestore Timestamp fields to ISO strings for client compatibility
-    const normalizeTs = (v) => {
-      try {
-        if (!v) return v;
-        if (v.toDate && typeof v.toDate === 'function') return v.toDate().toISOString();
-        const d = new Date(v);
-        if (!isNaN(d.getTime())) return d.toISOString();
-        if (v._seconds != null) {
-          return new Date(v._seconds * 1000 + Math.floor((v._nanoseconds || 0) / 1e6)).toISOString();
-        }
-      } catch (_) {}
-      return v;
-    };
-    clone.selectedDateTime = normalizeTs(clone.selectedDateTime);
-    clone.eventGenerateTime = normalizeTs(clone.eventGenerateTime);
-    clone.featureEndDate = normalizeTs(clone.featureEndDate);
-    return clone;
-  });
-
-  return { events: out, intent };
-});
+exports.aiSearchEvents = require("./discovery/natural-search").createNaturalSearch(admin);
 
 /**
  * Confirm ticket payment and issue the ticket
  */
-exports.confirmTicketPayment = onCall({ region: "us-central1" }, async (req) => {
+exports.confirmTicketPayment = onCall({region: "us-central1"}, async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new Error("UNAUTHENTICATED");
 
-  const { paymentIntentId, ticketId, eventId } = req.data || {};
+  const {paymentIntentId, ticketId, eventId} = req.data || {};
 
   if (!paymentIntentId || !eventId) {
     throw new Error("INVALID_ARGUMENT: Missing required fields");
@@ -3361,23 +1539,23 @@ exports.confirmTicketPayment = onCall({ region: "us-central1" }, async (req) => 
 
   try {
     const db = admin.firestore();
-    
+
     // Retrieve the payment intent from Stripe
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-    
-    if (paymentIntent.status !== 'succeeded') {
+
+    if (paymentIntent.status !== "succeeded") {
       throw new Error("Payment not successful");
     }
 
     // Update the payment record
-    await db.collection('TicketPayments').doc(paymentIntentId).update({
-      status: 'completed',
+    await db.collection("TicketPayments").doc(paymentIntentId).update({
+      status: "completed",
       completedAt: admin.firestore.Timestamp.now(),
     });
 
     // If ticketId is provided, update the ticket
     if (ticketId) {
-      await db.collection('Tickets').doc(ticketId).update({
+      await db.collection("Tickets").doc(ticketId).update({
         isPaid: true,
         paymentIntentId: paymentIntentId,
         paidAt: admin.firestore.Timestamp.now(),
@@ -3385,13 +1563,13 @@ exports.confirmTicketPayment = onCall({ region: "us-central1" }, async (req) => 
     }
 
     // Update event issued tickets count
-    await db.collection('Events').doc(eventId).update({
+    await db.collection("Events").doc(eventId).update({
       issuedTickets: admin.firestore.FieldValue.increment(1),
     });
 
-    return { status: 'success' };
+    return {status: "success"};
   } catch (error) {
-    logger.error('Error confirming payment:', error);
+    logger.error("Error confirming payment:", error);
     throw new Error(`INTERNAL: ${error.message}`);
   }
 });
@@ -3399,14 +1577,14 @@ exports.confirmTicketPayment = onCall({ region: "us-central1" }, async (req) => 
 /**
  * Create a payment intent for upgrading a ticket to skip-the-line
  */
-exports.createTicketUpgradePaymentIntent = onCall({ region: "us-central1" }, async (req) => {
+exports.createTicketUpgradePaymentIntent = onCall({region: "us-central1"}, async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new Error("UNAUTHENTICATED");
 
   const {
     ticketId,
     amount,
-    currency = 'usd',
+    currency = "usd",
     customerUid,
     customerName,
     customerEmail,
@@ -3424,24 +1602,24 @@ exports.createTicketUpgradePaymentIntent = onCall({ region: "us-central1" }, asy
 
   try {
     const db = admin.firestore();
-    
+
     // Verify the ticket exists and belongs to the user
-    const ticketDoc = await db.collection('Tickets').doc(ticketId).get();
-    
+    const ticketDoc = await db.collection("Tickets").doc(ticketId).get();
+
     if (!ticketDoc.exists) {
       throw new Error("Ticket not found");
     }
-    
+
     const ticketData = ticketDoc.data();
-    
+
     if (ticketData.customerUid !== uid) {
       throw new Error("PERMISSION_DENIED: You can only upgrade your own tickets");
     }
-    
+
     if (ticketData.isSkipTheLine) {
       throw new Error("ALREADY_EXISTS: Ticket is already upgraded");
     }
-    
+
     if (ticketData.isUsed) {
       throw new Error("FAILED_PRECONDITION: Cannot upgrade used tickets");
     }
@@ -3451,7 +1629,7 @@ exports.createTicketUpgradePaymentIntent = onCall({ region: "us-central1" }, asy
       amount: amount, // Amount should already be in cents
       currency: currency,
       metadata: {
-        type: 'ticket_upgrade',
+        type: "ticket_upgrade",
         ticketId: ticketId,
         eventId: ticketData.eventId,
         customerUid: customerUid,
@@ -3466,7 +1644,7 @@ exports.createTicketUpgradePaymentIntent = onCall({ region: "us-central1" }, asy
     // Create a payment record in Firestore
     const paymentDoc = {
       id: paymentIntent.id,
-      type: 'ticket_upgrade',
+      type: "ticket_upgrade",
       ticketId: ticketId,
       eventId: ticketData.eventId,
       eventTitle: eventTitle,
@@ -3476,18 +1654,18 @@ exports.createTicketUpgradePaymentIntent = onCall({ region: "us-central1" }, asy
       amount: amount / 100, // Store in dollars
       currency: currency,
       paymentIntentId: paymentIntent.id,
-      status: 'pending',
+      status: "pending",
       createdAt: admin.firestore.Timestamp.now(),
     };
 
-    await db.collection('TicketUpgradePayments').doc(paymentIntent.id).set(paymentDoc);
+    await db.collection("TicketUpgradePayments").doc(paymentIntent.id).set(paymentDoc);
 
     return {
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
     };
   } catch (error) {
-    logger.error('Error creating upgrade payment intent:', error);
+    logger.error("Error creating upgrade payment intent:", error);
     throw new Error(`INTERNAL: ${error.message}`);
   }
 });
@@ -3495,16 +1673,16 @@ exports.createTicketUpgradePaymentIntent = onCall({ region: "us-central1" }, asy
 /**
  * Webhook handler for Stripe events
  */
-exports.stripeWebhook = onCall({ region: "us-central1" }, async (req) => {
-  const sig = req.rawRequest.headers['stripe-signature'];
-  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_YOUR_WEBHOOK_SECRET';
+exports.stripeWebhook = onCall({region: "us-central1"}, async (req) => {
+  const sig = req.rawRequest.headers["stripe-signature"];
+  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || "whsec_YOUR_WEBHOOK_SECRET";
 
   let event;
 
   try {
     event = stripe.webhooks.constructEvent(req.rawRequest.rawBody, sig, endpointSecret);
   } catch (err) {
-    logger.error('Webhook signature verification failed:', err);
+    logger.error("Webhook signature verification failed:", err);
     throw new Error(`INVALID_ARGUMENT: ${err.message}`);
   }
 
@@ -3512,71 +1690,73 @@ exports.stripeWebhook = onCall({ region: "us-central1" }, async (req) => {
 
   // Handle the event
   switch (event.type) {
-    case 'payment_intent.succeeded':
+    case "payment_intent.succeeded": {
       const paymentIntent = event.data.object;
-      
+
       // Update payment status in Firestore
-      await db.collection('TicketPayments').doc(paymentIntent.id).update({
-        status: 'completed',
+      await db.collection("TicketPayments").doc(paymentIntent.id).update({
+        status: "completed",
         completedAt: admin.firestore.Timestamp.now(),
       });
-      
+
       // Check if this is an upgrade payment
-      const { type, eventId, ticketId, customerUid } = paymentIntent.metadata;
-      
-      if (type === 'ticket_upgrade') {
+      const {type, ticketId} = paymentIntent.metadata;
+
+      if (type === "ticket_upgrade") {
         // Handle ticket upgrade
-        await db.collection('Tickets').doc(ticketId).update({
+        await db.collection("Tickets").doc(ticketId).update({
           isSkipTheLine: true,
           upgradedAt: admin.firestore.Timestamp.now(),
           upgradePaymentIntentId: paymentIntent.id,
         });
-        
-        await db.collection('TicketUpgradePayments').doc(paymentIntent.id).update({
-          status: 'completed',
+
+        await db.collection("TicketUpgradePayments").doc(paymentIntent.id).update({
+          status: "completed",
           completedAt: admin.firestore.Timestamp.now(),
         });
-        
-        logger.info('Ticket upgrade succeeded:', paymentIntent.id);
+
+        logger.info("Ticket upgrade succeeded:", paymentIntent.id);
       } else {
         // Handle regular ticket purchase
         if (ticketId) {
-          await db.collection('Tickets').doc(ticketId).update({
+          await db.collection("Tickets").doc(ticketId).update({
             isPaid: true,
             paymentIntentId: paymentIntent.id,
             paidAt: admin.firestore.Timestamp.now(),
           });
         }
-        
-        logger.info('Payment succeeded:', paymentIntent.id);
-      }
-      
-      break;
 
-    case 'payment_intent.payment_failed':
+        logger.info("Payment succeeded:", paymentIntent.id);
+      }
+
+      break;
+    }
+
+    case "payment_intent.payment_failed": {
       const failedPayment = event.data.object;
-      
-      await db.collection('TicketPayments').doc(failedPayment.id).update({
-        status: 'failed',
+
+      await db.collection("TicketPayments").doc(failedPayment.id).update({
+        status: "failed",
         metadata: {
-          failureReason: failedPayment.last_payment_error?.message || 'Unknown error',
+          failureReason: failedPayment.last_payment_error?.message || "Unknown error",
         },
       });
-      
-      logger.error('Payment failed:', failedPayment.id);
+
+      logger.error("Payment failed:", failedPayment.id);
       break;
+    }
 
     default:
-      logger.info('Unhandled event type:', event.type);
+      logger.info("Unhandled event type:", event.type);
   }
 
-  return { received: true };
+  return {received: true};
 });
 
 /**
  * Create a payment intent for featuring an event (existing functionality)
  */
-exports.createFeaturePaymentIntent = onCall({ region: "us-central1" }, async (req) => {
+exports.createFeaturePaymentIntent = onCall({region: "us-central1"}, async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new Error("UNAUTHENTICATED");
 
@@ -3585,7 +1765,7 @@ exports.createFeaturePaymentIntent = onCall({ region: "us-central1" }, async (re
     durationDays,
     customerUid,
     amount,
-    currency = 'usd',
+    currency = "usd",
   } = req.data || {};
 
   // Validate input
@@ -3602,7 +1782,7 @@ exports.createFeaturePaymentIntent = onCall({ region: "us-central1" }, async (re
         eventId: eventId,
         durationDays: durationDays.toString(),
         customerUid: customerUid,
-        type: 'feature_event',
+        type: "feature_event",
       },
       description: `Feature event for ${durationDays} days`,
     });
@@ -3617,19 +1797,19 @@ exports.createFeaturePaymentIntent = onCall({ region: "us-central1" }, async (re
       currency: currency,
       durationDays: durationDays,
       paymentIntentId: paymentIntent.id,
-      status: 'pending',
-      type: 'feature_event',
+      status: "pending",
+      type: "feature_event",
       createdAt: admin.firestore.Timestamp.now(),
     };
 
-    await db.collection('FeaturePayments').doc(paymentIntent.id).set(paymentDoc);
+    await db.collection("FeaturePayments").doc(paymentIntent.id).set(paymentDoc);
 
     return {
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
     };
   } catch (error) {
-    logger.error('Error creating feature payment intent:', error);
+    logger.error("Error creating feature payment intent:", error);
     throw new Error(`INTERNAL: ${error.message}`);
   }
 });
@@ -3637,11 +1817,11 @@ exports.createFeaturePaymentIntent = onCall({ region: "us-central1" }, async (re
 /**
  * Confirm feature payment after successful Stripe payment
  */
-exports.confirmFeaturePayment = onCall({ region: "us-central1" }, async (req) => {
+exports.confirmFeaturePayment = onCall({region: "us-central1"}, async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new Error("UNAUTHENTICATED");
 
-  const { paymentIntentId, eventId, durationDays, untilEvent } = req.data || {};
+  const {paymentIntentId, eventId, durationDays, untilEvent} = req.data || {};
 
   if (!paymentIntentId || !eventId || !durationDays) {
     throw new Error("INVALID_ARGUMENT: Missing required fields");
@@ -3649,17 +1829,17 @@ exports.confirmFeaturePayment = onCall({ region: "us-central1" }, async (req) =>
 
   try {
     const db = admin.firestore();
-    
+
     // Retrieve the payment intent from Stripe
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-    
-    if (paymentIntent.status !== 'succeeded') {
+
+    if (paymentIntent.status !== "succeeded") {
       throw new Error("Payment not successful");
     }
 
     // Update the payment record
-    await db.collection('FeaturePayments').doc(paymentIntentId).update({
-      status: 'completed',
+    await db.collection("FeaturePayments").doc(paymentIntentId).update({
+      status: "completed",
       completedAt: admin.firestore.Timestamp.now(),
     });
 
@@ -3667,7 +1847,7 @@ exports.confirmFeaturePayment = onCall({ region: "us-central1" }, async (req) =>
     let featureEndDate;
     if (untilEvent) {
       // Get event date
-      const eventDoc = await db.collection('Events').doc(eventId).get();
+      const eventDoc = await db.collection("Events").doc(eventId).get();
       const eventData = eventDoc.data();
       featureEndDate = eventData.selectedDateTime;
     } else {
@@ -3677,14 +1857,14 @@ exports.confirmFeaturePayment = onCall({ region: "us-central1" }, async (req) =>
     }
 
     // Update event to be featured
-    await db.collection('Events').doc(eventId).update({
+    await db.collection("Events").doc(eventId).update({
       isFeatured: true,
       featureEndDate: admin.firestore.Timestamp.fromDate(featureEndDate),
     });
 
-    return { status: 'success' };
+    return {status: "success"};
   } catch (error) {
-    logger.error('Error confirming feature payment:', error);
+    logger.error("Error confirming feature payment:", error);
     throw new Error(`INTERNAL: ${error.message}`);
   }
 });
@@ -3697,117 +1877,70 @@ exports.confirmFeaturePayment = onCall({ region: "us-central1" }, async (req) =>
  * Reset Monthly Event Limits for Basic Tier Users
  * Runs on the 1st day of each month at midnight UTC
  */
-exports.resetMonthlyEventLimits = onSchedule({
-  schedule: '0 0 1 * *', // First day of each month at midnight UTC
-  timeZone: 'UTC',
-  region: 'us-central1',
-}, async (event) => {
-  logger.info('🔄 Starting monthly event limit reset for Basic tier users...');
-  
-  try {
-    const db = admin.firestore();
-    const now = admin.firestore.Timestamp.now();
-    
-    // Get all Basic tier subscriptions
-    const subscriptionsSnapshot = await db
-      .collection('subscriptions')
-      .where('tier', '==', 'basic')
-      .where('status', '==', 'active')
-      .get();
-    
-    if (subscriptionsSnapshot.empty) {
-      logger.info('No active Basic tier subscriptions found');
-      return null;
-    }
-    
-    logger.info(`Found ${subscriptionsSnapshot.docs.length} Basic tier subscriptions to reset`);
-    
-    const batch = db.batch();
-    let resetCount = 0;
-    
-    subscriptionsSnapshot.forEach(doc => {
-      batch.update(doc.ref, {
-        eventsCreatedThisMonth: 0,
-        currentMonthStart: now,
-        updatedAt: now,
-      });
-      resetCount++;
-    });
-    
-    await batch.commit();
-    
-    logger.info(`✅ Successfully reset monthly event limits for ${resetCount} Basic tier users`);
-    return { success: true, count: resetCount, timestamp: now };
-  } catch (error) {
-    logger.error('❌ Error resetting monthly limits:', error);
-    throw error;
-  }
-});
-
 /**
  * Apply Scheduled Plan Changes
  * Runs every 6 hours to check for and apply scheduled tier changes
  */
 exports.applyScheduledPlanChanges = onSchedule({
-  schedule: '0 */6 * * *', // Every 6 hours
-  timeZone: 'UTC',
-  region: 'us-central1',
-}, async (event) => {
-  logger.info('🔄 Checking for scheduled plan changes...');
-  
+  schedule: "0 */6 * * *", // Every 6 hours
+  timeZone: "UTC",
+  region: "us-central1",
+}, async (_event) => {
+  logger.info("🔄 Checking for scheduled plan changes...");
+
   try {
     const db = admin.firestore();
     const now = new Date();
-    
+
     // Get all subscriptions with scheduled plan changes
     const subscriptionsSnapshot = await db
-      .collection('subscriptions')
-      .where('scheduledPlanId', '!=', null)
-      .get();
-    
+        .collection("subscriptions")
+        .where("scheduledPlanId", "!=", null)
+        .get();
+
     if (subscriptionsSnapshot.empty) {
-      logger.info('No scheduled plan changes found');
+      logger.info("No scheduled plan changes found");
       return null;
     }
-    
+
     logger.info(`Found ${subscriptionsSnapshot.docs.length} subscriptions with scheduled changes`);
-    
+
     let appliedCount = 0;
     const batch = db.batch();
-    
+
     for (const doc of subscriptionsSnapshot.docs) {
       const data = doc.data();
       const scheduledStartDate = data.scheduledPlanStartDate?.toDate();
-      
+
       // Check if scheduled date has passed
       if (scheduledStartDate && now >= scheduledStartDate) {
         const scheduledPlanId = data.scheduledPlanId;
-        
+
         // Determine new tier and pricing
-        const isBasic = scheduledPlanId.includes('basic');
-        const tier = isBasic ? 'basic' : 'premium';
-        
+        const isBasic = scheduledPlanId.includes("basic");
+        const tier = isBasic ? "basic" : "premium";
+
         // Price determination
         const BASIC_PRICES = [500, 2500, 4000];
         const PREMIUM_PRICES = [2000, 10000, 17500];
         const prices = isBasic ? BASIC_PRICES : PREMIUM_PRICES;
-        
-        let priceAmount, billingDays, interval;
-        
-        if (scheduledPlanId.includes('6month')) {
+
+        let priceAmount; let billingDays; let interval;
+
+        if (scheduledPlanId.includes("6month")) {
           priceAmount = prices[1];
           billingDays = 180;
-          interval = '6months';
-        } else if (scheduledPlanId.includes('yearly')) {
+          interval = "6months";
+        } else if (scheduledPlanId.includes("yearly")) {
           priceAmount = prices[2];
           billingDays = 365;
-          interval = 'year';
+          interval = "year";
         } else {
           priceAmount = prices[0];
           billingDays = 30;
-          interval = 'month';
+          interval = "month";
         }
-        
+
         // Update subscription
         batch.update(doc.ref, {
           planId: scheduledPlanId,
@@ -3816,26 +1949,26 @@ exports.applyScheduledPlanChanges = onSchedule({
           interval: interval,
           currentPeriodStart: admin.firestore.Timestamp.fromDate(scheduledStartDate),
           currentPeriodEnd: admin.firestore.Timestamp.fromDate(
-            new Date(scheduledStartDate.getTime() + billingDays * 24 * 60 * 60 * 1000)
+              new Date(scheduledStartDate.getTime() + billingDays * 24 * 60 * 60 * 1000),
           ),
           scheduledPlanId: null,
           scheduledPlanStartDate: null,
           updatedAt: admin.firestore.Timestamp.now(),
         });
-        
+
         appliedCount++;
         logger.info(`✓ Applied scheduled plan change for user: ${doc.id} to ${tier} tier`);
       }
     }
-    
+
     if (appliedCount > 0) {
       await batch.commit();
     }
-    
+
     logger.info(`✅ Applied ${appliedCount} scheduled plan changes`);
-    return { success: true, count: appliedCount, timestamp: admin.firestore.Timestamp.now() };
+    return {success: true, count: appliedCount, timestamp: admin.firestore.Timestamp.now()};
   } catch (error) {
-    logger.error('❌ Error applying scheduled plan changes:', error);
+    logger.error("❌ Error applying scheduled plan changes:", error);
     throw error;
   }
 });
@@ -3846,80 +1979,87 @@ exports.applyScheduledPlanChanges = onSchedule({
  * Reminds users who have used 4+ events about upcoming reset
  */
 exports.sendBasicTierUsageReminder = onSchedule({
-  schedule: '0 10 25 * *', // 10 AM UTC on the 25th
-  timeZone: 'UTC',
-  region: 'us-central1',
-}, async (event) => {
-  logger.info('📢 Sending monthly usage reminders to Basic tier users...');
-  
+  schedule: "0 10 25 * *", // 10 AM UTC on the 25th
+  timeZone: "UTC",
+  region: "us-central1",
+}, async (_event) => {
+  logger.info("📢 Sending monthly usage reminders to Basic tier users...");
+
   try {
     const db = admin.firestore();
     const now = admin.firestore.Timestamp.now();
-    
+
     // Get Basic tier users who have used 4+ events (approaching limit)
     const subscriptionsSnapshot = await db
-      .collection('subscriptions')
-      .where('tier', '==', 'basic')
-      .where('status', '==', 'active')
-      .where('eventsCreatedThisMonth', '>=', 4)
-      .get();
-    
+        .collection("subscriptions")
+        .where("tier", "==", "basic")
+        .where("status", "==", "active")
+        .where("eventsCreatedThisMonth", ">=", 4)
+        .get();
+
     if (subscriptionsSnapshot.empty) {
-      logger.info('No users approaching event limit');
+      logger.info("No users approaching event limit");
       return null;
     }
-    
+
     logger.info(`Found ${subscriptionsSnapshot.docs.length} users to remind`);
-    
+
     let reminderCount = 0;
-    
+
     // Create notifications for users
     for (const doc of subscriptionsSnapshot.docs) {
-      const userId = doc.data().userId;
+      const userId = doc.data().userId || doc.id;
       const eventsUsed = doc.data().eventsCreatedThisMonth;
-      const remaining = 5 - eventsUsed;
-      
+      const remaining = Math.max(0, 5 - eventsUsed);
+      const month = new Date(_event.scheduleTime || now.toDate()).toISOString().slice(0, 7);
+      const deliveryKey = `usage-reminder:${month}`;
+
       try {
-        // Create notification in Firestore
-        await db.collection('notifications').add({
+        const reminderRef = db.collection("notifications").doc(`usage_${require("./events/roster").key(`${userId}:${month}`)}`);
+        await db.runTransaction(async (tx) => {
+          const [existing, deleting] = await Promise.all([tx.get(reminderRef), tx.get(db.collection("account_deletion_jobs").doc(userId))]);
+          if (existing.exists || deleting.exists) return;
+          if ((await require("./communications/qualification-isolation").qualificationDecision(db, {recipientUid: userId}, tx)).mode !== "normal") return;
+          tx.create(reminderRef, {
           userId: userId,
-          title: remaining === 0 ? 'Monthly Event Limit Reached' : 'Event Limit Almost Reached',
-          message: remaining === 0
-            ? 'Your 5-event monthly limit has been reached. It will reset on the 1st. Upgrade to Premium for unlimited events!'
-            : `You have ${remaining} event${remaining !== 1 ? 's' : ''} remaining this month. Your limit resets on the 1st.`,
-          type: 'usage_reminder',
+          title: remaining === 0 ? "Monthly Event Limit Reached" : "Event Limit Almost Reached",
+          message: remaining === 0 ?
+            "Your 5-event monthly limit has been reached. It will reset on the 1st. Upgrade to Premium for unlimited events!" :
+            `You have ${remaining} event${remaining !== 1 ? "s" : ""} remaining this month. Your limit resets on the 1st.`,
+          type: "usage_reminder",
           read: false,
           createdAt: now,
           data: {
             eventsUsed: eventsUsed,
             remaining: remaining,
-            upgradeUrl: '/premium-upgrade',
+            upgradeUrl: "/premium-upgrade",
           },
+          });
         });
-        
+
         // Send push notification if user has FCM token
         await sendNotificationToUser(userId, {
-          type: 'usage_reminder',
-          title: remaining === 0 ? 'Monthly Event Limit Reached' : 'Event Limit Almost Reached',
-          body: remaining === 0
-            ? 'Your 5-event monthly limit has been reached. It will reset on the 1st.'
-            : `You have ${remaining} event${remaining !== 1 ? 's' : ''} remaining this month.`,
+          type: "usage_reminder",
+          title: remaining === 0 ? "Monthly Event Limit Reached" : "Event Limit Almost Reached",
+          body: remaining === 0 ?
+            "Your 5-event monthly limit has been reached. It will reset on the 1st." :
+            `You have ${remaining} event${remaining !== 1 ? "s" : ""} remaining this month.`,
           data: {
             eventsUsed: eventsUsed,
             remaining: remaining,
           },
-        }, db);
-        
+        }, db, deliveryKey);
+
         reminderCount++;
       } catch (error) {
         logger.error(`Error sending reminder to user ${userId}:`, error);
       }
     }
-    
+
     logger.info(`✅ Sent reminders to ${reminderCount} users`);
-    return { success: true, count: reminderCount, timestamp: now };
+    return {success: true, count: reminderCount, timestamp: now};
   } catch (error) {
-    logger.error('❌ Error sending usage reminders:', error);
+    logger.error("❌ Error sending usage reminders:", error);
     throw error;
   }
 });
@@ -3929,7 +2069,7 @@ exports.sendBasicTierUsageReminder = onSchedule({
  * Callable function to migrate existing users to the new user_analytics system
  * Run once to populate user_analytics for all users with events
  */
-exports.backfillUserAnalytics = onCall({ region: "us-central1" }, async (req) => {
+exports.backfillUserAnalyticsV2 = onCall({region: "us-central1"}, async (req) => {
   try {
     // Require admin auth (check if caller has admin custom claim)
     if (!req.auth || req.auth.token.admin !== true) {
@@ -3944,8 +2084,8 @@ exports.backfillUserAnalytics = onCall({ region: "us-central1" }, async (req) =>
     if (confirmed !== true || typeof reason !== "string" ||
         reason.trim().length < 10 || reason.length > 500) {
       throw new HttpsError(
-        "invalid-argument",
-        "{ confirmed: true, reason (10-500 chars) } required",
+          "invalid-argument",
+          "{ confirmed: true, reason (10-500 chars) } required",
       );
     }
     await admin.firestore().collection("admin_audit_logs").doc().create({
@@ -3968,7 +2108,7 @@ exports.backfillUserAnalytics = onCall({ region: "us-central1" }, async (req) =>
     // Get all unique event creators
     const eventsSnapshot = await db.collection("Events").get();
     const userIds = new Set();
-    
+
     eventsSnapshot.docs.forEach((doc) => {
       const customerUid = doc.data().customerUid;
       if (customerUid) {
@@ -3985,148 +2125,17 @@ exports.backfillUserAnalytics = onCall({ region: "us-central1" }, async (req) =>
     for (const userId of userIds) {
       try {
         logger.info(`Processing user: ${userId}`);
-
-        // Get all events by this user
-        const userEventsQuery = await db.collection("Events")
-            .where("customerUid", "==", userId)
-            .get();
-
-        const userEvents = userEventsQuery.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-
-        if (userEvents.length === 0) {
-          logger.info(`User ${userId} has no events, skipping`);
-          continue;
-        }
-
-        // Get analytics for all user events in parallel
-        const eventAnalyticsPromises = userEvents.map(evt => 
-          db.collection("event_analytics").doc(evt.id).get()
+        await requestUserAnalyticsRecompute(admin, userId, "admin_backfill");
+        const processingResult = await processUserAnalyticsRecompute(
+            admin,
+            userId,
         );
-        const eventAnalyticsDocs = await Promise.all(eventAnalyticsPromises);
-
-        // Build aggregated analytics
-        let totalAttendees = 0;
-        let topPerformingEvent = null;
-        let maxAttendees = -1;
-        const eventCategories = {};
-        const monthlyTrends = {};
-        const eventAnalytics = {};
-
-        userEvents.forEach((evt, index) => {
-          const analyticsDoc = eventAnalyticsDocs[index];
-          const analytics = analyticsDoc.exists ? analyticsDoc.data() : {};
-          
-          const attendees = analytics.totalAttendees || 0;
-          const repeatAttendees = analytics.repeatAttendees || 0;
-
-          totalAttendees += attendees;
-
-          // Store individual event analytics
-          eventAnalytics[evt.id] = {
-            attendees: attendees,
-            repeatAttendees: repeatAttendees,
-          };
-
-          // Track top performing event
-          if (attendees > maxAttendees) {
-            maxAttendees = attendees;
-            topPerformingEvent = {
-              id: evt.id,
-              title: evt.title || "Untitled Event",
-              attendees: attendees,
-              date: evt.selectedDateTime || null,
-            };
-          }
-
-          // Track event categories
-          const category = (evt.categories && evt.categories.length > 0) 
-              ? evt.categories[0] 
-              : "Other";
-          eventCategories[category] = (eventCategories[category] || 0) + 1;
-
-          // Track monthly trends
-          if (evt.selectedDateTime) {
-            const date = evt.selectedDateTime.toDate ? evt.selectedDateTime.toDate() : new Date(evt.selectedDateTime);
-            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-            monthlyTrends[monthKey] = (monthlyTrends[monthKey] || 0) + attendees;
-          }
+        logger.info("Backfilled analytics for user", {
+          userId,
+          ...processingResult,
         });
 
-        // Calculate retention rate
-        let retentionRate = 0;
-        try {
-          const recentEvents = userEvents
-              .sort((a, b) => {
-                const dateA = a.selectedDateTime?.toDate ? a.selectedDateTime.toDate() : new Date(a.selectedDateTime);
-                const dateB = b.selectedDateTime?.toDate ? b.selectedDateTime.toDate() : new Date(b.selectedDateTime);
-                return dateB - dateA;
-              })
-              .slice(0, 60);
-
-          const eventIds = recentEvents.map(evt => evt.id);
-          
-          if (eventIds.length > 0) {
-            const batchSize = 10;
-            const attendanceSnapshots = [];
-            
-            for (let i = 0; i < eventIds.length; i += batchSize) {
-              const batch = eventIds.slice(i, i + batchSize);
-              const snapshot = await db.collection("Attendance")
-                  .where("eventId", "in", batch)
-                  .get();
-              attendanceSnapshots.push(...snapshot.docs);
-            }
-
-            const attendeeCountsByUser = {};
-            attendanceSnapshots.forEach(doc => {
-              const data = doc.data();
-              const uid = data.customerUid;
-              if (uid && uid !== "manual") {
-                attendeeCountsByUser[uid] = (attendeeCountsByUser[uid] || 0) + 1;
-              }
-            });
-
-            const uniqueAttendeeCount = Object.keys(attendeeCountsByUser).length;
-            const repeatAttendeeCount = Object.values(attendeeCountsByUser)
-                .filter(count => count > 1)
-                .length;
-
-            retentionRate = uniqueAttendeeCount > 0 
-                ? (repeatAttendeeCount / uniqueAttendeeCount) * 100.0 
-                : 0.0;
-          }
-        } catch (retentionError) {
-          logger.error(`Error calculating retention for user ${userId}:`, retentionError);
-        }
-
-        // Calculate average attendance
-        const averageAttendance = userEvents.length > 0 
-            ? totalAttendees / userEvents.length 
-            : 0;
-
-        // Build the user analytics document
-        const userAnalytics = {
-          totalEvents: userEvents.length,
-          totalAttendees: totalAttendees,
-          averageAttendance: averageAttendance,
-          topPerformingEvent: topPerformingEvent,
-          eventCategories: eventCategories,
-          monthlyTrends: monthlyTrends,
-          retentionRate: retentionRate,
-          eventAnalytics: eventAnalytics,
-          lastUpdated: admin.firestore.Timestamp.now(),
-          backfilled: true,
-        };
-
-        // Save to user_analytics collection
-        await db.collection("user_analytics").doc(userId).set(userAnalytics);
-
-        logger.info(`✓ Backfilled analytics for user ${userId}: ${userEvents.length} events`);
         successCount++;
-
       } catch (userError) {
         logger.error(`Error processing user ${userId}:`, userError);
         errorCount++;
@@ -4143,9 +2152,256 @@ exports.backfillUserAnalytics = onCall({ region: "us-central1" }, async (req) =>
 
     logger.info(`✅ Backfill complete: ${successCount} succeeded, ${errorCount} failed`);
     return result;
-
   } catch (error) {
     logger.error("❌ Error in backfillUserAnalytics:", error);
     throw error;
   }
 });
+
+// ============================================================================
+// SAFETY-FIRST PAYMENT CONTAINMENT
+// ============================================================================
+// These final exports intentionally override the legacy handlers above. The
+// legacy clients trusted caller-supplied amounts and entitlement targets. They
+// remain unavailable until the server-authoritative payment module and signed,
+// idempotent Stripe webhook have completed staging verification.
+
+function paymentTemporarilyUnavailable(req) {
+  const uid = req.auth?.uid;
+  const provider = req.auth?.token?.firebase?.sign_in_provider;
+  if (!uid || provider === "anonymous") {
+    throw new HttpsError("unauthenticated", "A signed-in account is required.");
+  }
+  throw new HttpsError(
+      "failed-precondition",
+      "Paid checkout is temporarily unavailable while Attendus completes a security upgrade.",
+  );
+}
+
+const disabledPaymentCallableOptions = {
+  region: "us-central1",
+  enforceAppCheck: true,
+  maxInstances: 2,
+};
+
+exports.createTicketPaymentIntent = onCall(
+    disabledPaymentCallableOptions,
+    paymentTemporarilyUnavailable,
+);
+exports.confirmTicketPayment = onCall(
+    disabledPaymentCallableOptions,
+    paymentTemporarilyUnavailable,
+);
+exports.createTicketUpgradePaymentIntent = onCall(
+    disabledPaymentCallableOptions,
+    paymentTemporarilyUnavailable,
+);
+exports.createFeaturePaymentIntent = onCall(
+    disabledPaymentCallableOptions,
+    paymentTemporarilyUnavailable,
+);
+exports.confirmFeaturePayment = onCall(
+    disabledPaymentCallableOptions,
+    paymentTemporarilyUnavailable,
+);
+
+exports.stripeWebhook = createStripeWebhook(admin);
+
+exports.applyScheduledPlanChanges = onSchedule({
+  schedule: "0 */6 * * *",
+  timeZone: "UTC",
+  region: "us-central1",
+}, async () => {
+  logger.warn(
+      "Scheduled plan mutation is disabled until Stripe is authoritative.",
+  );
+  return {disabled: true};
+});
+
+// The final export replaces the legacy best-effort deletion handler above with
+// an idempotent erasure job that removes subcollections and Storage objects,
+// anonymizes financial records, and deletes Authentication last.
+const {createDeleteUserAccount} = require("./account/deletion");
+exports.deleteUserAccount = createDeleteUserAccount();
+
+const {createIssueFreeTicket} = require("./tickets/issuance");
+exports.issueFreeTicket = createIssueFreeTicket();
+
+const {createSubmitGuestAttendance} = require("./guest/attendance");
+exports.submitGuestAttendance = createSubmitGuestAttendance(admin);
+
+const {
+  createAggregateProductFunnelDaily,
+  createRecordProductFunnelEvent,
+} = require("./product/funnel");
+exports.recordProductFunnelEvent = createRecordProductFunnelEvent(admin);
+exports.aggregateProductFunnelDaily = createAggregateProductFunnelDaily(admin);
+
+const {
+  createGetDiscoveryHome,
+  createGetDiscoveryHomeV2,
+  createMaintainDiscoveryMetadata,
+  createSavedEventCounter,
+  createSearchDiscoveryEvents,
+  createSearchDiscoveryEventsV2,
+} = require("./discovery/marketplace");
+exports.getDiscoveryHomeV1 = createGetDiscoveryHome(admin);
+exports.getDiscoveryHomeV2 = createGetDiscoveryHomeV2(admin);
+exports.searchDiscoveryEventsV1 = createSearchDiscoveryEvents(admin);
+exports.searchDiscoveryEventsV2 = createSearchDiscoveryEventsV2(admin);
+exports.maintainDiscoveryMetadataV1 = createMaintainDiscoveryMetadata(admin);
+exports.updateDiscoverySaveCountV1 = createSavedEventCounter(admin);
+
+const {
+  createDeliverDiscoveryNotifications,
+  createQueueDiscoveryNotifications,
+} = require("./discovery/notifications");
+exports.queueDiscoveryNotificationsV1 = createQueueDiscoveryNotifications(admin);
+exports.deliverDiscoveryNotificationsV1 = createDeliverDiscoveryNotifications(admin);
+exports.publicWeb = createPublicWeb(admin);
+exports.maintainPublicEventPageV1 = createMaintainPublicEventPage(admin);
+exports.maintainPublicCommunityPageV1 = createMaintainPublicCommunityPage(admin);
+exports.registerPublicEventV1 = createRegisterPublicEvent(admin);
+exports.createPublicTicketCheckoutV1 = createPublicTicketCheckout(admin);
+exports.getPublicTicketCheckoutStatusV1 =
+  createGetPublicTicketCheckoutStatus(admin);
+exports.releaseExpiredTicketReservationsV1 =
+  createReleaseExpiredTicketReservations(admin);
+exports.startPublicRegistrationV2 = createStartPublicRegistrationV2(admin);
+exports.getPublicRegistrationStatusV2 = createGetPublicRegistrationStatusV2(admin);
+exports.cancelPublicRegistrationV1 = createCancelPublicRegistrationV1(admin);
+exports.anonymizeExpiredGuestContactsV1 =
+  createAnonymizeExpiredGuestContacts(admin);
+exports.claimPublicRegistrationV1 = createClaimPublicRegistrationV1(admin);
+exports.resendPublicRegistrationConfirmationV1 =
+  createResendPublicRegistrationConfirmationV1(admin);
+exports.updatePublicRegistrationEmailV1 =
+  createUpdatePublicRegistrationEmailV1(admin);
+exports.getOrganizerEventRegistrationsV1 =
+  createGetOrganizerEventRegistrationsV1(admin);
+exports.exportOrganizerEventRegistrationsV1 =
+  createExportOrganizerEventRegistrationsV1(admin);
+exports.followPublicEventOrganizerV1 = createFollowPublicEventOrganizerV1(admin);
+exports.deliverOutboundMessageV1 = createDeliverOutboundMessage(admin);
+exports.retryOutboundMessagesV1 = createRetryOutboundMessages(admin);
+exports.resolveOutboundDeliveryUnknownV1 = require("./communications/delivery").createResolveOutboundDeliveryUnknownV1(admin);
+exports.startPublicRegistrationV3 = createStartPublicRegistrationV3(admin);
+
+const eventWizardFunctions = createEventWizardFunctions(admin);
+const launchOperations = createLaunchOperations(admin);
+exports.setEventStaffV1 = launchOperations.setEventStaffV1;
+exports.getEventCapabilitiesV1 = launchOperations.getEventCapabilitiesV1;
+exports.listMyAdmissionsV1 = launchOperations.listMyAdmissionsV1;
+exports.listEventRosterV2 = launchOperations.listEventRosterV2;
+exports.previewEventAnnouncementV1 = launchOperations.previewEventAnnouncementV1;
+exports.sendEventAnnouncementV1 = launchOperations.sendEventAnnouncementV1;
+exports.getEventAnnouncementV1 = launchOperations.getEventAnnouncementV1;
+exports.previewEventCancellationV1 = launchOperations.previewEventCancellationV1;
+exports.cancelEventV1 = launchOperations.cancelEventV1;
+exports.deleteEmptyEventV1 = launchOperations.deleteEmptyEventV1;
+exports.createEventExportV2 = launchOperations.createEventExportV2;
+exports.getEventExportV2 = launchOperations.getEventExportV2;
+exports.refreshRosterEvent = launchOperations.refreshRosterEvent;
+exports.refreshRosterCorrection = launchOperations.refreshRosterCorrection;
+exports.refreshRosterRegisterAttendance = launchOperations.refreshRosterRegisterAttendance;
+exports.refreshRosterAttendance = launchOperations.refreshRosterAttendance;
+exports.refreshRosterTickets = launchOperations.refreshRosterTickets;
+exports.refreshRosterHistoricalAttendance = launchOperations.refreshRosterHistoricalAttendance;
+exports.refreshRosterCustomers = launchOperations.refreshRosterCustomers;
+exports.refreshRosterGuestAttendees = launchOperations.refreshRosterGuestAttendees;
+exports.deliverEventAnnouncement = launchOperations.deliverEventAnnouncement;
+exports.generateEventExport = launchOperations.generateEventExport;
+exports.retryEventOperations = launchOperations.retryEventOperations;
+const attendanceHistory = require("./account/attendance-history").createAttendanceHistory(admin);
+exports.archiveRecordedAttendance = attendanceHistory.archiveRecordedAttendance;
+exports.getAttendanceHistoryV1 = attendanceHistory.getAttendanceHistoryV1;
+exports.getAttendanceHistoryIdentityV1 = attendanceHistory.getAttendanceHistoryIdentityV1;
+exports.correctAttendanceHistoryV1 = attendanceHistory.correctAttendanceHistoryV1;
+exports.resumeAccountDeletion = require("./account/deletion").createResumeAccountDeletion();
+exports.previewEventChangeV1 = eventWizardFunctions.previewEventChangeV1;
+exports.saveEventDraftV1 = eventWizardFunctions.saveEventDraftV1;
+exports.listEventDraftsV1 = eventWizardFunctions.listEventDraftsV1;
+exports.archiveEventDraftV1 = eventWizardFunctions.archiveEventDraftV1;
+exports.deleteEventDraftV1 = eventWizardFunctions.deleteEventDraftV1;
+exports.duplicateEventToDraftV1 = eventWizardFunctions.duplicateEventToDraftV1;
+exports.createEditEventDraftV1 = eventWizardFunctions.createEditEventDraftV1;
+exports.listEventTemplatesV1 = eventWizardFunctions.listEventTemplatesV1;
+exports.saveEventTemplateV1 = eventWizardFunctions.saveEventTemplateV1;
+exports.deleteEventTemplateV1 = eventWizardFunctions.deleteEventTemplateV1;
+exports.publishEventDraftV1 = eventWizardFunctions.publishEventDraftV1;
+exports.decideEventRegistrationV1 = eventWizardFunctions.decideEventRegistrationV1;
+
+const {
+  createEndCheckInSession,
+  createGetPersonalPass,
+  createMintVenueCredential,
+  createResolveCheckInCredential,
+  createStartCheckInSession,
+  createSubmitCheckIn,
+  createVoidAttendance,
+} = require("./attendance/v2");
+exports.startCheckInSession = createStartCheckInSession(admin);
+exports.endCheckInSession = createEndCheckInSession(admin);
+exports.mintVenueCredential = createMintVenueCredential(admin);
+exports.resolveCheckInCredential = createResolveCheckInCredential(admin);
+exports.submitCheckIn = createSubmitCheckIn(admin);
+exports.voidAttendance = createVoidAttendance(admin);
+exports.getPersonalAttendancePass = createGetPersonalPass(admin);
+
+// The scheduled-reminder V2 implementation intentionally overrides the
+// legacy minute worker above while its versioned reconciliation triggers are
+// verified independently in production.
+const {
+  createScheduledReminderFunctions,
+} = require("./notifications/scheduled-reminders");
+const scheduledReminderFunctions = createScheduledReminderFunctions(admin);
+exports.sendScheduledNotifications =
+  scheduledReminderFunctions.sendScheduledNotifications;
+exports.reconcileEventRemindersV2 =
+  scheduledReminderFunctions.reconcileEventRemindersV2;
+exports.reconcileTicketRemindersV2 =
+  scheduledReminderFunctions.reconcileTicketRemindersV2;
+exports.reconcileReminderSettingsV2 =
+  scheduledReminderFunctions.reconcileReminderSettingsV2;
+
+// Smart Arrival and session-independent Wallet admission credentials.
+const arrivalFunctions = require("./attendance/arrival").createArrivalFunctions(admin);
+exports.maintainSmartArrivalBoundary = arrivalFunctions.maintainSmartArrivalBoundary;
+exports.getSmartArrivalCandidates = arrivalFunctions.getSmartArrivalCandidates;
+exports.getAttendancePass = arrivalFunctions.getAttendancePass;
+exports.getAttendanceOfflineKit = arrivalFunctions.getAttendanceOfflineKit;
+exports.getAttendanceScanContext = arrivalFunctions.getAttendanceScanContext;
+exports.getAttendanceControl = arrivalFunctions.getAttendanceControl;
+exports.setAttendanceControl = arrivalFunctions.setAttendanceControl;
+const walletFunctions = require("./attendance/wallet").createWalletFunctions(admin);
+exports.attendanceWallet = walletFunctions.attendanceWallet;
+exports.reconcileAttendanceEventPasses = walletFunctions.reconcileAttendanceEventPasses;
+exports.reconcileAttendanceRegistrationPasses = walletFunctions.reconcileAttendanceRegistrationPasses;
+exports.reconcileAttendanceTicketPasses = walletFunctions.reconcileAttendanceTicketPasses;
+exports.reconcileAttendanceAccountPasses = walletFunctions.reconcileAttendanceAccountPasses;
+exports.refreshAttendanceWallets = walletFunctions.refreshAttendanceWallets;
+exports.queueAttendanceWalletDelivery = walletFunctions.queueAttendanceWalletDelivery;
+exports.deliverAttendanceWallets = walletFunctions.deliverAttendanceWallets;
+
+exports.guestAttendanceWeb = require("./attendance/guest-web").createGuestAttendanceWeb(admin);
+
+// Server-authoritative community, quiz, and retry-safe legacy analytics operations.
+const communityOperations = require("./community/operations").createCommunityOperations(admin);
+exports.communityMutationV1 = communityOperations.communityMutationV1;
+const liveQuizFunctions = require("./quiz/service").createLiveQuizFunctions(admin);
+exports.quizMutationV1 = liveQuizFunctions.quizMutationV1;
+exports.quizReadV1 = liveQuizFunctions.quizReadV1;
+const legacyAnalytics = require("./analytics/legacy-operations").createLegacyAnalyticsOperations(admin);
+exports.aggregateAttendanceData = legacyAnalytics.aggregateAttendanceData;
+exports.aggregateFeedbackData = legacyAnalytics.aggregateFeedbackData;
+exports.resetMonthlyEventLimits = legacyAnalytics.resetMonthlyEventLimits;
+const pushTokenOperations = require("./notifications/push-tokens").createPushTokenOperations(admin);
+exports.registerPushTokenV1 = pushTokenOperations.registerPushTokenV1;
+exports.revokePushTokenV1 = pushTokenOperations.revokePushTokenV1;
+
+// Cross-account profile access returns bounded public cards, never raw Customers.
+const publicProfiles = require("./profiles/public-profiles").createPublicProfileOperations(admin);
+exports.getPublicProfilesV1 = publicProfiles.getPublicProfilesV1;
+exports.searchPublicProfilesV1 = publicProfiles.searchPublicProfilesV1;
+exports.checkUsernameAvailabilityV1 = publicProfiles.checkUsernameAvailabilityV1;
+exports.lookupEventStaffAccountV1 = require("./profiles/staff-lookup").createLookupEventStaffAccountV1(admin);

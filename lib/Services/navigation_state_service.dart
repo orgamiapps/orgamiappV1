@@ -6,7 +6,8 @@ import 'package:attendus/Utils/logger.dart';
 
 /// Service for persisting and restoring navigation state
 class NavigationStateService {
-  static final NavigationStateService _instance = NavigationStateService._internal();
+  static final NavigationStateService _instance =
+      NavigationStateService._internal();
   factory NavigationStateService() => _instance;
   NavigationStateService._internal();
 
@@ -52,7 +53,7 @@ class NavigationStateService {
       }
 
       final prefs = await _getPrefs();
-      
+
       // Create route config
       final routeConfig = RouteConfig(
         routeName: routeName,
@@ -92,12 +93,12 @@ class NavigationStateService {
   Future<RouteConfig?> restoreNavigationState() async {
     try {
       final prefs = await _getPrefs();
-      
+
       // Try to restore last route
       final routeJson = prefs.getString(_keyLastRoute);
       if (routeJson != null) {
         final route = RouteConfig.fromJsonString(routeJson);
-        
+
         // Check if route is still valid (not too old)
         if (route.isValid()) {
           _lastRoute = route;
@@ -149,10 +150,10 @@ class NavigationStateService {
       await prefs.remove(_keyNavigationState);
       await prefs.remove(_keyLastRoute);
       await prefs.remove(_keyLastTabIndex);
-      
+
       _lastRoute = null;
       _lastTabIndex = null;
-      
+
       Logger.info('Cleared navigation state');
     } catch (e) {
       Logger.error('Failed to clear navigation state: $e');
@@ -178,7 +179,9 @@ class NavigationStateService {
       if (stateJson != null) {
         final state = NavigationState.fromJsonString(stateJson);
         if (state.isValid()) {
-          Logger.info('Restored navigation stack: ${state.stack.length} routes');
+          Logger.info(
+            'Restored navigation stack: ${state.stack.length} routes',
+          );
           return state;
         } else {
           Logger.info('Saved navigation stack is too old, ignoring');
@@ -234,4 +237,3 @@ class NavigationStateService {
     Logger.info('Navigation state cleared on logout');
   }
 }
-

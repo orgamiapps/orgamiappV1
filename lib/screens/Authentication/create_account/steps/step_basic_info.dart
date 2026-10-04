@@ -1,15 +1,12 @@
-import 'dart:async';
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:attendus/Utils/app_constants.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:provider/provider.dart';
 import 'package:attendus/screens/Authentication/create_account/create_account_view_model.dart';
+import 'package:attendus/screens/Authentication/create_account/dob_input.dart';
 import 'package:attendus/firebase/firebase_google_auth_helper.dart';
 import 'package:attendus/Services/auth_service.dart';
 import 'package:attendus/widgets/attendus_auth_layout.dart';
@@ -47,13 +44,6 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
   // bool _usernameAvailable = false;
   DateTime? _selectedDob; // used to fill display; age may be computed later
 
-  // Places autocomplete
-  List<dynamic> _placeSuggestions = [];
-  Timer? _placesDebounce;
-  bool _locationSelectedFromSuggestions = false;
-  late final String _placesSessionToken = DateTime.now().millisecondsSinceEpoch
-      .toString();
-
   @override
   void dispose() {
     _firstNameController.dispose();
@@ -75,52 +65,20 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
       firstDate: DateTime(1900),
       lastDate: DateTime(now.year - 13, now.month, now.day),
     );
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() {
         _selectedDob = picked;
-        _dobController.text = DateFormat('MMM d, yyyy').format(picked);
+        _dobController.text = DateFormat('MM/dd/yyyy').format(picked);
       });
     }
   }
 
-  void _onLocationChanged(String value) {
-    _locationSelectedFromSuggestions = false;
-    _placesDebounce?.cancel();
-    _placesDebounce = Timer(const Duration(milliseconds: 300), () async {
-      final query = value.trim();
-      if (query.length < 2) {
-        setState(() => _placeSuggestions = []);
-        return;
-      }
-      await _fetchPlaceSuggestions(query);
-    });
-  }
-
-  Future<void> _fetchPlaceSuggestions(String input) async {
-    try {
-      final uri = Uri.https(
-        'maps.googleapis.com',
-        '/maps/api/place/autocomplete/json',
-        {
-          'input': input,
-          'key': AppConstants.googlePlacesApiKey,
-          'sessiontoken': _placesSessionToken,
-          'types': '(regions)',
-        },
-      );
-      final response = await http.get(uri);
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final List predictions = (data['predictions'] as List?) ?? [];
-        setState(() {
-          _placeSuggestions = predictions;
-        });
-      }
-    } catch (_) {}
-  }
-
   Future<void> _validateAndNext() async {
     if (!_formKey.currentState!.validate()) return;
+
+    _selectedDob = _dobController.text.trim().isEmpty
+        ? null
+        : parseDateOfBirth(_dobController.text.trim());
 
     // Persist basic info to view model for later account creation
     context.read<CreateAccountViewModel>().setBasicInfo(
@@ -275,67 +233,48 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
     keyboard: TextInputType.emailAddress,
   );
 
-  Widget _dobField() => GestureDetector(
-    onTap: _pickDob,
-    child: AbsorbPointer(
-      child: _textField(
-        label: 'Date of birth',
-        controller: _dobController,
-        icon: Icons.cake_outlined,
-        hint: 'MM/DD/YYYY',
-        validator: (_) => null,
-      ),
+  Widget _dobField() => _textField(
+    label: 'Date of birth',
+    controller: _dobController,
+    icon: Icons.cake_outlined,
+    hint: 'MM/DD/YYYY',
+    keyboard: TextInputType.number,
+    inputFormatters: const [DateOfBirthInputFormatter()],
+    suffixIcon: IconButton(
+      tooltip: 'Choose date of birth',
+      icon: const Icon(Icons.calendar_today_outlined),
+      onPressed: _pickDob,
     ),
+    onChanged: (value) {
+      _selectedDob = parseDateOfBirth(value);
+    },
+    validator: (value) {
+      final text = value?.trim() ?? '';
+      if (text.isEmpty) return null;
+      if (text.length < 10) return 'Enter the complete date as MM/DD/YYYY';
+
+      final parsed = parseDateOfBirth(text);
+      if (parsed == null) return 'Enter a valid date of birth';
+
+      final now = DateTime.now();
+      final earliest = DateTime(1900);
+      final latest = DateTime(now.year - 13, now.month, now.day);
+      if (parsed.isBefore(earliest)) {
+        return 'Date of birth must be on or after 01/01/1900';
+      }
+      if (parsed.isAfter(latest)) {
+        return 'You must be at least 13 years old';
+      }
+      return null;
+    },
   );
 
-  Widget _locationField() => Column(
-    children: [
-      _textField(
-        label: 'Location',
-        controller: _locationController,
-        icon: Icons.location_on_outlined,
-        hint: 'Enter your city, state, or country (optional)',
-        onChanged: _onLocationChanged,
-        validator: (v) {
-          if (v != null &&
-              v.trim().isNotEmpty &&
-              !_locationSelectedFromSuggestions) {
-            return 'Please select a location from suggestions';
-          }
-          return null;
-        },
-      ),
-      if (_placeSuggestions.isNotEmpty)
-        AttendUsCard(
-          padding: EdgeInsets.zero,
-          margin: const EdgeInsets.only(top: 8),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 220),
-            child: ListView.builder(
-              itemCount: _placeSuggestions.length,
-              shrinkWrap: true,
-              itemBuilder: (context, index) {
-                final suggestion = _placeSuggestions[index];
-                final description = suggestion['description'] as String? ?? '';
-                return ListTile(
-                  leading: Icon(
-                    Icons.location_on_outlined,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  title: Text(description),
-                  onTap: () {
-                    setState(() {
-                      _locationController.text = description;
-                      _locationSelectedFromSuggestions = true;
-                      _placeSuggestions = [];
-                    });
-                  },
-                );
-              },
-            ),
-          ),
-        ),
-    ],
+  Widget _locationField() => _textField(
+    label: 'Location',
+    controller: _locationController,
+    icon: Icons.location_on_outlined,
+    hint: 'City or region (optional; you can update this later)',
+    inputFormatters: [LengthLimitingTextInputFormatter(120)],
   );
 
   Widget _nextButton() {
@@ -395,6 +334,7 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
                 if (!mounted) return;
                 await AuthService().ensureInMemoryUserModel();
                 await Future.delayed(const Duration(milliseconds: 120));
+                if (!context.mounted) return;
                 RouterClass().homeScreenRoute(context: context);
               } catch (e) {
                 ShowToast().showNormalToast(msg: 'Login error');
@@ -405,7 +345,7 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
                 ShowToast().showNormalToast(
                   msg:
                       FirebaseGoogleAuthHelper.lastGoogleErrorMessage ??
-                      'Google sign-in failed.',
+                      'Google login failed.',
                 );
               }
             }
@@ -436,6 +376,7 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
                 if (!mounted) return;
                 await AuthService().ensureInMemoryUserModel();
                 await Future.delayed(const Duration(milliseconds: 120));
+                if (!context.mounted) return;
                 RouterClass().homeScreenRoute(context: context);
               } catch (e) {
                 ShowToast().showNormalToast(msg: 'Login error');
@@ -445,7 +386,7 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
                 ShowToast().showNormalToast(
                   msg:
                       FirebaseGoogleAuthHelper.lastAppleErrorMessage ??
-                      'Apple sign-in failed.',
+                      'Apple login failed.',
                 );
               }
             }
@@ -467,6 +408,7 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
     TextInputType? keyboard,
     TextCapitalization capitalization = TextCapitalization.none,
     ValueChanged<String>? onChanged,
+    Widget? suffixIcon,
   }) {
     return AttendUsFormTextField(
       controller: controller,
@@ -478,6 +420,7 @@ class _StepBasicInfoState extends State<StepBasicInfo> {
       prefixIcon: icon,
       validator: validator,
       onChanged: onChanged,
+      suffixIcon: suffixIcon,
     );
   }
 }

@@ -53,7 +53,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutGroups => 'About groups';
 
   @override
-  String get orgGroupExplainer => 'Selecting a group here will create a group conversation with all approved members of that organization.';
+  String get orgGroupExplainer =>
+      'Selecting a group here will create a group conversation with all approved members of that organization.';
 
   @override
   String get viewProfile => 'View profile';
@@ -108,7 +109,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get removeSelectedHint => 'Double tap to remove';
 
   @override
-  String get a11yScaleFabTooltip => 'Toggle text scale for accessibility testing';
+  String get a11yScaleFabTooltip =>
+      'Toggle text scale for accessibility testing';
 
   @override
   String a11yScaleFabLabel(Object scale) {

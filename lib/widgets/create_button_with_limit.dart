@@ -30,12 +30,11 @@ class CreateButtonWithLimit extends StatelessWidget {
         final limitService = CreationLimitService();
         final subscriptionService = SubscriptionService();
 
-        if (subscriptionService.hasPremium) {
+        if (subscriptionService.hasPremium ||
+            (type.toLowerCase() == 'event' &&
+                subscriptionService.hasUnlimitedEvents())) {
           // Premium users - no badge needed
-          return GestureDetector(
-            onTap: onPressed,
-            child: child,
-          );
+          return GestureDetector(onTap: onPressed, child: child);
         }
 
         final isEvent = type.toLowerCase() == 'event';
@@ -53,11 +52,7 @@ class CreateButtonWithLimit extends StatelessWidget {
           onTap: canCreate
               ? onPressed
               : () {
-                  LimitReachedDialog.show(
-                    context,
-                    type: type,
-                    limit: limit,
-                  );
+                  LimitReachedDialog.show(context, type: type, limit: limit);
                 },
           child: Stack(
             clipBehavior: Clip.none,
@@ -77,8 +72,11 @@ class CreateButtonWithLimit extends StatelessWidget {
                         colors: remaining == 0
                             ? [const Color(0xFFEF4444), const Color(0xFFDC2626)]
                             : remaining <= 1
-                                ? [const Color(0xFFF59E0B), const Color(0xFFD97706)]
-                                : [const Color(0xFF6366F1), const Color(0xFF4F46E5)],
+                            ? [const Color(0xFFF59E0B), const Color(0xFFD97706)]
+                            : [
+                                const Color(0xFF6366F1),
+                                const Color(0xFF4F46E5),
+                              ],
                       ),
                       borderRadius: BorderRadius.circular(10),
                       boxShadow: [
@@ -106,4 +104,3 @@ class CreateButtonWithLimit extends StatelessWidget {
     );
   }
 }
-

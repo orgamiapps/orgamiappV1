@@ -1,3 +1,5 @@
+import 'package:attendus/screens/Events/Widget/delete_event_dialogue.dart';
+import 'package:attendus/Services/community_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -169,6 +171,7 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
 
               for (final doc in feedDocs) {
                 final data = doc.data() as Map<String, dynamic>;
+                if (data['deleted'] == true) continue;
                 final type = (data['type'] ?? 'announcement').toString();
                 final isHidden = data['isHidden'] == true;
                 final isPinned = data['isPinned'] == true;
@@ -802,12 +805,11 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
         nextOrder = maxOrder + 1;
       }
 
-      await _db
-          .collection('Organizations')
-          .doc(widget.organizationId)
-          .collection('Feed')
-          .doc(postId)
-          .update({'isPinned': pin, 'pinnedOrder': nextOrder});
+      await CommunityService().mutate('updateFeed', {
+        'organizationId': widget.organizationId,
+        'postId': postId,
+        'updates': {'isPinned': pin, 'pinnedOrder': nextOrder},
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -833,12 +835,11 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
 
   Future<void> _toggleHidePost(String postId, bool hide) async {
     try {
-      await _db
-          .collection('Organizations')
-          .doc(widget.organizationId)
-          .collection('Feed')
-          .doc(postId)
-          .update({'isHidden': hide});
+      await CommunityService().mutate('updateFeed', {
+        'organizationId': widget.organizationId,
+        'postId': postId,
+        'updates': {'isHidden': hide},
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -859,12 +860,11 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
 
   Future<void> _closePoll(String postId) async {
     try {
-      await _db
-          .collection('Organizations')
-          .doc(widget.organizationId)
-          .collection('Feed')
-          .doc(postId)
-          .update({'isClosed': true});
+      await CommunityService().mutate('updateFeed', {
+        'organizationId': widget.organizationId,
+        'postId': postId,
+        'updates': {'isClosed': true},
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(
@@ -938,12 +938,10 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
     });
 
     try {
-      await _db
-          .collection('Organizations')
-          .doc(widget.organizationId)
-          .collection('Feed')
-          .doc(postId)
-          .delete();
+      await CommunityService().mutate('deleteFeed', {
+        'organizationId': widget.organizationId,
+        'postId': postId,
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1145,11 +1143,7 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
                                   : Colors.orange,
                             ),
                             const SizedBox(width: 12),
-                            Text(
-                              status == 'cancelled'
-                                  ? 'Reopen Event'
-                                  : 'Cancel Event',
-                            ),
+                            Text('Cancel / delete empty event'),
                           ],
                         ),
                       ),
@@ -1218,9 +1212,10 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
         }
         nextOrder = maxOrder + 1;
       }
-      await _db.collection('Events').doc(eventId).update({
-        'isPinned': pin,
-        'pinnedOrder': nextOrder,
+      await CommunityService().mutate('updateEvent', {
+        'organizationId': widget.organizationId,
+        'eventId': eventId,
+        'updates': {'isPinned': pin, 'pinnedOrder': nextOrder},
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1238,7 +1233,11 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
 
   Future<void> _toggleHideEvent(String eventId, bool hide) async {
     try {
-      await _db.collection('Events').doc(eventId).update({'isHidden': hide});
+      await CommunityService().mutate('updateEvent', {
+        'organizationId': widget.organizationId,
+        'eventId': eventId,
+        'updates': {'isHidden': hide},
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(hide ? 'Event hidden' : 'Event unhidden')),
@@ -1253,67 +1252,29 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
     }
   }
 
-  Future<void> _toggleCancelEvent(String eventId, String status) async {
+  Future<void> _showEventLifecycleDialog(String eventId) async {
     try {
-      await _db.collection('Events').doc(eventId).update({'status': status});
+      final doc = await _db.collection('Events').doc(eventId).get();
+      if (!mounted || !doc.exists) return;
+      await showDialog<bool>(
+        context: context,
+        builder: (_) => DeleteEventDialoge(
+          singleEvent: EventModel.fromJson({...doc.data()!, 'id': doc.id}),
+        ),
+      );
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              status == 'cancelled' ? 'Event cancelled' : 'Event reopened',
-            ),
-          ),
+          SnackBar(content: Text('Unable to open event actions: $error')),
         );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error updating event: $e')));
       }
     }
   }
 
+  Future<void> _toggleCancelEvent(String eventId, String status) =>
+      _showEventLifecycleDialog(eventId);
   void _showDeleteEventConfirmation(String eventId, String title) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Event'),
-        content: Text(
-          'Are you sure you want to delete "$title"? This cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              try {
-                await _db.collection('Events').doc(eventId).delete();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Event deleted'),
-                      backgroundColor: Color(0xFF667EEA),
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error deleting event: $e')),
-                  );
-                }
-              }
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
+    _showEventLifecycleDialog(eventId);
   }
 }
 

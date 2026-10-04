@@ -1,6 +1,6 @@
+import 'package:attendus/Services/event_creation_entitlement_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Services/subscription_service.dart';
@@ -10,7 +10,8 @@ import 'package:attendus/models/subscription_model.dart';
 /// Free users can create up to 5 events and 5 groups
 /// Premium users have unlimited creation
 class CreationLimitService extends ChangeNotifier {
-  static final CreationLimitService _instance = CreationLimitService._internal();
+  static final CreationLimitService _instance =
+      CreationLimitService._internal();
   factory CreationLimitService() => _instance;
   CreationLimitService._internal();
 
@@ -32,7 +33,9 @@ class CreationLimitService extends ChangeNotifier {
 
   // Computed properties for remaining creations
   int get eventsRemaining {
-    if (_subscriptionService.hasPremium) return -1; // -1 indicates unlimited
+    if (_subscriptionService.hasUnlimitedEvents()) {
+      return -1; // -1 indicates unlimited
+    }
     return (freeEventLimit - _eventsCreated).clamp(0, freeEventLimit);
   }
 
@@ -45,13 +48,13 @@ class CreationLimitService extends ChangeNotifier {
   bool get canCreateEvent {
     // Premium: unlimited
     if (_subscriptionService.hasUnlimitedEvents()) return true;
-    
+
     // Basic: check monthly limit (handled by subscription service)
     if (_subscriptionService.currentTier == SubscriptionTier.basic) {
       final remaining = _subscriptionService.getRemainingEvents();
       return remaining != null && remaining > 0;
     }
-    
+
     // Free: check lifetime limit
     return _eventsCreated < freeEventLimit;
   }
@@ -60,14 +63,14 @@ class CreationLimitService extends ChangeNotifier {
   bool get canCreateGroup {
     // Premium: unlimited
     if (_subscriptionService.canCreateGroups()) return true;
-    
+
     // Basic and Free: no group creation
     return false;
   }
 
   // Check if user is approaching limit (1 remaining)
   bool get isApproachingEventLimit {
-    if (_subscriptionService.hasPremium) return false;
+    if (_subscriptionService.hasUnlimitedEvents()) return false;
     return eventsRemaining == 1;
   }
 
@@ -78,6 +81,7 @@ class CreationLimitService extends ChangeNotifier {
 
   /// Initialize the service and load user's creation counts
   Future<void> initialize() async {
+    EventCreationEntitlementService.instance.initialize();
     final userId = _auth.currentUser?.uid;
     if (userId == null) return;
 
@@ -106,16 +110,15 @@ class CreationLimitService extends ChangeNotifier {
     if (userId == null) return;
 
     try {
-      final doc = await _firestore
-          .collection('Customers')
-          .doc(userId)
-          .get();
+      final doc = await _firestore.collection('Customers').doc(userId).get();
 
       if (doc.exists) {
         final data = doc.data()!;
         _eventsCreated = data['eventsCreated'] ?? 0;
         _groupsCreated = data['groupsCreated'] ?? 0;
-        Logger.info('Loaded creation counts: Events=$_eventsCreated, Groups=$_groupsCreated');
+        Logger.info(
+          'Loaded creation counts: Events=$_eventsCreated, Groups=$_groupsCreated',
+        );
       }
     } catch (e) {
       Logger.error('Error loading creation counts', e);
@@ -124,8 +127,9 @@ class CreationLimitService extends ChangeNotifier {
 
   /// Get event limit description text for UI
   String getEventLimitText() {
+    if (_subscriptionService.hasUnlimitedEvents()) return 'Unlimited events';
     final tier = _subscriptionService.currentTier;
-    
+
     switch (tier) {
       case SubscriptionTier.premium:
         return 'Unlimited events';
@@ -162,16 +166,13 @@ class CreationLimitService extends ChangeNotifier {
     }
 
     try {
-      await _firestore
-          .collection('Customers')
-          .doc(userId)
-          .update({
+      await _firestore.collection('Customers').doc(userId).update({
         'eventsCreated': FieldValue.increment(1),
       });
 
       _eventsCreated++;
       notifyListeners();
-      
+
       Logger.success('Event count incremented to $_eventsCreated');
       return true;
     } catch (e) {
@@ -202,21 +203,18 @@ class CreationLimitService extends ChangeNotifier {
     if (userId == null) return;
 
     // Premium users don't track counts
-    if (_subscriptionService.hasPremium) return;
+    if (_subscriptionService.hasUnlimitedEvents()) return;
 
     if (_eventsCreated <= 0) return;
 
     try {
-      await _firestore
-          .collection('Customers')
-          .doc(userId)
-          .update({
+      await _firestore.collection('Customers').doc(userId).update({
         'eventsCreated': FieldValue.increment(-1),
       });
 
       _eventsCreated = (_eventsCreated - 1).clamp(0, freeEventLimit);
       notifyListeners();
-      
+
       Logger.info('Event count decremented to $_eventsCreated');
     } catch (e) {
       Logger.error('Error decrementing event count', e);
@@ -234,16 +232,13 @@ class CreationLimitService extends ChangeNotifier {
     if (_groupsCreated <= 0) return;
 
     try {
-      await _firestore
-          .collection('Customers')
-          .doc(userId)
-          .update({
+      await _firestore.collection('Customers').doc(userId).update({
         'groupsCreated': FieldValue.increment(-1),
       });
 
       _groupsCreated = (_groupsCreated - 1).clamp(0, freeGroupLimit);
       notifyListeners();
-      
+
       Logger.info('Group count decremented to $_groupsCreated');
     } catch (e) {
       Logger.error('Error decrementing group count', e);
@@ -256,10 +251,7 @@ class CreationLimitService extends ChangeNotifier {
     if (userId == null) return;
 
     try {
-      await _firestore
-          .collection('Customers')
-          .doc(userId)
-          .update({
+      await _firestore.collection('Customers').doc(userId).update({
         'eventsCreated': 0,
         'groupsCreated': 0,
       });
@@ -267,7 +259,7 @@ class CreationLimitService extends ChangeNotifier {
       _eventsCreated = 0;
       _groupsCreated = 0;
       notifyListeners();
-      
+
       Logger.info('Creation counts reset');
     } catch (e) {
       Logger.error('Error resetting counts', e);
@@ -276,7 +268,7 @@ class CreationLimitService extends ChangeNotifier {
 
   /// Get formatted limit status text
   String getEventLimitStatus() {
-    if (_subscriptionService.hasPremium) {
+    if (_subscriptionService.hasUnlimitedEvents()) {
       return 'Unlimited';
     }
     return '$_eventsCreated / $freeEventLimit';
@@ -291,7 +283,7 @@ class CreationLimitService extends ChangeNotifier {
 
   /// Get progress percentage (0.0 to 1.0)
   double getEventProgress() {
-    if (_subscriptionService.hasPremium) return 0.0;
+    if (_subscriptionService.hasUnlimitedEvents()) return 0.0;
     return (_eventsCreated / freeEventLimit).clamp(0.0, 1.0);
   }
 
@@ -300,4 +292,3 @@ class CreationLimitService extends ChangeNotifier {
     return (_groupsCreated / freeGroupLimit).clamp(0.0, 1.0);
   }
 }
-

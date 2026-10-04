@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 
 class CustomerModel {
   static String firebaseKey = 'Customers';
@@ -47,9 +46,6 @@ class CustomerModel {
 
   factory CustomerModel.fromFirestore(DocumentSnapshot snap) {
     Map d = snap.data() as Map<dynamic, dynamic>;
-    if (kDebugMode) {
-      debugPrint('User Info $d');
-    }
 
     // Robust createdAt parsing with safe fallback
     DateTime parsedCreatedAt = DateTime.now();
@@ -83,10 +79,26 @@ class CustomerModel {
           true, // Default to true for backward compatibility
       favorites: List<String>.from(d['favorites'] ?? []), // Saved events field
       createdAt: parsedCreatedAt,
-      eventsCreated: d['eventsCreated'] ?? 0, // Default to 0 for backward compatibility
-      groupsCreated: d['groupsCreated'] ?? 0, // Default to 0 for backward compatibility
+      eventsCreated:
+          d['eventsCreated'] ?? 0, // Default to 0 for backward compatibility
+      groupsCreated:
+          d['groupsCreated'] ?? 0, // Default to 0 for backward compatibility
     );
   }
+
+  /// Allowlisted card projection. Extra server fields are deliberately ignored.
+  factory CustomerModel.fromPublicProfile(Map<String, dynamic> data) =>
+      CustomerModel(
+        uid: data['uid'] as String? ?? '',
+        name: data['name'] as String? ?? 'Attendus member',
+        email: '',
+        username: data['username'] as String?,
+        profilePictureUrl: data['profilePictureUrl'] as String?,
+        bannerUrl: data['bannerUrl'] as String?,
+        bio: data['bio'] as String?,
+        isDiscoverable: data['isDiscoverable'] == true,
+        createdAt: DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+      );
 
   static Map<String, dynamic> getMap(CustomerModel d) {
     return {
@@ -112,4 +124,20 @@ class CustomerModel {
       'groupsCreated': d.groupsCreated, // Track groups created
     };
   }
+
+  /// Profile editors must not write stale copies of server-owned quota fields.
+  static Map<String, dynamic> getProfileUpdateMap(CustomerModel customer) =>
+      getMap(customer)
+        ..remove('eventsCreated')
+        ..remove('groupsCreated');
+
+  static Map<String, dynamic> getPublicMap(CustomerModel customer) => {
+    'uid': customer.uid,
+    'name': customer.name,
+    'username': customer.username,
+    'profilePictureUrl': customer.profilePictureUrl,
+    'bannerUrl': customer.bannerUrl,
+    'bio': customer.bio,
+    'isDiscoverable': customer.isDiscoverable,
+  };
 }

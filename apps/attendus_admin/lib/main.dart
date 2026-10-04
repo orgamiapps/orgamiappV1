@@ -28,8 +28,14 @@ class _AttendusAdminAppState extends State<AttendusAdminApp> {
     const seed = Color(0xFF3867D6);
     return MultiProvider(
       providers: [
-        Provider(create: (_) => AdminApiClient()),
-        ChangeNotifierProvider(create: (_) => SessionController()),
+        Provider(
+          create: (_) => AdminApiClient(),
+          dispose: (_, api) => api.dispose(),
+        ),
+        ChangeNotifierProvider(
+          create: (context) =>
+              SessionController(api: context.read<AdminApiClient>()),
+        ),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
@@ -55,6 +61,7 @@ class _AttendusAdminAppState extends State<AttendusAdminApp> {
         home: Consumer<SessionController>(
           builder: (_, session, _) => switch (session.status) {
             SessionStatus.authorized => AdminShell(
+              key: ValueKey(session.user?.uid),
               onThemeChanged: () => setState(
                 () => mode = mode == ThemeMode.dark
                     ? ThemeMode.light

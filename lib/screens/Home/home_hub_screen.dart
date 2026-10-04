@@ -1,8 +1,9 @@
+import 'package:attendus/widgets/smart_arrival_card.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:attendus/screens/Home/home_screen.dart' as legacy;
 import 'package:attendus/screens/Home/search_screen.dart';
+import 'package:attendus/screens/Home/home_screen.dart' as legacy;
 import 'package:attendus/screens/QRScanner/qr_scanner_flow_screen.dart';
 import 'package:attendus/firebase/organization_helper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -16,8 +17,14 @@ import 'package:attendus/Utils/firebase_retry_helper.dart';
 import 'package:attendus/screens/Events/global_events_map_screen.dart';
 import 'package:attendus/Services/guest_mode_service.dart';
 import 'package:attendus/screens/Authentication/create_account/create_account_screen.dart';
+import 'package:attendus/screens/Authentication/login_screen.dart';
+import 'package:attendus/Services/account_access_service.dart';
+import 'package:attendus/Services/pending_auth_intent_service.dart';
+import 'package:attendus/widgets/account_required_sheet.dart';
+import 'package:attendus/Services/product_funnel_service.dart';
 import 'package:attendus/Utils/attendus_theme.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
+import 'package:attendus/screens/Home/discovery_marketplace_view.dart';
 
 class HomeHubScreen extends StatefulWidget {
   final bool? _guestModeOverride;
@@ -46,6 +53,16 @@ class HomeHubScreen extends StatefulWidget {
   State<HomeHubScreen> createState() => _HomeHubScreenState();
 }
 
+@visibleForTesting
+bool resolveUseLegacyDiscovery(Map<String, dynamic>? data) {
+  return data?['useLegacyFeed'] != false;
+}
+
+@visibleForTesting
+int resolveMarketplaceExperienceVersion(Map<String, dynamic>? data) {
+  return data?['marketplaceExperienceVersion'] == 2 ? 2 : 1;
+}
+
 class _HomeHubScreenState extends State<HomeHubScreen> {
   int _tabIndex = 0; // 0: Public, 1: Private
   final TextEditingController _searchCtlr = TextEditingController();
@@ -54,6 +71,9 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
   List<Map<String, dynamic>> _discoverOrgs = [];
   String? _selectedCategoryLower;
   String? _discoverError;
+  bool _useLegacyDiscovery = true;
+  bool _discoveryConfigReady = false;
+  int _marketplaceExperienceVersion = 1;
   // Removed unused _categoryOptions (old UI)
 
   @override
@@ -66,10 +86,38 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _loadOrgs();
+          _loadDiscoveryRollback();
         }
       });
     }
+    if (_isGuestMode) {
+      ProductFunnelService().record('guest_discover_view');
+    }
     Logger.debug('🏠 HomeHubScreen: initState finished');
+  }
+
+  Future<void> _loadDiscoveryRollback() async {
+    try {
+      final document = await FirebaseFirestore.instance
+          .collection('AppConfig')
+          .doc('discovery')
+          .get()
+          .timeout(const Duration(seconds: 10));
+      if (mounted) {
+        setState(() {
+          _useLegacyDiscovery = resolveUseLegacyDiscovery(document.data());
+          _marketplaceExperienceVersion = resolveMarketplaceExperienceVersion(
+            document.data(),
+          );
+        });
+      }
+    } catch (_) {
+      // Fail closed to the legacy feed. The marketplace is enabled only by an
+      // explicit, successfully loaded configuration value.
+      if (mounted) setState(() => _useLegacyDiscovery = true);
+    } finally {
+      if (mounted) setState(() => _discoveryConfigReady = true);
+    }
   }
 
   Future<void> _loadOrgs() async {
@@ -212,6 +260,19 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
   @override
   Widget build(BuildContext context) {
     final isGuestMode = _isGuestMode;
+    final publicContent =
+        widget._publicContentOverride ??
+        (!_discoveryConfigReady
+            ? const Center(child: CircularProgressIndicator())
+            : _useLegacyDiscovery
+            ? const legacy.HomeScreen(
+                key: ValueKey('legacy-public-events'),
+                showHeader: false,
+              )
+            : DiscoveryMarketplaceView(
+                key: ValueKey('discovery-marketplace'),
+                experienceVersion: _marketplaceExperienceVersion,
+              ));
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -223,30 +284,26 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
             constraints: const BoxConstraints(
               maxWidth: AttendUsTokens.pageMaxWidth,
             ),
-            child: NestedScrollView(
-              headerSliverBuilder: (context, innerBoxIsScrolled) => [
-                SliverToBoxAdapter(
-                  child: _buildDiscoveryHeader(isGuestMode: isGuestMode),
+            child: Column(
+              children: [
+                if (!isGuestMode) _buildSegmentedTabs(),
+                if ((_tabIndex == 0 || isGuestMode) &&
+                    widget._publicContentOverride == null)
+                  const SmartArrivalCard(),
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    child: (_tabIndex == 0 || isGuestMode)
+                        ? publicContent
+                        : KeyedSubtree(
+                            key: const ValueKey('private-groups'),
+                            child:
+                                widget._privateContentOverride ??
+                                SingleChildScrollView(child: _buildOrgsTab()),
+                          ),
+                  ),
                 ),
-                if (isGuestMode) SliverToBoxAdapter(child: _buildGuestBanner()),
-                if (!isGuestMode)
-                  SliverToBoxAdapter(child: _buildSegmentedTabs()),
               ],
-              body: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 250),
-                child: (_tabIndex == 0 || isGuestMode)
-                    ? (widget._publicContentOverride ??
-                          const legacy.HomeScreen(
-                            key: ValueKey('public-events'),
-                            showHeader: false,
-                            coordinateWithParentScroll: true,
-                          ))
-                    : KeyedSubtree(
-                        key: const ValueKey('private-groups'),
-                        child:
-                            widget._privateContentOverride ?? _buildOrgsTab(),
-                      ),
-              ),
             ),
           ),
         ),
@@ -276,7 +333,9 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
     );
   }
 
-  Widget _buildDiscoveryHeader({required bool isGuestMode}) {
+  // Retained for the one-release legacy rollback path.
+  // ignore: unused_element
+  Widget _buildDiscoveryHeader() {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
@@ -286,38 +345,16 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildQuickActionRow(),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  AttendUsStatusBadge(
-                    label: isGuestMode ? 'Guest discovery' : 'Signed in',
-                    tone: isGuestMode
-                        ? AttendUsStatusTone.warning
-                        : AttendUsStatusTone.success,
-                    icon: isGuestMode
-                        ? Icons.visibility_outlined
-                        : Icons.verified_user_outlined,
-                  ),
-                  AttendUsStatusBadge(
-                    label: _tabIndex == 0 || isGuestMode
-                        ? 'Public events'
-                        : 'Private groups',
-                    tone: AttendUsStatusTone.info,
-                    icon: _tabIndex == 0 || isGuestMode
-                        ? Icons.public
-                        : Icons.apartment_outlined,
-                  ),
-                  if (_discoverError != null)
-                    AttendUsStatusBadge(
-                      label: 'Discovery limited',
-                      tone: AttendUsStatusTone.danger,
-                      icon: Icons.cloud_off_outlined,
-                    ),
-                ],
-              ),
               if (_discoverError != null) ...[
+                const SizedBox(height: 12),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: AttendUsStatusBadge(
+                    label: 'Discovery limited',
+                    tone: AttendUsStatusTone.danger,
+                    icon: Icons.cloud_off_outlined,
+                  ),
+                ),
                 const SizedBox(height: 10),
                 Text(
                   _discoverError!,
@@ -337,45 +374,35 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
     final actions = [
       _DiscoveryQuickAction(
         key: const ValueKey('discover-shortcut-search'),
-        icon: Icons.search,
         title: 'Search',
-        tone: AttendUsStatusTone.info,
         onTap: () {
           RouterClass.nextScreenNormal(context, const SearchScreen());
         },
       ),
       _DiscoveryQuickAction(
         key: const ValueKey('discover-shortcut-map'),
-        icon: Icons.public,
         title: 'Map',
-        tone: AttendUsStatusTone.info,
         onTap: () {
           RouterClass.nextScreenNormal(context, const GlobalEventsMapScreen());
         },
       ),
       _DiscoveryQuickAction(
         key: const ValueKey('discover-shortcut-check-in'),
-        icon: Icons.fact_check_outlined,
         title: 'Check in',
-        tone: AttendUsStatusTone.success,
         onTap: () {
           RouterClass.nextScreenNormal(context, const QRScannerFlowScreen());
         },
       ),
       _DiscoveryQuickAction(
         key: const ValueKey('discover-shortcut-calendar'),
-        icon: Icons.calendar_month_outlined,
         title: 'Calendar',
-        tone: AttendUsStatusTone.warning,
         onTap: () {
           RouterClass.nextScreenNormal(context, const CalendarScreen());
         },
       ),
       _DiscoveryQuickAction(
         key: const ValueKey('discover-shortcut-create'),
-        icon: Icons.add_circle_outline,
         title: 'Create',
-        tone: AttendUsStatusTone.neutral,
         onTap: () {
           if (_isGuestMode) {
             _showGuestRestrictionDialog(GuestFeature.createEvent);
@@ -391,13 +418,12 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
 
     return SizedBox(
       key: const ValueKey('discover-shortcut-row'),
-      height: 76,
+      height: 48,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: actions.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 10),
-        itemBuilder: (context, index) =>
-            SizedBox(width: 112, child: actions[index]),
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) => actions[index],
       ),
     );
   }
@@ -610,35 +636,79 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
   }
 
   /// Build guest mode banner with account creation CTA
+  // Retained for the one-release legacy rollback path.
+  // ignore: unused_element
   Widget _buildGuestBanner() {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
       child: AttendUsCard(
         padding: const EdgeInsets.all(16),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AttendUsStatusBadge(
-              label: 'Guest',
-              tone: AttendUsStatusTone.warning,
-              icon: Icons.visibility_outlined,
+            Row(
+              children: [
+                AttendUsStatusBadge(
+                  label: 'Browsing as guest',
+                  tone: AttendUsStatusTone.neutral,
+                  icon: Icons.visibility_outlined,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Get more from Attendus',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Create an account to create events, join groups, and access private attendance tools.',
-                style: theme.textTheme.bodyMedium,
-              ),
+            const SizedBox(height: 10),
+            Text(
+              'Create an account to create events, join groups, send messages, and manage your profile.',
+              style: theme.textTheme.bodyMedium,
             ),
-            const SizedBox(width: 12),
-            AttendUsButton.primary(
-              label: 'Sign up',
-              onPressed: () {
-                RouterClass.nextScreenNormal(
-                  context,
-                  const CreateAccountScreen(),
-                );
-              },
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                AttendUsButton.primary(
+                  label: 'Create account',
+                  icon: Icons.person_add_alt_1_outlined,
+                  onPressed: () async {
+                    ProductFunnelService().record(
+                      'guest_auth_cta_selected',
+                      dimensions: {
+                        'entryPoint': 'discover_card',
+                        'authChoice': 'create_account',
+                      },
+                    );
+                    await PendingAuthIntentService.clear();
+                    if (!mounted) return;
+                    RouterClass.nextScreenNormal(
+                      context,
+                      const CreateAccountScreen(),
+                    );
+                  },
+                ),
+                AttendUsButton.secondary(
+                  label: 'Log in',
+                  icon: Icons.login,
+                  onPressed: () async {
+                    ProductFunnelService().record(
+                      'guest_auth_cta_selected',
+                      dimensions: {
+                        'entryPoint': 'discover_card',
+                        'authChoice': 'sign_in',
+                      },
+                    );
+                    await PendingAuthIntentService.clear();
+                    if (!mounted) return;
+                    RouterClass.nextScreenNormal(context, const LoginScreen());
+                  },
+                ),
+              ],
             ),
           ],
         ),
@@ -648,162 +718,22 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
 
   /// Show dialog explaining guest mode restrictions
   void _showGuestRestrictionDialog(GuestFeature feature) {
-    final message = GuestModeService().getFeatureRestrictionMessage(feature);
-
-    showDialog(
+    showAccountRequiredSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF667EEA).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.lock_outline,
-                color: Color(0xFF667EEA),
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text(
-                'Account Required',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  fontFamily: 'Roboto',
-                ),
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.person_add_outlined,
-              size: 64,
-              color: Color(0xFF667EEA),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 15,
-                height: 1.5,
-                fontFamily: 'Roboto',
-              ),
-            ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.2),
-                ),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.check_circle_outline,
-                        color: Color(0xFF10B981),
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Free account with instant access',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey[700],
-                            fontFamily: 'Roboto',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.check_circle_outline,
-                        color: Color(0xFF10B981),
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Create events, join groups & more',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey[700],
-                            fontFamily: 'Roboto',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            style: TextButton.styleFrom(foregroundColor: Colors.grey[600]),
-            child: const Text('Maybe Later'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              RouterClass.nextScreenNormal(
-                context,
-                const CreateAccountScreen(),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF667EEA),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            ),
-            child: const Text(
-              'Create Account',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontFamily: 'Roboto',
-              ),
-            ),
-          ),
-        ],
-      ),
+      feature: feature == GuestFeature.createEvent
+          ? AccountFeature.createEvent
+          : AccountFeature.account,
     );
   }
 }
 
 class _DiscoveryQuickAction extends StatelessWidget {
-  final IconData icon;
   final String title;
-  final AttendUsStatusTone tone;
   final VoidCallback onTap;
 
   const _DiscoveryQuickAction({
     super.key,
-    required this.icon,
     required this.title,
-    required this.tone,
     required this.onTap,
   });
 
@@ -811,20 +741,15 @@ class _DiscoveryQuickAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return AttendUsCard(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       onTap: onTap,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          AttendUsStatusBadge(label: '', icon: icon, tone: tone),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: theme.textTheme.labelLarge,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+      child: Center(
+        child: Text(
+          title,
+          style: theme.textTheme.labelLarge,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
       ),
     );
   }

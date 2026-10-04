@@ -1,3 +1,4 @@
+import 'package:attendus/Services/community_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -6,7 +7,7 @@ import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:attendus/Utils/app_constants.dart';
+import 'package:attendus/Services/event_share_service.dart';
 
 class AccessListManagementWidget extends StatefulWidget {
   final EventModel eventModel;
@@ -43,7 +44,9 @@ class _AccessListManagementWidgetState
         searchQuery: q,
         limit: 20,
       );
-      setState(() => _results = users);
+      if (mounted && _searchController.text.trim() == q) {
+        setState(() => _results = users);
+      }
     } finally {
       if (mounted) setState(() => _isSearching = false);
     }
@@ -52,62 +55,54 @@ class _AccessListManagementWidgetState
   Future<void> _addToAccess(String userId) async {
     setState(() => _updating = true);
     try {
-      await FirebaseFirestore.instance
-          .collection(EventModel.firebaseKey)
-          .doc(widget.eventModel.id)
-          .update({
-            'accessList': FieldValue.arrayUnion([userId]),
-          });
+      await CommunityService().mutate('setEventAccess', {
+        'eventId': widget.eventModel.id,
+        'userId': userId,
+        'allowed': true,
+      });
+      if (!mounted) return;
       setState(() => _accessList.add(userId));
       ShowToast().showNormalToast(msg: 'User added to access list');
     } catch (e) {
       ShowToast().showNormalToast(msg: 'Failed to add user: $e');
     } finally {
-      setState(() => _updating = false);
+      if (mounted) setState(() => _updating = false);
     }
   }
 
   Future<void> _removeFromAccess(String userId) async {
     setState(() => _updating = true);
     try {
-      await FirebaseFirestore.instance
-          .collection(EventModel.firebaseKey)
-          .doc(widget.eventModel.id)
-          .update({
-            'accessList': FieldValue.arrayRemove([userId]),
-          });
+      await CommunityService().mutate('setEventAccess', {
+        'eventId': widget.eventModel.id,
+        'userId': userId,
+        'allowed': false,
+      });
+      if (!mounted) return;
       setState(() => _accessList.remove(userId));
       ShowToast().showNormalToast(msg: 'User removed from access list');
     } catch (e) {
       ShowToast().showNormalToast(msg: 'Failed to remove user: $e');
     } finally {
-      setState(() => _updating = false);
+      if (mounted) setState(() => _updating = false);
     }
   }
 
-  void _shareInviteLink() async {
-    // Build a long dynamic link (no SDK) as fallback; Firebase will handle routing if configured
-    final deepLink = AppConstants.buildInviteUri(
-      widget.eventModel.id,
-    ).toString();
-    final dynamicLink = Uri.parse(AppConstants.dynamicLinksDomain)
-        .replace(
-          queryParameters: {
-            'link': deepLink,
-            'apn': AppConstants.androidPackageName,
-            'ibi': AppConstants.iosBundleId,
-            // Optional social tags (non-shortened):
-            'st': widget.eventModel.title,
-            'sd': widget.eventModel.description,
-          },
-        )
-        .toString();
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
-    // Prefer the dynamic link domain if configured; otherwise use the direct invite link
-    final toShare = (AppConstants.dynamicLinksDomain.isNotEmpty)
-        ? dynamicLink
-        : deepLink;
-    await Share.share('Join my private event: $toShare');
+  void _shareInviteLink() async {
+    final toShare = EventShareService.eventUri(widget.eventModel.id);
+    await SharePlus.instance.share(
+      ShareParams(
+        title: widget.eventModel.title,
+        subject: 'Private event invitation: ${widget.eventModel.title}',
+        text: 'Request access to my private event: $toShare',
+      ),
+    );
   }
 
   @override

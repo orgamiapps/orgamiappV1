@@ -1,16 +1,15 @@
-import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/models/event_model.dart';
+import 'package:attendus/Services/event_share_service.dart';
 import 'dart:typed_data';
 
 class EventFlyerGenerator {
-  /// Generates a beautiful event flyer image and returns the file path
-  static Future<File> generateEventFlyer(
+  /// Captures the event flyer as bytes on native and web
+  static Future<Uint8List> generateEventFlyer(
     EventModel event,
     GlobalKey repaintBoundaryKey,
   ) async {
@@ -51,15 +50,8 @@ class EventFlyerGenerator {
 
       final Uint8List pngBytes = byteData.buffer.asUint8List();
 
-      // Save to temporary file
-      final tempDir = await getTemporaryDirectory();
-      final file = File(
-        '${tempDir.path}/event_flyer_${event.id}_${DateTime.now().millisecondsSinceEpoch}.png',
-      );
-      await file.writeAsBytes(pngBytes);
-
-      print('Event flyer generated successfully: ${file.path}');
-      return file;
+      image.dispose();
+      return pngBytes;
     } catch (e, stackTrace) {
       print('Error generating event flyer: $e');
       print('Stack trace: $stackTrace');
@@ -71,11 +63,11 @@ class EventFlyerGenerator {
 class EventFlyerWidget extends StatelessWidget {
   final EventModel event;
 
-  const EventFlyerWidget({Key? key, required this.event}) : super(key: key);
+  const EventFlyerWidget({super.key, required this.event});
 
   @override
   Widget build(BuildContext context) {
-    final eventUrl = 'attendus://event/${event.id}';
+    final eventUrl = EventShareService.eventUri(event.id).toString();
     final dateFormat = DateFormat('MMM d, yyyy');
     final timeFormat = DateFormat('h:mm a');
 

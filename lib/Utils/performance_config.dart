@@ -25,8 +25,11 @@ class PerformanceConfig {
 
   // UI performance settings
   static const int maxAnimationControllers = 2; // Limit concurrent animations
-  static const Duration frameThrottleDuration = Duration(milliseconds: 16); // 60fps
-  static const int maxConcurrentOperations = 3; // Increased for better parallelism
+  static const Duration frameThrottleDuration = Duration(
+    milliseconds: 16,
+  ); // 60fps
+  static const int maxConcurrentOperations =
+      3; // Increased for better parallelism
   static const double scrollCacheExtent = 600.0; // Pixels to cache off-screen
 
   // Data processing limits - optimized for faster initial loads
@@ -61,7 +64,8 @@ class PerformanceConfig {
   // List optimization
   static const bool addAutomaticKeepAlives = true;
   static const bool addRepaintBoundaries = true;
-  static const double listItemExtent = 80.0; // Average item height for better scrolling
+  static const double listItemExtent =
+      80.0; // Average item height for better scrolling
 
   // State management optimization
   static const bool useSelectorsOverConsumers = true;

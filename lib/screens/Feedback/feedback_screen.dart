@@ -1,3 +1,4 @@
+import 'package:attendus/Services/community_service.dart';
 import 'package:flutter/material.dart';
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/Utils/app_app_bar_view.dart';
@@ -14,6 +15,7 @@ class FeedbackScreen extends StatefulWidget {
 }
 
 class FeedbackScreenState extends State<FeedbackScreen> {
+  final _submissionId = CommunityService.newId();
   final _btnCtlr = RoundedLoadingButtonController();
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
@@ -69,6 +71,7 @@ class FeedbackScreenState extends State<FeedbackScreen> {
         }
 
         await _firestoreHelper.submitAppFeedback(
+          submissionId: _submissionId,
           userId: userId.isEmpty ? null : userId,
           rating: _selectedRating,
           comment: comment.isEmpty ? null : comment,

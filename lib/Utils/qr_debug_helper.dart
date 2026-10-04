@@ -8,16 +8,16 @@ class QRDebugHelper {
       debugPrint('=== QR Code Scan Debug ===');
       debugPrint('Raw QR Data: $qrData');
       debugPrint('Data Length: ${qrData.length}');
-      
+
       // Test different QR formats
       _testEventQRFormat(qrData);
       _testTicketQRFormat(qrData);
       _testBadgeQRFormat(qrData);
-      
+
       debugPrint('=== End QR Debug ===');
     }
   }
-  
+
   static void _testEventQRFormat(String qrData) {
     if (qrData.contains('orgami_app_code_')) {
       final eventCode = qrData.split('orgami_app_code_').last;
@@ -27,7 +27,7 @@ class QRDebugHelper {
       debugPrint('❌ Not Event QR Format');
     }
   }
-  
+
   static void _testTicketQRFormat(String qrData) {
     final ticketData = TicketModel.parseQRCodeData(qrData);
     if (ticketData != null) {
@@ -39,7 +39,7 @@ class QRDebugHelper {
       debugPrint('❌ Not Ticket QR Format');
     }
   }
-  
+
   static void _testBadgeQRFormat(String qrData) {
     final userId = UserBadgeModel.parseBadgeQr(qrData);
     if (userId != null) {
@@ -49,19 +49,23 @@ class QRDebugHelper {
       debugPrint('❌ Not Badge QR Format');
     }
   }
-  
+
   static String generateTestEventQR(String eventId) {
     return 'orgami_app_code_$eventId';
   }
-  
-  static String generateTestTicketQR(String ticketId, String eventId, String ticketCode) {
+
+  static String generateTestTicketQR(
+    String ticketId,
+    String eventId,
+    String ticketCode,
+  ) {
     return 'orgami_ticket_${ticketId}_${eventId}_$ticketCode';
   }
-  
+
   static String generateTestBadgeQR(String userId) {
     return 'attendus_user_$userId';
   }
-  
+
   static void logCameraPermissionStatus(bool hasPermission) {
     if (kDebugMode) {
       debugPrint('=== Camera Permission Debug ===');
@@ -69,7 +73,7 @@ class QRDebugHelper {
       debugPrint('=== End Permission Debug ===');
     }
   }
-  
+
   static void logScannerInitialization(bool success, String? error) {
     if (kDebugMode) {
       debugPrint('=== Scanner Initialization Debug ===');

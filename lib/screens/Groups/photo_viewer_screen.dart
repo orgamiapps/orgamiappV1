@@ -32,7 +32,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen>
   late PageController _pageController;
   late int _currentIndex;
   bool _showUI = true;
-  
+
   // Drag gesture state
   double _dragOffset = 0.0;
   double _backgroundOpacity = 1.0;
@@ -44,20 +44,22 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen>
     super.initState();
     _currentIndex = widget.initialIndex;
     _pageController = PageController(initialPage: widget.initialIndex);
-    
+
     // Initialize snap-back animation
     _snapBackController = AnimationController(
       duration: const Duration(milliseconds: 250),
       vsync: this,
     );
-    _snapBackAnimation = Tween<double>(begin: 0.0, end: 0.0).animate(
-      CurvedAnimation(parent: _snapBackController, curve: Curves.easeOut),
-    )..addListener(() {
-        setState(() {
-          _dragOffset = _snapBackAnimation.value;
-          _backgroundOpacity = 1.0 - (_dragOffset.abs() / 400).clamp(0.0, 1.0);
+    _snapBackAnimation =
+        Tween<double>(begin: 0.0, end: 0.0).animate(
+          CurvedAnimation(parent: _snapBackController, curve: Curves.easeOut),
+        )..addListener(() {
+          setState(() {
+            _dragOffset = _snapBackAnimation.value;
+            _backgroundOpacity =
+                1.0 - (_dragOffset.abs() / 400).clamp(0.0, 1.0);
+          });
         });
-      });
   }
 
   @override
@@ -105,19 +107,16 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen>
   void _handleVerticalDragEnd(DragEndDetails details) {
     const double dismissThreshold = 150.0;
     const double dismissVelocity = 500.0;
-    
+
     final velocity = details.velocity.pixelsPerSecond.dy;
-    
+
     // Dismiss if dragged down enough or with sufficient velocity
     if (_dragOffset > dismissThreshold || velocity > dismissVelocity) {
       // Animate out and dismiss
       Navigator.pop(context);
     } else {
       // Snap back to original position
-      _snapBackAnimation = Tween<double>(
-        begin: _dragOffset,
-        end: 0.0,
-      ).animate(
+      _snapBackAnimation = Tween<double>(begin: _dragOffset, end: 0.0).animate(
         CurvedAnimation(parent: _snapBackController, curve: Curves.easeOut),
       );
       _snapBackController.forward(from: 0.0);
@@ -162,187 +161,189 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen>
                 ),
               ),
 
-          // Top bar with gradient
-          if (_showUI)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.7),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-                child: SafeArea(
-                  bottom: false,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(
-                            Icons.arrow_back,
-                            color: Colors.white,
-                            size: 28,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                widget.authorName,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              if (widget.imageUrls.length > 1)
-                                Text(
-                                  '${_currentIndex + 1} / ${widget.imageUrls.length}',
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.9),
-                                    fontSize: 12,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-          // Bottom bar with caption and actions
-          if (_showUI)
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.8),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-                child: SafeArea(
-                  top: false,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (widget.caption.isNotEmpty) ...[
-                          RichText(
-                            text: TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: widget.authorName,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const TextSpan(text: ' '),
-                                TextSpan(
-                                  text: widget.caption,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 16),
+              // Top bar with gradient
+              if (_showUI)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.7),
+                          Colors.transparent,
                         ],
-                        // Action buttons
-                        Row(
+                      ),
+                    ),
+                    child: SafeArea(
+                      bottom: false,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        child: Row(
                           children: [
-                            _ActionButton(
-                              icon: Icons.comment_outlined,
-                              label: widget.commentCount.toString(),
-                              onTap: _showComments,
+                            IconButton(
+                              onPressed: () => Navigator.pop(context),
+                              icon: const Icon(
+                                Icons.arrow_back,
+                                color: Colors.white,
+                                size: 28,
+                              ),
                             ),
-                            const SizedBox(width: 24),
-                            _ActionButton(
-                              icon: Icons.share_outlined,
-                              label: 'Share',
-                              onTap: () {
-                                // TODO: Implement share
-                              },
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    widget.authorName,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (widget.imageUrls.length > 1)
+                                    Text(
+                                      '${_currentIndex + 1} / ${widget.imageUrls.length}',
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.9,
+                                        ),
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
                           ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-          // Page indicator dots (if multiple images)
-          if (_showUI && widget.imageUrls.length > 1)
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 80,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: List.generate(
-                      widget.imageUrls.length,
-                      (index) => Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 3),
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: index == _currentIndex
-                              ? Colors.white
-                              : Colors.white.withValues(alpha: 0.5),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ),
+
+              // Bottom bar with caption and actions
+              if (_showUI)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.8),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                    child: SafeArea(
+                      top: false,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (widget.caption.isNotEmpty) ...[
+                              RichText(
+                                text: TextSpan(
+                                  children: [
+                                    TextSpan(
+                                      text: widget.authorName,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    const TextSpan(text: ' '),
+                                    TextSpan(
+                                      text: widget.caption,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                            // Action buttons
+                            Row(
+                              children: [
+                                _ActionButton(
+                                  icon: Icons.comment_outlined,
+                                  label: widget.commentCount.toString(),
+                                  onTap: _showComments,
+                                ),
+                                const SizedBox(width: 24),
+                                _ActionButton(
+                                  icon: Icons.share_outlined,
+                                  label: 'Share',
+                                  onTap: () {
+                                    // TODO: Implement share
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Page indicator dots (if multiple images)
+              if (_showUI && widget.imageUrls.length > 1)
+                Positioned(
+                  top: MediaQuery.of(context).padding.top + 80,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: List.generate(
+                          widget.imageUrls.length,
+                          (index) => Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: index == _currentIndex
+                                  ? Colors.white
+                                  : Colors.white.withValues(alpha: 0.5),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -395,4 +396,3 @@ class _ActionButton extends StatelessWidget {
     );
   }
 }
-

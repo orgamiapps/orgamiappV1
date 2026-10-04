@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/models/attendance_model.dart';
@@ -10,16 +9,21 @@ import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
+import 'package:attendus/Services/attendance_check_in_service.dart';
 
 class AnsQuestionsToSignInEventScreen extends StatefulWidget {
   final EventModel eventModel;
   final AttendanceModel newAttendance;
   final String nextPageRoute;
+  final String? checkInSessionId;
+  final Map<String, dynamic>? checkInCredential;
   const AnsQuestionsToSignInEventScreen({
     super.key,
     required this.eventModel,
     required this.newAttendance,
     required this.nextPageRoute,
+    this.checkInSessionId,
+    this.checkInCredential,
   });
 
   @override
@@ -33,6 +37,8 @@ class _AnsQuestionsToSignInEventScreenState
   late AttendanceModel newAttendance = widget.newAttendance;
 
   final _btnCtlr = RoundedLoadingButtonController();
+  final AttendanceCheckInService _attendanceService =
+      AttendanceCheckInService();
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final List<TextEditingController> _textControllers = [];
@@ -64,7 +70,7 @@ class _AnsQuestionsToSignInEventScreenState
     }
   }
 
-  void _makeSingIn() {
+  Future<void> _makeSingIn() async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
 
@@ -78,52 +84,41 @@ class _AnsQuestionsToSignInEventScreenState
         }
       }
 
-      FirebaseFirestore.instance
-          .collection(AttendanceModel.firebaseKey)
-          .doc(newAttendance.id)
-          .set(newAttendance.toJson())
-          .then((value) {
-            if (!mounted) return;
-            ShowToast().showSnackBar('Signed In Successfully!', context);
-            _btnCtlr.success();
-            Future.delayed(const Duration(seconds: 1), () {
-              _btnCtlr.reset();
-              if (widget.nextPageRoute == 'singleEventPopup') {
-                // Navigate back to SingleEventScreen and refresh it
-                if (!mounted) return;
-                Navigator.pop(context); // Close the questions screen
-                // Navigate to SingleEventScreen to refresh the attendance status
-                if (!mounted) return;
-                RouterClass.nextScreenAndReplacement(
-                  context,
-                  SingleEventScreen(eventModel: widget.eventModel),
-                );
-              } else if (widget.nextPageRoute == 'dashboardQrScanner') {
-                if (!mounted) return;
-                RouterClass.nextScreenAndReplacement(
-                  context,
-                  SingleEventScreen(eventModel: widget.eventModel),
-                );
-              } else if (widget.nextPageRoute == 'qrScannerForLogedIn') {
-                if (!mounted) return;
-                RouterClass.nextScreenAndReplacement(
-                  context,
-                  SingleEventScreen(eventModel: widget.eventModel),
-                );
-              } else if (widget.nextPageRoute == 'withoutLogin') {
-                if (!mounted) return;
-                Navigator.pop(context);
-              }
-            });
-          })
-          .catchError((error) {
-            _btnCtlr.error();
-            if (!mounted) return;
-            ShowToast().showSnackBar('Error signing in: $error', context);
-            Future.delayed(const Duration(seconds: 2), () {
-              _btnCtlr.reset();
-            });
-          });
+      try {
+        if (widget.checkInSessionId == null ||
+            widget.checkInCredential == null) {
+          throw StateError(
+            'This older check-in attempt is no longer valid. Scan the current '
+            'venue QR or ask event staff for assistance.',
+          );
+        }
+        await _attendanceService.submitCheckIn(
+          eventId: widget.eventModel.id,
+          sessionId: widget.checkInSessionId!,
+          credential: widget.checkInCredential!,
+          answers: newAttendance.answers,
+        );
+        if (!mounted) return;
+        ShowToast().showSnackBar('Signed In Successfully!', context);
+        _btnCtlr.success();
+        await Future.delayed(const Duration(seconds: 1));
+        if (!mounted) return;
+        _btnCtlr.reset();
+        if (widget.nextPageRoute == 'withoutLogin') {
+          Navigator.pop(context);
+        } else {
+          RouterClass.nextScreenAndReplacement(
+            context,
+            SingleEventScreen(eventModel: widget.eventModel),
+          );
+        }
+      } catch (error) {
+        _btnCtlr.error();
+        if (!mounted) return;
+        ShowToast().showSnackBar('Error signing in: $error', context);
+        await Future.delayed(const Duration(seconds: 2));
+        _btnCtlr.reset();
+      }
     } else {
       _btnCtlr.reset();
     }

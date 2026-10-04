@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/models/payment_model.dart';
 import 'package:attendus/Services/payment_service.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Utils/app_app_bar_view.dart';
+import 'package:attendus/widgets/attendus_design_system.dart';
+import 'package:attendus/config/safety_flags.dart';
 
 class FeatureEventScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -23,7 +22,6 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
   bool _loading = false;
   final List<int> _tiers = [3, 7, 14];
   bool _untilEvent = false;
-  String? _currentPaymentIntentId;
   String? _clientSecret;
 
   // Animation controllers
@@ -40,7 +38,9 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
   }
 
   bool get _canFeatureEvent {
-    return !_isEventPassed && !widget.eventModel.isFeatured;
+    return SafetyFlags.eventFeaturingEnabled &&
+        !_isEventPassed &&
+        !widget.eventModel.isFeatured;
   }
 
   @override
@@ -104,6 +104,30 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            if (!SafetyFlags.eventFeaturingEnabled) ...[
+                              AttendUsCard(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(Icons.security_update_good),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          SafetyFlags.paymentMaintenanceMessage,
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodyLarge,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                            ],
                             _buildBenefitsSection(),
                             const SizedBox(height: 24),
                             if (_isEventPassed) ...[
@@ -269,38 +293,44 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
               topLeft: Radius.circular(20),
               topRight: Radius.circular(20),
             ),
-            child: CachedNetworkImage(
+            child: AttendUsEventImage(
               imageUrl: event.imageUrl,
               height: 160,
               width: double.infinity,
               fit: BoxFit.cover,
-              placeholder: (context, url) => Container(
+              loadingBuilder: (context) => Container(
                 height: 160,
                 color: const Color(0xFFF5F7FA),
-                child: const Center(
+                child: Center(
                   child: CircularProgressIndicator(color: Color(0xFF667EEA)),
                 ),
               ),
-              errorWidget: (context, url, error) => Container(
+              errorBuilder: (context, retry) => Container(
                 height: 160,
                 color: const Color(0xFFF5F7FA),
-                child: const Center(
+                child: Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.image_not_supported,
                         color: Color(0xFF667EEA),
                         size: 48,
                       ),
-                      SizedBox(height: 8),
-                      Text(
+                      const SizedBox(height: 8),
+                      const Text(
                         'Image not available',
                         style: TextStyle(
                           color: Color(0xFF667EEA),
                           fontSize: 14,
                           fontFamily: 'Roboto',
                         ),
+                      ),
+                      const SizedBox(height: 4),
+                      TextButton.icon(
+                        onPressed: retry,
+                        icon: const Icon(Icons.refresh, size: 18),
+                        label: const Text('Retry'),
                       ),
                     ],
                   ),
@@ -821,10 +851,17 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
   }
 
   Future<void> _processPaymentAndFeature() async {
+    if (!SafetyFlags.eventFeaturingEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(SafetyFlags.paymentMaintenanceMessage)),
+      );
+      return;
+    }
     if ((_selectedDays == null && !_untilEvent) ||
         _loading ||
-        !_canFeatureEvent)
+        !_canFeatureEvent) {
       return;
+    }
 
     setState(() => _loading = true);
 
@@ -851,11 +888,9 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
       final paymentData = await PaymentService.createPaymentIntent(
         eventId: widget.eventModel.id,
         durationDays: durationDays,
-        customerUid: FirebaseAuth.instance.currentUser!.uid,
       );
 
       _clientSecret = paymentData['clientSecret'];
-      _currentPaymentIntentId = paymentData['paymentIntentId'];
 
       // Process payment with Stripe
       Logger.debug('Processing payment...');
@@ -898,38 +933,8 @@ class _FeatureEventScreenState extends State<FeatureEventScreen>
   }
 
   Future<void> _featureEventAfterPayment() async {
-    DateTime endDate;
-    if (_untilEvent) {
-      endDate = widget.eventModel.selectedDateTime;
-      if (endDate.isBefore(DateTime.now())) {
-        throw Exception('Event start time has already passed.');
-      }
-    } else {
-      endDate = DateTime.now().add(Duration(days: _selectedDays!));
-    }
-
-    // Update the event to featured status
-    await FirebaseFirestore.instance
-        .collection(EventModel.firebaseKey)
-        .doc(widget.eventModel.id)
-        .update({'isFeatured': true, 'featureEndDate': endDate});
-
-    // Confirm payment in backend
-    if (_currentPaymentIntentId != null) {
-      final durationDays = _untilEvent
-          ? FeaturePaymentModel.getPricingTierForDays(
-              widget.eventModel.selectedDateTime
-                  .difference(DateTime.now())
-                  .inDays,
-            )
-          : _selectedDays!;
-
-      await PaymentService.confirmFeaturePayment(
-        paymentIntentId: _currentPaymentIntentId!,
-        eventId: widget.eventModel.id,
-        durationDays: durationDays,
-        untilEvent: _untilEvent,
-      );
-    }
+    throw UnsupportedError(
+      'Client feature activation is disabled. Feature status is webhook-owned.',
+    );
   }
 }

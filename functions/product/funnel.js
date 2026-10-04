@@ -1,0 +1,221 @@
+"use strict";
+
+const crypto = require("node:crypto");
+const {onCall, HttpsError} = require("firebase-functions/v2/https");
+const {onSchedule} = require("firebase-functions/v2/scheduler");
+const {Timestamp, FieldValue} = require("firebase-admin/firestore");
+
+const EVENTS = new Set([
+  "smart_arrival_fallback",
+  "smart_arrival_completed",
+  "attendance_offline_reconciled",
+  "guest_discover_view",
+  "guest_auth_cta_selected",
+  "guest_locked_feature_prompt",
+  "guest_auth_started",
+  "guest_auth_completed",
+  "guest_auth_failed",
+  "guest_intent_resumed",
+  "guest_checkin_started",
+  "guest_checkin_completed",
+  "guest_checkin_failed",
+  "discovery_view",
+  "discovery_location_prompt",
+  "discovery_location_result",
+  "discovery_section_impression",
+  "discovery_card_open",
+  "discovery_search_results",
+  "discovery_search_no_result",
+  "discovery_radius_expansion",
+  "discovery_save",
+  "discovery_follow",
+  "discovery_registration_start",
+  "discovery_registration_complete",
+  "discovery_organizer_create_cta",
+  "discovery_category_module_impression",
+  "discovery_category_selected",
+  "discovery_category_cleared",
+  "discovery_category_view_all",
+  "discovery_quick_choice_selected",
+  "discovery_section_view_all",
+  "discovery_search_page_loaded",
+  "discovery_category_no_result",
+  "event_wizard_started",
+  "event_wizard_template_selected",
+  "event_wizard_draft_saved",
+  "event_wizard_draft_restored",
+  "event_wizard_stage_viewed",
+  "event_wizard_stage_completed",
+  "event_wizard_stage_error",
+  "event_wizard_preview_opened",
+  "event_wizard_duplicate_started",
+  "event_wizard_recurrence_configured",
+  "event_wizard_attendance_preset_selected",
+  "event_wizard_advanced_attendance_opened",
+  "event_wizard_publish_attempted",
+  "event_wizard_publish_succeeded",
+  "event_wizard_publish_failed",
+  "event_wizard_abandoned",
+]);
+const DIMENSIONS = new Set([
+  "durationMs", "entryPoint", "feature", "authChoice", "checkInMethod", "platform",
+  "result", "errorCategory", "section", "position", "radiusBand",
+  "locationSource", "category", "accessMode", "resultCount", "source",
+  "targetType", "metro", "categoryId", "choice", "experienceVersion",
+  "stage", "mode", "templateId", "organizationContext", "saveState",
+]);
+const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+
+async function rateLimit(db, uid, nowMs = Date.now()) {
+  const id = crypto.createHash("sha256").update(uid).digest("hex").slice(0, 32);
+  const ref = db.collection("service_rate_limits").doc(`funnel_${id}`);
+  const allowed = await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    const data = snapshot.exists ? snapshot.data() : {};
+    const start = Number(data.windowStartedAtMs || 0);
+    const active = nowMs - start < 60000;
+    const count = active ? Number(data.count || 0) : 0;
+    if (count >= 120) return false;
+    transaction.set(ref, {
+      service: "product_funnel",
+      windowStartedAtMs: active ? start : nowMs,
+      count: count + 1,
+      expiresAt: Timestamp.fromMillis(nowMs + 120000),
+    }, {merge: true});
+    return true;
+  });
+  if (!allowed) throw new HttpsError("resource-exhausted", "Analytics rate limit reached.");
+}
+
+function validate(data) {
+  const event = typeof data?.event === "string" ? data.event : "";
+  const sessionId = typeof data?.sessionId === "string" ? data.sessionId : "";
+  if (!EVENTS.has(event) || !/^[a-f0-9]{32}$/.test(sessionId)) {
+    throw new HttpsError("invalid-argument", "Invalid funnel event.");
+  }
+  if (data.dimensions === null || data.dimensions === undefined ||
+      typeof data.dimensions !== "object" ||
+      Array.isArray(data.dimensions)) {
+    throw new HttpsError("invalid-argument", "Invalid funnel dimensions.");
+  }
+  const dimensions = {};
+  for (const [key, raw] of Object.entries(data.dimensions)) {
+    if (!DIMENSIONS.has(key) || typeof raw !== "string" || raw.length > 64 ||
+        !/^[a-zA-Z0-9_.:-]*$/.test(raw)) {
+      throw new HttpsError("invalid-argument", "Unsupported funnel dimension.");
+    }
+    dimensions[key] = raw;
+  }
+  return {event, sessionId, dimensions};
+}
+
+function createRecordProductFunnelEvent(adminSdk) {
+  const db = adminSdk.firestore();
+  return onCall({
+    region: "us-central1",
+    enforceAppCheck: process.env.FUNCTIONS_EMULATOR !== "true",
+    maxInstances: 20,
+  }, async (request) => {
+    if (!request.auth?.uid) throw new HttpsError("unauthenticated", "Authentication required.");
+    const input = validate(request.data);
+    await rateLimit(db, request.auth.uid);
+    const provider = request.auth.token?.firebase?.sign_in_provider || "unknown";
+    await db.collection("product_funnel_events").add({
+      event: input.event,
+      sessionId: input.sessionId,
+      dimensions: input.dimensions,
+      accessMode: provider === "anonymous" ? "guest" : "authenticated",
+      occurredAt: FieldValue.serverTimestamp(),
+      expireAt: Timestamp.fromMillis(Date.now() + RETENTION_MS),
+      schemaVersion: 1,
+    });
+    return {accepted: true};
+  });
+}
+
+function increment(target, key) {
+  // The Firestore serializer itself uses ordinary objects internally. Escape
+  // reserved map names before serialization as well as using safe local maps.
+  // '%' is not allowed by dimension validation; escaping it also makes legacy
+  // values unambiguous. Ordinary existing dimension bucket names stay unchanged.
+  const raw = String(key);
+  const bucket = /^__.*__$/.test(raw) || raw.startsWith("%") ?
+    `%${Buffer.from(raw, "utf8").toString("base64url")}` : raw;
+  target[bucket] = Number(target[bucket] || 0) + 1;
+}
+
+function createAggregateProductFunnelDaily(adminSdk) {
+  const db = adminSdk.firestore();
+  return onSchedule({
+    region: "us-central1",
+    schedule: "30 2 * * *",
+    timeZone: "UTC",
+    timeoutSeconds: 540,
+  }, async () => {
+    const end = new Date();
+    end.setUTCHours(0, 0, 0, 0);
+    const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+    const snapshot = await db.collection("product_funnel_events")
+        .where("occurredAt", ">=", Timestamp.fromDate(start))
+        .where("occurredAt", "<", Timestamp.fromDate(end)).get();
+    // Dimension values are untrusted property names, including __proto__ and
+    // constructor. Null-prototype maps count them as data, not inherited keys.
+    const counts = Object.create(null);
+    const byEntryPoint = Object.create(null);
+    const byCheckInMethod = Object.create(null);
+    const byFeature = Object.create(null);
+    const discoveryCounts = Object.create(null);
+    const sessions = new Set();
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      increment(counts, data.event);
+      sessions.add(data.sessionId);
+      const dimensions = data.dimensions || {};
+      if (dimensions.entryPoint) increment(byEntryPoint, dimensions.entryPoint);
+      if (dimensions.checkInMethod) increment(byCheckInMethod, dimensions.checkInMethod);
+      if (dimensions.feature) increment(byFeature, dimensions.feature);
+      if (String(data.event || "").startsWith("discovery_")) {
+        increment(discoveryCounts, data.event);
+      }
+    }
+    const day = start.toISOString().slice(0, 10);
+    await db.collection("admin_funnel_daily").doc(day).set({
+      date: day,
+      counts,
+      byEntryPoint,
+      byCheckInMethod,
+      byFeature,
+      dimensionKeyEncoding: "reserved-base64url-v1",
+      discovery: {
+        counts: discoveryCounts,
+        eventDetailCtr: (discoveryCounts.discovery_view || 0) > 0 ?
+          (discoveryCounts.discovery_card_open || 0) / discoveryCounts.discovery_view : 0,
+        zeroResultRate: ((discoveryCounts.discovery_search_results || 0) +
+          (discoveryCounts.discovery_search_no_result || 0)) > 0 ?
+          (discoveryCounts.discovery_search_no_result || 0) /
+            ((discoveryCounts.discovery_search_results || 0) +
+             (discoveryCounts.discovery_search_no_result || 0)) : 0,
+        saveRate: (discoveryCounts.discovery_card_open || 0) > 0 ?
+          (discoveryCounts.discovery_save || 0) / discoveryCounts.discovery_card_open : 0,
+        followRate: (discoveryCounts.discovery_card_open || 0) > 0 ?
+          (discoveryCounts.discovery_follow || 0) / discoveryCounts.discovery_card_open : 0,
+        registrationConversion: (discoveryCounts.discovery_registration_start || 0) > 0 ?
+          (discoveryCounts.discovery_registration_complete || 0) /
+            discoveryCounts.discovery_registration_start : 0,
+        categorySelectionRate: (discoveryCounts.discovery_category_module_impression || 0) > 0 ?
+          (discoveryCounts.discovery_category_selected || 0) /
+            discoveryCounts.discovery_category_module_impression : 0,
+      },
+      sessions: sessions.size,
+      updatedAt: FieldValue.serverTimestamp(),
+      schemaVersion: 1,
+    });
+  });
+}
+
+module.exports = {
+  EVENTS,
+  createAggregateProductFunnelDaily,
+  createRecordProductFunnelEvent,
+  validate,
+};

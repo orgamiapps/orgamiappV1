@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:attendus/Utils/attendus_theme.dart';
+import 'package:attendus/Utils/images.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
 
 class AttendUsNavDestination {
   final String label;
   final IconData icon;
   final IconData selectedIcon;
+  final bool requiresAccount;
 
   const AttendUsNavDestination({
     required this.label,
     required this.icon,
     required this.selectedIcon,
+    this.requiresAccount = false,
   });
 }
 
@@ -21,8 +24,10 @@ class AttendUsScaffold extends StatelessWidget {
   final int selectedIndex;
   final List<AttendUsNavDestination> destinations;
   final ValueChanged<int> onDestinationSelected;
+  final VoidCallback? onBrandPressed;
   final List<Widget> actions;
   final Widget? floatingActionButton;
+  final VoidCallback? onLoginPressed;
   final VoidCallback? onNotificationsPressed;
   final VoidCallback? onProfilePressed;
   final String? profileName;
@@ -37,8 +42,10 @@ class AttendUsScaffold extends StatelessWidget {
     required this.selectedIndex,
     required this.destinations,
     required this.onDestinationSelected,
+    this.onBrandPressed,
     this.actions = const [],
     this.floatingActionButton,
+    this.onLoginPressed,
     this.onNotificationsPressed,
     this.onProfilePressed,
     this.profileName,
@@ -53,6 +60,16 @@ class AttendUsScaffold extends StatelessWidget {
     final useExpandedSidebar = width >= 1100;
     final shellActions = [
       ...actions,
+      if (onLoginPressed != null) ...[
+        ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          child: AttendUsButton.primary(
+            label: 'Log in',
+            onPressed: onLoginPressed,
+          ),
+        ),
+        const SizedBox(width: 8),
+      ],
       if (onNotificationsPressed != null)
         _NotificationButton(
           onPressed: onNotificationsPressed!,
@@ -87,6 +104,7 @@ class AttendUsScaffold extends StatelessWidget {
                 destinations: destinations,
                 selectedIndex: selectedIndex,
                 onDestinationSelected: onDestinationSelected,
+                onBrandPressed: onBrandPressed,
                 expanded: useExpandedSidebar,
               ),
               Expanded(
@@ -128,8 +146,14 @@ class AttendUsScaffold extends StatelessWidget {
         destinations: [
           for (final destination in destinations)
             NavigationDestination(
-              icon: Icon(destination.icon),
-              selectedIcon: Icon(destination.selectedIcon),
+              icon: _DestinationIcon(
+                icon: destination.icon,
+                locked: destination.requiresAccount,
+              ),
+              selectedIcon: _DestinationIcon(
+                icon: destination.selectedIcon,
+                locked: destination.requiresAccount,
+              ),
               label: destination.label,
             ),
         ],
@@ -142,12 +166,14 @@ class _AttendUsSidebar extends StatelessWidget {
   final int selectedIndex;
   final List<AttendUsNavDestination> destinations;
   final ValueChanged<int> onDestinationSelected;
+  final VoidCallback? onBrandPressed;
   final bool expanded;
 
   const _AttendUsSidebar({
     required this.selectedIndex,
     required this.destinations,
     required this.onDestinationSelected,
+    this.onBrandPressed,
     required this.expanded,
   });
 
@@ -166,29 +192,46 @@ class _AttendUsSidebar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: EdgeInsets.fromLTRB(16, 20, expanded ? 20 : 16, 16),
-            child: Row(
-              mainAxisAlignment: expanded
-                  ? MainAxisAlignment.start
-                  : MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.event_available,
-                    color: theme.colorScheme.onPrimary,
+            padding: EdgeInsets.fromLTRB(8, 12, expanded ? 12 : 8, 8),
+            child: Tooltip(
+              message: 'Go to Home',
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(AttendUsTokens.radiusMd),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(AttendUsTokens.radiusMd),
+                  onTap: onBrandPressed,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Row(
+                      mainAxisAlignment: expanded
+                          ? MainAxisAlignment.start
+                          : MainAxisAlignment.center,
+                      children: [
+                        Image.asset(
+                          Images.inAppLogoOnly,
+                          key: const ValueKey('attendus-brand-logo'),
+                          width: 38,
+                          height: 38,
+                          fit: BoxFit.contain,
+                          semanticLabel: 'Attendus logo',
+                        ),
+                        if (expanded) ...[
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Attendus',
+                              style: theme.textTheme.titleLarge,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
-                if (expanded) ...[
-                  const SizedBox(width: 12),
-                  Text('Attendus', style: theme.textTheme.titleLarge),
-                ],
-              ],
+              ),
             ),
           ),
           const Divider(),
@@ -228,6 +271,8 @@ class _AttendUsSidebar extends StatelessWidget {
                                 ? theme.colorScheme.primary
                                 : theme.colorScheme.onSurfaceVariant,
                           ),
+                          if (!expanded && destination.requiresAccount)
+                            const _LockDot(),
                           if (expanded) ...[
                             const SizedBox(width: 12),
                             Expanded(
@@ -242,6 +287,14 @@ class _AttendUsSidebar extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            if (destination.requiresAccount) ...[
+                              const SizedBox(width: 8),
+                              Icon(
+                                Icons.lock_outline,
+                                size: 16,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ],
                           ],
                         ],
                       ),
@@ -265,6 +318,39 @@ class _AttendUsSidebar extends StatelessWidget {
   }
 }
 
+class _DestinationIcon extends StatelessWidget {
+  final IconData icon;
+  final bool locked;
+
+  const _DestinationIcon({required this.icon, required this.locked});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!locked) return Icon(icon);
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(icon),
+        const Positioned(right: -7, top: -5, child: _LockDot()),
+      ],
+    );
+  }
+}
+
+class _LockDot extends StatelessWidget {
+  const _LockDot();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(2),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surface,
+      shape: BoxShape.circle,
+    ),
+    child: const Icon(Icons.lock, size: 10),
+  );
+}
+
 class _NotificationButton extends StatelessWidget {
   final VoidCallback onPressed;
   final int count;
@@ -279,6 +365,7 @@ class _NotificationButton extends StatelessWidget {
       children: [
         IconButton(
           tooltip: 'Notifications',
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
           onPressed: onPressed,
           icon: const Icon(Icons.notifications_none),
         ),
@@ -330,7 +417,7 @@ class _ProfileButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final displayName = (name == null || name!.trim().isEmpty)
-        ? 'Account'
+        ? 'Profile'
         : name!.trim();
     return Tooltip(
       message: displayName,

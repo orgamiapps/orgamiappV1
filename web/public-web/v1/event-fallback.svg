@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Attendus event</title>
+  <desc id="desc">Attendus branded event image</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eaf2ff"/>
+      <stop offset="1" stop-color="#d9e7ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="1050" cy="85" r="240" fill="#246bfd" opacity=".10"/>
+  <circle cx="120" cy="600" r="310" fill="#7a5cff" opacity=".10"/>
+  <rect x="460" y="168" width="280" height="280" rx="64" fill="#246bfd"/>
+  <path d="M525 250h150M525 315h150M525 380h95" stroke="#fff" stroke-width="26" stroke-linecap="round"/>
+  <circle cx="525" cy="210" r="15" fill="#fff"/><circle cx="675" cy="210" r="15" fill="#fff"/>
+  <text x="600" y="530" text-anchor="middle" font-family="Arial,sans-serif" font-size="52" font-weight="700" fill="#14233b">Attendus</text>
+</svg>

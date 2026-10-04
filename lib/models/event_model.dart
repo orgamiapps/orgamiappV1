@@ -1,5 +1,7 @@
+import 'package:attendus/models/event_schedule.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:attendus/models/check_in_policy.dart';
 
 class EventModel {
   static String firebaseKey = 'Events';
@@ -8,6 +10,13 @@ class EventModel {
   String? locationName; // Optional display name for the venue/location
   String locationType; // 'in_person' or 'online'
   String? placeId;
+  String? geohash;
+  String city;
+  String regionCode;
+  String countryCode;
+  String streetAddress;
+  String postalCode;
+  String eventTimeZone;
 
   DateTime selectedDateTime, eventGenerateTime;
 
@@ -17,18 +26,35 @@ class EventModel {
 
   bool private, getLocation;
   List<String> categories;
+  String? primaryDiscoveryCategoryId;
+  List<String> discoveryCategoryIds;
+  String discoveryCategorySource;
+  int discoveryCategoryVersion;
   bool isFeatured;
   DateTime? featureEndDate;
   bool ticketsEnabled;
   int maxTickets;
   int issuedTickets;
+  int reservedTickets;
+  int saveCount;
   double? ticketPrice; // Price per ticket in USD
   bool ticketUpgradeEnabled; // Whether skip-the-line upgrades are available
   double? ticketUpgradePrice; // Total skip-the-line upgrade price
+  int? eventDurationMinutes;
+  int confirmedRegistrationCount;
   int eventDuration; // Duration in hours
   List<String> coHosts; // Array of user IDs who are co-hosts
+  List<String> checkInStaff; // User IDs with event-day console access
   String? organizationId; // Optional organization context for the event
   List<String> accessList; // Private-event invitees outside the organization
+  Map<String, dynamic> registrationPolicy;
+  Map<String, dynamic> experience;
+  Map<String, dynamic> reminderPolicy;
+  String? seriesId;
+  int? occurrenceIndex;
+  int? seriesVersion;
+  int eventRevision;
+  int wizardSchemaVersion;
 
   // Sign-in methods configuration
   // Legacy support: ['qr_code', 'manual_code', 'geofence', 'facial_recognition']
@@ -39,6 +65,7 @@ class EventModel {
   String? signInSecurityTier;
 
   String? manualCode; // Custom manual code for the event
+  CheckInPolicy checkInPolicy;
 
   // Live Quiz configuration
   bool hasLiveQuiz; // Whether this event has a live quiz
@@ -67,25 +94,50 @@ class EventModel {
     this.locationName,
     this.locationType = 'in_person',
     this.placeId,
+    this.geohash,
+    this.city = '',
+    this.regionCode = '',
+    this.countryCode = 'US',
+    this.streetAddress = '',
+    this.postalCode = '',
+    this.eventTimeZone = 'UTC',
     this.categories = const [],
+    this.primaryDiscoveryCategoryId,
+    this.discoveryCategoryIds = const [],
+    this.discoveryCategorySource = 'inferred',
+    this.discoveryCategoryVersion = 1,
     this.isFeatured = false,
     this.featureEndDate,
     this.ticketsEnabled = false,
     this.maxTickets = 0,
     this.issuedTickets = 0,
+    this.reservedTickets = 0,
+    this.saveCount = 0,
     this.ticketPrice,
     this.ticketUpgradeEnabled = false,
     this.ticketUpgradePrice,
+    this.eventDurationMinutes,
+    this.confirmedRegistrationCount = 0,
     this.eventDuration = 2, // Default 2 hours
     this.coHosts = const [],
+    this.checkInStaff = const [],
     this.organizationId,
     this.accessList = const [],
+    this.registrationPolicy = const {},
+    this.experience = const {},
+    this.reminderPolicy = const {},
+    this.seriesId,
+    this.occurrenceIndex,
+    this.seriesVersion,
+    this.eventRevision = 0,
+    this.wizardSchemaVersion = 1,
     this.signInMethods = const [
       'qr_code',
       'manual_code',
     ], // Default methods (legacy support)
     this.signInSecurityTier = 'regular', // Default to regular tier
     this.manualCode,
+    this.checkInPolicy = const CheckInPolicy(),
     this.hasLiveQuiz = false,
     this.liveQuizId,
   });
@@ -104,12 +156,19 @@ class EventModel {
       locationName: data['locationName'],
       locationType: data['locationType'] == 'online' ? 'online' : 'in_person',
       placeId: data['placeId'],
+      geohash: data['geohash'],
+      city: data['city']?.toString() ?? '',
+      regionCode: data['regionCode']?.toString() ?? '',
+      countryCode: data['countryCode']?.toString() ?? 'US',
+      streetAddress: data['streetAddress']?.toString() ?? '',
+      postalCode: data['postalCode']?.toString() ?? '',
+      eventTimeZone: data['eventTimeZone']?.toString() ?? 'UTC',
       imageUrl: data['imageUrl'],
       customerUid: data['customerUid'],
       status: data['status'],
       selectedDateTime: data['selectedDateTime'] is Timestamp
           ? (data['selectedDateTime'] as Timestamp).toDate()
-          : DateTime.tryParse(data['selectedDateTime'].toString()) ??
+          : DateTime.tryParse(data['selectedDateTime'].toString())?.toLocal() ??
                 DateTime.now(),
       eventGenerateTime: data['eventGenerateTime'] is Timestamp
           ? (data['eventGenerateTime'] as Timestamp).toDate()
@@ -119,10 +178,21 @@ class EventModel {
       getLocation: data['getLocation'] ?? false,
       latitude: (data['latitude'] as num?)?.toDouble() ?? 0.0,
       longitude: (data['longitude'] as num?)?.toDouble() ?? 0.0,
-      radius: (data['radius'] as num?)?.toDouble() ?? 1.0,
+      radius: data['radiusUnit'] == 'meters'
+          ? (data['radius'] as num?)?.toDouble() ?? 1.0
+          : ((data['radius'] as num?)?.toDouble() ?? 1.0) * 0.3048,
       categories: (data.containsKey('categories') && data['categories'] != null)
           ? List<String>.from(data['categories'])
           : [],
+      primaryDiscoveryCategoryId: data['primaryDiscoveryCategoryId']
+          ?.toString(),
+      discoveryCategoryIds: data['discoveryCategoryIds'] is List
+          ? List<String>.from(data['discoveryCategoryIds'])
+          : const [],
+      discoveryCategorySource:
+          data['discoveryCategorySource']?.toString() ?? 'inferred',
+      discoveryCategoryVersion:
+          (data['discoveryCategoryVersion'] as num?)?.round() ?? 1,
       isFeatured: data['isFeatured'] ?? false,
       featureEndDate: data['featureEndDate'] != null
           ? (data['featureEndDate'] is Timestamp
@@ -132,23 +202,54 @@ class EventModel {
       ticketsEnabled: data['ticketsEnabled'] ?? false,
       maxTickets: data['maxTickets'] ?? 0,
       issuedTickets: data['issuedTickets'] ?? 0,
+      reservedTickets: data['reservedTickets'] ?? 0,
+      saveCount: data['saveCount'] ?? 0,
       ticketPrice: data['ticketPrice']?.toDouble(),
       ticketUpgradeEnabled: data['ticketUpgradeEnabled'] ?? false,
       ticketUpgradePrice: data['ticketUpgradePrice']?.toDouble(),
       eventDuration: data['eventDuration'] ?? 2,
+      eventDurationMinutes:
+          (data['eventDurationMinutes'] as num?)?.toInt() ??
+          ((data['eventDuration'] as num?)?.toInt() ?? 0) * 60,
+      confirmedRegistrationCount:
+          (data['confirmedRegistrationCount'] as num?)?.toInt() ?? 0,
       coHosts: (data.containsKey('coHosts') && data['coHosts'] != null)
           ? List<String>.from(data['coHosts'])
+          : [],
+      checkInStaff:
+          (data.containsKey('checkInStaff') && data['checkInStaff'] != null)
+          ? List<String>.from(data['checkInStaff'])
           : [],
       organizationId: data['organizationId'],
       accessList: (data.containsKey('accessList') && data['accessList'] != null)
           ? List<String>.from(data['accessList'])
           : [],
+      registrationPolicy: data['registrationPolicy'] is Map
+          ? Map<String, dynamic>.from(data['registrationPolicy'])
+          : const {},
+      experience: data['experience'] is Map
+          ? Map<String, dynamic>.from(data['experience'])
+          : const {},
+      reminderPolicy: data['reminderPolicy'] is Map
+          ? Map<String, dynamic>.from(data['reminderPolicy'])
+          : const {},
+      seriesId: data['seriesId']?.toString(),
+      occurrenceIndex: (data['occurrenceIndex'] as num?)?.round(),
+      seriesVersion: (data['seriesVersion'] as num?)?.round(),
+      eventRevision: (data['eventRevision'] as num?)?.round() ?? 0,
+      wizardSchemaVersion: (data['wizardSchemaVersion'] as num?)?.round() ?? 1,
       signInMethods:
           (data.containsKey('signInMethods') && data['signInMethods'] != null)
           ? List<String>.from(data['signInMethods'])
           : ['qr_code', 'manual_code'], // Default to regular methods
       signInSecurityTier: data['signInSecurityTier'] ?? 'regular',
       manualCode: data['manualCode'],
+      checkInPolicy: CheckInPolicy.fromJson(
+        data['checkInPolicy'] is Map
+            ? Map<String, dynamic>.from(data['checkInPolicy'])
+            : null,
+        legacyTier: data['signInSecurityTier']?.toString(),
+      ),
       hasLiveQuiz: data['hasLiveQuiz'] ?? false,
       liveQuizId: data['liveQuizId'],
     );
@@ -180,8 +281,17 @@ class EventModel {
   String get rawId => id;
 
   /// Returns the event end time based on selectedDateTime + eventDuration
-  DateTime get eventEndTime =>
-      selectedDateTime.add(Duration(hours: eventDuration));
+  DateTime get eventEndTime => schedule.end ?? selectedDateTime;
+
+  EventSchedule get schedule => EventSchedule(
+    selectedDateTime,
+    eventDurationMinutes == null
+        ? eventDuration * 60
+        : eventDurationMinutes! > 0
+        ? eventDurationMinutes
+        : null,
+    eventTimeZone,
+  );
 
   /// Returns the dwell tracking end time (event end + 1 hour buffer)
   DateTime get dwellTrackingEndTime =>
@@ -197,8 +307,24 @@ class EventModel {
     return customerUid == userId || coHosts.contains(userId);
   }
 
+  /// Door staff can use attendance tools without receiving event-edit access.
+  bool hasCheckInPermissions(String userId) {
+    return hasManagementPermissions(userId) || checkInStaff.contains(userId);
+  }
+
   /// Check if a specific sign-in method is enabled
   bool isSignInMethodEnabled(String method) {
+    if (method == 'venue_token' ||
+        method == 'qr_code' ||
+        method == 'manual_code') {
+      return checkInPolicy.attendeeSelfCheckInEnabled;
+    }
+    if (method == 'personal_pass' || method == 'staff_roster') {
+      return checkInPolicy.staffEntryEnabled || checkInPolicy.staffFallback;
+    }
+    if (method == 'facial_recognition' || method == 'geofence') {
+      return false;
+    }
     // For new security tier system
     if (signInSecurityTier != null) {
       switch (signInSecurityTier) {
@@ -225,6 +351,17 @@ class EventModel {
 
   /// Get available sign-in methods based on security tier
   List<String> getAvailableSignInMethods() {
+    if (checkInPolicy.needsOrganizerReview) return const [];
+    return switch (checkInPolicy.profile) {
+      CheckInProfile.selfCheckIn => const ['venue_token'],
+      CheckInProfile.staffEntry => const ['personal_pass', 'staff_roster'],
+      CheckInProfile.hybrid => const [
+        'venue_token',
+        'personal_pass',
+        'staff_roster',
+      ],
+    };
+    /* Legacy implementation retained below for source compatibility.
     if (signInSecurityTier != null) {
       switch (signInSecurityTier) {
         case 'most_secure':
@@ -244,15 +381,11 @@ class EventModel {
 
     // Legacy support
     return signInMethods;
+    */
   }
 
   /// Check if the event requires geofence-based sign-in
-  bool get requiresGeofence {
-    return signInSecurityTier == 'most_secure' ||
-        signInSecurityTier == 'geofence_only' ||
-        signInSecurityTier == 'all' ||
-        signInMethods.contains('geofence');
-  }
+  bool get requiresGeofence => checkInPolicy.proximityAssist;
 
   /// Get the manual code for the event (generates one if not set)
   String getManualCode() {
@@ -287,6 +420,13 @@ class EventModel {
     data['locationName'] = isOnline ? null : locationName;
     data['locationType'] = locationType;
     data['placeId'] = isOnline || placeId?.isEmpty == true ? null : placeId;
+    data['geohash'] = isOnline ? null : geohash;
+    data['city'] = isOnline ? '' : city;
+    data['regionCode'] = isOnline ? '' : regionCode;
+    data['countryCode'] = isOnline ? '' : countryCode;
+    data['streetAddress'] = isOnline ? '' : streetAddress;
+    data['postalCode'] = isOnline ? '' : postalCode;
+    data['eventTimeZone'] = eventTimeZone;
     data['imageUrl'] = imageUrl;
     data['customerUid'] = customerUid;
     data['status'] = status;
@@ -295,24 +435,45 @@ class EventModel {
     data['private'] = private;
     data['getLocation'] = isOnline ? false : getLocation;
     data['radius'] = isOnline ? 0.0 : radius;
+    data['radiusUnit'] = 'meters';
     data['longitude'] = isOnline ? 0.0 : longitude;
     data['latitude'] = isOnline ? 0.0 : latitude;
     data['categories'] = categories;
+    data['primaryDiscoveryCategoryId'] = primaryDiscoveryCategoryId;
+    data['discoveryCategoryIds'] = discoveryCategoryIds.take(3).toList();
+    data['discoveryCategorySource'] = discoveryCategorySource;
+    data['discoveryCategoryVersion'] = discoveryCategoryVersion;
     data['isFeatured'] = isFeatured;
     data['featureEndDate'] = featureEndDate;
     data['ticketsEnabled'] = ticketsEnabled;
     data['maxTickets'] = maxTickets;
     data['issuedTickets'] = issuedTickets;
+    data['reservedTickets'] = reservedTickets;
+    data['saveCount'] = saveCount;
     if (ticketPrice != null) data['ticketPrice'] = ticketPrice;
     data['ticketUpgradeEnabled'] = ticketUpgradeEnabled;
     if (ticketUpgradePrice != null) {
       data['ticketUpgradePrice'] = ticketUpgradePrice;
     }
     data['eventDuration'] = eventDuration;
+    data['eventDurationMinutes'] = eventDurationMinutes;
+    data['confirmedRegistrationCount'] = confirmedRegistrationCount;
+    data['registrationPolicy'] = registrationPolicy;
+    data['experience'] = experience;
     data['coHosts'] = coHosts;
+    data['checkInStaff'] = checkInStaff;
     if (organizationId != null) data['organizationId'] = organizationId;
     data['accessList'] = accessList;
+    data['registrationPolicy'] = registrationPolicy;
+    data['experience'] = experience;
+    data['reminderPolicy'] = reminderPolicy;
+    data['seriesId'] = seriesId;
+    data['occurrenceIndex'] = occurrenceIndex;
+    data['seriesVersion'] = seriesVersion;
+    data['eventRevision'] = eventRevision;
+    data['wizardSchemaVersion'] = wizardSchemaVersion;
     data['signInMethods'] = normalizedSignInMethods;
+    data['checkInPolicy'] = checkInPolicy.toJson();
     if (normalizedSecurityTier != null) {
       data['signInSecurityTier'] = normalizedSecurityTier;
     }

@@ -7,6 +7,7 @@ import 'package:attendus/models/ticket_payment_model.dart';
 import 'package:attendus/models/ticket_model.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/Utils/logger.dart';
+import 'package:attendus/config/safety_flags.dart';
 
 class TicketPaymentService {
   static final FirebaseFunctions _functions = FirebaseFunctions.instance;
@@ -15,31 +16,18 @@ class TicketPaymentService {
   /// Create a payment intent for purchasing a ticket
   static Future<Map<String, dynamic>> createTicketPaymentIntent({
     required String eventId,
-    required String ticketId,
-    required double amount,
-    required String customerUid,
-    required String customerName,
-    required String customerEmail,
-    required String creatorUid,
-    required String eventTitle,
+    String ticketTypeId = 'general',
   }) async {
+    if (!SafetyFlags.paidCheckoutEnabled) {
+      throw StateError(SafetyFlags.paymentMaintenanceMessage);
+    }
     try {
       Logger.debug('Creating ticket payment intent for event: $eventId');
-
-      final amountInCents = (amount * 100)
-          .round(); // Convert to cents for Stripe
 
       final callable = _functions.httpsCallable('createTicketPaymentIntent');
       final result = await callable.call({
         'eventId': eventId,
-        'ticketId': ticketId,
-        'amount': amountInCents,
-        'currency': 'usd',
-        'customerUid': customerUid,
-        'customerName': customerName,
-        'customerEmail': customerEmail,
-        'creatorUid': creatorUid,
-        'eventTitle': eventTitle,
+        'ticketTypeId': ticketTypeId,
       });
 
       Logger.debug('Ticket payment intent created successfully');
@@ -58,6 +46,7 @@ class TicketPaymentService {
     required String clientSecret,
     required String eventTitle,
   }) async {
+    if (!SafetyFlags.paidCheckoutEnabled) return false;
     try {
       Logger.debug('Initializing payment sheet for ticket');
 
@@ -103,21 +92,9 @@ class TicketPaymentService {
     required String ticketId,
     required String eventId,
   }) async {
-    try {
-      Logger.debug('Confirming ticket payment for ticket: $ticketId');
-
-      final callable = _functions.httpsCallable('confirmTicketPayment');
-      await callable.call({
-        'paymentIntentId': paymentIntentId,
-        'ticketId': ticketId,
-        'eventId': eventId,
-      });
-
-      Logger.success('Ticket payment confirmed');
-    } catch (e) {
-      Logger.error('Failed to confirm ticket payment: $e', e);
-      throw Exception('Failed to confirm payment: ${e.toString()}');
-    }
+    throw UnsupportedError(
+      'Client payment confirmation is disabled. Payment status is webhook-owned.',
+    );
   }
 
   /// Issue a paid ticket after successful payment
@@ -128,47 +105,10 @@ class TicketPaymentService {
     required EventModel eventModel,
     required String paymentIntentId,
   }) async {
-    try {
-      Logger.debug('Issuing paid ticket for event: $eventId');
-
-      // Create ticket document
-      final ticketId = _firestore.collection(TicketModel.firebaseKey).doc().id;
-      final ticketCode = TicketModel.generateTicketCode();
-
-      final ticket = TicketModel(
-        id: ticketId,
-        eventId: eventId,
-        eventTitle: eventModel.title,
-        eventImageUrl: eventModel.imageUrl,
-        eventLocation: eventModel.location,
-        eventDateTime: eventModel.selectedDateTime,
-        customerUid: customerUid,
-        customerName: customerName,
-        ticketCode: ticketCode,
-        issuedDateTime: DateTime.now(),
-        price: eventModel.ticketPrice,
-        isPaid: true,
-        paymentIntentId: paymentIntentId,
-        paidAt: DateTime.now(),
-      );
-
-      // Save ticket
-      await _firestore
-          .collection(TicketModel.firebaseKey)
-          .doc(ticketId)
-          .set(ticket.toJson());
-
-      // Update event ticket count
-      await _firestore.collection(EventModel.firebaseKey).doc(eventId).update({
-        'issuedTickets': FieldValue.increment(1),
-      });
-
-      Logger.success('Paid ticket issued successfully');
-      return ticket;
-    } catch (e) {
-      Logger.error('Failed to issue paid ticket: $e', e);
-      return null;
-    }
+    Logger.warning(
+      'Blocked client-side paid ticket issuance for payment $paymentIntentId',
+    );
+    return null;
   }
 
   /// Get payment history for tickets purchased by a user
@@ -262,6 +202,9 @@ class TicketPaymentService {
     required String customerEmail,
     required String eventTitle,
   }) async {
+    if (!SafetyFlags.paidCheckoutEnabled) {
+      throw StateError(SafetyFlags.paymentMaintenanceMessage);
+    }
     try {
       Logger.debug(
         'Creating ticket upgrade payment intent for ticket: $ticketId',
@@ -345,23 +288,8 @@ class TicketPaymentService {
     required String ticketId,
     required String paymentIntentId,
   }) async {
-    try {
-      Logger.debug('Confirming ticket upgrade for ticket: $ticketId');
-
-      // Update ticket in Firestore
-      await _firestore
-          .collection(TicketModel.firebaseKey)
-          .doc(ticketId)
-          .update({
-            'isSkipTheLine': true,
-            'upgradedAt': DateTime.now(),
-            'upgradePaymentIntentId': paymentIntentId,
-          });
-
-      Logger.success('Ticket upgraded to skip-the-line successfully');
-    } catch (e) {
-      Logger.error('Failed to confirm ticket upgrade: $e', e);
-      throw Exception('Failed to confirm upgrade: ${e.toString()}');
-    }
+    throw UnsupportedError(
+      'Client ticket upgrades are disabled. Upgrade status is webhook-owned.',
+    );
   }
 }

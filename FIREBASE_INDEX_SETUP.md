@@ -1,68 +1,40 @@
-# Firebase Index Setup for My Profile Events
+# Firestore Index Management
 
-If you're experiencing issues with events not showing on the My Profile screen, you may need to create a composite index in Firebase Firestore.
+`firestore.indexes.json` is the source of truth for AttendUs composite indexes
+in both `attendus-staging` and `orgami-66nxok`. Do not create a console-only
+index as the permanent fix for a query failure: add it to the manifest, add or
+update its query-contract test, and let the release workflow deploy it.
 
-## Required Index
+## Public Discover index
 
-Create a composite index for the Events collection with the following configuration:
+The public Discover feed runs this query against `Events`:
 
-### Collection ID
-`Events`
+- `private == false`
+- `selectedDateTime > <48-hour cutoff>`
 
-### Fields to Index
-1. `customerUid` - Ascending
-2. `eventGenerateTime` - Descending
+It therefore requires the collection-scope composite index:
 
-## How to Create the Index
+1. `private` — ascending
+2. `selectedDateTime` — ascending
 
-### Option 1: Via Firebase Console
-1. Go to [Firebase Console](https://console.firebase.google.com/)
-2. Select your project
-3. Navigate to Firestore Database
-4. Click on "Indexes" tab
-5. Click "Create Index"
-6. Enter the following:
-   - Collection ID: `Events`
-   - Add field: `customerUid` (Ascending)
-   - Add field: `eventGenerateTime` (Descending)
-7. Click "Create"
+The contract is declared by `PublicEventsRepository.requiredIndex` and checked
+by `test/public_events_repository_test.dart`.
 
-### Option 2: Via Error Link
-If you see an error in the console logs like:
-```
-The query requires an index. You can create it here: https://console.firebase.google.com/...
-```
-Click the link and it will automatically create the required index for you.
+## Deployment
 
-### Option 3: Via Firebase CLI
-Add to your `firestore.indexes.json`:
-```json
-{
-  "indexes": [
-    {
-      "collectionGroup": "Events",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "customerUid",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "eventGenerateTime",
-          "order": "DESCENDING"
-        }
-      ]
-    }
-  ]
-}
-```
+Main-branch Hosting releases call the reusable Firestore index workflow first.
+That workflow:
 
-Then deploy:
-```bash
-firebase deploy --only firestore:indexes
-```
+1. deploys `firestore.indexes.json` to staging;
+2. waits for every manifest index to report `READY` and rejects drift;
+3. repeats the deployment and verification in production; and
+4. allows Hosting to continue only after both projects pass.
 
-## Notes
-- Index creation can take a few minutes
-- The app will work without the index but queries will be slower
-- The code has been updated to handle missing indexes gracefully by falling back to a query without ordering and sorting in memory
+For an index-only repair, manually dispatch **Deploy and Verify Firestore
+Indexes** and select staging, production, or both. The production job is
+restricted to `main` and manual dispatches.
+
+The Firebase console link included in a `failed-precondition` error is useful
+for identifying the required fields. If it is used during an emergency, export
+the resulting index into `firestore.indexes.json` immediately so source control
+and the deployed database cannot drift.

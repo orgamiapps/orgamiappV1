@@ -1,3 +1,4 @@
+import 'package:attendus/config/safety_flags.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
@@ -5,7 +6,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
-import '../../Controller/customer_controller.dart';
+import '../../controller/customer_controller.dart';
 import '../../Permissions/permissions_helper.dart';
 import '../../Services/face_recognition_service.dart';
 import '../../models/event_model.dart';
@@ -36,18 +37,18 @@ class SimpleFaceEnrollmentScreen extends StatefulWidget {
 
 // State Machine States
 enum EnrollmentState {
-  INITIALIZING,
-  READY,
-  CAPTURING,
-  PROCESSING,
-  COMPLETE,
-  ERROR,
+  initializing,
+  ready,
+  capturing,
+  processing,
+  complete,
+  error,
 }
 
 class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
     with TickerProviderStateMixin {
   // State Management
-  EnrollmentState _currentState = EnrollmentState.INITIALIZING;
+  EnrollmentState _currentState = EnrollmentState.initializing;
   String _statusMessage = 'Initializing camera...';
   String _errorMessage = '';
 
@@ -64,20 +65,20 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
   bool _isProcessingFrame = false;
   int _frameCounter = 0;
   int _frameSkipCounter = 0;
-  static const int FRAME_SKIP_COUNT = 10; // Process every 10th frame
+  static const int frameSkipCount = 10; // Process every 10th frame
 
   // Enrollment Progress
   int _capturedSamples = 0;
-  static const int REQUIRED_SAMPLES = 5;
+  static const int requiredSamples = 5;
   final List<List<double>> _faceFeatures = [];
   DateTime? _lastCaptureTime;
-  static const Duration CAPTURE_INTERVAL = Duration(milliseconds: 1500);
+  static const Duration captureInterval = Duration(milliseconds: 1500);
 
   // Timers and Timeouts
   Timer? _timeoutTimer;
   Timer? _simulationTimer;
-  static const Duration ENROLLMENT_TIMEOUT = Duration(seconds: 30);
-  static const Duration SIMULATION_DELAY = Duration(seconds: 1);
+  static const Duration enrollmentTimeout = Duration(seconds: 30);
+  static const Duration simulationDelay = Duration(seconds: 1);
 
   // UI Elements
   late AnimationController _pulseController;
@@ -107,11 +108,12 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
   }
 
   void _startEnrollmentProcess() async {
+    if (!SafetyFlags.biometricCheckInEnabled) return;
     _logWithTimestamp('Starting enrollment process...');
-    _updateState(EnrollmentState.INITIALIZING);
+    _updateState(EnrollmentState.initializing);
 
     // Set enrollment timeout
-    _timeoutTimer = Timer(ENROLLMENT_TIMEOUT, () {
+    _timeoutTimer = Timer(enrollmentTimeout, () {
       _logWithTimestamp('Enrollment timeout reached');
       _handleTimeout();
     });
@@ -125,7 +127,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
   }
 
   void _startSimulation() {
-    _updateState(EnrollmentState.READY);
+    _updateState(EnrollmentState.ready);
     _updateStatus('SIMULATION MODE - Face detection simulated');
 
     // Initialize dummy camera for visual feedback
@@ -133,14 +135,14 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
 
     // Simulate face captures
     int simulatedCaptures = 0;
-    _simulationTimer = Timer.periodic(SIMULATION_DELAY, (timer) {
-      if (simulatedCaptures < REQUIRED_SAMPLES) {
+    _simulationTimer = Timer.periodic(simulationDelay, (timer) {
+      if (simulatedCaptures < requiredSamples) {
         simulatedCaptures++;
         _capturedSamples = simulatedCaptures;
 
         setState(() {
           _updateStatus(
-            'Simulated capture $simulatedCaptures of $REQUIRED_SAMPLES',
+            'Simulated capture $simulatedCaptures of $requiredSamples',
           );
           _frameCounter++;
         });
@@ -150,7 +152,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
         // Provide haptic feedback
         HapticFeedback.mediumImpact();
 
-        if (simulatedCaptures >= REQUIRED_SAMPLES) {
+        if (simulatedCaptures >= requiredSamples) {
           timer.cancel();
           _completeEnrollment();
         }
@@ -159,6 +161,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
   }
 
   Future<void> _initializeDummyCamera() async {
+    if (!SafetyFlags.biometricCheckInEnabled) return;
     try {
       _cameras = await availableCameras();
       if (_cameras!.isNotEmpty) {
@@ -187,6 +190,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
   }
 
   void _initializeRealMode() async {
+    if (!SafetyFlags.biometricCheckInEnabled) return;
     try {
       _logWithTimestamp('Initializing real face detection mode...');
 
@@ -214,7 +218,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
 
       // Step 4: Start Image Stream
       if (_isCameraInitialized) {
-        _updateState(EnrollmentState.READY);
+        _updateState(EnrollmentState.ready);
         _updateStatus('Position your face in the frame');
         _startImageStream();
       }
@@ -225,6 +229,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
   }
 
   Future<void> _initializeFaceDetection() async {
+    if (!SafetyFlags.biometricCheckInEnabled) return;
     try {
       _logWithTimestamp('Initializing ML Kit face detector...');
 
@@ -248,6 +253,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
   }
 
   Future<void> _initializeCamera() async {
+    if (!SafetyFlags.biometricCheckInEnabled) return;
     try {
       _logWithTimestamp('Getting available cameras...');
       _cameras = await availableCameras();
@@ -310,14 +316,14 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
     try {
       _logWithTimestamp('Starting camera image stream...');
       _isStreamActive = true;
-      _updateState(EnrollmentState.CAPTURING);
+      _updateState(EnrollmentState.capturing);
 
       _cameraController!.startImageStream((CameraImage image) {
         _frameCounter++;
         _frameSkipCounter++;
 
-        // Process only every FRAME_SKIP_COUNT frames
-        if (_frameSkipCounter >= FRAME_SKIP_COUNT) {
+        // Process only every frameSkipCount frames
+        if (_frameSkipCounter >= frameSkipCount) {
           _frameSkipCounter = 0;
           _processCameraFrame(image);
         }
@@ -337,14 +343,14 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
   }
 
   void _processCameraFrame(CameraImage image) async {
-    if (_isProcessingFrame || _capturedSamples >= REQUIRED_SAMPLES) {
+    if (_isProcessingFrame || _capturedSamples >= requiredSamples) {
       return;
     }
 
     // Throttle captures
     final now = DateTime.now();
     if (_lastCaptureTime != null &&
-        now.difference(_lastCaptureTime!) < CAPTURE_INTERVAL) {
+        now.difference(_lastCaptureTime!) < captureInterval) {
       return;
     }
 
@@ -395,9 +401,9 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
       _lastCaptureTime = DateTime.now();
 
       _logWithTimestamp(
-        'Captured sample $_capturedSamples of $REQUIRED_SAMPLES',
+        'Captured sample $_capturedSamples of $requiredSamples',
       );
-      _updateStatus('Captured $_capturedSamples of $REQUIRED_SAMPLES samples');
+      _updateStatus('Captured $_capturedSamples of $requiredSamples samples');
 
       // Haptic feedback
       HapticFeedback.mediumImpact();
@@ -405,7 +411,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
       // Animate capture
       setState(() {});
 
-      if (_capturedSamples >= REQUIRED_SAMPLES) {
+      if (_capturedSamples >= requiredSamples) {
         _completeEnrollment();
       }
     } catch (e) {
@@ -428,11 +434,11 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
 
       // Simulate a capture
       _capturedSamples++;
-      _updateStatus('Manual capture $_capturedSamples of $REQUIRED_SAMPLES');
+      _updateStatus('Manual capture $_capturedSamples of $requiredSamples');
 
       HapticFeedback.heavyImpact();
 
-      if (_capturedSamples >= REQUIRED_SAMPLES) {
+      if (_capturedSamples >= requiredSamples) {
         _completeEnrollment();
       }
     } catch (e) {
@@ -442,7 +448,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
 
   void _completeEnrollment() async {
     _logWithTimestamp('Completing enrollment...');
-    _updateState(EnrollmentState.PROCESSING);
+    _updateState(EnrollmentState.processing);
     _updateStatus('Processing enrollment...');
 
     // Stop camera stream
@@ -488,7 +494,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
         }
       }
 
-      _updateState(EnrollmentState.COMPLETE);
+      _updateState(EnrollmentState.complete);
       _updateStatus('Enrollment successful!');
       _logWithTimestamp('Enrollment completed successfully');
 
@@ -552,13 +558,13 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
   }
 
   void _handleTimeout() {
-    _updateState(EnrollmentState.ERROR);
+    _updateState(EnrollmentState.error);
     _updateStatus('Enrollment timeout - please try again');
     _errorMessage = 'The enrollment process took too long. Please try again.';
   }
 
   void _handleError(String message) {
-    _updateState(EnrollmentState.ERROR);
+    _updateState(EnrollmentState.error);
     _updateStatus('Error occurred');
     _errorMessage = message;
 
@@ -588,7 +594,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
 
     // Reset state
     setState(() {
-      _currentState = EnrollmentState.INITIALIZING;
+      _currentState = EnrollmentState.initializing;
       _capturedSamples = 0;
       _faceFeatures.clear();
       _frameCounter = 0;
@@ -648,40 +654,52 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
 
   Color _getStateColor() {
     switch (_currentState) {
-      case EnrollmentState.INITIALIZING:
+      case EnrollmentState.initializing:
         return Colors.blue;
-      case EnrollmentState.READY:
+      case EnrollmentState.ready:
         return Colors.orange;
-      case EnrollmentState.CAPTURING:
+      case EnrollmentState.capturing:
         return Colors.green;
-      case EnrollmentState.PROCESSING:
+      case EnrollmentState.processing:
         return Colors.purple;
-      case EnrollmentState.COMPLETE:
+      case EnrollmentState.complete:
         return Colors.green;
-      case EnrollmentState.ERROR:
+      case EnrollmentState.error:
         return Colors.red;
     }
   }
 
   IconData _getStateIcon() {
     switch (_currentState) {
-      case EnrollmentState.INITIALIZING:
+      case EnrollmentState.initializing:
         return Icons.hourglass_empty;
-      case EnrollmentState.READY:
+      case EnrollmentState.ready:
         return Icons.face;
-      case EnrollmentState.CAPTURING:
+      case EnrollmentState.capturing:
         return Icons.camera_alt;
-      case EnrollmentState.PROCESSING:
+      case EnrollmentState.processing:
         return Icons.autorenew;
-      case EnrollmentState.COMPLETE:
+      case EnrollmentState.complete:
         return Icons.check_circle;
-      case EnrollmentState.ERROR:
+      case EnrollmentState.error:
         return Icons.error;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!SafetyFlags.biometricCheckInEnabled) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Check-in')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(SafetyFlags.biometricMaintenanceMessage),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -702,8 +720,8 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
 
           // Face Guide Overlay
           if (!_isNavigating &&
-              (_currentState == EnrollmentState.CAPTURING ||
-                  _currentState == EnrollmentState.READY))
+              (_currentState == EnrollmentState.capturing ||
+                  _currentState == EnrollmentState.ready))
             _buildFaceGuide(),
 
           // Status Panel
@@ -716,7 +734,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
           if (!_isNavigating && _useManualCapture) _buildManualCaptureButton(),
 
           // Error Dialog
-          if (!_isNavigating && _currentState == EnrollmentState.ERROR)
+          if (!_isNavigating && _currentState == EnrollmentState.error)
             _buildErrorDialog(),
 
           // Loading overlay during navigation
@@ -757,7 +775,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
   Widget _buildCameraView() {
     if (_isCameraInitialized && _cameraController != null) {
       return Positioned.fill(child: CameraPreview(_cameraController!));
-    } else if (_currentState == EnrollmentState.INITIALIZING) {
+    } else if (_currentState == EnrollmentState.initializing) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -786,7 +804,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
       painter: FaceGuidePainter(
         animation: _pulseAnimation,
         capturedSamples: _capturedSamples,
-        requiredSamples: REQUIRED_SAMPLES,
+        requiredSamples: requiredSamples,
       ),
       child: Container(),
     );
@@ -844,17 +862,17 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
                     ),
                   ],
                 ),
-                if (_currentState == EnrollmentState.CAPTURING) ...[
+                if (_currentState == EnrollmentState.capturing) ...[
                   SizedBox(height: 15),
                   LinearProgressIndicator(
-                    value: _capturedSamples / REQUIRED_SAMPLES,
+                    value: _capturedSamples / requiredSamples,
                     backgroundColor: Colors.white30,
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     minHeight: 6,
                   ),
                   SizedBox(height: 10),
                   Text(
-                    '$_capturedSamples / $REQUIRED_SAMPLES samples captured',
+                    '$_capturedSamples / $requiredSamples samples captured',
                     style: TextStyle(color: Colors.white, fontSize: 14),
                   ),
                 ],
@@ -873,7 +891,7 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
       right: 20,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(REQUIRED_SAMPLES, (index) {
+        children: List.generate(requiredSamples, (index) {
           final isComplete = index < _capturedSamples;
           final isCurrent = index == _capturedSamples;
 
@@ -956,16 +974,16 @@ class _SimpleFaceEnrollmentScreenState extends State<SimpleFaceEnrollmentScreen>
               children: [
                 TextButton(
                   onPressed: _skipEnrollment,
-                  child: Text('Skip'),
                   style: TextButton.styleFrom(foregroundColor: Colors.grey),
+                  child: Text('Skip'),
                 ),
                 ElevatedButton(
                   onPressed: _retryEnrollment,
-                  child: Text('Try Again'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
                   ),
+                  child: Text('Try Again'),
                 ),
               ],
             ),

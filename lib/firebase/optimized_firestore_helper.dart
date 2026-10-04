@@ -1,3 +1,4 @@
+import 'package:attendus/Services/public_profile_service.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/models/event_model.dart';
@@ -12,7 +13,7 @@ class OptimizedFirestoreHelper {
   static final Map<String, DateTime> _cacheTimestamps = {};
   static const Duration _cacheExpiry = Duration(minutes: 5);
   static const int _maxCacheSize = 100; // Prevent unlimited cache growth
-  
+
   // Track cache hits for optimization insights
   static int _cacheHits = 0;
   static int _cacheMisses = 0;
@@ -43,42 +44,8 @@ class OptimizedFirestoreHelper {
     }
   }
 
-  /// Get user with caching and timeout
-  static Future<CustomerModel?> getOptimizedUser(String userId) async {
-    final cacheKey = 'user_$userId';
-
-    // Check cache first
-    if (_isValidCache(cacheKey)) {
-      Logger.debug('Returning cached user data (hits: $_cacheHits, misses: $_cacheMisses)');
-      return _cache[cacheKey] as CustomerModel?;
-    }
-    
-    // Enforce cache size limit before adding new entries
-    _enforceCacheSizeLimit();
-
-    try {
-      final docSnapshot = await _firestore
-          .collection('Customers')
-          .doc(userId)
-          .get()
-          .timeout(const Duration(seconds: 5));
-
-      if (docSnapshot.exists) {
-        final userData = CustomerModel.fromFirestore(docSnapshot);
-
-        // Cache the result
-        _cache[cacheKey] = userData;
-        _cacheTimestamps[cacheKey] = DateTime.now();
-
-        return userData;
-      }
-
-      return null;
-    } catch (e) {
-      Logger.error('Error getting user: $e');
-      return null;
-    }
-  }
+  static Future<CustomerModel?> getOptimizedUser(String userId) =>
+      PublicProfileService().getCustomer(userId);
 
   /// Search events with debouncing and limits
   static Future<List<EventModel>> searchOptimizedEvents(String query) async {
@@ -119,6 +86,7 @@ class OptimizedFirestoreHelper {
       }
 
       // Cache the results
+      _enforceCacheSizeLimit();
       _cache[cacheKey] = events;
       _cacheTimestamps[cacheKey] = DateTime.now();
 
@@ -129,58 +97,8 @@ class OptimizedFirestoreHelper {
     }
   }
 
-  /// Search users with optimization
-  static Future<List<CustomerModel>> searchOptimizedUsers(String query) async {
-    if (query.trim().isEmpty) return [];
-
-    final cacheKey = 'search_users_${query.toLowerCase()}';
-
-    // Check cache first
-    if (_isValidCache(cacheKey)) {
-      Logger.debug('Returning cached user search results');
-      return _cache[cacheKey] as List<CustomerModel>;
-    }
-
-    try {
-      // Search by username first (more efficient)
-      final snapshot = await _firestore
-          .collection('Customers')
-          .where('isDiscoverable', isEqualTo: true)
-          .limit(30)
-          .get()
-          .timeout(const Duration(seconds: 5));
-
-      List<CustomerModel> users = [];
-      final queryLower = query.toLowerCase();
-
-      for (var doc in snapshot.docs) {
-        try {
-          final user = CustomerModel.fromFirestore(doc);
-
-          // Simple text search on name and username
-          if (user.name.toLowerCase().contains(queryLower) ||
-              (user.username?.toLowerCase().contains(queryLower) ?? false)) {
-            users.add(user);
-          }
-
-          // Limit results to prevent performance issues
-          if (users.length >= 20) break;
-        } catch (e) {
-          Logger.error('Error parsing user search result: $e');
-          continue;
-        }
-      }
-
-      // Cache the results
-      _cache[cacheKey] = users;
-      _cacheTimestamps[cacheKey] = DateTime.now();
-
-      return users;
-    } catch (e) {
-      Logger.error('Error searching users: $e');
-      return [];
-    }
-  }
+  static Future<List<CustomerModel>> searchOptimizedUsers(String query) =>
+      PublicProfileService().search(query);
 
   /// Check if cached data is still valid
   static bool _isValidCache(String key) {
@@ -197,7 +115,7 @@ class OptimizedFirestoreHelper {
       _cacheHits++;
       return true;
     }
-    
+
     _cacheMisses++;
     return false;
   }
@@ -232,7 +150,7 @@ class OptimizedFirestoreHelper {
     _cacheMisses = 0;
     Logger.debug('All cache cleared');
   }
-  
+
   /// Enforce cache size limit to prevent memory issues
   static void _enforceCacheSizeLimit() {
     if (_cache.length >= _maxCacheSize) {
@@ -240,14 +158,16 @@ class OptimizedFirestoreHelper {
       final entriesToRemove = (_maxCacheSize * 0.2).round();
       final sortedEntries = _cacheTimestamps.entries.toList()
         ..sort((a, b) => a.value.compareTo(b.value));
-      
+
       for (var i = 0; i < entriesToRemove && i < sortedEntries.length; i++) {
         final key = sortedEntries[i].key;
         _cache.remove(key);
         _cacheTimestamps.remove(key);
       }
-      
-      Logger.debug('Enforced cache size limit: removed $entriesToRemove entries');
+
+      Logger.debug(
+        'Enforced cache size limit: removed $entriesToRemove entries',
+      );
     }
   }
 
@@ -256,7 +176,7 @@ class OptimizedFirestoreHelper {
     final hitRate = _cacheHits + _cacheMisses > 0
         ? (_cacheHits / (_cacheHits + _cacheMisses) * 100).toStringAsFixed(1)
         : '0.0';
-    
+
     return {
       'totalEntries': _cache.length,
       'memoryUsage': _cache.length * 1000, // Rough estimation

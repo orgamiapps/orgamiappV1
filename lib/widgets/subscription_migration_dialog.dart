@@ -68,10 +68,7 @@ class SubscriptionMigrationDialog {
     if (userId == null) return;
 
     try {
-      await FirebaseFirestore.instance
-          .collection('Customers')
-          .doc(userId)
-          .set({
+      await FirebaseFirestore.instance.collection('Customers').doc(userId).set({
         _migrationKey: true,
         'migrationCompletedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -114,11 +111,11 @@ class __MigrationDialogContentState extends State<_MigrationDialogContent>
 
     _slideAnimation =
         Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeOutCubic,
-      ),
-    );
+          CurvedAnimation(
+            parent: _animationController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
 
     _animationController.forward();
   }
@@ -132,16 +129,16 @@ class __MigrationDialogContentState extends State<_MigrationDialogContent>
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 500, maxHeight: 700),
         child: FadeTransition(
           opacity: _fadeAnimation,
           child: SlideTransition(
             position: _slideAnimation,
-            child: _currentPage == 0 ? _buildWelcomePage() : _buildSelectionPage(),
+            child: _currentPage == 0
+                ? _buildWelcomePage()
+                : _buildSelectionPage(),
           ),
         ),
       ),
@@ -196,10 +193,7 @@ class __MigrationDialogContentState extends State<_MigrationDialogContent>
               const SizedBox(height: 12),
               const Text(
                 'We\'ve introduced new subscription tiers',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.white,
-                ),
+                style: TextStyle(fontSize: 16, color: Colors.white),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -280,10 +274,7 @@ class __MigrationDialogContentState extends State<_MigrationDialogContent>
                   ),
                   child: const Text(
                     'Continue',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -312,16 +303,16 @@ class __MigrationDialogContentState extends State<_MigrationDialogContent>
               Text(
                 'Choose Your Plan',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Select the subscription tier that works for you',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -333,8 +324,10 @@ class __MigrationDialogContentState extends State<_MigrationDialogContent>
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: TierComparisonWidget(
-              onBasicSelected: () => _handleTierSelection(SubscriptionTier.basic),
-              onPremiumSelected: () => _handleTierSelection(SubscriptionTier.premium),
+              onBasicSelected: () =>
+                  _handleTierSelection(SubscriptionTier.basic),
+              onPremiumSelected: () =>
+                  _handleTierSelection(SubscriptionTier.premium),
             ),
           ),
         ),
@@ -354,7 +347,12 @@ class __MigrationDialogContentState extends State<_MigrationDialogContent>
     );
   }
 
-  Widget _buildFeatureBullet(String title, String description, IconData icon, Color color) {
+  Widget _buildFeatureBullet(
+    String title,
+    String description,
+    IconData icon,
+    Color color,
+  ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -409,10 +407,7 @@ class __MigrationDialogContentState extends State<_MigrationDialogContent>
         await FirebaseFirestore.instance
             .collection('subscriptions')
             .doc(userId)
-            .update({
-          'tier': tier.value,
-          'updatedAt': Timestamp.now(),
-        });
+            .update({'tier': tier.value, 'updatedAt': Timestamp.now()});
 
         // Mark migration as completed
         await SubscriptionMigrationDialog._markMigrationCompleted();
@@ -453,10 +448,10 @@ class __MigrationDialogContentState extends State<_MigrationDialogContent>
             .collection('subscriptions')
             .doc(userId)
             .update({
-          'tier': 'premium', // Default to premium with grace period
-          'migrationPending': true,
-          'updatedAt': Timestamp.now(),
-        });
+              'tier': 'premium', // Default to premium with grace period
+              'migrationPending': true,
+              'updatedAt': Timestamp.now(),
+            });
 
         await SubscriptionMigrationDialog._markMigrationCompleted();
 
@@ -475,4 +470,3 @@ class __MigrationDialogContentState extends State<_MigrationDialogContent>
     }
   }
 }
-

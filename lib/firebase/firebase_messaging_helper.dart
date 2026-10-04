@@ -1,6 +1,23 @@
+import 'package:attendus/Services/public_profile_service.dart';
+import 'package:attendus/Services/notification_preferences_service.dart';
+import 'package:attendus/Services/pending_auth_intent_service.dart';
+import 'package:attendus/Services/push_token_lifecycle.dart';
+import 'package:attendus/Services/push_notification_intent.dart';
+import 'dart:async';
 import 'dart:convert';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:attendus/main.dart' show appNavigatorKey;
+import 'package:attendus/widgets/deferred_shared_event_screen.dart';
+import 'package:attendus/widgets/deferred_shared_community_screen.dart';
+import 'package:attendus/widgets/deferred_conversation_screen.dart';
+import 'package:attendus/widgets/deferred_screen_loader.dart';
+import 'package:attendus/screens/Home/dashboard_screen.dart'
+    deferred as dashboard;
+import 'package:flutter/material.dart' show MaterialPageRoute, WidgetsBinding;
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:attendus/firebase_options.dart';
 import 'package:firebase_messaging/firebase_messaging.dart' as fcm;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -13,6 +30,8 @@ import 'package:attendus/models/notification_model.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
 class NotificationPage {
   final List<NotificationModel> items;
@@ -31,96 +50,168 @@ class FirebaseMessagingHelper {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final fcm.FirebaseMessaging _messaging = fcm.FirebaseMessaging.instance;
   FlutterLocalNotificationsPlugin? _localNotifications;
-  UserNotificationSettings? _settings;
+  late final NotificationPreferencesService _preferences =
+      NotificationPreferencesService(
+        currentUid: () => _auth.currentUser?.uid,
+        load: (uid) async =>
+            (await _firestore
+                    .collection('users')
+                    .doc(uid)
+                    .collection('settings')
+                    .doc('notifications')
+                    .get())
+                .data(),
+        save: (uid, data) => _firestore
+            .collection('users')
+            .doc(uid)
+            .collection('settings')
+            .doc('notifications')
+            .set(data),
+      );
+  UserNotificationSettings? get _settings => _preferences.cached;
   EventModel? _pendingFeedbackEvent;
+  bool _listenersInitialized = false;
+  StreamSubscription<User?>? _pushAuthSubscription;
+  StreamSubscription<List<ConnectivityResult>>? _pushNetworkSubscription;
+  static const _pushStateKey = 'push_installation_v1';
+
+  String? get _pushUid {
+    final user = _auth.currentUser;
+    return user == null || user.isAnonymous ? null : user.uid;
+  }
+
+  late final PushTokenLifecycle _pushLifecycle = PushTokenLifecycle(
+    currentUid: () => _pushUid,
+    readState: () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      final raw = prefs.getString(_pushStateKey);
+      if (raw == null) return <String, dynamic>{};
+      try {
+        return Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      } catch (_) {
+        return <String, dynamic>{};
+      }
+    },
+    writeState: (state) async {
+      final prefs = await SharedPreferences.getInstance();
+      if (!await prefs.setString(_pushStateKey, jsonEncode(state))) {
+        throw StateError('Could not persist notification session');
+      }
+    },
+    newInstallationId: () => const Uuid().v4(),
+    acquireToken: () async {
+      final settings = await _messaging.getNotificationSettings();
+      if (settings.authorizationStatus != fcm.AuthorizationStatus.authorized &&
+          settings.authorizationStatus != fcm.AuthorizationStatus.provisional) {
+        await _messaging.setAutoInitEnabled(false);
+        return null;
+      }
+      await _messaging.setAutoInitEnabled(true);
+      const publicKey = String.fromEnvironment('ATTENDUS_WEB_PUSH_VAPID_KEY');
+      return _messaging.getToken(
+        vapidKey: kIsWeb && publicKey.isNotEmpty ? publicKey : null,
+      );
+    },
+    deleteToken: () async {
+      await _messaging.setAutoInitEnabled(false);
+      await _messaging.deleteToken();
+    },
+    register: (intent) => _pushRequest('registerPushTokenV1', intent),
+    revoke: (intent) => _pushRequest('revokePushTokenV1', intent),
+    clearNotifications: () async {
+      if (!kIsWeb) {
+        await (_localNotifications ?? FlutterLocalNotificationsPlugin())
+            .cancelAll();
+      }
+    },
+    onError: (error) =>
+        Logger.warning('Notification session cleanup pending: $error'),
+  );
+
+  Future<void> _pushRequest(String name, Map<String, dynamic> intent) async {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      if (_pushUid != intent['expectedUid']) {
+        throw StateError('Notification account changed');
+      }
+      try {
+        await FirebaseFunctions.instance.httpsCallable(name).call(intent);
+        return;
+      } on FirebaseFunctionsException catch (error) {
+        final details = error.details;
+        if (details is Map &&
+            details['code'] == 'installation-reset-required') {
+          throw PushInstallationReset();
+        }
+        if (attempt != 0 ||
+            !const {'unavailable', 'deadline-exceeded'}.contains(error.code)) {
+          rethrow;
+        }
+        // The same generation is replayed; an obsolete intent is never promoted.
+      }
+    }
+  }
+
+  Future<void> clearForSignOut() async {
+    _pushIntents.invalidate();
+    _pendingFeedbackEvent = null;
+    await _pushLifecycle.clearForSignOut();
+  }
+
+  Future<void> requestEventReminders() async {
+    await requestPermissions();
+  }
 
   // Initialize messaging with optimizations
   Future<void> initialize() async {
     try {
-      // Quick connectivity check
-      bool isOnline = true;
-      try {
-        final connectivity = await Connectivity().checkConnectivity().timeout(
-          const Duration(milliseconds: 500),
+      _pushAuthSubscription ??= _auth.authStateChanges().listen((_) {
+        _pushIntents.invalidate();
+        _pendingFeedbackEvent = null;
+        unawaited(
+          _pushLifecycle.synchronize().catchError((Object error) {
+            Logger.warning('Notification session registration pending: $error');
+          }),
         );
-        // connectivity is always a List<ConnectivityResult> in newer versions
-        final list = List<ConnectivityResult>.from(
-          connectivity.cast<ConnectivityResult>(),
-        );
-        isOnline =
-            list.isNotEmpty && !list.every((c) => c == ConnectivityResult.none);
-      } catch (_) {
-        // Assume online if check fails
-        isOnline = true;
-      }
-
-      if (!isOnline) {
-        Logger.warning('Skipping Messaging init: offline');
-        return;
-      }
-
-      // Request permission non-blocking
-      _messaging
-          .requestPermission(
-            alert: true,
-            announcement: false,
-            badge: true,
-            carPlay: false,
-            criticalAlert: false,
-            provisional: false,
-            sound: true,
-          )
-          .then((settings) {
-            if (kDebugMode) {
-              if (settings.authorizationStatus ==
-                  fcm.AuthorizationStatus.authorized) {
-                Logger.success('✅ Notification permissions granted');
-              } else {
-                Logger.warning('❌ Notification permissions denied');
-              }
-            }
-          })
-          .catchError((e) {
-            Logger.warning('Permission request failed: $e');
-          });
-
-      // Initialize local notifications async
-      if (!kIsWeb) {
-        _initializeLocalNotifications().catchError((e) {
-          Logger.warning('Local notifications init failed: $e');
-        });
-      }
-
-      // Enable auto-init
-      _messaging.setAutoInitEnabled(true).catchError((e) {
-        Logger.warning('Auto-init failed: $e');
-      });
-
-      // Get FCM token async
-      (() async {
-        try {
-          String? fcmToken;
-          if (kIsWeb) {
-            fcmToken = await _messaging.getToken(
-              vapidKey:
-                  'BCFlVkRk4wUzL3pNaP7bVYqg8uH3M2vYsmYcB5dOSdpnqjWcW1O9xv5v3kHcQ8bYl1o3tB6Qx4HjG3C2D5E6F7G8',
-            );
-          } else {
-            fcmToken = await _messaging.getToken();
-          }
-          if (fcmToken != null) {
-            _saveTokenToFirestore(fcmToken).catchError((e) {
-              Logger.warning('Failed to save FCM token: $e');
-            });
-          }
-        } catch (e) {
-          Logger.warning('Failed to get FCM token: $e');
+        if (_pushUid != null) {
+          unawaited(
+            _loadNotificationSettings().catchError((Object error) {
+              Logger.warning('Notification preferences unavailable: $error');
+            }),
+          );
         }
-      })();
+      });
+      _pushNetworkSubscription ??= Connectivity().onConnectivityChanged.listen((
+        results,
+      ) {
+        if (results.any((value) => value != ConnectivityResult.none)) {
+          unawaited(
+            _pushLifecycle.synchronize().catchError((Object error) {
+              Logger.warning('Notification session retry pending: $error');
+            }),
+          );
+        }
+      });
+      unawaited(
+        _pushLifecycle.synchronize().catchError((Object error) {
+          Logger.warning('Notification session registration pending: $error');
+        }),
+      );
 
+      // Taps and auth changes remain relevant when offline or when permission
+      // was revoked after delivery. Only token acquisition requires permission.
+      if (_listenersInitialized) return;
+      _listenersInitialized = true;
+      if (!kIsWeb) {
+        unawaited(
+          _initializeLocalNotifications().catchError((Object error) {
+            Logger.warning('Local notifications init failed: $error');
+          }),
+        );
+      }
       // Listen for token refresh
       _messaging.onTokenRefresh.listen((token) {
-        _saveTokenToFirestore(token).catchError((e) {
+        _pushLifecycle.tokenRefreshed(token).catchError((e) {
           Logger.warning('Failed to save refreshed token: $e');
         });
       });
@@ -139,6 +230,16 @@ class FirebaseMessagingHelper {
       // Handle notification taps (mobile only)
       if (!kIsWeb) {
         fcm.FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
+        unawaited(
+          _messaging
+              .getInitialMessage()
+              .then((message) {
+                if (message != null) _handleNotificationTap(message);
+              })
+              .catchError((Object error) {
+                Logger.warning('Initial notification unavailable: $error');
+              }),
+        );
       }
 
       // Load user settings async
@@ -160,9 +261,9 @@ class FirebaseMessagingHelper {
 
     const DarwinInitializationSettings initializationSettingsIOS =
         DarwinInitializationSettings(
-          requestAlertPermission: true,
-          requestBadgePermission: true,
-          requestSoundPermission: true,
+          requestAlertPermission: false,
+          requestBadgePermission: false,
+          requestSoundPermission: false,
         );
 
     const InitializationSettings initializationSettings =
@@ -177,214 +278,103 @@ class FirebaseMessagingHelper {
     );
   }
 
-  Future<void> _saveTokenToFirestore(String token) async {
-    try {
-      // Avoid writes when offline
-      try {
-        final dynamic connectivity = await Connectivity().checkConnectivity();
-        bool offline = false;
-        if (connectivity is ConnectivityResult) {
-          offline = connectivity == ConnectivityResult.none;
-        } else if (connectivity is Iterable) {
-          final list = List<ConnectivityResult>.from(
-            connectivity.cast<ConnectivityResult>(),
-          );
-          offline =
-              list.isEmpty || list.every((c) => c == ConnectivityResult.none);
-        }
-        if (offline) {
-          if (kDebugMode) {
-            Logger.warning('Skipping FCM token save: offline');
-          }
+  Future<void> _loadNotificationSettings() async {
+    await _preferences.read();
+  }
+
+  Future<void> _saveNotificationSettings(UserNotificationSettings settings) =>
+      _preferences.write(settings);
+
+  late final PushIntentCoordinator _pushIntents = PushIntentCoordinator(
+    currentUid: () => _pushUid,
+    remember: (intent) => switch (intent.destination) {
+      PushDestination.event => PendingAuthIntentService.rememberSharedEvent(
+        intent.id,
+      ),
+      PushDestination.community => PendingAuthIntentService.rememberCommunity(
+        intent.id,
+      ),
+      PushDestination.conversation =>
+        PendingAuthIntentService.rememberConversation(intent.id),
+      PushDestination.discovery => PendingAuthIntentService.rememberHome(),
+    },
+    present: (intent, stillCurrent) {
+      final result = Completer<bool>();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!stillCurrent()) {
+          result.complete(false);
           return;
         }
-      } catch (_) {}
-
-      final user = _auth.currentUser;
-      if (user != null) {
-        await _firestore.collection('users').doc(user.uid).set({
-          'fcmToken': token,
-          'lastTokenUpdate': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-        if (kDebugMode) {
-          Logger.success('✅ FCM token saved to Firestore');
+        final navigator = appNavigatorKey.currentState;
+        if (navigator == null) {
+          result.complete(false);
+          return;
         }
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        Logger.error('❌ Error saving FCM token: $e', e);
-      }
-    }
-  }
-
-  Future<void> _loadNotificationSettings() async {
-    try {
-      final user = _auth.currentUser;
-      if (user != null) {
-        final doc = await _firestore
-            .collection('users')
-            .doc(user.uid)
-            .collection('settings')
-            .doc('notifications')
-            .get();
-
-        if (doc.exists) {
-          _settings = UserNotificationSettings.fromMap(doc.data()!);
-        } else {
-          _settings = UserNotificationSettings();
-          await _saveNotificationSettings(_settings!);
-        }
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        Logger.error('❌ Error loading notification settings: $e');
-      }
-      _settings = UserNotificationSettings();
-    }
-  }
-
-  Future<void> _saveNotificationSettings(
-    UserNotificationSettings settings,
-  ) async {
-    try {
-      final user = _auth.currentUser;
-      if (user != null) {
-        await _firestore
-            .collection('users')
-            .doc(user.uid)
-            .collection('settings')
-            .doc('notifications')
-            .set(settings.toMap());
-        _settings = settings;
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        Logger.error('❌ Error saving notification settings: $e');
-      }
-    }
-  }
+        final screen = switch (intent.destination) {
+          PushDestination.event => DeferredSharedEventScreen(
+            eventId: intent.id,
+          ),
+          PushDestination.community => DeferredSharedCommunityScreen(
+            organizationId: intent.id,
+          ),
+          PushDestination.conversation => DeferredConversationScreen(
+            conversationId: intent.id,
+          ),
+          PushDestination.discovery => DeferredScreenLoader(
+            loadLibrary: dashboard.loadLibrary,
+            builder: () => dashboard.DashboardScreen(restoreSavedTab: false),
+            recoveryKey: 'dashboard',
+            loadingLabel: 'Loading Discover',
+          ),
+        };
+        navigator.push(MaterialPageRoute<void>(builder: (_) => screen));
+        result.complete(true);
+      });
+      WidgetsBinding.instance.ensureVisualUpdate();
+      return result.future;
+    },
+  );
 
   void _handleForegroundMessage(fcm.RemoteMessage message) {
-    if (kDebugMode) {
-      Logger.error(
-        '📱 Received foreground message: ${message.notification?.title}',
-      );
+    final uid = _pushUid;
+    if (uid == null || !PushNotificationIntent.belongsTo(message.data, uid)) {
+      return;
     }
-
     if (_settings?.generalNotifications == true) {
-      _showLocalNotification(message);
+      unawaited(
+        _showLocalNotification(message).catchError((Object error) {
+          Logger.warning('Could not display notification: $error');
+        }),
+      );
     }
   }
 
   void _handleNotificationTap(fcm.RemoteMessage message) {
-    if (kDebugMode) {
-      Logger.error('👆 Notification tapped: ${message.data}');
-    }
-    // Handle navigation based on message data
-    _handleNotificationNavigation(message.data);
+    handleNotificationPayload(message.data);
   }
 
   void _onNotificationTapped(NotificationResponse response) {
-    if (kDebugMode) {
-      Logger.error('👆 Local notification tapped: ${response.payload}');
-    }
-    if (response.payload != null) {
-      final data = json.decode(response.payload!);
-      _handleNotificationNavigation(data);
-    }
+    handleLocalNotificationTap(response);
   }
 
-  void _handleNotificationNavigation(Map<String, dynamic> data) {
-    // Handle navigation based on notification type
-    final type = data['type'];
-    final eventId = data['eventId'];
-    final conversationId = data['conversationId'];
-    final organizationId = data['organizationId'];
-
-    switch (type) {
-      case 'event_reminder':
-        _openEventIfPossible(eventId);
-        break;
-      case 'event_changes':
-        // Time/venue/agenda updates; cancellations/reschedules
-        if (_settings?.eventChanges == true) {
-          _openEventIfPossible(eventId);
-        }
-        break;
-      case 'geofence_checkin':
-        // Near venue; prompt event screen
-        if (_settings?.geofenceCheckIn == true) {
-          _openEventIfPossible(eventId);
-        }
-        break;
-      case 'new_event':
-        // Navigate to events list
-        break;
-      case 'ticket_update':
-        // Navigate to tickets
-        break;
-      case 'message_mention':
-        if (_settings?.messageMentions == true && conversationId != null) {
-          _openChatIfPossible(conversationId);
-        }
-        break;
-      case 'org_update':
-        // Join requests/approvals/role changes
-        if (_settings?.organizationUpdates == true) {
-          _openOrganizationIfPossible(organizationId);
-        }
-        break;
-      case 'organizer_feedback':
-        if (_settings?.organizerFeedback == true) {
-          _navigateToFeedbackScreen(eventId);
-        }
-        break;
-      case 'event_feedback':
-        // Post-event attendee feedback prompt
-        _navigateToFeedbackScreen(eventId);
-        break;
-      default:
-        // Navigate to notifications screen
-        break;
-    }
-  }
-
-  void _navigateToFeedbackScreen(String? eventId) {
-    if (eventId == null) return;
-
-    // Get the event model and navigate to feedback screen
-    FirebaseFirestore.instance.collection('Events').doc(eventId).get().then((
-      doc,
-    ) {
-      if (doc.exists) {
-        final eventModel = EventModel.fromJson(doc);
-
-        // Navigate to feedback screen
-        // Note: This requires a global navigator key or context
-        // For now, we'll store the event data to be used when the app opens
-        _pendingFeedbackEvent = eventModel;
+  void handleLocalNotificationTap(NotificationResponse response) {
+    if (response.payload == null) return;
+    try {
+      final decoded = jsonDecode(response.payload!);
+      if (decoded is Map) {
+        handleNotificationPayload(Map<String, dynamic>.from(decoded));
       }
-    });
+    } catch (error) {
+      Logger.warning('Ignoring invalid notification payload: $error');
+    }
   }
 
-  void _openEventIfPossible(String? eventId) {
-    if (eventId == null) return;
-    // Store pending event for later consumption; UI can read and navigate
-    FirebaseFirestore.instance.collection('Events').doc(eventId).get().then((
-      d,
-    ) {
-      if (d.exists) {
-        _pendingFeedbackEvent = EventModel.fromJson(d);
-      }
-    });
-  }
-
-  void _openChatIfPossible(String conversationId) {
-    // No global navigator here; consuming UI should handle route from payload
-  }
-
-  void _openOrganizationIfPossible(String? organizationId) {
-    // No global navigator here; consuming UI should handle route from payload
+  void handleNotificationPayload(Map<String, dynamic> data) {
+    unawaited(
+      _pushIntents.handle(data).catchError((Object error) {
+        Logger.warning('Could not open notification destination: $error');
+      }),
+    );
   }
 
   Future<void> _showLocalNotification(fcm.RemoteMessage message) async {
@@ -429,346 +419,64 @@ class FirebaseMessagingHelper {
     );
   }
 
-  // Messaging methods
+  // Message writes are authenticated, atomic and idempotent on the server.
   Future<String> sendMessage({
-    String? receiverId, // for 1-1
+    String? receiverId,
     required String content,
     String messageType = 'text',
     String? mediaUrl,
     String? fileName,
-    String? conversationId, // for group or existing thread
+    String? conversationId,
+    String? requestId,
   }) async {
-    try {
-      final user = _auth.currentUser;
-      if (user == null) throw Exception('User not authenticated');
-
-      if (kDebugMode) {
-        Logger.error(
-          '📤 Creating message data for conv: ${conversationId ?? 'n/a'} receiver: ${receiverId ?? 'n/a'}',
-        );
-      }
-      // Determine conversationId
-      String resolvedConversationId =
-          conversationId ??
-          (receiverId != null ? _getConversationId(user.uid, receiverId) : '');
-
-      if (resolvedConversationId.isEmpty) {
-        throw Exception('conversationId or receiverId required');
-      }
-
-      final messageData = {
-        'senderId': user.uid,
-        'receiverId': receiverId,
-        'conversationId': resolvedConversationId,
-        'content': content,
-        'timestamp': FieldValue.serverTimestamp(),
-        'isRead': false,
-        'messageType': messageType,
-        'mediaUrl': mediaUrl,
-        'fileName': fileName,
-      };
-
-      if (kDebugMode) {
-        Logger.error('📤 Adding message to Firestore...');
-      }
-      final messageRef = await _firestore
-          .collection('Messages')
-          .add(messageData);
-
-      if (kDebugMode) {
-        Logger.error('✅ Message added with ID: ${messageRef.id}');
-      }
-
-      // Update conversation metadata
-      await _updateConversation(
-        conversationId: resolvedConversationId,
-        lastMessage: content,
-        lastMessageTime: DateTime.now(),
-        lastMessageSenderId: user.uid,
-      );
-
-      // Ensure conversation exists (1-1 only)
-      if (receiverId != null) {
-        await _ensureConversationExists(user.uid, receiverId);
-      }
-
-      // Send push notification to receiver
-      if (receiverId != null) {
-        await _sendPushNotification(receiverId, content, user.uid);
-      } else {
-        // Broadcast to all group members except sender
-        await _broadcastGroupPushNotifications(
-          resolvedConversationId,
-          content,
-          user.uid,
-        );
-      }
-
-      return messageRef.id;
-    } catch (e) {
-      if (kDebugMode) {
-        Logger.error('❌ Error sending message: $e');
-      }
-      rethrow;
+    final user = _auth.currentUser;
+    if (user == null || user.isAnonymous) {
+      throw StateError('Sign in to send messages');
     }
-  }
-
-  Future<void> _ensureConversationExists(String userId1, String userId2) async {
-    try {
-      final conversationId = _getConversationId(userId1, userId2);
-      final conversationDoc = await _firestore
-          .collection('Conversations')
-          .doc(conversationId)
-          .get();
-
-      if (!conversationDoc.exists) {
-        if (kDebugMode) {
-          Logger.error('🔧 Creating conversation $conversationId');
-        }
-        await createConversation(
-          userId: userId1,
-          otherUserId: userId2,
-          otherUserInfo: {
-            'name': 'User',
-            'profilePictureUrl': null,
-            'username': 'user',
-          },
-        );
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        Logger.error('❌ Error ensuring conversation exists: $e');
-      }
+    if (messageType != 'text') {
+      throw UnsupportedError('Only text messages are supported');
     }
-  }
-
-  Future<void> _sendPushNotification(
-    String receiverId,
-    String content,
-    String senderId,
-  ) async {
-    try {
-      // Get receiver's FCM token
-      final receiverDoc = await _firestore
-          .collection('users')
-          .doc(receiverId)
-          .get();
-      if (!receiverDoc.exists) return;
-
-      final receiverData = receiverDoc.data() as Map<String, dynamic>;
-      final fcmToken = receiverData['fcmToken'] as String?;
-
-      if (fcmToken == null) return;
-
-      // Get sender's info
-      final senderDoc = await _firestore
-          .collection('Customers')
-          .doc(senderId)
-          .get();
-      if (!senderDoc.exists) return;
-
-      final senderData = senderDoc.data() as Map<String, dynamic>;
-      final senderName = senderData['name'] as String? ?? 'Someone';
-
-      // Enqueue for server-side push delivery (Cloud Function processes this)
-      await _firestore.collection('pendingPushNotifications').add({
-        'receiverId': receiverId,
-        'senderId': senderId,
-        'title': senderName,
-        'body': content,
-        'type': 'message',
-        'conversationId': _getConversationId(senderId, receiverId),
-        'fcmToken': fcmToken,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      if (kDebugMode) {
-        Logger.error(
-          '📱 Enqueued push to $receiverId (token present): "$content" from $senderName',
-        );
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        Logger.error('❌ Error sending push notification: $e');
-      }
-    }
-  }
-
-  Future<void> _broadcastGroupPushNotifications(
-    String conversationId,
-    String content,
-    String senderId,
-  ) async {
-    try {
-      final convDoc = await _firestore
-          .collection('Conversations')
-          .doc(conversationId)
-          .get();
-      if (!convDoc.exists) return;
-
-      final data = convDoc.data() ?? const <String, dynamic>{};
-      final List<dynamic> participantIdsDyn =
-          (data['participantIds'] as List<dynamic>?) ?? const [];
-      final List<String> participantIds = participantIdsDyn
-          .map((e) => e.toString())
-          .toList();
-      final String groupName = (data['groupName'] as String?) ?? 'Group';
-
-      // Resolve sender name once
-      final senderDoc = await _firestore
-          .collection('Customers')
-          .doc(senderId)
-          .get();
-      final senderData = senderDoc.data() ?? const <String, dynamic>{};
-      final senderName = (senderData['name'] as String?) ?? 'Someone';
-
-      for (final uid in participantIds) {
-        if (uid == senderId) continue;
-
-        // Get fcm token for this user
-        final userDoc = await _firestore.collection('users').doc(uid).get();
-        if (!userDoc.exists) continue;
-        final userData = userDoc.data() as Map<String, dynamic>;
-        final fcmToken = userData['fcmToken'] as String?;
-        if (fcmToken == null || fcmToken.isEmpty) continue;
-
-        // Enqueue push for processing by backend
-        await _firestore.collection('pendingPushNotifications').add({
-          'receiverId': uid,
-          'senderId': senderId,
-          'title': '$groupName • $senderName',
-          'body': content,
-          'type': 'group_message',
-          'conversationId': conversationId,
-          'fcmToken': fcmToken,
-          'createdAt': FieldValue.serverTimestamp(),
+    final id =
+        conversationId ??
+        (receiverId == null
+            ? null
+            : await getConversationId(user.uid, receiverId));
+    if (id == null) throw ArgumentError('A conversation is required');
+    final result = await FirebaseFunctions.instance
+        .httpsCallable('sendConversationMessageV2')
+        .call({
+          'conversationId': id,
+          'requestId': requestId ?? _firestore.collection('Messages').doc().id,
+          'content': content,
         });
-      }
-
-      if (kDebugMode) {
-        Logger.error(
-          '📣 Broadcast enqueued to group ($conversationId) by $senderName',
-        );
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        Logger.error('❌ Error broadcasting group push: $e');
-      }
-    }
-  }
-
-  Future<void> _updateConversation({
-    required String conversationId,
-    required String lastMessage,
-    required DateTime lastMessageTime,
-    String? lastMessageSenderId,
-  }) async {
-    try {
-      final conversationRef = _firestore
-          .collection('Conversations')
-          .doc(conversationId);
-
-      final conversationData = {
-        'lastMessage': lastMessage,
-        // Ensure server time is used for consistent ordering across devices
-        'lastMessageTime': FieldValue.serverTimestamp(),
-        'lastMessageSenderId': lastMessageSenderId,
-      };
-
-      if (kDebugMode) {
-        Logger.error(
-          '💬 Updating conversation $conversationId with message: $lastMessage',
-        );
-      }
-      await conversationRef.set(conversationData, SetOptions(merge: true));
-      if (kDebugMode) {
-        Logger.error('✅ Conversation updated successfully');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        Logger.error('❌ Error updating conversation: $e');
-      }
-    }
-  }
-
-  String _getConversationId(String userId1, String userId2) {
-    final sortedIds = [userId1, userId2]..sort();
-    return '${sortedIds[0]}_${sortedIds[1]}';
+    return result.data['messageId'] as String;
   }
 
   Future<CustomerModel> _getUserInfo(String userId) async {
-    try {
-      final userDoc = await _firestore
-          .collection('Customers')
-          .doc(userId)
-          .get();
-      return CustomerModel.fromFirestore(userDoc);
-    } catch (e) {
-      if (kDebugMode) {
-        Logger.error('❌ Error getting user info: $e');
-      }
-      rethrow;
-    }
+    final profiles = await PublicProfileService().getByIds([userId]);
+    if (profiles.isEmpty) throw StateError('This profile is unavailable.');
+    return profiles.first;
   }
 
   Stream<List<ConversationModel>> getUserConversations(String userId) {
-    if (kDebugMode) {
-      Logger.error('🔍 Getting conversations for user: $userId');
-    }
-
-    try {
-      // Prefer new schema: participantIds contains user. With index in place, use server-side order for efficiency.
-      final baseQuery = _firestore
-          .collection('Conversations')
-          .where('participantIds', arrayContains: userId)
-          .orderBy('lastMessageTime', descending: true)
-          .snapshots();
-
-      return baseQuery.asyncMap((snapshotNew) async {
-        final convNew = snapshotNew.docs
-            .map((doc) {
-              try {
-                return ConversationModel.fromFirestore(doc);
-              } catch (e) {
-                if (kDebugMode) Logger.error('❌ Parse conv error: $e');
-                return null;
-              }
-            })
-            .whereType<ConversationModel>()
-            .toList();
-
-        // Legacy fallback: participant1Id/participant2Id
-        final legacy1 = await _firestore
-            .collection('Conversations')
-            .where('participant1Id', isEqualTo: userId)
-            .get();
-        final legacy2 = await _firestore
-            .collection('Conversations')
-            .where('participant2Id', isEqualTo: userId)
-            .get();
-
-        final convLegacy = <ConversationModel>[];
-        for (final doc in [...legacy1.docs, ...legacy2.docs]) {
-          try {
-            convLegacy.add(ConversationModel.fromFirestore(doc));
-          } catch (_) {}
-        }
-
-        // Merge by id
-        final byId = <String, ConversationModel>{
-          for (final c in convNew) c.id: c,
-          for (final c in convLegacy) c.id: c,
-        };
-        final all = byId.values.toList()
-          ..sort((a, b) => b.lastMessageTime.compareTo(a.lastMessageTime));
-        return all;
-      });
-    } catch (e) {
-      if (kDebugMode) {
-        Logger.error('❌ Error in getUserConversations: $e');
-      }
-      return Stream.value([]);
-    }
+    return _firestore
+        .collection('Conversations')
+        .where('participantIds', arrayContains: userId)
+        .orderBy('lastMessageTime', descending: true)
+        .snapshots(includeMetadataChanges: true)
+        .where(
+          (snapshot) =>
+              !snapshot.metadata.isFromCache || snapshot.docs.isNotEmpty,
+        )
+        .map(
+          (snapshot) => snapshot.docs
+              .where((doc) => doc.data()['redirectConversationId'] == null)
+              .map(
+                (doc) =>
+                    ConversationModel.fromFirestore(doc, currentUserId: userId),
+              )
+              .toList(),
+        );
   }
 
   Future<ConversationModel?> createConversation({
@@ -776,151 +484,39 @@ class FirebaseMessagingHelper {
     required String otherUserId,
     required Map<String, dynamic> otherUserInfo,
   }) async {
-    try {
-      if (kDebugMode) {
-        Logger.error(
-          '🔧 Creating conversation between $userId and $otherUserId',
-        );
-      }
-
-      // Get user info for both participants
-      final userInfo = await _getUserInfo(userId);
-
-      // Create conversation document with proper ID
-      final conversationId = _getConversationId(userId, otherUserId);
-      final participantIds = [userId, otherUserId]..sort();
-      final conversationData = {
-        'participant1Id': userId,
-        'participant2Id': otherUserId,
-        'participantIds': participantIds,
-        'isGroup': false,
-        'lastMessage': '',
-        'lastMessageTime': FieldValue.serverTimestamp(),
-        'unreadCount': 0,
-        'participantInfo': {
-          userId: {
-            'name': userInfo.name,
-            'profilePictureUrl': userInfo.profilePictureUrl,
-            'username': userInfo.username,
-          },
-          otherUserId: otherUserInfo,
-        },
-      };
-
-      await _firestore
-          .collection('Conversations')
-          .doc(conversationId)
-          .set(conversationData);
-
-      // Create the conversation model
-      final conversation = ConversationModel(
-        id: conversationId,
-        participant1Id: userId,
-        participant2Id: otherUserId,
-        participantIds: participantIds,
-        lastMessage: '',
-        lastMessageTime: DateTime.now(),
-        unreadCount: 0,
-        participantInfo:
-            conversationData['participantInfo'] as Map<String, dynamic>,
-        isGroup: false,
-      );
-
-      if (kDebugMode) {
-        Logger.error('✅ Conversation created with ID: $conversationId');
-      }
-      return conversation;
-    } catch (e) {
-      if (kDebugMode) {
-        Logger.error('❌ Error creating conversation: $e');
-      }
-      return null;
-    }
+    final id = await getConversationId(userId, otherUserId);
+    if (id == null) return null;
+    final doc = await _firestore.collection('Conversations').doc(id).get();
+    return ConversationModel.fromFirestore(doc, currentUserId: userId);
   }
 
   Stream<List<MessageModel>> getMessages(String conversationId) {
-    try {
-      if (kDebugMode) {
-        Logger.error('🔍 Getting messages for conversation: $conversationId');
-      }
-
-      return _firestore
-          .collection('Messages')
-          .where('conversationId', isEqualTo: conversationId)
-          .orderBy('timestamp', descending: false)
-          .snapshots()
-          .map((snapshot) {
-            final messageModels = snapshot.docs
-                .map((doc) {
-                  try {
-                    return MessageModel.fromFirestore(doc);
-                  } catch (e) {
-                    if (kDebugMode) {
-                      Logger.error('❌ Error parsing message document: $e');
-                    }
-                    return null;
-                  }
-                })
-                .whereType<MessageModel>()
-                .toList();
-            return messageModels;
-          });
-    } catch (e) {
-      if (kDebugMode) {
-        Logger.error('❌ Error in getMessages: $e');
-      }
-      return Stream.value([]);
-    }
+    return _firestore
+        .collection('Messages')
+        .where('conversationId', isEqualTo: conversationId)
+        .orderBy('timestamp')
+        .snapshots(includeMetadataChanges: true)
+        .where(
+          (snapshot) =>
+              !snapshot.metadata.isFromCache || snapshot.docs.isNotEmpty,
+        )
+        .map(
+          (snapshot) => snapshot.docs.map(MessageModel.fromFirestore).toList(),
+        );
   }
 
   Future<void> markMessagesAsRead(
     String conversationId,
-    String currentUserId,
-  ) async {
-    try {
-      final batch = _firestore.batch();
-
-      // Get conversation to know if it's group
-      final convDoc = await _firestore
-          .collection('Conversations')
-          .doc(conversationId)
-          .get();
-      final isGroup = (convDoc.data() ?? const {})['isGroup'] == true;
-
-      if (isGroup) {
-        final messagesQuery = await _firestore
-            .collection('Messages')
-            .where('conversationId', isEqualTo: conversationId)
-            .get();
-        for (final doc in messagesQuery.docs) {
-          batch.update(doc.reference, {
-            'readByUserIds': FieldValue.arrayUnion([currentUserId]),
-          });
-        }
-      } else {
-        final participants = conversationId.split('_');
-        if (participants.length == 2) {
-          final otherParticipantId = participants.firstWhere(
-            (id) => id != currentUserId,
-          );
-          final messagesQuery = await _firestore
-              .collection('Messages')
-              .where('senderId', isEqualTo: otherParticipantId)
-              .where('receiverId', isEqualTo: currentUserId)
-              .where('isRead', isEqualTo: false)
-              .get();
-          for (final doc in messagesQuery.docs) {
-            batch.update(doc.reference, {'isRead': true});
-          }
-        }
-      }
-
-      await batch.commit();
-    } catch (e) {
-      if (kDebugMode) {
-        Logger.error('❌ Error marking messages as read: $e');
-      }
-    }
+    String currentUserId, {
+    required String lastMessageId,
+  }) async {
+    if (_auth.currentUser?.uid != currentUserId) return;
+    await FirebaseFunctions.instance
+        .httpsCallable('markConversationReadV2')
+        .call({
+          'conversationId': conversationId,
+          'lastMessageId': lastMessageId,
+        });
   }
 
   // Create a group conversation
@@ -969,7 +565,12 @@ class FirebaseMessagingHelper {
         'participantInfo': infoEntries,
         'lastMessage': '',
         'lastMessageTime': FieldValue.serverTimestamp(),
-        'unreadCount': 0,
+        'messagingVersion': 2,
+        'sequence': 0,
+        'receivedTotals': <String, int>{},
+        'readTotals': <String, int>{},
+        'readSequences': <String, int>{},
+        'unreadCounts': <String, int>{},
       });
 
       return ConversationModel(
@@ -993,48 +594,24 @@ class FirebaseMessagingHelper {
     String query,
     String currentUserId,
   ) async {
-    try {
-      final queryLower = query.toLowerCase();
-      final usersQuery = await _firestore
-          .collection('Customers')
-          .where('isDiscoverable', isEqualTo: true)
-          .get();
-
-      final users = usersQuery.docs
-          .map((doc) => CustomerModel.fromFirestore(doc))
-          .where(
-            (user) =>
-                user.uid != currentUserId &&
-                (user.name.toLowerCase().contains(queryLower) ||
-                    (user.username?.toLowerCase().contains(queryLower) ??
-                        false)),
-          )
-          .toList();
-
-      return users;
-    } catch (e) {
-      if (kDebugMode) {
-        Logger.error('❌ Error searching users: $e');
-      }
-      return [];
+    if (_auth.currentUser?.uid != currentUserId) {
+      throw StateError('Your account changed.');
     }
+    final users = await PublicProfileService().search(query, limit: 50);
+    if (_auth.currentUser?.uid != currentUserId) {
+      throw StateError('Your account changed.');
+    }
+    return users.where((user) => user.uid != currentUserId).toList();
   }
 
   Future<String?> getConversationId(String userId1, String userId2) async {
-    try {
-      final conversationId = _getConversationId(userId1, userId2);
-      final conversationDoc = await _firestore
-          .collection('Conversations')
-          .doc(conversationId)
-          .get();
-
-      return conversationDoc.exists ? conversationId : null;
-    } catch (e) {
-      if (kDebugMode) {
-        Logger.error('❌ Error getting conversation ID: $e');
-      }
-      return null;
+    if (_auth.currentUser?.uid != userId1) {
+      throw StateError('Sign in to start a conversation');
     }
+    final result = await FirebaseFunctions.instance
+        .httpsCallable('getOrCreateDirectConversationV2')
+        .call({'otherUserId': userId2});
+    return result.data['conversationId'] as String;
   }
 
   // Public methods
@@ -1054,37 +631,6 @@ class FirebaseMessagingHelper {
 
   void clearPendingFeedbackEvent() {
     _pendingFeedbackEvent = null;
-  }
-
-  Future<void> sendEventReminder(
-    String eventId,
-    String eventTitle,
-    DateTime eventTime,
-  ) async {
-    if (_settings?.eventReminders == true) {
-      try {
-        final reminderTime = DateTime.now().add(
-          Duration(minutes: _settings!.reminderTime),
-        );
-
-        await _firestore.collection('scheduledNotifications').add({
-          'type': 'event_reminder',
-          'eventId': eventId,
-          'eventTitle': eventTitle,
-          'eventTime': Timestamp.fromDate(eventTime),
-          'scheduledTime': Timestamp.fromDate(reminderTime),
-          'title': 'Event Reminder',
-          'body':
-              'Your event "$eventTitle" starts in ${_settings!.reminderTime} minutes',
-          'userId': _auth.currentUser?.uid,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      } catch (e) {
-        if (kDebugMode) {
-          Logger.error('❌ Error scheduling event reminder: $e');
-        }
-      }
-    }
   }
 
   Future<void> markNotificationAsRead(String notificationId) async {
@@ -1176,7 +722,11 @@ class FirebaseMessagingHelper {
         .doc(user.uid)
         .collection('notifications')
         .orderBy('createdAt', descending: true)
-        .snapshots()
+        .snapshots(includeMetadataChanges: true)
+        .where(
+          (snapshot) =>
+              !snapshot.metadata.isFromCache || snapshot.docs.isNotEmpty,
+        )
         .map(
           (snapshot) => snapshot.docs
               .map((doc) => NotificationModel.fromFirestore(doc))
@@ -1302,6 +852,12 @@ class FirebaseMessagingHelper {
       provisional: false,
       sound: true,
     );
+    if (settings.authorizationStatus == fcm.AuthorizationStatus.authorized ||
+        settings.authorizationStatus == fcm.AuthorizationStatus.provisional) {
+      // Settings can grant permission after startup left token auto-init off.
+      // Listener setup is immediate; the lifecycle bounds registration itself.
+      await initialize();
+    }
     return settings;
   }
 
@@ -1332,35 +888,26 @@ class FirebaseMessagingHelper {
   }
 }
 
-// Background message handler
+// Retained by release tree shaking and initialized in the background isolate.
+// The server owns inbox records; a device must never copy an old account's
+// payload into whichever account happens to be current when it wakes up.
+@pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(
   fcm.RemoteMessage message,
 ) async {
-  if (kDebugMode) {
-    Logger.info('📱 Handling background message: ${message.messageId}');
-  }
-
-  // Store notification in Firestore for the user
   try {
-    final FirebaseAuth auth = FirebaseAuth.instance;
-    final user = auth.currentUser;
-    if (user != null) {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('notifications')
-          .add({
-            'title': message.notification?.title ?? 'New Notification',
-            'body': message.notification?.body ?? '',
-            'type': message.data['type'] ?? 'general',
-            'createdAt': FieldValue.serverTimestamp(),
-            'isRead': false,
-            'data': message.data,
-          });
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
     }
-  } catch (e) {
-    if (kDebugMode) {
-      Logger.error('Failed to store background notification: $e');
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null ||
+        user.isAnonymous ||
+        !PushNotificationIntent.belongsTo(message.data, user.uid)) {
+      return;
     }
+  } catch (error) {
+    Logger.warning('Background notification initialization failed: $error');
   }
 }

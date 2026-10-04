@@ -56,6 +56,12 @@ class _NewMessageScreenState extends State<NewMessageScreen>
   int _listLimit = 30;
   bool _isNavigating = false;
   Timer? _searchDebounce;
+  String? _ownerUid;
+  StreamSubscription<User?>? _authSubscription;
+  bool _accountChanged = false;
+  int _queryRevision = 0;
+  bool get _currentAccount =>
+      mounted && !_accountChanged && _auth.currentUser?.uid == _ownerUid;
   List<String> _recentSearches = [];
   String _lastSearchQuery = '';
   final double _testTextScale = 1.0; // debug-only a11y testing
@@ -66,6 +72,21 @@ class _NewMessageScreenState extends State<NewMessageScreen>
   @override
   void initState() {
     super.initState();
+    _ownerUid = _auth.currentUser?.uid;
+    _authSubscription = _auth.authStateChanges().listen((user) {
+      if (mounted && user?.uid != _ownerUid) {
+        _queryRevision++;
+        _searchDebounce?.cancel();
+        setState(() {
+          _accountChanged = true;
+          _searchResults = [];
+          _allUsers = [];
+          _selectedUserIds.clear();
+          _blockedUserIds.clear();
+          _myOrgs = [];
+        });
+      }
+    });
     // Clear all state to ensure clean start
     _searchController.clear();
     _selectedUserIds.clear();
@@ -76,7 +97,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
     _loadMyOrganizations();
     _groupTabController = TabController(length: 2, vsync: this);
     _groupTabController!.addListener(() {
-      if (!mounted) return;
+      if (!mounted || !_currentAccount) return;
       setState(() {
         _groupTabIndex = _groupTabController!.index;
       });
@@ -86,6 +107,8 @@ class _NewMessageScreenState extends State<NewMessageScreen>
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
+    _queryRevision++;
     // Clear recent searches from storage when leaving the screen
     _clearRecentSearches();
     _searchController.dispose();
@@ -112,7 +135,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
       final lastMode = prefs.getBool(_prefsKeyMode);
       // Don't restore recent searches - start with a clean slate each time
       // This prevents confusion with old search terms appearing as selections
-      if (!mounted) return;
+      if (!mounted || !_currentAccount) return;
       setState(() {
         _groupMode = lastMode ?? false;
         _recentSearches = <String>[]; // Always start with empty recent searches
@@ -140,14 +163,14 @@ class _NewMessageScreenState extends State<NewMessageScreen>
       });
       final helper = OrganizationHelper();
       final orgs = await helper.getUserOrganizationsLite();
-      if (!mounted) return;
+      if (!mounted || !_currentAccount) return;
       setState(() {
         _myOrgs = orgs;
         _isLoadingOrgs = false;
       });
     } catch (e) {
       Logger.error('Error loading organizations: $e');
-      if (!mounted) return;
+      if (!mounted || !_currentAccount) return;
       setState(() {
         _isLoadingOrgs = false;
         _myOrgs = [];
@@ -171,10 +194,13 @@ class _NewMessageScreenState extends State<NewMessageScreen>
             .doc(currentUser.uid)
             .collection('blocks')
             .get();
+        if (!_currentAccount) return;
         _blockedUserIds = bs.docs.map((d) => d.id).toSet();
       } catch (_) {}
 
+      if (!_currentAccount) return;
       final users = await _messagingHelper.searchUsers('', currentUser.uid);
+      if (!_currentAccount) return;
       // filter out blocked users from selectable list
       final filtered = users
           .where((u) => !_blockedUserIds.contains(u.uid))
@@ -186,6 +212,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
       });
     } catch (e) {
       Logger.error('Error loading users: $e');
+      if (!_currentAccount) return;
       setState(() {
         _isLoading = false;
       });
@@ -193,6 +220,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
   }
 
   void _onSearchChanged() {
+    _queryRevision++;
     final query = _searchController.text.trim();
     setState(() {
       _isSearching = query.isNotEmpty;
@@ -216,6 +244,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
   }
 
   Future<void> _performSearch(String query) async {
+    final revision = _queryRevision;
     try {
       final User? currentUser = _auth.currentUser;
       if (currentUser == null) return;
@@ -236,7 +265,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
             return true;
           })
           .toList();
-      if (!mounted) return;
+      if (!mounted || !_currentAccount || revision != _queryRevision) return;
       setState(() {
         _searchResults = filtered;
         _isSearchInFlight = false;
@@ -246,7 +275,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
       _addRecentSearch(query);
     } catch (e) {
       Logger.error('Error searching users: $e');
-      if (!mounted) return;
+      if (!mounted || !_currentAccount || revision != _queryRevision) return;
       setState(() {
         _isSearchInFlight = false;
         _searchFailed = true;
@@ -274,60 +303,28 @@ class _NewMessageScreenState extends State<NewMessageScreen>
 
       if (existingConversationId != null) {
         // Navigate to existing conversation
-        if (!mounted) return;
+        if (!mounted || !_currentAccount) return;
         await Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => ChatScreen(
               conversationId: existingConversationId,
-              otherParticipantInfo: CustomerModel(
-                uid: user.uid,
-                name: user.name,
-                email: user.email,
-                username: user.username,
-                profilePictureUrl: user.profilePictureUrl,
-                bio: user.bio,
-                phoneNumber: user.phoneNumber,
-                age: user.age,
-                gender: user.gender,
-                location: user.location,
-                occupation: user.occupation,
-                company: user.company,
-                website: user.website,
-                socialMediaLinks: user.socialMediaLinks,
-                isDiscoverable: user.isDiscoverable,
-                favorites: user.favorites,
-                createdAt: user.createdAt,
+              otherParticipantInfo: CustomerModel.fromPublicProfile(
+                CustomerModel.getPublicMap(user),
               ),
             ),
           ),
         );
       } else {
         // Create new conversation and navigate
-        if (!mounted) return;
+        if (!mounted || !_currentAccount) return;
         await Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => ChatScreen(
               conversationId: conversationId,
-              otherParticipantInfo: CustomerModel(
-                uid: user.uid,
-                name: user.name,
-                email: user.email,
-                username: user.username,
-                profilePictureUrl: user.profilePictureUrl,
-                bio: user.bio,
-                phoneNumber: user.phoneNumber,
-                age: user.age,
-                gender: user.gender,
-                location: user.location,
-                occupation: user.occupation,
-                company: user.company,
-                website: user.website,
-                socialMediaLinks: user.socialMediaLinks,
-                isDiscoverable: user.isDiscoverable,
-                favorites: user.favorites,
-                createdAt: user.createdAt,
+              otherParticipantInfo: CustomerModel.fromPublicProfile(
+                CustomerModel.getPublicMap(user),
               ),
             ),
           ),
@@ -335,7 +332,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
       }
     } catch (e) {
       Logger.error('Error starting conversation: $e');
-      if (!mounted) return;
+      if (!mounted || !_currentAccount) return;
       ShowToast().showSnackBar('Error starting conversation', context);
     } finally {
       if (mounted) setState(() => _isNavigating = false);
@@ -343,6 +340,8 @@ class _NewMessageScreenState extends State<NewMessageScreen>
   }
 
   Future<void> _createGroupChat() async {
+    if (_isNavigating || !_currentAccount) return;
+    setState(() => _isNavigating = true);
     try {
       final currentUser = _auth.currentUser;
       if (currentUser == null) return;
@@ -356,12 +355,14 @@ class _NewMessageScreenState extends State<NewMessageScreen>
       }
 
       final groupName = await _promptForGroupName(context);
-      final sanitizedName = groupName?.trim();
+      if (groupName == null || !_currentAccount) return;
+      final sanitizedName = groupName.trim();
 
       final conv = await _messagingHelper.createGroupConversation(
-        groupName: sanitizedName?.isEmpty ?? true ? null : sanitizedName,
+        groupName: sanitizedName.isEmpty ? null : sanitizedName,
         participantIds: participants,
       );
+      if (!_currentAccount) return;
       if (conv == null) {
         if (mounted) {
           ShowToast().showSnackBar('Failed to create group', context);
@@ -379,8 +380,10 @@ class _NewMessageScreenState extends State<NewMessageScreen>
       }
     } catch (e) {
       Logger.error('Error creating group: $e');
-      if (!mounted) return;
+      if (!mounted || !_currentAccount) return;
       ShowToast().showSnackBar('Error creating group', context);
+    } finally {
+      if (_currentAccount) setState(() => _isNavigating = false);
     }
   }
 
@@ -459,6 +462,8 @@ class _NewMessageScreenState extends State<NewMessageScreen>
     String organizationId,
     String organizationName,
   ) async {
+    if (_isNavigating || !_currentAccount) return;
+    setState(() => _isNavigating = true);
     try {
       final currentUser = _auth.currentUser;
       if (currentUser == null) return;
@@ -471,6 +476,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
           .limit(500)
           .get();
 
+      if (!_currentAccount) return;
       final Set<String> participantIds = <String>{};
       for (final d in membersSnap.docs) {
         final data = d.data();
@@ -496,6 +502,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
         groupName: organizationName.isEmpty ? null : organizationName,
         participantIds: participantIds.toList()..sort(),
       );
+      if (!_currentAccount) return;
       if (conv == null) {
         if (mounted) {
           ShowToast().showSnackBar('Failed to create group', context);
@@ -503,7 +510,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
         return;
       }
 
-      if (!mounted) return;
+      if (!mounted || !_currentAccount) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -512,14 +519,24 @@ class _NewMessageScreenState extends State<NewMessageScreen>
       );
     } catch (e) {
       Logger.error('Error creating org group: $e');
-      if (!mounted) return;
+      if (!mounted || !_currentAccount) return;
       ShowToast().showSnackBar('Error creating group', context);
+    } finally {
+      if (_currentAccount) setState(() => _isNavigating = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    if (_accountChanged) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('New message')),
+        body: const Center(
+          child: Text('Your account changed. Reopen messages to continue.'),
+        ),
+      );
+    }
     final theme = Theme.of(context);
 
     final scaffold = AppScaffoldWrapper(
@@ -1214,7 +1231,7 @@ class _NewMessageScreenState extends State<NewMessageScreen>
                               <String>[];
                           list.remove(s);
                           await prefs.setStringList(_prefsKeyRecent, list);
-                          if (!mounted) return;
+                          if (!mounted || !_currentAccount) return;
                           setState(() => _recentSearches = list);
                         },
                       ),
@@ -1675,8 +1692,10 @@ class _NewMessageScreenState extends State<NewMessageScreen>
     return value;
   }
 
-  void _inviteFriends() {
-    Share.share('Join me on Attendus to chat and collaborate!');
+  Future<void> _inviteFriends() async {
+    await SharePlus.instance.share(
+      ShareParams(text: 'Join me on Attendus to chat and collaborate!'),
+    );
   }
 
   void _discoverPeople() {

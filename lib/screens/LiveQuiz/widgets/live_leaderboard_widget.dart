@@ -22,9 +22,10 @@ class LiveLeaderboardWidget extends StatefulWidget {
 class _LiveLeaderboardWidgetState extends State<LiveLeaderboardWidget>
     with TickerProviderStateMixin {
   final _liveQuizService = LiveQuizService();
+  bool _connectionFailed = false;
 
   List<QuizParticipantModel> _participants = [];
-  Map<String, int> _previousRanks = {};
+  final Map<String, int> _previousRanks = {};
   StreamSubscription<List<QuizParticipantModel>>? _participantsSubscription;
 
   // Animation controllers
@@ -93,20 +94,30 @@ class _LiveLeaderboardWidgetState extends State<LiveLeaderboardWidget>
   void _setupParticipantsStream() {
     _participantsSubscription = _liveQuizService
         .getParticipantsStream(widget.quizId)
-        .listen((participants) {
-          // Store previous ranks for animation
-          for (final participant in _participants) {
-            _previousRanks[participant.id] = participant.currentRank ?? 999;
-          }
-
-          setState(() {
-            _participants = participants.take(widget.maxVisible).toList();
-          });
-        });
+        .listen(
+          (participants) {
+            if (!mounted) return;
+            for (final participant in _participants) {
+              _previousRanks[participant.id] = participant.currentRank ?? 999;
+            }
+            setState(() {
+              _connectionFailed = false;
+              _participants = participants.take(widget.maxVisible).toList();
+            });
+          },
+          onError: (Object _) {
+            if (mounted) setState(() => _connectionFailed = true);
+          },
+        );
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_connectionFailed) {
+      return const Center(
+        child: Text('Leaderboard connection interrupted. Retrying...'),
+      );
+    }
     return FadeTransition(
       opacity: _fadeAnimation,
       child: SlideTransition(
@@ -611,7 +622,7 @@ class CompactLeaderboardWidget extends StatelessWidget {
                     ],
                   ),
                 );
-              }).toList(),
+              }),
             ],
           ),
         );

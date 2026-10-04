@@ -1,20 +1,13 @@
-import 'dart:io';
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:attendus/controller/customer_controller.dart';
-import 'package:attendus/firebase/firebase_firestore_helper.dart';
-import 'package:attendus/models/attendance_model.dart';
-import 'package:attendus/models/event_model.dart';
 import 'package:attendus/Permissions/permissions_helper.dart';
-import 'package:attendus/screens/QRScanner/ans_questions_to_sign_in_event_screen.dart';
 import 'package:attendus/Utils/colors.dart';
-import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/dimensions.dart';
 import 'package:attendus/Utils/qr_debug_helper.dart';
 import 'package:qr_code_scanner_plus/qr_code_scanner_plus.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:attendus/screens/Events/single_event_screen.dart';
 
 class ModernQRScannerScreen extends StatefulWidget {
   const ModernQRScannerScreen({super.key});
@@ -25,16 +18,15 @@ class ModernQRScannerScreen extends StatefulWidget {
 
 class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
     with TickerProviderStateMixin {
-  Barcode? result;
   QRViewController? controller;
+  StreamSubscription<Barcode>? _scanSubscription;
   final GlobalKey qrKey = GlobalKey(debugLabel: 'QR');
   Future<bool>? _cameraInitFuture;
+  Future<bool>? _permissionFuture;
+  bool _completed = false;
 
   final TextEditingController _codeController = TextEditingController();
-  final TextEditingController _nameController = TextEditingController();
 
-  bool _isAnonymousSignIn = false;
-  bool _isLoading = false;
   bool _isManualEntry = false;
   bool _isFlashOn = false;
   bool _isCameraPermissionGranted = false;
@@ -48,15 +40,9 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
   void initState() {
     super.initState();
     _initializeAnimations();
+    _animationController.forward();
     // Memoize camera initialization to avoid recreating the Future on rebuilds
     _cameraInitFuture = _initializeCamera();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Re-check permissions when returning to this screen
-    _checkPermissions();
   }
 
   void _initializeAnimations() {
@@ -81,9 +67,15 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
     _pulseController.repeat(reverse: true);
   }
 
-  Future<void> _checkPermissions() async {
+  Future<bool> _checkPermissions() => _permissionFuture ??=
+      _requestCameraPermission().whenComplete(() => _permissionFuture = null);
+
+  Future<bool> _requestCameraPermission() async {
     try {
-      final hasPermission = await PermissionsHelperClass.checkCameraPermission(context: context);
+      final hasPermission = await PermissionsHelperClass.checkCameraPermission(
+        context: context,
+      );
+      if (!mounted || _completed) return false;
       QRDebugHelper.logCameraPermissionStatus(hasPermission);
       setState(() {
         _isCameraPermissionGranted = hasPermission;
@@ -91,13 +83,15 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
       if (hasPermission) {
         debugPrint('Camera permission granted for QR scanner');
       }
+      return hasPermission;
     } catch (e) {
       // Handle permission denied or emulator scenario
       debugPrint('Camera permission check failed in QR scanner: $e');
       QRDebugHelper.logScannerInitialization(false, e.toString());
-      setState(() {
-        _isCameraPermissionGranted = false;
-      });
+      if (mounted && !_completed) {
+        setState(() => _isCameraPermissionGranted = false);
+      }
+      return false;
     }
   }
 
@@ -184,21 +178,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
                     ),
                     const SizedBox(height: 30),
                     ElevatedButton(
-                      onPressed: () async {
-                        await _checkPermissions();
-                        if (_isCameraPermissionGranted) {
-                          setState(() {
-                            // Re-run camera initialization now that permission is granted
-                            _cameraInitFuture = _initializeCamera();
-                          });
-                        } else {
-                          // If still no permission, show manual entry option
-                          setState(() {
-                            _isManualEntry = true;
-                          });
-                          _animationController.forward();
-                        }
-                      },
+                      onPressed: _retryCameraPermission,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppThemeColor.darkBlueColor,
                         foregroundColor: AppThemeColor.pureWhiteColor,
@@ -223,7 +203,9 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
                       child: Text(
                         'Enter code manually instead',
                         style: TextStyle(
-                          color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.8),
+                          color: AppThemeColor.pureWhiteColor.withValues(
+                            alpha: 0.8,
+                          ),
                           fontSize: Dimensions.fontSizeDefault,
                         ),
                       ),
@@ -290,12 +272,23 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
 
   Future<bool> _initializeCamera() async {
     try {
-      await _checkPermissions();
-      return _isCameraPermissionGranted;
+      return await _checkPermissions();
     } catch (e) {
       debugPrint('Camera initialization failed: $e');
       // For emulator, always return false to show demo mode
       return false;
+    }
+  }
+
+  Future<void> _retryCameraPermission() async {
+    if (!mounted || _completed || _permissionFuture != null) return;
+    final pending = _initializeCamera();
+    setState(() => _cameraInitFuture = pending);
+    final granted = await pending;
+    if (!mounted || _completed) return;
+    if (!granted) {
+      setState(() => _isManualEntry = true);
+      _animationController.forward();
     }
   }
 
@@ -392,7 +385,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
   Widget _buildManualEntrySection() {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      height: _isManualEntry ? 200 : 60,
+      height: _isManualEntry ? 135 : 60,
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
         color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.1),
@@ -410,11 +403,6 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
               setState(() {
                 _isManualEntry = !_isManualEntry;
               });
-              if (_isManualEntry) {
-                _animationController.forward();
-              } else {
-                _animationController.reverse();
-              }
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
@@ -456,19 +444,9 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
                   const SizedBox(height: 10),
                   _buildTextField(
                     controller: _codeController,
-                    hintText: 'Enter event code',
+                    hintText: 'Enter six-character venue code',
                     icon: Icons.qr_code,
                   ),
-                  const SizedBox(height: 15),
-                  if (CustomerController.logeInCustomer == null) ...[
-                    _buildTextField(
-                      controller: _nameController,
-                      hintText: 'Enter your name',
-                      icon: Icons.person,
-                    ),
-                    const SizedBox(height: 15),
-                  ],
-                  _buildAnonymousToggle(),
                 ],
               ),
             ),
@@ -519,47 +497,6 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
           filled: true,
           fillColor: AppThemeColor.pureWhiteColor,
         ),
-      ),
-    );
-  }
-
-  Widget _buildAnonymousToggle() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          Transform.scale(
-            scale: 0.8,
-            child: Checkbox(
-              value: _isAnonymousSignIn,
-              onChanged: (value) {
-                setState(() {
-                  _isAnonymousSignIn = value ?? false;
-                });
-              },
-              activeColor: AppThemeColor.darkGreenColor,
-              side: BorderSide(
-                color: AppThemeColor.pureWhiteColor.withValues(alpha: 0.5),
-                width: 2,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Sign in anonymously',
-              style: TextStyle(
-                color: AppThemeColor.pureWhiteColor,
-                fontSize: Dimensions.fontSizeSmall,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -636,7 +573,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
 
   Widget _buildSignInButton() {
     return GestureDetector(
-      onTap: _isLoading ? null : _handleSignIn,
+      onTap: _handleSignIn,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 15),
         decoration: BoxDecoration(
@@ -653,21 +590,8 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (_isLoading) ...[
-              SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    AppThemeColor.pureWhiteColor,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-            ],
             Text(
-              _isLoading ? 'Signing In...' : 'Sign In',
+              'Continue',
               style: TextStyle(
                 color: AppThemeColor.pureWhiteColor,
                 fontSize: Dimensions.fontSizeDefault,
@@ -700,10 +624,7 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
         child: Row(
           children: [
             GestureDetector(
-              onTap: () {
-                // Safely navigate back without result
-                Navigator.of(context).pop();
-              },
+              onTap: () => _finish(null),
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -734,39 +655,63 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
     );
   }
 
-  void _toggleFlash() {
-    setState(() {
-      _isFlashOn = !_isFlashOn;
-    });
-    controller?.toggleFlash();
+  Future<void> _toggleFlash() async {
+    final active = controller;
+    if (active == null || !mounted || _completed) return;
+    try {
+      await active.toggleFlash();
+      if (mounted && !_completed && identical(controller, active)) {
+        setState(() => _isFlashOn = !_isFlashOn);
+      }
+    } catch (error) {
+      debugPrint('QR flashlight unavailable: $error');
+    }
   }
 
   void _onQRViewCreated(QRViewController controller) {
-    setState(() {
-      this.controller = controller;
-    });
-    
-    controller.scannedDataStream.listen((scanData) async {
+    if (!mounted || _completed) {
+      _cameraOperation(controller.pauseCamera());
+      return;
+    }
+    _cancelScanSubscription();
+    this.controller = controller;
+
+    _scanSubscription = controller.scannedDataStream.listen((scanData) {
+      if (!mounted || _completed || !identical(this.controller, controller)) {
+        return;
+      }
       if (scanData.code != null) {
         final scannedCode = scanData.code!;
-        
+
         // Use debug helper to log scan results
         QRDebugHelper.logQRScanResult(scannedCode);
-        
+
         // Handle different QR code formats
         String? eventCode;
-        
-        // Check for event QR code format
-        if (scannedCode.contains('orgami_app_code_')) {
-          eventCode = scannedCode.split('orgami_app_code_').last;
-          debugPrint('Event QR detected, event code: $eventCode');
+
+        // Attendance 2.0 keeps venue credentials and event-share links
+        // distinct. Only the rotating venue credential can record attendance.
+        if (scannedCode.startsWith('attendus_checkin:v1:')) {
+          eventCode = scannedCode;
+          debugPrint('Rotating venue credential detected');
+        } else if (scannedCode.startsWith('attendus_event:v1:')) {
+          eventCode = scannedCode;
+          debugPrint('Permanent event-share QR detected');
+        }
+        // Legacy static event QRs now open event details and never check in.
+        else if (scannedCode.contains('orgami_app_code_')) {
+          final legacyId = scannedCode.split('orgami_app_code_').last;
+          eventCode = 'attendus_event:v1:$legacyId';
+          debugPrint('Legacy event-share QR detected: $legacyId');
         }
         // Check for ticket QR code format
         else if (scannedCode.startsWith('orgami_ticket_')) {
           final parts = scannedCode.split('_');
           if (parts.length >= 4) {
-            eventCode = parts[3]; // eventId from ticket QR
-            debugPrint('Ticket QR detected, extracted event code: $eventCode');
+            ShowToast().showNormalToast(
+              msg: 'Show this personal ticket to event staff for scanning.',
+            );
+            return;
           }
         }
         // Check for user badge QR code format
@@ -776,19 +721,9 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
           );
           return;
         }
-        
+
         if (eventCode != null) {
-          _codeController.text = eventCode;
-          setState(() {
-            result = scanData;
-          });
-
-          // Haptic feedback
-          HapticFeedback.lightImpact();
-
-          // Return the scanned code to the previous screen
-          if (!mounted) return;
-          Navigator.of(context).pop(eventCode);
+          _finish(eventCode);
         } else {
           ShowToast().showNormalToast(
             msg: 'Invalid QR code format. Please scan a valid event QR code.',
@@ -798,144 +733,79 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
     });
   }
 
-  Future<void> _handleSignIn() async {
-    if (_codeController.text.isEmpty) {
-      ShowToast().showNormalToast(msg: 'Please enter an event code!');
+  void _handleSignIn() {
+    if (!mounted || _completed) return;
+    final code = _codeController.text.trim();
+    if (code.isEmpty) {
+      ShowToast().showNormalToast(msg: 'Enter the six-character venue code.');
       return;
     }
+    _finish(code.toUpperCase());
+  }
 
-    if (CustomerController.logeInCustomer == null &&
-        _nameController.text.isEmpty &&
-        !_isAnonymousSignIn) {
-      ShowToast().showNormalToast(msg: 'Please enter your name!');
+  void _finish(String? code) {
+    if (!mounted || _completed || ModalRoute.of(context)?.isCurrent == false) {
       return;
     }
+    _completed = true;
+    _cancelScanSubscription();
+    _cameraOperation(controller?.pauseCamera());
+    if (code != null) unawaited(HapticFeedback.lightImpact());
+    Navigator.of(context).pop(code);
+  }
 
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      String docId;
-      if (CustomerController.logeInCustomer != null) {
-        docId =
-            '${_codeController.text}-${CustomerController.logeInCustomer!.uid}';
-      } else {
-        docId = FirebaseFirestore.instance
-            .collection(AttendanceModel.firebaseKey)
-            .doc()
-            .id;
-      }
-
-      AttendanceModel newAttendanceModel = AttendanceModel(
-        id: docId,
-        eventId: _codeController.text,
-        userName: _isAnonymousSignIn
-            ? 'Anonymous'
-            : (CustomerController.logeInCustomer?.name ?? _nameController.text),
-        customerUid: CustomerController.logeInCustomer?.uid ?? 'without_login',
-        attendanceDateTime: DateTime.now(),
-        answers: [],
-        isAnonymous: _isAnonymousSignIn,
-        realName: _isAnonymousSignIn
-            ? (CustomerController.logeInCustomer?.name ?? _nameController.text)
-            : null,
-      );
-
-      // Try to find event by ID or manual code
-      EventModel? eventExist = await FirebaseFirestoreHelper().getSingleEvent(
-        newAttendanceModel.eventId,
-      );
-
-      // If not found by ID, try to find by manual code
-      eventExist ??= await _findEventByManualCode(newAttendanceModel.eventId);
-
-      if (eventExist != null) {
-        // Check for sign-in prompts
-        final questions = await FirebaseFirestoreHelper().getEventQuestions(
-          eventId: eventExist.id,
-        );
-
-        if (questions.isNotEmpty) {
-          _codeController.text = '';
-          if (!mounted) return;
-          RouterClass.nextScreenAndReplacement(
-            context,
-            AnsQuestionsToSignInEventScreen(
-              eventModel: eventExist,
-              newAttendance: newAttendanceModel,
-              nextPageRoute: 'modernQrScanner',
-            ),
-          );
-        } else {
-          // No prompts, sign in directly
-          await FirebaseFirestore.instance
-              .collection(AttendanceModel.firebaseKey)
-              .doc(newAttendanceModel.id)
-              .set(newAttendanceModel.toJson());
-
-          ShowToast().showNormalToast(msg: 'Signed In Successfully!');
-
-          // Navigate to event details after a short delay
-          Future.delayed(const Duration(seconds: 1), () {
-            if (!mounted) return;
-            RouterClass.nextScreenAndReplacement(
-              context,
-              SingleEventScreen(eventModel: eventExist!),
-            );
-          });
-        }
-      } else {
-        ShowToast().showNormalToast(msg: 'Entered an incorrect code!');
-      }
-    } catch (e) {
-      debugPrint('Error signing in: $e');
-      ShowToast().showNormalToast(msg: 'Failed to sign in. Please try again.');
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
+  void _cancelScanSubscription() {
+    final subscription = _scanSubscription;
+    _scanSubscription = null;
+    if (subscription != null) {
+      _cameraOperation(subscription.cancel());
     }
+  }
+
+  void _cameraOperation(Future<void>? operation) {
+    if (operation == null) return;
+    unawaited(
+      operation.catchError((Object error) {
+        debugPrint('QR camera operation failed: $error');
+      }),
+    );
   }
 
   @override
   void dispose() {
+    _completed = true;
+    _cancelScanSubscription();
+    _cameraOperation(controller?.pauseCamera());
+    // qr_code_scanner_plus 2.2 owns controller disposal in QRView. Its public
+    // dispose method is deprecated and does nothing; release our reference.
+    controller = null;
     _animationController.dispose();
     _pulseController.dispose();
+    _codeController.dispose();
     super.dispose();
   }
 
   @override
   void deactivate() {
     // Pause camera when screen is deactivated
-    controller?.pauseCamera();
+    _cameraOperation(controller?.pauseCamera());
     super.deactivate();
   }
 
   @override
   void reassemble() {
     super.reassemble();
-    // Resume camera when screen is reassembled
-    if (Platform.isAndroid) {
-      controller?.pauseCamera();
-    }
-    controller?.resumeCamera();
+    if (!kIsWeb) _cameraOperation(_restartCamera());
   }
 
-  Future<EventModel?> _findEventByManualCode(String manualCode) async {
-    try {
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection(EventModel.firebaseKey)
-          .where('manualCode', isEqualTo: manualCode)
-          .get();
-
-      if (querySnapshot.docs.isNotEmpty) {
-        return EventModel.fromJson(querySnapshot.docs.first.data());
-      }
-      return null;
-    } catch (e) {
-      debugPrint('Error finding event by manual code: $e');
-      return null;
+  Future<void> _restartCamera() async {
+    final active = controller;
+    if (active == null || !mounted || _completed) return;
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      await active.pauseCamera();
+    }
+    if (mounted && !_completed && identical(controller, active)) {
+      await active.resumeCamera();
     }
   }
 }

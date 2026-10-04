@@ -1,0 +1,146 @@
+name: Freeze web candidates and deploy staging
+'on':
+  workflow_dispatch: null
+permissions:
+  contents: read
+  actions: read
+jobs:
+  quality:
+    uses: ./.github/workflows/web-quality.yml
+    secrets: inherit
+  predecessors:
+    needs: quality
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    environment: web-production-read
+    steps:
+    - &id001
+      uses: actions/checkout@v4
+    - &id002
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - &id003
+      run: npm ci
+      working-directory: functions
+    - uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+        service_account: ${{ vars.READER_SERVICE_ACCOUNT }}
+    - run: node tools/web_release_pipeline.js capture-predecessors --output build/predecessors.json
+      name: Capture both predecessor deployments before building
+    - uses: actions/upload-artifact@v4
+      with:
+        name: web-predecessors
+        path: build/predecessors.json
+        include-hidden-files: true
+        retention-days: 90
+        if-no-files-found: error
+    - uses: actions/upload-artifact@v4
+      with:
+        name: web-staging-predecessor
+        path: build/staging-predecessor/
+        retention-days: 90
+        include-hidden-files: true
+        if-no-files-found: error
+  candidates:
+    needs:
+    - quality
+    - predecessors
+    strategy:
+      fail-fast: true
+      matrix:
+        environment:
+        - staging
+        - production
+    runs-on: ubuntu-latest
+    environment: ${{ matrix.environment == 'production' && 'web-production-build' || 'staging' }}
+    env:
+      TARGET_ENV: ${{ matrix.environment }}
+      GOOGLE_MAPS_WEB_API_KEY: ${{ secrets.GOOGLE_MAPS_WEB_API_KEY }}
+      RECAPTCHA_SITE_KEY: ${{ vars.ATTENDUS_RECAPTCHA_ENTERPRISE_SITE_KEY }}
+    steps:
+    - *id001
+    - *id002
+    - uses: subosito/flutter-action@v2
+      with:
+        flutter-version: 3.44.6
+        cache: true
+    - uses: actions/download-artifact@v4
+      with:
+        name: web-predecessors
+        path: build/predecessor
+    - run: flutter pub get --enforce-lockfile
+    - run: 'test -n "$RECAPTCHA_SITE_KEY"
+
+        dart run tools/check_maps_web_key.dart
+
+        node -e ''const c=require("node:crypto"); console.log("RELEASE_ID="+c.createHash("sha256").update(`${process.env.GITHUB_SHA}:${process.env.GITHUB_RUN_ID}:${process.env.TARGET_ENV}`).digest("hex"))''
+        >> "$GITHUB_ENV"'
+      name: Require environment-specific public configuration
+    - run: flutter build web --release --pwa-strategy=none --no-wasm-dry-run --dart-define=GOOGLE_MAPS_WEB_API_KEY="$GOOGLE_MAPS_WEB_API_KEY"
+        --dart-define=ATTENDUS_ENABLE_WEB_APP_CHECK=true --dart-define=ATTENDUS_RECAPTCHA_ENTERPRISE_SITE_KEY="$RECAPTCHA_SITE_KEY"
+        --dart-define=ATTENDUS_RELEASE_ID="$RELEASE_ID" --dart-define=ATTENDUS_FIREBASE_ENV="$TARGET_ENV"
+      name: Build this environment exactly once
+    - run: dart run tools/configure_web_environment.dart --environment "$TARGET_ENV"
+      name: Configure environment before packaging
+    - run: node tools/retain_web_associations.js "$TARGET_ENV" build/web
+      name: Preserve published mobile associations without changing native identity
+    - run: 'cp web/flutter_service_worker_retirement.js build/web/flutter_service_worker.js
+
+        if [ "$TARGET_ENV" = production ]; then origin=https://attendus.app/; else origin=https://attendus-staging.web.app/;
+        fi
+
+        dart run tools/retain_web_releases.dart "$origin"'
+    - run: dart run tools/package_web_release.dart --release-id "$RELEASE_ID"
+    - run: dart run tools/check_deferred_web_chunks.dart
+    - run: dart run tools/check_web_bundle_size.dart
+    - run: node tools/web_release_pipeline.js seal --environment "$TARGET_ENV" --web build/web --predecessor build/predecessor/predecessors.json
+        --output build/candidate
+      name: Freeze source, deployment selectors, configuration and exact web bytes
+    - uses: actions/upload-artifact@v4
+      with:
+        name: web-candidate-${{ matrix.environment }}
+        path: build/candidate/
+        include-hidden-files: true
+        retention-days: 90
+        if-no-files-found: error
+  staging:
+    needs:
+    - quality
+    - candidates
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+    - *id001
+    - *id002
+    - uses: google-github-actions/setup-gcloud@v2
+    - *id003
+    - uses: actions/download-artifact@v4
+      with:
+        name: web-candidate-staging
+        path: build/frozen-staging
+    - uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+        service_account: ${{ vars.DEPLOYER_SERVICE_ACCOUNT }}
+    - run: node tools/web_release_pipeline.js stage --bundle build/frozen-staging --output build/staging-receipt/deployment.json
+      name: Deploy explicit resources and the frozen staging artifact
+    - uses: actions/upload-artifact@v4
+      with:
+        name: web-staging-deployment
+        path: build/staging-receipt/
+        include-hidden-files: true
+        retention-days: 90
+        if-no-files-found: error
+      if: always()
+concurrency:
+  group: attendus-web-staging
+  cancel-in-progress: false

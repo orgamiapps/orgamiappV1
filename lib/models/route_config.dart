@@ -144,4 +144,3 @@ class NavigationState {
     return 'NavigationState(stack: ${stack.length} routes, currentIndex: $currentIndex, tabIndex: $currentTabIndex)';
   }
 }
-

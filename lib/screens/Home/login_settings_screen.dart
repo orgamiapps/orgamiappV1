@@ -47,9 +47,9 @@ class _LoginSettingsScreenState extends State<LoginSettingsScreen> {
           _autoLoginEnabled = enabled;
         });
         ShowToast().showNormalToast(
-          msg: enabled 
-            ? 'Auto-login enabled' 
-            : 'Auto-login disabled. You\'ll need to sign in manually next time.',
+          msg: enabled
+              ? 'Auto-login enabled'
+              : 'Auto-login disabled. You\'ll need to sign in manually next time.',
         );
       }
     } catch (e) {
@@ -66,17 +66,12 @@ class _LoginSettingsScreenState extends State<LoginSettingsScreen> {
         foregroundColor: Colors.white,
         title: const Text(
           'Login Settings',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 20,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 20),
         ),
         elevation: 0,
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(),
-            )
+          ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -95,9 +90,7 @@ class _LoginSettingsScreenState extends State<LoginSettingsScreen> {
   Widget _buildSettingsCard() {
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -115,19 +108,13 @@ class _LoginSettingsScreenState extends State<LoginSettingsScreen> {
             SwitchListTile(
               title: const Text(
                 'Keep me logged in',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
               ),
               subtitle: Text(
                 _autoLoginEnabled
                     ? 'You\'ll be automatically logged in when opening the app'
                     : 'You\'ll need to sign in manually each time',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
               ),
               value: _autoLoginEnabled,
               onChanged: _updateAutoLogin,
@@ -144,9 +131,7 @@ class _LoginSettingsScreenState extends State<LoginSettingsScreen> {
     return Card(
       elevation: 1,
       color: Colors.blue.shade50,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -154,11 +139,7 @@ class _LoginSettingsScreenState extends State<LoginSettingsScreen> {
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.info_outline,
-                  color: Colors.blue.shade700,
-                  size: 20,
-                ),
+                Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
                 const SizedBox(width: 8),
                 Text(
                   'About Auto-Login',

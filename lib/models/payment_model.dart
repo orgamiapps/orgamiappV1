@@ -16,9 +16,9 @@ class FeaturePaymentModel {
 
   // Pricing tiers (in dollars)
   static const Map<int, double> pricingTiers = {
-    3: 3.00,   // $3.00 for 3 days
-    7: 5.00,   // $5.00 for 7 days
-    14: 8.00,  // $8.00 for 14 days
+    3: 3.00, // $3.00 for 3 days
+    7: 5.00, // $5.00 for 7 days
+    14: 8.00, // $8.00 for 14 days
   };
 
   FeaturePaymentModel({
@@ -59,13 +59,13 @@ class FeaturePaymentModel {
       currency: json['currency'] ?? 'usd',
       paymentIntentId: json['paymentIntentId'] ?? '',
       status: json['status'] ?? 'pending',
-      createdAt: json['createdAt'] is Timestamp 
+      createdAt: json['createdAt'] is Timestamp
           ? (json['createdAt'] as Timestamp).toDate()
           : DateTime.now(),
-      completedAt: json['completedAt'] != null 
-          ? (json['completedAt'] is Timestamp 
-              ? (json['completedAt'] as Timestamp).toDate()
-              : json['completedAt'] as DateTime)
+      completedAt: json['completedAt'] != null
+          ? (json['completedAt'] is Timestamp
+                ? (json['completedAt'] as Timestamp).toDate()
+                : json['completedAt'] as DateTime)
           : null,
     );
   }

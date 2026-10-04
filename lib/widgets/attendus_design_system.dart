@@ -1,3 +1,5 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:attendus/Utils/attendus_theme.dart';
@@ -123,7 +125,7 @@ class _ButtonLabel extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (icon != null) ...[Icon(icon, size: 18), const SizedBox(width: 8)],
-        Text(label),
+        Flexible(child: Text(label, textAlign: TextAlign.center)),
       ],
     );
   }
@@ -368,6 +370,7 @@ class AttendUsPageSection extends StatelessWidget {
 }
 
 class AttendUsSectionHeader extends StatelessWidget {
+  final int? subtitleMaxLines;
   final String title;
   final String? subtitle;
   final IconData? icon;
@@ -379,6 +382,7 @@ class AttendUsSectionHeader extends StatelessWidget {
     this.subtitle,
     this.icon,
     this.actions = const [],
+    this.subtitleMaxLines = 2,
   });
 
   @override
@@ -401,8 +405,10 @@ class AttendUsSectionHeader extends StatelessWidget {
                 Text(
                   subtitle!,
                   style: theme.textTheme.bodySmall,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                  maxLines: subtitleMaxLines,
+                  overflow: subtitleMaxLines == null
+                      ? TextOverflow.visible
+                      : TextOverflow.ellipsis,
                 ),
               ],
             ],
@@ -670,6 +676,7 @@ class AttendUsBottomSheet extends StatelessWidget {
             AttendUsSectionHeader(
               title: title,
               subtitle: subtitle,
+              subtitleMaxLines: null,
               actions: actions,
             ),
             const SizedBox(height: 18),
@@ -683,6 +690,7 @@ class AttendUsBottomSheet extends StatelessWidget {
       top: false,
       child: Align(
         alignment: Alignment.bottomCenter,
+        heightFactor: 1,
         child: scrollable ? SingleChildScrollView(child: sheet) : sheet,
       ),
     );
@@ -1111,12 +1119,14 @@ class _IconBadge extends StatelessWidget {
 class AttendUsTopBar extends StatelessWidget {
   final String title;
   final String? subtitle;
+  final Widget? leading;
   final List<Widget> actions;
 
   const AttendUsTopBar({
     super.key,
     required this.title,
     this.subtitle,
+    this.leading,
     this.actions = const [],
   });
 
@@ -1133,6 +1143,7 @@ class AttendUsTopBar extends StatelessWidget {
       ),
       child: Row(
         children: [
+          if (leading != null) ...[leading!, const SizedBox(width: 12)],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1495,6 +1506,206 @@ class AttendUsQuizActionBar extends StatelessWidget {
   }
 }
 
+const String attendusEventImageCacheVersion = '3';
+
+String resolveAttendusEventImageUrl(String? imageUrl, {String? retryToken}) {
+  final source = imageUrl?.trim() ?? '';
+  if (source.isEmpty) return source;
+
+  final uri = Uri.tryParse(source);
+  if (uri == null || uri.host != 'firebasestorage.googleapis.com') {
+    return source;
+  }
+
+  return uri
+      .replace(
+        queryParameters: {
+          ...uri.queryParameters,
+          'attendus_image_v': attendusEventImageCacheVersion,
+          if (retryToken != null && retryToken.isNotEmpty)
+            'attendus_retry': retryToken,
+        },
+      )
+      .toString();
+}
+
+typedef AttendUsEventImageErrorBuilder =
+    Widget Function(BuildContext context, VoidCallback retry);
+
+class AttendUsEventImage extends StatefulWidget {
+  final String? imageUrl;
+  final double? width;
+  final double? height;
+  final BoxFit fit;
+  final Alignment alignment;
+  final WidgetBuilder? loadingBuilder;
+  final AttendUsEventImageErrorBuilder? errorBuilder;
+  final WidgetBuilder? emptyBuilder;
+  final bool compact;
+  final bool? useWebRendererForTesting;
+
+  const AttendUsEventImage({
+    super.key,
+    required this.imageUrl,
+    this.width,
+    this.height,
+    this.fit = BoxFit.cover,
+    this.alignment = Alignment.center,
+    this.loadingBuilder,
+    this.errorBuilder,
+    this.emptyBuilder,
+    this.compact = false,
+    @visibleForTesting this.useWebRendererForTesting,
+  });
+
+  @override
+  State<AttendUsEventImage> createState() => _AttendUsEventImageState();
+}
+
+class _AttendUsEventImageState extends State<AttendUsEventImage> {
+  String? _retryToken;
+  String? _reportedFailureUrl;
+
+  @override
+  void didUpdateWidget(covariant AttendUsEventImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageUrl != widget.imageUrl) {
+      _retryToken = null;
+      _reportedFailureUrl = null;
+    }
+  }
+
+  void _retry() {
+    setState(() {
+      _retryToken = DateTime.now().microsecondsSinceEpoch.toString();
+      _reportedFailureUrl = null;
+    });
+  }
+
+  void _reportFailure(String resolvedUrl, Object error) {
+    if (_reportedFailureUrl == resolvedUrl) return;
+    _reportedFailureUrl = resolvedUrl;
+    final uri = Uri.tryParse(resolvedUrl);
+    debugPrint(
+      'Event image failed to load '
+      '(host=${uri?.host ?? 'invalid'}, path=${uri?.path ?? 'invalid'}): '
+      '${error.runtimeType}',
+    );
+  }
+
+  Widget _defaultState(
+    BuildContext context, {
+    required bool isLoading,
+    required bool canRetry,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    return ColoredBox(
+      color: colors.primaryContainer,
+      child: Center(
+        child: Padding(
+          padding: EdgeInsets.all(widget.compact ? 8 : 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (isLoading)
+                SizedBox(
+                  width: widget.compact ? 24 : 32,
+                  height: widget.compact ? 24 : 32,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: colors.primary,
+                  ),
+                )
+              else
+                Icon(
+                  Icons.image_not_supported_outlined,
+                  color: colors.primary,
+                  size: widget.compact ? 32 : 48,
+                ),
+              if (!widget.compact) ...[
+                const SizedBox(height: 12),
+                Text(
+                  isLoading ? 'Loading image...' : 'Image not available',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: colors.onPrimaryContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+              if (canRetry) ...[
+                SizedBox(height: widget.compact ? 2 : 4),
+                TextButton.icon(
+                  onPressed: _retry,
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text('Retry'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _loading(BuildContext context) =>
+      widget.loadingBuilder?.call(context) ??
+      _defaultState(context, isLoading: true, canRetry: false);
+
+  Widget _error(BuildContext context) =>
+      widget.errorBuilder?.call(context, _retry) ??
+      _defaultState(context, isLoading: false, canRetry: true);
+
+  Widget _empty(BuildContext context) =>
+      widget.emptyBuilder?.call(context) ??
+      _defaultState(context, isLoading: false, canRetry: false);
+
+  @override
+  Widget build(BuildContext context) {
+    final source = widget.imageUrl?.trim() ?? '';
+    if (source.isEmpty) return _empty(context);
+
+    final resolvedUrl = resolveAttendusEventImageUrl(
+      source,
+      retryToken: _retryToken,
+    );
+    final useWebRenderer = widget.useWebRendererForTesting ?? kIsWeb;
+
+    if (useWebRenderer) {
+      return Image.network(
+        resolvedUrl,
+        key: ValueKey(resolvedUrl),
+        width: widget.width,
+        height: widget.height,
+        fit: widget.fit,
+        alignment: widget.alignment,
+        webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+        loadingBuilder: (context, child, loadingProgress) =>
+            loadingProgress == null ? child : _loading(context),
+        errorBuilder: (context, error, stackTrace) {
+          _reportFailure(resolvedUrl, error);
+          return _error(context);
+        },
+      );
+    }
+
+    return CachedNetworkImage(
+      imageUrl: resolvedUrl,
+      key: ValueKey(resolvedUrl),
+      width: widget.width,
+      height: widget.height,
+      fit: widget.fit,
+      alignment: widget.alignment,
+      placeholder: (context, url) => _loading(context),
+      errorWidget: (context, url, error) {
+        _reportFailure(resolvedUrl, error);
+        return _error(context);
+      },
+    );
+  }
+}
+
 class AttendUsEventSummaryCard extends StatelessWidget {
   final String title;
   final String? subtitle;
@@ -1502,7 +1713,15 @@ class AttendUsEventSummaryCard extends StatelessWidget {
   final String dateLabel;
   final String locationLabel;
   final String? statusLabel;
+  final String? organizerLabel;
+  final String? distanceLabel;
+  final String? priceLabel;
+  final String? availabilityLabel;
+  final bool isSaved;
+  final VoidCallback? onSave;
   final VoidCallback? onTap;
+  final double imageAspectRatio;
+  final IconData? fallbackIcon;
 
   const AttendUsEventSummaryCard({
     super.key,
@@ -1512,8 +1731,39 @@ class AttendUsEventSummaryCard extends StatelessWidget {
     required this.dateLabel,
     required this.locationLabel,
     this.statusLabel,
+    this.organizerLabel,
+    this.distanceLabel,
+    this.priceLabel,
+    this.availabilityLabel,
+    this.isSaved = false,
+    this.onSave,
     this.onTap,
+    this.imageAspectRatio = 16 / 8,
+    this.fallbackIcon,
   });
+
+  Widget _imageFallback(BuildContext context, {bool isLoading = false}) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return ColoredBox(
+      color: colorScheme.primaryContainer,
+      child: Center(
+        child: isLoading
+            ? SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: colorScheme.primary,
+                ),
+              )
+            : Icon(
+                fallbackIcon ?? Icons.event,
+                color: colorScheme.primary,
+                size: 40,
+              ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1524,23 +1774,70 @@ class AttendUsEventSummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AspectRatio(
-            aspectRatio: 16 / 8,
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(AttendUsTokens.radiusMd),
+          Stack(
+            children: [
+              AspectRatio(
+                aspectRatio: imageAspectRatio,
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(AttendUsTokens.radiusMd),
+                  ),
+                  child: AttendUsEventImage(
+                    imageUrl: imageUrl,
+                    fit: BoxFit.cover,
+                    compact: true,
+                    emptyBuilder: _imageFallback,
+                    loadingBuilder: (context) =>
+                        _imageFallback(context, isLoading: true),
+                  ),
+                ),
               ),
-              child: imageUrl == null || imageUrl!.isEmpty
-                  ? Container(
-                      color: theme.colorScheme.primaryContainer,
-                      child: Icon(
-                        Icons.event,
+              Positioned(
+                left: 10,
+                top: 10,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface.withValues(alpha: .94),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 6,
+                    ),
+                    child: Text(
+                      dateLabel,
+                      style: theme.textTheme.labelMedium?.copyWith(
                         color: theme.colorScheme.primary,
-                        size: 40,
+                        fontWeight: FontWeight.w700,
                       ),
-                    )
-                  : Image.network(imageUrl!, fit: BoxFit.cover),
-            ),
+                    ),
+                  ),
+                ),
+              ),
+              if (onSave != null)
+                Positioned(
+                  right: 6,
+                  top: 6,
+                  child: Semantics(
+                    button: true,
+                    label: isSaved
+                        ? 'Remove $title from saved events'
+                        : 'Save $title',
+                    child: IconButton.filledTonal(
+                      tooltip: isSaved ? 'Saved' : 'Save event',
+                      constraints: const BoxConstraints(
+                        minWidth: 44,
+                        minHeight: 44,
+                      ),
+                      onPressed: onSave,
+                      icon: Icon(
+                        isSaved ? Icons.bookmark : Icons.bookmark_border,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
           Padding(
             padding: const EdgeInsets.all(14),
@@ -1576,13 +1873,35 @@ class AttendUsEventSummaryCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
+                if (organizerLabel != null && organizerLabel!.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'By $organizerLabel',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 10,
                   runSpacing: 8,
                   children: [
-                    _Meta(icon: Icons.schedule, label: dateLabel),
-                    _Meta(icon: Icons.place_outlined, label: locationLabel),
+                    _Meta(
+                      icon: Icons.place_outlined,
+                      label: distanceLabel == null
+                          ? locationLabel
+                          : '$locationLabel · $distanceLabel',
+                    ),
+                    if (priceLabel != null)
+                      _Meta(icon: Icons.sell_outlined, label: priceLabel!),
+                    if (availabilityLabel != null)
+                      _Meta(
+                        icon: Icons.confirmation_number_outlined,
+                        label: availabilityLabel!,
+                      ),
                   ],
                 ),
               ],

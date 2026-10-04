@@ -1,10 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 
-const _defaultBundlePath = 'build/web/main.dart.js';
 const _defaultMaxGzipBytes = 1800000;
 
 Future<void> main(List<String> arguments) async {
-  final bundlePath = arguments.isEmpty ? _defaultBundlePath : arguments.first;
+  final bundlePath = arguments.isEmpty ? _currentBundlePath() : arguments.first;
   final maxGzipBytes = arguments.length < 2
       ? _defaultMaxGzipBytes
       : int.parse(arguments[1]);
@@ -32,4 +32,12 @@ Future<void> main(List<String> arguments) async {
     );
     exitCode = 1;
   }
+}
+
+String _currentBundlePath() {
+  final manifest = File('build/web/release-manifest.json');
+  if (!manifest.existsSync()) return 'build/web/main.dart.js';
+  final decoded = jsonDecode(manifest.readAsStringSync()) as Map;
+  final releaseId = decoded['currentRelease'];
+  return 'build/web/releases/$releaseId/main.dart.js';
 }

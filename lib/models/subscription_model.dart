@@ -354,7 +354,8 @@ class SubscriptionModel {
       scheduledPlanId: scheduledPlanId,
       scheduledPlanStartDate: scheduledPlanStartDate,
       tier: tier ?? this.tier,
-      eventsCreatedThisMonth: eventsCreatedThisMonth ?? this.eventsCreatedThisMonth,
+      eventsCreatedThisMonth:
+          eventsCreatedThisMonth ?? this.eventsCreatedThisMonth,
       currentMonthStart: currentMonthStart,
     );
   }

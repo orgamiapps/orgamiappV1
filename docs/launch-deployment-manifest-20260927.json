@@ -1,0 +1,273 @@
+{
+  "generatedAt": "2026-09-27T22:01:22.257Z",
+  "completionGatesSatisfied": false,
+  "stagingDeployed": true,
+  "productionDeployed": "additive_indexes_only",
+  "deviceQualified": false,
+  "observed": false,
+  "sourceManifest": "build/deployment-request-20260927/staging-candidate-manifest.json",
+  "documentationChangedSinceFreeze": [
+    "docs/launch-execution-checkpoint-20260927.md",
+    "docs/launch-fixes-20260927.md"
+  ],
+  "artifactDrift": [],
+  "postflight": {
+    "checkedAt": "2026-09-27T21:58:02.368Z",
+    "hosting": {
+      "orgami-66nxok": {
+        "release": "projects/951311475019/sites/orgami-66nxok/releases/1790476984806000",
+        "version": "projects/951311475019/sites/orgami-66nxok/versions/e0b3b60897962a19",
+        "releaseTime": "2026-09-27T02:43:04.806Z",
+        "unchanged": true
+      },
+      "attendus-staging": {
+        "release": "projects/925344893088/sites/attendus-staging/releases/1790546061479000",
+        "version": "projects/925344893088/sites/attendus-staging/versions/1273c217a14dfaad",
+        "releaseTime": "2026-09-27T21:54:21.479Z",
+        "unchanged": false
+      }
+    },
+    "productionFunctions": {
+      "count": 111,
+      "changed": [],
+      "missing": []
+    },
+    "stagingErrorLogs": {
+      "count": 1,
+      "more": false,
+      "services": [
+        ""
+      ]
+    }
+  },
+  "files": [
+    {
+      "path": "build/deployment-request-20260927/attendus-staging-fields-before.json",
+      "sha256": "cfcfc1dc5b0d4f6d28ba5802dc8262463b6cffa274249e9de7464b5f41d66a44"
+    },
+    {
+      "path": "build/deployment-request-20260927/attendus-staging-hosting-before.json",
+      "sha256": "7dc1cf78e1985c6505fca2d591d58caf5c54a117ddac05af9656ec4af685a462"
+    },
+    {
+      "path": "build/deployment-request-20260927/attendus-staging-index-config.json",
+      "sha256": "82fae8f4461bc40aa29aadb9670f227195d6735e9513f01273dc71ac03432e39"
+    },
+    {
+      "path": "build/deployment-request-20260927/attendus-staging-index-verification.json",
+      "sha256": "f1032bd78761a3646d3934d011096b0865654c83aff0a8209da86ffa9a1621d3"
+    },
+    {
+      "path": "build/deployment-request-20260927/attendus-staging-indexes-additive.json",
+      "sha256": "ceb7dcb40d734ed0a95b3d5eeb8f97ff8eddebba98e6a0267db236967c232e6e"
+    },
+    {
+      "path": "build/deployment-request-20260927/attendus-staging-indexes-before.json",
+      "sha256": "98796065ba042342c819ca47c502412e14928973238598b7ffb1661f7cfa22d5"
+    },
+    {
+      "path": "build/deployment-request-20260927/attendus-staging-preflight.json",
+      "sha256": "2ddb79726141c3a414088b6e7fceb5573960f450446dc7681dda628bc5c9364b"
+    },
+    {
+      "path": "build/deployment-request-20260927/check-before-hosting.cjs",
+      "sha256": "6a06fd67c37c90be5bc4e2576724225b1d3181ce54f5d1e1805803d4bbd4cd0d"
+    },
+    {
+      "path": "build/deployment-request-20260927/check-indexes.cjs",
+      "sha256": "21762ef2a0c9057b738fe29976e6d13ea912120c56633c5220454cebb0a7d823"
+    },
+    {
+      "path": "build/deployment-request-20260927/final-verification-all-databases.json",
+      "sha256": "1c1dd1386215c5408c2bb14b2aec8835cafbf726019e2e50a7e1026c2d106d05"
+    },
+    {
+      "path": "build/deployment-request-20260927/final-verification.json",
+      "sha256": "77e5e9e7f99b3fad96168f87e12f256e2fc575cf828da4af0c33afdf5d329cd7"
+    },
+    {
+      "path": "build/deployment-request-20260927/function-deploy-targets.txt",
+      "sha256": "dc4c9ce4317be5fb5523212a942d2738bde3f966bc1e95ba6177901fa01e60e7"
+    },
+    {
+      "path": "build/deployment-request-20260927/index-tests.log",
+      "sha256": "d3c76d84b01ebc651a5b20d29881d416b6958ced9b86cc10d7c2313c9feaf7fe"
+    },
+    {
+      "path": "build/deployment-request-20260927/migration-dry-run-arguments-failed.log",
+      "sha256": "969f284f812a8f47c84c1dad70b4a502bf335af7a84c989161e1adce203d434b"
+    },
+    {
+      "path": "build/deployment-request-20260927/orgami-66nxok-fields-before.json",
+      "sha256": "3fcfb05488c96ff8efff38c19e0438d403a4f54722e834614affee97333395e6"
+    },
+    {
+      "path": "build/deployment-request-20260927/orgami-66nxok-hosting-before.json",
+      "sha256": "07e0ed0fb3203a6d5a257692300889988649118cdbe4bacc4369b310f1c9de3e"
+    },
+    {
+      "path": "build/deployment-request-20260927/orgami-66nxok-index-config.json",
+      "sha256": "8907f2352ed81951d1738398a201d705974f41c9ed1118f393eb494a04470693"
+    },
+    {
+      "path": "build/deployment-request-20260927/orgami-66nxok-index-verification.json",
+      "sha256": "73a11990f020508159b31c66f5898b8c8e371553e9d8317c2ab3162ec92cb1b5"
+    },
+    {
+      "path": "build/deployment-request-20260927/orgami-66nxok-indexes-additive.json",
+      "sha256": "dc16b9e85188262f4aa898f6aed2c02790d249e116639395d028b14eac2314fd"
+    },
+    {
+      "path": "build/deployment-request-20260927/orgami-66nxok-indexes-before.json",
+      "sha256": "968184ba2068b729fd15531f6d3ab688055fea9a1bc381fb8b49ddd76d98e05d"
+    },
+    {
+      "path": "build/deployment-request-20260927/orgami-66nxok-preflight.json",
+      "sha256": "07ec4f789059403fafcbd606903d9b07dca6d9c61c7db623799ff15c5404f70d"
+    },
+    {
+      "path": "build/deployment-request-20260927/postflight.cjs",
+      "sha256": "a687b231007d39ac7f6cb81ad45a716747e56fb99f505c034909f6c5d9b115d8"
+    },
+    {
+      "path": "build/deployment-request-20260927/postflight.json",
+      "sha256": "7565cfe4ea037da89e4669597d97c336cfd163c27dbab839ddd5f9bbb7cae11c"
+    },
+    {
+      "path": "build/deployment-request-20260927/preflight.cjs",
+      "sha256": "77ce9bb4a8449072609e89985db822c16931f43efa63c3fa8870fb9b843c8e0e"
+    },
+    {
+      "path": "build/deployment-request-20260927/prepare-indexes.cjs",
+      "sha256": "265a5509af1e0afbb098895ebebb279df0c883a0292a44a66aab9c1f92bbcf2e"
+    },
+    {
+      "path": "build/deployment-request-20260927/production-index-deploy-2.log",
+      "sha256": "f1977d2473b8d422b53b97c5111949cf9a6a15d4a4059c535364914b856f8555"
+    },
+    {
+      "path": "build/deployment-request-20260927/production-index-deploy.log",
+      "sha256": "47fecca675dacd227968e45e9208363c79f8b7f03a9b68c103c5f584a282ad14"
+    },
+    {
+      "path": "build/deployment-request-20260927/production-migration-dry-run.json",
+      "sha256": "d21d779346ce780fb16564a9fea2c6fb0d6e9800195a4041d7c3a0dadfd7ce15"
+    },
+    {
+      "path": "build/deployment-request-20260927/provision-staging-signing.cjs",
+      "sha256": "36c74cb8ecf6722abf851ccc07fcf67006f099fb44bb37d9763c4ee5e6aae388"
+    },
+    {
+      "path": "build/deployment-request-20260927/rules-before.cjs",
+      "sha256": "b5c3477210f0f470368c6d1f5d0969a2673a4203a1f9b76d8b4fac493554738d"
+    },
+    {
+      "path": "build/deployment-request-20260927/rules-history.cjs",
+      "sha256": "2082ed939f3a7d97c6e317cece9f37e1a3e357626f20a37e3d28c2ca6c94dad1"
+    },
+    {
+      "path": "build/deployment-request-20260927/secret-metadata.cjs",
+      "sha256": "41472de5298780cb4613ae50c48a3badb2881b628dce500ce57dd6fe5eaaa0ad"
+    },
+    {
+      "path": "build/deployment-request-20260927/staging-analytics-canary.log",
+      "sha256": "273a81f35e5e9989a9b8d7015aa305515ee70ca94b00059338bf08051afc71e3"
+    },
+    {
+      "path": "build/deployment-request-20260927/staging-backend-deploy-2.log",
+      "sha256": "3a2513a848a250eda7e1e6a59f372cc1255357ba29a7fca091d31ac8db5ac0fb"
+    },
+    {
+      "path": "build/deployment-request-20260927/staging-backend-deploy.log",
+      "sha256": "3a28ddae0e4d8550c813b3aaddeebe179cfcb3dc74b0e8295bedd55612eebae4"
+    },
+    {
+      "path": "build/deployment-request-20260927/staging-candidate-manifest.json",
+      "sha256": "1d6e304494ec302e05498e40aaea831d9cecf754d0e882df583d1a8fba905ff6"
+    },
+    {
+      "path": "build/deployment-request-20260927/staging-error-logs.json",
+      "sha256": "5dde8ee024c7ec987f9146000164e7c656bd93524204354e7aa7bfe450426ffc"
+    },
+    {
+      "path": "build/deployment-request-20260927/staging-functions-after.json",
+      "sha256": "47925c45edd273dc4791155c472f7873d1e11bb546c8e8b4c5356ddabb7b0ded"
+    },
+    {
+      "path": "build/deployment-request-20260927/staging-functions-before.json",
+      "sha256": "37bd5dbf3d3b08a352d2a91954e8670f2989a6d9d618970d925736bbefe794f0"
+    },
+    {
+      "path": "build/deployment-request-20260927/staging-hosting-deploy.log",
+      "sha256": "4b33fde75ebd3dbfc4173d4b846aaa4f848222652a99f3cfb77eae8dd9fa741b"
+    },
+    {
+      "path": "build/deployment-request-20260927/staging-index-deploy.log",
+      "sha256": "ec9be432659fbf3388fda9c07d1fb0c2c89e499763223c707565b732116ab1f0"
+    },
+    {
+      "path": "build/deployment-request-20260927/staging-inventory.cjs",
+      "sha256": "2661573bd33d2bf589275773b658e2b70c9b5e46e38f977010d099babe70749f"
+    },
+    {
+      "path": "build/deployment-request-20260927/staging-live-assets.log",
+      "sha256": "e1f5f4908bdaeca726475a1cdc821b66d95636307058b40205ffeefbab6408e7"
+    },
+    {
+      "path": "build/deployment-request-20260927/staging-query-canary.log",
+      "sha256": "5f59a18ce3708f42e29d75ad56ea2af44136458f61e547eff7e0572213691f5a"
+    },
+    {
+      "path": "build/deployment-request-20260927/staging-reminder-canary.log",
+      "sha256": "5aff48057c557dcd58225fdb556748f48998c4cf14d331cae661a766e96cd1bf"
+    },
+    {
+      "path": "build/deployment-request-20260927/staging-rules-captured-during-deploy.json",
+      "sha256": "7b2920139bf4939b6b37be7d62595098bfbe8a479eccadd6b6767dafabd8853a"
+    },
+    {
+      "path": "build/deployment-request-20260927/staging-rules-prior-candidates.json",
+      "sha256": "111bee04e22f1bcd3ad410ea4a89dd481ccdfffd2480734e84f32c74a7991dfb"
+    },
+    {
+      "path": "build/deployment-request-20260927/staging-secret-metadata.json",
+      "sha256": "1937fa98f456403f16144e850fb8f8aa2e968e3157bfef5c2cb64cf13d19cdc6"
+    },
+    {
+      "path": "build/deployment-request-20260927/staging-signing-key-created.json",
+      "sha256": "65f7313e39f56a125418e3e0c2d1d3c33bb7a28d33bffbe7359f00d69ac7a4e0"
+    },
+    {
+      "path": "build/deployment-request-20260927/staging-web-build.log",
+      "sha256": "66b2cc21fe8f405ec07120fc9fc2125f946c06692ba4ba5251c63a66d3ff12a3"
+    },
+    {
+      "path": "build/deployment-request-20260927/verify-backend.cjs",
+      "sha256": "24d5c1c0c7eba67ecd6aeffbc3c83933e49bbb1c9eda918a2bd7d03d487fd31d"
+    },
+    {
+      "path": "build/deployment-request-20260927/verify-final.cjs",
+      "sha256": "67490e9e5419f8fa23a8ac6014cbf4b7eb91fd1d59e580faafb24ef29423be29"
+    },
+    {
+      "path": "build/deployment-request-20260927/write-manifest.cjs",
+      "sha256": "a172824ed53cfab4c0553ac1505bdc03cb06ad0e6828ede0eb5c735b68349510"
+    },
+    {
+      "path": "docs/launch-deployment-report-20260927.md",
+      "sha256": "6cf9ee55e091f56c314d694eff5e9a6f5a98f6c0fea989e3e1d83ee77a95fb35"
+    },
+    {
+      "path": "docs/launch-fixes-20260927.md",
+      "sha256": "b1db68187600a16724532f1e569cf3535f204db106c0aa3a497b6d506cf011c5"
+    },
+    {
+      "path": "docs/launch-execution-checkpoint-20260927.md",
+      "sha256": "450ac5535f652a7823d78b4f470cb8252d36ff4422c08b951fbefea7a4311780"
+    },
+    {
+      "path": "docs/launch-store-enrollment-20260927.md",
+      "sha256": "406c66a0c7fdc5f6a6fcec17aa5df1a54372761232719dba05f98bc03137aa1e"
+    }
+  ]
+}

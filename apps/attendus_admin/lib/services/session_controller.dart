@@ -19,11 +19,15 @@ enum SessionStatus {
 class SessionController extends ChangeNotifier {
   SessionController({FirebaseAuth? auth, AdminApiClient? api})
     : _auth = auth ?? FirebaseAuth.instance,
-      _api = api ?? AdminApiClient() {
+      _api = api ?? AdminApiClient(auth: auth),
+      _ownsApi = api == null {
     _subscription = _auth.authStateChanges().listen(_changed);
   }
   final FirebaseAuth _auth;
   final AdminApiClient _api;
+  final bool _ownsApi;
+  int _revision = 0;
+  bool _disposed = false;
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: const ['email', 'profile'],
   );
@@ -33,6 +37,9 @@ class SessionController extends ChangeNotifier {
   String? error;
   User? get user => _auth.currentUser;
   Future<void> _changed(User? user) async {
+    _revision++;
+    permissions = const AdminPermissions({});
+    error = null;
     if (user == null) {
       status = SessionStatus.signedOut;
       permissions = const AdminPermissions({});
@@ -43,6 +50,9 @@ class SessionController extends ChangeNotifier {
   }
 
   Future<void> signIn(String email, String password) async {
+    final revision = ++_revision;
+    _api.invalidateSession();
+    permissions = const AdminPermissions({});
     status = SessionStatus.loading;
     error = null;
     notifyListeners();
@@ -52,6 +62,7 @@ class SessionController extends ChangeNotifier {
         password: password,
       );
     } on FirebaseAuthException catch (e) {
+      if (_disposed || revision != _revision) return;
       error = e.message ?? 'Sign in failed.';
       status = SessionStatus.signedOut;
       notifyListeners();
@@ -59,6 +70,9 @@ class SessionController extends ChangeNotifier {
   }
 
   Future<void> signInWithGoogle() async {
+    final revision = ++_revision;
+    _api.invalidateSession();
+    permissions = const AdminPermissions({});
     status = SessionStatus.loading;
     error = null;
     notifyListeners();
@@ -69,6 +83,7 @@ class SessionController extends ChangeNotifier {
         );
       }
       final googleUser = await _googleSignIn.signIn();
+      if (_disposed || revision != _revision) return;
       if (googleUser == null) {
         error = 'Google sign-in was canceled.';
         status = SessionStatus.signedOut;
@@ -76,12 +91,14 @@ class SessionController extends ChangeNotifier {
         return;
       }
       final googleAuth = await googleUser.authentication;
+      if (_disposed || revision != _revision) return;
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
       await _auth.signInWithCredential(credential);
     } on FirebaseAuthException catch (e) {
+      if (_disposed || revision != _revision) return;
       error = switch (e.code) {
         'web-context-cancelled' ||
         'canceled' ||
@@ -93,10 +110,12 @@ class SessionController extends ChangeNotifier {
       status = SessionStatus.signedOut;
       notifyListeners();
     } on StateError catch (e) {
+      if (_disposed || revision != _revision) return;
       error = e.message;
       status = SessionStatus.signedOut;
       notifyListeners();
     } catch (_) {
+      if (_disposed || revision != _revision) return;
       error =
           'Google sign-in could not be completed. Check the desktop OAuth client configuration.';
       status = SessionStatus.signedOut;
@@ -105,35 +124,67 @@ class SessionController extends ChangeNotifier {
   }
 
   Future<void> refreshAccess() async {
+    final revision = ++_revision;
+    final uid = _auth.currentUser?.uid;
+    permissions = const AdminPermissions({});
+    if (uid == null) {
+      status = SessionStatus.signedOut;
+      error = null;
+      if (!_disposed) notifyListeners();
+      return;
+    }
     status = SessionStatus.checkingAccess;
     error = null;
     notifyListeners();
     try {
       final response = await _api.getJson('/v1/me');
-      final data = response['data'] as Map<String, dynamic>;
+      if (!_current(revision, uid)) return;
+      final data = response['data'];
+      if (data is! Map<String, dynamic> ||
+          data['roles'] is! List ||
+          (data['roles'] as List).any((role) => role is! String)) {
+        throw const ApiException(
+          'INVALID_RESPONSE',
+          'The Admin API returned invalid access details. Please retry.',
+        );
+      }
       permissions = AdminPermissions.fromWire(
         data['roles'] as List? ?? const [],
       );
       status = SessionStatus.authorized;
     } on ApiException catch (e) {
+      if (!_current(revision, uid)) return;
       error = e.message;
       status = e.status == 403
           ? SessionStatus.unauthorized
           : SessionStatus.error;
     }
-    notifyListeners();
+    if (_current(revision, uid)) notifyListeners();
   }
 
+  bool _current(int revision, String uid) =>
+      !_disposed && revision == _revision && _auth.currentUser?.uid == uid;
+
   Future<void> signOut() async {
-    if (isGoogleDesktopOAuthConfigured) {
-      await _googleSignIn.signOut();
+    _revision++;
+    _api.invalidateSession();
+    permissions = const AdminPermissions({});
+    error = null;
+    status = SessionStatus.signedOut;
+    notifyListeners();
+    try {
+      if (isGoogleDesktopOAuthConfigured) await _googleSignIn.signOut();
+    } finally {
+      await _auth.signOut();
     }
-    await _auth.signOut();
   }
 
   @override
   void dispose() {
+    _disposed = true;
+    _revision++;
     _subscription?.cancel();
+    if (_ownsApi) _api.dispose();
     super.dispose();
   }
 }

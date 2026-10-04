@@ -1,3 +1,4 @@
+import 'package:attendus/config/safety_flags.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/models/ticket_payment_model.dart';
@@ -20,6 +21,7 @@ class TicketRevenueScreen extends StatefulWidget {
 
 class _TicketRevenueScreenState extends State<TicketRevenueScreen> {
   bool isLoading = true;
+  bool _loadFailed = false;
   List<TicketPaymentModel> payments = [];
   double totalRevenue = 0;
   int totalTicketsSold = 0;
@@ -33,12 +35,18 @@ class _TicketRevenueScreenState extends State<TicketRevenueScreen> {
   }
 
   Future<void> _loadRevenue() async {
+    if (!SafetyFlags.paidCheckoutEnabled) return;
     setState(() {
       isLoading = true;
+      _loadFailed = false;
     });
 
     try {
       if (CustomerController.logeInCustomer == null) {
+        setState(() {
+          isLoading = false;
+          _loadFailed = true;
+        });
         ShowToast().showNormalToast(msg: 'Please log in to view revenue');
         return;
       }
@@ -110,13 +118,35 @@ class _TicketRevenueScreenState extends State<TicketRevenueScreen> {
         setState(() {
           isLoading = false;
         });
-        ShowToast().showNormalToast(msg: 'Failed to load revenue: $e');
+        setState(() => _loadFailed = true);
+        ShowToast().showNormalToast(
+          msg: 'Failed to load revenue. Check access and retry.',
+        );
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!SafetyFlags.paidCheckoutEnabled || _loadFailed) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Ticket Revenue')),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                !SafetyFlags.paidCheckoutEnabled
+                    ? 'Paid ticket revenue is unavailable in this release.'
+                    : 'Revenue could not be loaded. Check your access and connection.',
+              ),
+              if (SafetyFlags.paidCheckoutEnabled)
+                TextButton(onPressed: _loadRevenue, child: const Text('Retry')),
+            ],
+          ),
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: Text(

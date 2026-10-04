@@ -12,7 +12,7 @@ class StepContacts extends StatelessWidget {
     return AttendUsPageSection(
       title: 'Find people you know',
       subtitle:
-          'Contact sync is optional. You can skip this now and manage contacts later from Settings.',
+          'Explore discoverable people on Attendus. You can skip this and find people later.',
       icon: Icons.contacts_outlined,
       framed: false,
       padding: const EdgeInsets.all(24),
@@ -23,7 +23,7 @@ class StepContacts extends StatelessWidget {
             icon: Icons.people_alt_outlined,
             title: 'Connect with attendees and organizers',
             subtitle:
-                'Attendus can help suggest contacts after you grant permission.',
+                'Browse people who have made their profiles discoverable.',
             tone: AttendUsStatusTone.info,
           ),
           const SizedBox(height: 24),
@@ -38,7 +38,7 @@ class StepContacts extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: AttendUsButton.primary(
-                  label: 'Sync contacts',
+                  label: 'Find people',
                   icon: Icons.sync,
                   onPressed: () {
                     RouterClass.nextScreenNormal(

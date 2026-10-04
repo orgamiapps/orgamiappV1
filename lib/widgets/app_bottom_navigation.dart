@@ -45,11 +45,6 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
       selectedIcon: Icon(Icons.person),
       label: 'Profile',
     ),
-    NavigationDestination(
-      icon: Icon(Icons.menu),
-      selectedIcon: Icon(Icons.menu),
-      label: 'Account',
-    ),
   ];
 
   int _normalizeIndex(int index) {

@@ -5,6 +5,9 @@ enum QuizStatus { draft, live, paused, ended }
 class LiveQuizModel {
   static String firebaseKey = 'LiveQuizzes';
 
+  final int session;
+  final int revision;
+  final DateTime? currentQuestionEndsAt;
   final String id;
   final String eventId;
   final String creatorId;
@@ -14,14 +17,14 @@ class LiveQuizModel {
   final DateTime createdAt;
   final DateTime? startedAt;
   final DateTime? endedAt;
-  
+
   // Quiz Settings
   final int timePerQuestion; // seconds
   final bool autoAdvance;
   final bool showLeaderboard;
   final bool allowAnonymous;
   final int maxParticipants;
-  
+
   // Current State
   final int? currentQuestionIndex;
   final DateTime? currentQuestionStartedAt;
@@ -29,6 +32,9 @@ class LiveQuizModel {
   final int participantCount;
 
   const LiveQuizModel({
+    this.session = 0,
+    this.revision = 0,
+    this.currentQuestionEndsAt,
     required this.id,
     required this.eventId,
     required this.creatorId,
@@ -51,6 +57,10 @@ class LiveQuizModel {
 
   factory LiveQuizModel.fromJson(Map<String, dynamic> data) {
     return LiveQuizModel(
+      session: (data['session'] as num?)?.toInt() ?? 0,
+      revision: (data['revision'] as num?)?.toInt() ?? 0,
+      currentQuestionEndsAt: (data['currentQuestionEndsAt'] as Timestamp?)
+          ?.toDate(),
       id: data['id'] ?? '',
       eventId: data['eventId'] ?? '',
       creatorId: data['creatorId'] ?? '',
@@ -69,7 +79,8 @@ class LiveQuizModel {
       allowAnonymous: data['allowAnonymous'] ?? true,
       maxParticipants: data['maxParticipants'] ?? 1000,
       currentQuestionIndex: data['currentQuestionIndex'],
-      currentQuestionStartedAt: (data['currentQuestionStartedAt'] as Timestamp?)?.toDate(),
+      currentQuestionStartedAt: (data['currentQuestionStartedAt'] as Timestamp?)
+          ?.toDate(),
       totalQuestions: data['totalQuestions'] ?? 0,
       participantCount: data['participantCount'] ?? 0,
     );
@@ -82,6 +93,11 @@ class LiveQuizModel {
 
   Map<String, dynamic> toJson() {
     return {
+      'session': session,
+      'revision': revision,
+      'currentQuestionEndsAt': currentQuestionEndsAt == null
+          ? null
+          : Timestamp.fromDate(currentQuestionEndsAt!),
       'id': id,
       'eventId': eventId,
       'creatorId': creatorId,
@@ -97,8 +113,8 @@ class LiveQuizModel {
       'allowAnonymous': allowAnonymous,
       'maxParticipants': maxParticipants,
       'currentQuestionIndex': currentQuestionIndex,
-      'currentQuestionStartedAt': currentQuestionStartedAt != null 
-          ? Timestamp.fromDate(currentQuestionStartedAt!) 
+      'currentQuestionStartedAt': currentQuestionStartedAt != null
+          ? Timestamp.fromDate(currentQuestionStartedAt!)
           : null,
       'totalQuestions': totalQuestions,
       'participantCount': participantCount,
@@ -126,6 +142,9 @@ class LiveQuizModel {
     int? participantCount,
   }) {
     return LiveQuizModel(
+      session: session,
+      revision: revision,
+      currentQuestionEndsAt: currentQuestionEndsAt,
       id: id ?? this.id,
       eventId: eventId ?? this.eventId,
       creatorId: creatorId ?? this.creatorId,
@@ -141,7 +160,8 @@ class LiveQuizModel {
       allowAnonymous: allowAnonymous ?? this.allowAnonymous,
       maxParticipants: maxParticipants ?? this.maxParticipants,
       currentQuestionIndex: currentQuestionIndex ?? this.currentQuestionIndex,
-      currentQuestionStartedAt: currentQuestionStartedAt ?? this.currentQuestionStartedAt,
+      currentQuestionStartedAt:
+          currentQuestionStartedAt ?? this.currentQuestionStartedAt,
       totalQuestions: totalQuestions ?? this.totalQuestions,
       participantCount: participantCount ?? this.participantCount,
     );
@@ -153,24 +173,29 @@ class LiveQuizModel {
   bool get isEnded => status == QuizStatus.ended;
   bool get isPaused => status == QuizStatus.paused;
   bool get hasStarted => startedAt != null;
-  
-  bool get hasCurrentQuestion => currentQuestionIndex != null && 
-      currentQuestionIndex! >= 0 && 
+
+  bool get hasCurrentQuestion =>
+      currentQuestionIndex != null &&
+      currentQuestionIndex! >= 0 &&
       currentQuestionIndex! < totalQuestions;
-  
+
   Duration? get timeRemainingForCurrentQuestion {
     if (!hasCurrentQuestion || currentQuestionStartedAt == null) return null;
-    
+
+    if (currentQuestionEndsAt != null) {
+      final remaining = currentQuestionEndsAt!.difference(DateTime.now());
+      return remaining.isNegative ? Duration.zero : remaining;
+    }
     final elapsed = DateTime.now().difference(currentQuestionStartedAt!);
     final remaining = Duration(seconds: timePerQuestion) - elapsed;
     return remaining.isNegative ? Duration.zero : remaining;
   }
-  
+
   bool get isCurrentQuestionExpired {
     final remaining = timeRemainingForCurrentQuestion;
     return remaining != null && remaining == Duration.zero;
   }
-  
+
   double get progressPercentage {
     if (totalQuestions == 0) return 0.0;
     if (currentQuestionIndex == null) return 0.0;

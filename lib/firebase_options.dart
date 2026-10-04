@@ -2,7 +2,7 @@
 // ignore_for_file: type=lint
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, kIsWeb, TargetPlatform;
+    show defaultTargetPlatform, kIsWeb, kDebugMode, TargetPlatform;
 
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
@@ -15,9 +15,36 @@ import 'package:flutter/foundation.dart'
 /// );
 /// ```
 class DefaultFirebaseOptions {
+  static const String environment = String.fromEnvironment(
+    'ATTENDUS_FIREBASE_ENV',
+    defaultValue: 'production',
+  );
+
   static FirebaseOptions get currentPlatform {
+    if (environment == 'emulator') {
+      if (!kDebugMode) {
+        throw StateError('Firebase emulator configuration is debug-only.');
+      }
+      return emulator;
+    }
+    if (environment == 'staging') {
+      if (kIsWeb) {
+        return stagingWeb;
+      }
+      return nativeEnvironment;
+    }
+    if (environment != 'production') {
+      throw UnsupportedError(
+        'Unknown ATTENDUS_FIREBASE_ENV value: $environment',
+      );
+    }
     if (kIsWeb) {
       return web;
+    }
+    if (const String.fromEnvironment(
+      'ATTENDUS_NATIVE_FIREBASE_APP_ID',
+    ).isNotEmpty) {
+      return nativeEnvironment;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -43,6 +70,48 @@ class DefaultFirebaseOptions {
     }
   }
 
+  static FirebaseOptions get nativeEnvironment {
+    const project = String.fromEnvironment(
+      'ATTENDUS_NATIVE_FIREBASE_PROJECT_ID',
+    );
+    const appId = String.fromEnvironment('ATTENDUS_NATIVE_FIREBASE_APP_ID');
+    const apiKey = String.fromEnvironment('ATTENDUS_NATIVE_FIREBASE_API_KEY');
+    const sender = String.fromEnvironment('ATTENDUS_NATIVE_FIREBASE_SENDER_ID');
+    const bucket = String.fromEnvironment(
+      'ATTENDUS_NATIVE_FIREBASE_STORAGE_BUCKET',
+    );
+    const applicationId = String.fromEnvironment(
+      'ATTENDUS_NATIVE_APPLICATION_ID',
+    );
+    final platform = defaultTargetPlatform == TargetPlatform.android
+        ? 'android'
+        : defaultTargetPlatform == TargetPlatform.iOS
+        ? 'ios'
+        : '';
+    if (platform.isEmpty ||
+        apiKey.isEmpty ||
+        sender.isEmpty ||
+        bucket.isEmpty ||
+        applicationId.isEmpty ||
+        project !=
+            (environment == 'staging' ? 'attendus-staging' : 'orgami-66nxok') ||
+        !appId.startsWith('1:$sender:$platform:') ||
+        ((applicationId == 'com.stormdeve.orgami') !=
+            (environment == 'production'))) {
+      throw StateError(
+        'Run the native release preflight with protected environment configuration.',
+      );
+    }
+    return FirebaseOptions(
+      apiKey: apiKey,
+      appId: appId,
+      messagingSenderId: sender,
+      projectId: project,
+      storageBucket: bucket,
+      iosBundleId: platform == 'ios' ? applicationId : null,
+    );
+  }
+
   static const FirebaseOptions web = FirebaseOptions(
     apiKey: 'AIzaSyA-PFyqhP5aEVE6XwGku3jMe91G3efMaVw',
     appId: '1:951311475019:web:65b1de24d2f3a8d289c8ce',
@@ -53,6 +122,24 @@ class DefaultFirebaseOptions {
     // that partition third-party storage.
     authDomain: 'attendus.app',
     storageBucket: 'orgami-66nxok.appspot.com',
+  );
+
+  static const FirebaseOptions emulator = FirebaseOptions(
+    apiKey: 'demo-only-key',
+    appId: '1:123456789:web:demo',
+    messagingSenderId: '123456789',
+    projectId: 'demo-attendus-admin',
+    authDomain: 'localhost',
+    storageBucket: 'demo-attendus-admin.appspot.com',
+  );
+
+  static const FirebaseOptions stagingWeb = FirebaseOptions(
+    apiKey: 'AIzaSyBCFt_7BJNVVzgAZ2Fa7S_5UMGYIVDQ-dg',
+    appId: '1:925344893088:web:3be71e809ba516e1d021c5',
+    messagingSenderId: '925344893088',
+    projectId: 'attendus-staging',
+    authDomain: 'attendus-staging.firebaseapp.com',
+    storageBucket: 'attendus-staging.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(

@@ -46,11 +46,13 @@ class _CoHostManagementWidgetState extends State<CoHostManagementWidget> {
         eventId: widget.eventModel.id,
       );
 
+      if (!mounted) return;
       setState(() {
         coHosts = coHostsList;
         isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         isLoading = false;
       });

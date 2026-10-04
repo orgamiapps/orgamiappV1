@@ -5,11 +5,11 @@ import 'package:attendus/Utils/route_names.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/screens/Home/dashboard_screen.dart';
 import 'package:attendus/models/event_model.dart';
-import 'package:attendus/models/customer_model.dart';
+import 'package:attendus/firebase/firebase_firestore_helper.dart';
 
 // Event screens
 import 'package:attendus/screens/Events/single_event_screen.dart';
-import 'package:attendus/screens/Events/edit_event_screen.dart';
+import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:attendus/screens/Events/ticket_management_screen.dart';
 import 'package:attendus/screens/Events/event_analytics_screen.dart';
 
@@ -201,7 +201,7 @@ class RouteBuilder {
 
         if (doc.exists) {
           final event = EventModel.fromJson(doc);
-          return EditEventScreen(eventModel: event);
+          return EventCreationExperienceGate(event: event);
         }
       } catch (e) {
         Logger.error('Error fetching event for edit $eventId: $e');
@@ -332,14 +332,10 @@ class RouteBuilder {
 
     if (userId != null) {
       try {
-        // Fetch user from Firestore
-        final doc = await FirebaseFirestore.instance
-            .collection('Customers')
-            .doc(userId)
-            .get();
-
-        if (doc.exists) {
-          final user = CustomerModel.fromFirestore(doc);
+        final user = await FirebaseFirestoreHelper().getSingleCustomer(
+          customerId: userId,
+        );
+        if (user != null) {
           return UserProfileScreen(user: user);
         }
       } catch (e) {

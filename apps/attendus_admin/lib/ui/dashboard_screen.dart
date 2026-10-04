@@ -13,6 +13,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Map<String, dynamic>? data;
   ApiException? error;
   bool loading = true;
+  int _loadRevision = 0;
   @override
   void initState() {
     super.initState();
@@ -20,25 +21,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> load() async {
+    if (!mounted) return;
+    final revision = ++_loadRevision;
     setState(() {
       loading = true;
       error = null;
+      data = null;
     });
     try {
       final response = await context.read<AdminApiClient>().getJson(
         '/v1/metrics',
       );
-      if (mounted) {
-        setState(
-          () =>
-              data = ((response['data'] as Map)['current'] as Map? ?? const {})
-                  .cast<String, dynamic>(),
-        );
+      final current = requireApiObject(
+        requireApiObject(response['data'])['current'],
+      );
+      if (mounted && revision == _loadRevision) {
+        setState(() => data = current);
       }
     } on ApiException catch (e) {
-      if (mounted) setState(() => error = e);
+      if (mounted && revision == _loadRevision) setState(() => error = e);
     } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted && revision == _loadRevision) setState(() => loading = false);
     }
   }
 

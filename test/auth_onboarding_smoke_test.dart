@@ -18,7 +18,7 @@ void main() {
 
     expect(find.text('Welcome to Attendus'), findsOneWidget);
     expect(find.text('Create account'), findsOneWidget);
-    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Log in'), findsOneWidget);
     expect(find.text('Continue as guest'), findsOneWidget);
   });
 
@@ -28,7 +28,7 @@ void main() {
     expect(find.text('Welcome back'), findsOneWidget);
     expect(find.text('Email address'), findsOneWidget);
     expect(find.text('Password'), findsOneWidget);
-    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Log in'), findsOneWidget);
   });
 
   testWidgets('create account screen renders first wizard step', (

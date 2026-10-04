@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:attendus/Services/pending_auth_intent_service.dart';
+import 'package:attendus/Services/arrival_route_observer.dart';
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -13,17 +15,27 @@ import 'package:attendus/Services/creation_limit_service.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:attendus/Utils/error_handler.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:attendus/Utils/emulator_config.dart';
 import 'package:attendus/Services/firebase_initializer.dart';
 import 'package:attendus/Services/navigation_state_service.dart';
+import 'package:attendus/Services/guest_mode_service.dart';
 import 'package:attendus/widgets/app_startup_gate.dart';
+import 'package:attendus/Services/event_share_service.dart';
+import 'package:attendus/Services/community_share_service.dart';
+import 'package:attendus/widgets/deferred_shared_event_screen.dart';
+import 'package:attendus/widgets/deferred_shared_community_screen.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  final startupConversationId = kIsWeb
+      ? Uri.base.queryParameters['conversationId']
+      : null;
+  usePathUrlStrategy();
   // Initialize global error handling with better crash reporting
   ErrorHandler.initialize();
 
@@ -42,7 +54,11 @@ void main() {
 
   final Stopwatch startupStopwatch = Stopwatch()..start();
   Logger.info('Starting Firebase initialization in parallel with first paint');
-  final firebaseInitialization = FirebaseInitializer.initializeOnce();
+  final firebaseInitialization = FirebaseInitializer.initializeOnce().then((
+    _,
+  ) async {
+    await PendingAuthIntentService.rememberConversation(startupConversationId);
+  });
 
   // Build the app after Firebase is ready
   // Use lazy initialization for providers to improve startup time
@@ -73,6 +89,7 @@ void main() {
   final Widget appWidget = MultiProvider(
     providers: [
       ChangeNotifierProvider.value(value: themeProvider),
+      ChangeNotifierProvider.value(value: GuestModeService()),
       ChangeNotifierProvider(
         create: (context) => SubscriptionService(),
         lazy: true, // Lazy load - only initialize when first accessed
@@ -127,6 +144,7 @@ void _scheduleProviderInitialization() {
     try {
       final context = appNavigatorKey.currentContext;
       if (context == null) return;
+      if (!context.mounted) return;
 
       final subscriptionService = Provider.of<SubscriptionService>(
         context,
@@ -139,6 +157,7 @@ void _scheduleProviderInitialization() {
       Future.delayed(const Duration(milliseconds: 300), () {
         final currentContext = appNavigatorKey.currentContext;
         if (currentContext == null) return;
+        if (!currentContext.mounted) return;
 
         final creationLimitService = Provider.of<CreationLimitService>(
           currentContext,
@@ -169,6 +188,9 @@ void _configureFirestore() {
     // Reduced cache size for faster startup and less memory pressure
     FirebaseFirestore.instance.settings = Settings(
       persistenceEnabled: true,
+      webPersistentTabManager: kIsWeb
+          ? const WebPersistentMultipleTabManager()
+          : null,
       // OPTIMIZATION: Further reduced cache sizes for even faster app startup
       cacheSizeBytes: kDebugMode
           ? 10 *
@@ -307,6 +329,41 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           darkTheme: AttendUsTheme.dark,
           themeMode: themeProvider.themeMode,
           navigatorKey: appNavigatorKey,
+          onGenerateRoute: (settings) {
+            final name = settings.name;
+            if (name == null) return null;
+            final uri = Uri.parse(name);
+            if (uri.path == '/app/discover') {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: (_) => AppStartupGate(
+                  initialization: _firebaseInitialization,
+                  onRetry: widget.onFirebaseRetry ?? FirebaseInitializer.retry,
+                  onReady: widget.onFirebaseReady,
+                  child: const AuthGate(forceDiscover: true),
+                ),
+              );
+            }
+            final eventId = EventShareService.eventIdFromUri(uri);
+            if (eventId != null) {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: (_) => DeferredSharedEventScreen(
+                  eventId: eventId,
+                  initialAction: uri.queryParameters['action'],
+                ),
+              );
+            }
+            final communityId = CommunityShareService.communityIdFromUri(uri);
+            if (communityId != null) {
+              return MaterialPageRoute<void>(
+                settings: settings,
+                builder: (_) =>
+                    DeferredSharedCommunityScreen(organizationId: communityId),
+              );
+            }
+            return null;
+          },
           // Localization scaffolding removed until ARB/gen is configured
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
@@ -323,7 +380,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 child: const AuthGate(),
               ),
           // Add navigation observer for debugging and state tracking
-          navigatorObservers: [_NavigationLogger()],
+          navigatorObservers: [_NavigationLogger(), arrivalRouteObserver],
         );
       },
     );

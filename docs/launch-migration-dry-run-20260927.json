@@ -1,0 +1,2587 @@
+{
+  "project": "orgami-66nxok",
+  "readOnly": true,
+  "generatedAt": "2026-09-27T19:28:46.897Z",
+  "backup": null,
+  "events": [
+    {
+      "eventId": "100020",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "b0cfde6906a9cd5fe656726879773011779798c008233f355fd6ca515f114870"
+    },
+    {
+      "eventId": "100021",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "8e16fb1ee9be220a009a76199e63898ee251bb800a790bb94bf33683bd7fe938"
+    },
+    {
+      "eventId": "100022",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "930e3f2267da76ef635367c90bd17b4bcb5fcbaa2693fc7208a2eb4f22cbacac"
+    },
+    {
+      "eventId": "100023",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "cace05581aaa3a2a0742d374fabcfdb50a65089d120e788602a9d4686149240d"
+    },
+    {
+      "eventId": "100024",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "0cfd6b8563eba8aeae14bb5a416f2f24786df27744cb200739a44bc71ee574a0"
+    },
+    {
+      "eventId": "100025",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 2,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 2,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "6b3466ceac768185f5b3103d704435faf49a8a098f4f626a278bdbaf68be1ac3"
+    },
+    {
+      "eventId": "100026",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 2,
+      "attendanceSourceCount": 6,
+      "totals": {
+        "confirmed": 2,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 3,
+        "inside": null,
+        "remaining": 1,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "778c0c45bda5ee586167e132677c14e85c45b6edc554d6c5457fff139cc3135f"
+    },
+    {
+      "eventId": "100027",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "9f20955361249204697b89fc18c1685958d084bbedd1191041b75b0efb2f4766"
+    },
+    {
+      "eventId": "100028",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "37e95fe3b1dfe28672b94566221c4740585a14ddb17dbb7dfc6e237ee26aab36"
+    },
+    {
+      "eventId": "100029",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 3,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 3,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 3,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "7fb6c4450c8346695a204f7e2d614d78f82ccbdb297bed34e54edde99200a172"
+    },
+    {
+      "eventId": "100030",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 2,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 2,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 2,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "f935e2386d0d56e98a2fc71834ca87c724002c5b81b4e4240082479978b4771a"
+    },
+    {
+      "eventId": "100031",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "ec0c1b049e8be58a134552c19f03fdfd698adfe1ff1babad2856fa94c5b4d7a3"
+    },
+    {
+      "eventId": "100032",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "341e6bae0ed8e70dbe0367ae16bca437fc363dae84f70f94dc63d58977c9f9a9"
+    },
+    {
+      "eventId": "100033",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "d7ae7324f38ba3d83b861e4987366f5bae518eb2be696621a6bd8288d73c9859"
+    },
+    {
+      "eventId": "100034",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "a96e66899202ac265e87c07bcb126165d6890f58dc67749458dfcc877f762ab1"
+    },
+    {
+      "eventId": "100035",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "e1b660590a686b76ed9c9850c1a4f6b01d49701ac4500346feb8af66a5035bc7"
+    },
+    {
+      "eventId": "100036",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "8d031e6e9c6e742f0743c1cef8e6170d19993984a92fae610d46fb4ca96e0d26"
+    },
+    {
+      "eventId": "100037",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "76dc70d4551a30bc76c2f064dc42be42ad5e333717c79c2dbe3fd1452829bbf1"
+    },
+    {
+      "eventId": "100038",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "6f46f2bc7984d32f2633f36d0848ca98d04816ddd5bab47c293a1395a9f3b1c7"
+    },
+    {
+      "eventId": "100039",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 1,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 1,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "c7e040507c830d9cf94eaa70bd7283a008524fc1a096e3781b1d4c205a085319"
+    },
+    {
+      "eventId": "100040",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 1,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 1,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "e3e1cb0966274e94053348c4c69c53f775c046b3c4ebf50abc03f871d84ca520"
+    },
+    {
+      "eventId": "100041",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "ff71e05918050efe6bdb9100864f21537d103535fbc8f88949eae7ca01ec6101"
+    },
+    {
+      "eventId": "100042",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "419100b1b12d449445bca2f01ef5f158668d5b53e2b7cfac91d337e5b64a409c"
+    },
+    {
+      "eventId": "100043",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "231b33ba95519842b8d0fd2990148026f73f70aeb6b99e292e7777c6e6c0e6b6"
+    },
+    {
+      "eventId": "100044",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "20e1ff89b477dcf12bf022f6aeb36786e5fb224580bfc0d811ed15f65672bd88"
+    },
+    {
+      "eventId": "100045",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "70058f360cf61291db87f4b622c60a20063e90735f851cff70083237903bc98a"
+    },
+    {
+      "eventId": "100046",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "6a176cd7c1941b1818171602ae0adf952951caa5975bbb3b237805351a517825"
+    },
+    {
+      "eventId": "100047",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 1,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "4ba4c0bdeb8a777bb37561d15c374b84e68002ceebb9ba0868db2d3052ad29bc"
+    },
+    {
+      "eventId": "100048",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "054feef17def90437cc31cfe193f7bea2ec59760816b65935bcbbc5e8bdf5d81"
+    },
+    {
+      "eventId": "100049",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 1,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "1d947ca89ce6b79deb14c68095744b91cd6e72ef2250bbaccaf6cd69754f9618"
+    },
+    {
+      "eventId": "100050",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 1,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 1,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "8729d522ad1b99ade19786218ee0ab2f0345aaaf4359e24ba09622f8bc037eb0"
+    },
+    {
+      "eventId": "100052",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "f53c34daee33dc94fc922625280243400316905108efe0e4fda13150cc34df03"
+    },
+    {
+      "eventId": "100053",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "fdee3695caee9159f261a6b5610dc97a996768b0d01ad27d63d0033360a4c29f"
+    },
+    {
+      "eventId": "100054",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "903c09f1b0225c317971eadaac0a36d030e948e39260f4e7bad2ff9267c7ff25"
+    },
+    {
+      "eventId": "100055",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "f8d77674a1bd8610bb4c562d5fdf6c6b2c4677992d81c3dd79c06b4539b9c303"
+    },
+    {
+      "eventId": "100056",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "4ad65e1fa3dd429d21958d399a096a168a9646b2d83da09f4b9749975a7bf894"
+    },
+    {
+      "eventId": "100057",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 1,
+      "attendanceSourceCount": 2,
+      "totals": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 2,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "7f650fb056460601cb52214fbf94f3317ed78ac50596d23c635fbfbb93302f0d"
+    },
+    {
+      "eventId": "100059",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "a2fa31e622f092ac53774fa2502c90b272452ebf21502a57c2e167e45ec2c840"
+    },
+    {
+      "eventId": "100060",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 1,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "9a6bb0e55f6c465d4a79c776c3ad26add1d2db5eda5260316315eb2e5cff7b4c"
+    },
+    {
+      "eventId": "100061",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "758b0d32ff4f568bd86a649ca19e92cf2d7dcefdd3b81ff4d1a9a563d0362787"
+    },
+    {
+      "eventId": "100062",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "da8d0dca9d7b1af7fcbdfd04c70e46e5709ebd17b1afe6641906b9a02758c8e2"
+    },
+    {
+      "eventId": "100063",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 1,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 1,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "9caffa54e284b25f21fd32932509ec83d446c28a2d0a72e93c5924745a129f1f"
+    },
+    {
+      "eventId": "100064",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "03d0219de693379a899a199cc147d4f3bd1f2160dcd336b498b8f339eddc377b"
+    },
+    {
+      "eventId": "100065",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "23ed71acd968b32b9f66f15d94a6d9ec0ce28b94ee947a6cf1da8899a7a4b16a"
+    },
+    {
+      "eventId": "100066",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "637b4a9e75325e28d1745dc1f2d1159e870ff359f04614b3199268556d6f8074"
+    },
+    {
+      "eventId": "100067",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "a149de4a55fe9f0d1967e76f00fb599c8aba96d0df6343e4f6cfa5b48aa9346d"
+    },
+    {
+      "eventId": "100068",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "40201e829f261a9c6603c409867a9c6ccc75d34c049457de8f8bcf59ca3c7057"
+    },
+    {
+      "eventId": "100069",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "ad35de22ccf2a13fc8d2b3d2484e5ea8262d3984f48973224eeea3862bc84ca5"
+    },
+    {
+      "eventId": "100070",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "6a89ca3e2a431ca452a34585817b10847fb4a92e0bce5a238ea7478fd23099e2"
+    },
+    {
+      "eventId": "100071",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "d1c940885438a111df541d88542eab33c399f9faf637227cf4be2b3d65b997de"
+    },
+    {
+      "eventId": "100072",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "92d195761857c4f73afb51e8eb81387b15aa6f489f0544bf3529deeb776173fa"
+    },
+    {
+      "eventId": "100073",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 1,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "22d6a56c8011d0debd196107f05dc763219265a2e58e133162d9012caba9fd50"
+    },
+    {
+      "eventId": "100074",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "ab80691b524a78d684cce8dad1c0170487bc77ea3d218d33ee97f749cfd9d897"
+    },
+    {
+      "eventId": "100075",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "f58bafc54e06392eea04e5151c68439bb78453facd6fed56d16ad64ce538f6e5"
+    },
+    {
+      "eventId": "100076",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "298f653a0b54ef73c8dc7f2431b43f6da84fbdee32b12efdda38caeeef65a914"
+    },
+    {
+      "eventId": "100077",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "9184a41386e5fa7d664c67a6a66c0a776d5d8fb5106147f69efdd2672841572a"
+    },
+    {
+      "eventId": "100078",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "723b9e85a52af2a8162fffcfd68982939340177285b8759411a39ac4340c2cb4"
+    },
+    {
+      "eventId": "100079",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "49d7440d92098fce0c6b502c4288aaf0065c347c60c687418c224c09fb7abe52"
+    },
+    {
+      "eventId": "100080",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "200724e264756af78e353ad9ba9e5577c5108074039375d498a3bbb8912fea66"
+    },
+    {
+      "eventId": "100081",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "1753e3d7f8064c7dc069fc1dfd654bd5dd6380432a502f496979d70c06716566"
+    },
+    {
+      "eventId": "100082",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 1,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "a040b86b3b01b4d75ccf2bd0da6e1567967331000487e7263cc6b62cd6d16607"
+    },
+    {
+      "eventId": "100083",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "9f99696ba3879af1f37b0cd843a3e8673c4f32f3c72402c2492cdd74c1ab0189"
+    },
+    {
+      "eventId": "100084",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "8d07d164e38679124a11dec56d0b670b354ccaab6de069ac6ba0379b5fa29c29"
+    },
+    {
+      "eventId": "100085",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "f0091a4d9ad520bd81bbb8a613871323ef74536e7139ed68fc28289369a4f670"
+    },
+    {
+      "eventId": "100086",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "ccf1d2ae4e5df85f23fe709ef873543e43b8c81c34e992a2e529a048ffaae401"
+    },
+    {
+      "eventId": "100087",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 1,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 1,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "04e66e239edd684b40d37919db65995357a3047774e2d4cf344cbf5537c34f6e"
+    },
+    {
+      "eventId": "100088",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "7075049edd106944470c688a7a13795cbaf8a4cf412a741f8548be9c54184420"
+    },
+    {
+      "eventId": "100089",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 1,
+      "attendanceSourceCount": 2,
+      "totals": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 2,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "ef2438ff744e2aeafa3555d96efcc5c7cc244df6698f060fc3e1c8f891aaeb60"
+    },
+    {
+      "eventId": "100090",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "207b1984add249487e444187b1eeff7803eecc3fccd5ddbbf3746001d013c902"
+    },
+    {
+      "eventId": "100091",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "c53fef7d3e7455e140e6d8fd160c586c1d496f02aa46905c165842fef08e52aa"
+    },
+    {
+      "eventId": "100092",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 2,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 2,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "53e36f44a371142793db8cb7c93eec07c035c2f94bb13af1606894d75a33bc53"
+    },
+    {
+      "eventId": "100093",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "d1cee3e90b4d64bfcd308efbe5431302759d406546b79d267f4f1c0542ab2d5c"
+    },
+    {
+      "eventId": "100094",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "48e27457f114361e44b52e96d1500b4330effecd2c4abe26d06e38af512848c0"
+    },
+    {
+      "eventId": "100095",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 2,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 2,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "4b26587592967ca08f0ac55bc2582e462321f1660cf08db0c89ede79905ceb0b"
+    },
+    {
+      "eventId": "100096",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "2b68906fd5a5a03ac9e613b38a06bb250ef983f0c987d56d4a63e1a5ccbb88fd"
+    },
+    {
+      "eventId": "100097",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "d29cdbb4e08388247502df1517319248d16671ace05910e65868c5ed69796a06"
+    },
+    {
+      "eventId": "100098",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 1,
+      "attendanceSourceCount": 4,
+      "totals": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 2,
+        "inside": null,
+        "remaining": 1,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "032554c7784044d59867613fa0fa029795434983309bb1c4bb1df983601ce336"
+    },
+    {
+      "eventId": "100099",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "5f262993c830e15ecc65095411fc01a27c2749f2f7df332ac91fc68ed428ec65"
+    },
+    {
+      "eventId": "100100",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "555bc16c837a17af7dbbe82dd6735de09ff5cd57063202677e805402cda807d9"
+    },
+    {
+      "eventId": "100101",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "1f0923d3e0aabe1c1c9fd8a3bcdaf7da20c731428d8aceef5026d13cfbaad376"
+    },
+    {
+      "eventId": "100105",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "e92625cc42be8e19b94cbdd5593cef6ecbbcced11173c479dfc3e6d7c6118cdd"
+    },
+    {
+      "eventId": "100106",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "ba2b764cc78f072fa14e6bce76643f433e1448815578a91dd787ebd0bca8d0f0"
+    },
+    {
+      "eventId": "100107",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "856022c5ec566da31c36904b03a81b82843ca27e87f31ad3a0a837c28da44ffb"
+    },
+    {
+      "eventId": "100108",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "645d7ce98efa6f4fc28a1b632c904c1270b9813db5bb466bd32cf13f33f3614f"
+    },
+    {
+      "eventId": "1754961645146",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "5ff8af7be9c944cbc29ec41ff1ef1e61e0773ad77db0db37159b25d3a0f0ed38"
+    },
+    {
+      "eventId": "1754973428877",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "1f09b35a2faef6e850878e0ac6f7ca0700a70511abc9b36b364d0c74100c6139"
+    },
+    {
+      "eventId": "BOLD-472YO",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "de85dec7fd218023c70c419b6dae7031042055f711dadde18ea1edf2a5581134"
+    },
+    {
+      "eventId": "BRAVE-859G2",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "cb1545244b7da0f8efb4bce0a438020133fc5600d859dcbae6e3947c513713c3"
+    },
+    {
+      "eventId": "BRIGHT-203QY",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 1,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 1,
+        "noShow": 1
+      },
+      "issues": [],
+      "fingerprint": "35dc954996c2aa0d6688449de43e9162f3f2240e35e601534dc6d2201f8e3fce"
+    },
+    {
+      "eventId": "BRIGHT-432V3",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 1,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 1,
+        "noShow": 1
+      },
+      "issues": [],
+      "fingerprint": "f85121bcc91b7373793e41c0de0a686c45f7a41b39b5a68bee56af63377ddd64"
+    },
+    {
+      "eventId": "COOL-284P2",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "b2521750fe1936b9edd2cef2c3ca0c705b31531ca028492d3e619b3060aecb00"
+    },
+    {
+      "eventId": "CREATE-900WD",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 4,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 4,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "b825bbb592109d4fb0086419eef3c1a544ce41b94b061bab3128ff53b5278b73"
+    },
+    {
+      "eventId": "DANCE-574OH",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "973204816fea6d047e4512136332468ae18435b09adef7bcc0a5a2bb19cfe2ad"
+    },
+    {
+      "eventId": "DOLPHIN-146YO",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "2011f59a863a4cde8b0b6cb0e800bdaea4b11935299b04a8713523b80c03fa92"
+    },
+    {
+      "eventId": "DOLPHIN-701",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "409442ec7c4f818dde23acea6bca597c50da3ba8a277e00926a99b4c59542b67"
+    },
+    {
+      "eventId": "DREAM-378",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "cf578184fc4dfa4872d41ce6f3a4f3bef18e117d1c7e27adfb6cc0aacf64e04a"
+    },
+    {
+      "eventId": "GENTLE-655",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "3a9831d04b6e36bfd2f0fb8dac3babadaa3af2211c58723829de6809d6354390"
+    },
+    {
+      "eventId": "GO-149",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 2,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "2cca2ba2fc16239e79c4eef87bed3401e263f1b79ffae8613b1872a4d01196b1"
+    },
+    {
+      "eventId": "GO-316P",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "f3069dbb34545623a5d203b4b6f6cf1745c651057e07d8977d096140fe6425a7"
+    },
+    {
+      "eventId": "GOAL-54D1",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "029b73446f69c0bbe8a76de21d9f459b37fdaa80a5d8fca5251a398a986aa42b"
+    },
+    {
+      "eventId": "HAPPY-426IP",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 1,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 1,
+        "noShow": 1
+      },
+      "issues": [],
+      "fingerprint": "03ac553ac775861b8319058af155eca6be570620c2d843ed359da067a93ad12b"
+    },
+    {
+      "eventId": "HAPPY-924",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 1,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 1,
+        "noShow": 1
+      },
+      "issues": [],
+      "fingerprint": "fb1b751b96656c7f53d247bb77550d51b56471661d3aabe9871f728385817137"
+    },
+    {
+      "eventId": "HEART-169QL",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "e21d0437f9f97f67c42c065a54d7fd60229bda1a41eef4a54f9a42eaa456da1e"
+    },
+    {
+      "eventId": "HEART-377EO",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 1,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "5dd31a803cdd43ee8b4e066d8a9b03031a54e4638928e20755e1dd58160457b3"
+    },
+    {
+      "eventId": "HOPE-787WF",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "6ad472d24d82c0886e0b027cc6d60c86880e159c2dd6ed3f927d2da1888a3388"
+    },
+    {
+      "eventId": "LION-1197M",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "3087a5de0c0ff896b72c55a33c7ffd4012ff7ebf3c95d3fdf49f0c3a13b6a9d6"
+    },
+    {
+      "eventId": "LOOK-624ZN",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "47d5c34bf393ccf4981518dab61fea949db4a0c93194ba8d5065486341883ef0"
+    },
+    {
+      "eventId": "MOON-376",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "7f1b157984f534360575595f49d47fb7a7b14e1ef79c781fc2bc660af04cd436"
+    },
+    {
+      "eventId": "MOUNTAIN-56",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "5d57d299c849e8123e2ad9cd7aee72b8a98752b629db35c86ec2115ba9f77445"
+    },
+    {
+      "eventId": "PEACE-436UT",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "e0579bf1e7cdb10fe731aefae7ad9c6fb931b53bc5ee0d32398ea7104a7672c6"
+    },
+    {
+      "eventId": "PLAY-426",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "e21e298e264ec2f4d9c12ab79efa8cc9e32dd54ddc4a5df6c5e34341f49a2f4f"
+    },
+    {
+      "eventId": "PORTCITY26-ACOUSTIC",
+      "revision": 1,
+      "scheduleQuality": "exact",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "fa3e4b25dfa8925fd4cd27b44b6446927d5cacd3b646118cfad12cb9c670ba41"
+    },
+    {
+      "eventId": "PORTCITY26-AI",
+      "revision": 1,
+      "scheduleQuality": "exact",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "8987b3e7394de57c1206a80f82d75c49b9ff9c5df4c701c384a432fd39626382"
+    },
+    {
+      "eventId": "PORTCITY26-CLEANUP",
+      "revision": 1,
+      "scheduleQuality": "exact",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "0f2a58821f8d583f4a8b99e8cc7de74fac77d90a1b91c5dc19312e951d767adb"
+    },
+    {
+      "eventId": "PORTCITY26-COFFEE",
+      "revision": 1,
+      "scheduleQuality": "exact",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "55ee21ec906a49b7e130990a5b5dcf80c89b3af0dd9d464d479b7a9a5cf4efba"
+    },
+    {
+      "eventId": "PORTCITY26-MINDFULNESS",
+      "revision": 1,
+      "scheduleQuality": "exact",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "fef5e12f0c180c8056e2105b4279509f366346136af6554e513ad63ca3371adb"
+    },
+    {
+      "eventId": "PORTCITY26-NATURE",
+      "revision": 1,
+      "scheduleQuality": "exact",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "4c699643e07c5b3edae3dc62c45fcc80bc57cc402d1963a3d80f40adffc274c8"
+    },
+    {
+      "eventId": "PORTCITY26-PHOTO",
+      "revision": 1,
+      "scheduleQuality": "exact",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "0bf3410c3e2ce4b9cc3284c5f60662c28d883aec6fe3cf5d7dc7147a6ac26ff6"
+    },
+    {
+      "eventId": "PORTCITY26-PICNIC",
+      "revision": 1,
+      "scheduleQuality": "exact",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "f7a005163db2b618cbeac58310d207eefa8114a4bc6a261e75f85ca5beae5885"
+    },
+    {
+      "eventId": "PORTCITY26-RUN",
+      "revision": 1,
+      "scheduleQuality": "exact",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "5230bebde370cc66807b93eb649fab2ee9f302231647b44d12fd428f30821632"
+    },
+    {
+      "eventId": "PORTCITY26-SKETCH",
+      "revision": 1,
+      "scheduleQuality": "exact",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "83442908d1b929b7351317f39df9c4c2e883f2cdedd0ad3e4146683cb69e9693"
+    },
+    {
+      "eventId": "POWER-970",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 2,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 2,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "5afe6ca438b2b63eeba3df341eb43ca7d8a522ec88f9e8798234a0635af0bb59"
+    },
+    {
+      "eventId": "RISE-2012M",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "375709765eb50df231daac0c1ae19556c71b8a70896605959db2b76c037a4f5a"
+    },
+    {
+      "eventId": "RISE-892",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "cc775b5c42e3548ac559fcc84bcca34b64f651744ad0b2be94de8ee215fe8987"
+    },
+    {
+      "eventId": "RIVER-552",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 1,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 1,
+        "noShow": 1
+      },
+      "issues": [],
+      "fingerprint": "b21862fbefc422e2bb9b81ee4b3914858de2b9bf379558092d87be9cf54da283"
+    },
+    {
+      "eventId": "RIVER-666",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 2,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "043e8471569f83926f2221fd24d866e9f44457ab64584440153b906db4be5812"
+    },
+    {
+      "eventId": "RIVER-719",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "667751cd8be48600161781bceda741dac8a48cd0abcd45e20663bbdc78959ac5"
+    },
+    {
+      "eventId": "SEEK-931",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "e5adb338e31602575815426668985a2eb276244abfd48af5f47551195b534a45"
+    },
+    {
+      "eventId": "SHINE-679XB",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "8e9cb370930bfab0cee57ca01d4f7c586c7fd31f3da796196dc437f6c2f2bc6a"
+    },
+    {
+      "eventId": "SING-883NN",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "0af888c6abdab39f8fac5323ed6570aacca81d196fe8b3e4f7112f5925bb0b33"
+    },
+    {
+      "eventId": "SING-89PU",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "bfaf3d76d723d6c5dac3d04b392287e33f6b7e73290a39d449ae7d1df5564d94"
+    },
+    {
+      "eventId": "SLOW-6253S",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "a8b1c403c8ac9cb0055034f2ef0c8eddd3983c3728c682855f48dea52c8b982d"
+    },
+    {
+      "eventId": "SLOW-675ND",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "dd134a13ecb88e6d56c16f7404058615a89847103f1836cb9f2d40f41ddf5e68"
+    },
+    {
+      "eventId": "SLOW-9158Z",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "5147b574450f3029254794a8f428cc5277a7aa9530d5311b4117ffdc88e93502"
+    },
+    {
+      "eventId": "SMILE-393",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "445ee42665225edb408bab88f24f65185576c72ce8372d2f9d61d35b12f17d58"
+    },
+    {
+      "eventId": "SOUL-4690C",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "137d7efdd31c39f3f5cdb9fea1895fb30b1ad837057338a78e0edf9e371ebd59"
+    },
+    {
+      "eventId": "SPARK-5112S",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 1,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 1,
+        "noShow": 1
+      },
+      "issues": [],
+      "fingerprint": "858206c78355566a920a2f075b674b0277138e87d0ba425c5f4f387d9d9b5750"
+    },
+    {
+      "eventId": "SUNNY-637MC",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "946ea49bd57f7ee2cc555d47984de3260bb1dffd896d188f1cb95a979b313e8e"
+    },
+    {
+      "eventId": "TIGER-862",
+      "revision": 0,
+      "scheduleQuality": "incomplete",
+      "confirmedCount": 1,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 1,
+        "noShow": null
+      },
+      "issues": [],
+      "fingerprint": "49574da9437df2d023b8e678271b6ab6d4311763c3ce496e216fdab7bd6296d7"
+    },
+    {
+      "eventId": "TIGER-885Y5",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "aafdb57790d1b6f13c7bf6d02cf3524c1230fd47d9e4907eee27f218a7f6037e"
+    },
+    {
+      "eventId": "WATCH-963",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 0,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 0,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 0,
+        "noShow": 0
+      },
+      "issues": [],
+      "fingerprint": "59fbebae278e3c2fc448426f0943fbe2ba75b654b9f834380701badc25f7c7ae"
+    },
+    {
+      "eventId": "WISE-234NT",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 2,
+      "attendanceSourceCount": 1,
+      "totals": {
+        "confirmed": 2,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 1,
+        "inside": null,
+        "remaining": 2,
+        "noShow": 2
+      },
+      "issues": [
+        {
+          "type": "ambiguous_admission_link",
+          "recordId": "AQcvxavSlVWo2KGYyyMM"
+        }
+      ],
+      "fingerprint": "eb34198dae784c456cfe84902e3069e3071d918c72d2b40d46fc702c977576cf"
+    },
+    {
+      "eventId": "YOUNG-618",
+      "revision": 0,
+      "scheduleQuality": "legacy",
+      "confirmedCount": 1,
+      "attendanceSourceCount": 0,
+      "totals": {
+        "confirmed": 1,
+        "pending": 0,
+        "waitlisted": 0,
+        "arrived": 0,
+        "inside": null,
+        "remaining": 1,
+        "noShow": 1
+      },
+      "issues": [],
+      "fingerprint": "70dc4767b6d94a0eba1e060941d73cbfd1a0c71fc3610634742afa999845bf1c"
+    }
+  ]
+}

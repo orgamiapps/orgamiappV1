@@ -42,7 +42,9 @@ Dashboard reads use `admin_metrics_current/current` and range queries on `admin_
 
 `functions/admin/bootstrap-super-admin.js` is a local-only CLI using Application Default Credentials. It requires project ID and email flags plus an explicit confirmation phrase, verifies the Auth user, merges the coarse claim without deleting existing claims, creates the role document, and appends an audit record. It is not exported. Do not run it until the administrator email is explicitly confirmed.
 
-Production rollout order is: provision secrets and plan-to-price mapping; run emulator/rules/backend/Flutter tests; deploy functions; smoke-test with a non-admin; explicitly bootstrap the first administrator; deploy rules; install a signed Windows build; monitor function errors/audits. Roll back by disabling admin role documents, reverting the function revision, reverting rules to the last reviewed production rules (never the development catch-all), and uninstalling the client. Audit logs must be retained.
+Production rollout order is: provision secrets and plan-to-price mapping; run emulator/rules/backend/Flutter tests; deploy functions; smoke-test with a non-admin; explicitly bootstrap the first administrator; deploy rules; install the Windows build; monitor function errors/audits. Roll back by disabling admin role documents, reverting the function revision, reverting rules to the last reviewed production rules (never the development catch-all), and uninstalling the client. Audit logs must be retained.
+
+The Windows admin client is currently a personal-use tool for the sole Attendus administrator. Its installer is intentionally unsigned, must not be distributed, and is verified locally using the SHA-256 emitted by `scripts/build_admin_windows.ps1`. Google desktop OAuth is deferred; production builds omit `ATTENDUS_GOOGLE_OAUTH_CLIENT_ID`, hide the Google action, and retain Firebase email/password authentication plus the same server-side role checks. Public or multi-user distribution requires a separate code-signing and Desktop OAuth rollout.
 
 ## Audit findings
 

@@ -2,37 +2,57 @@
   "name": "functions",
   "description": "Cloud Functions for Firebase",
   "scripts": {
-    "lint": "echo 'Linting disabled'",
+    "lint": "eslint . --ext .js --max-warnings=0",
     "serve": "firebase emulators:start --only functions",
     "shell": "firebase functions:shell",
     "start": "npm run shell",
-    "test": "node --test test/admin-unit.test.js test/places.test.js",
-    "test:rules": "firebase emulators:exec --config ../firebase.json --project demo-attendus-admin --only firestore \"node --test test/firestore-rules.test.js\"",
-    "test:integration": "firebase emulators:exec --config ../firebase.json --project demo-attendus-admin --only auth,firestore,functions \"node --test test/admin-emulator.test.js\"",
+    "test": "node --test test/admin-unit.test.js test/places.test.js test/places-rate-limit.test.js test/callable-security.test.js test/account-deletion.test.js test/biometric-retention.test.js test/ticket-issuance.test.js test/guest-experience.test.js test/attendance-v2.test.js test/scheduled-reminders.test.js test/discovery-marketplace.test.js test/discovery-categories.test.js test/public-web.test.js test/public-checkout.test.js test/accountless-registration.test.js test/event-wizard.test.js test/arrival-core.test.js test/attendance-wallet.test.js test/guest-attendance-web.test.js test/attendance-pass-audit.test.js test/event-schedule.test.js test/launch-roster.test.js test/launch-jobs.test.js test/refund-capacity.test.js test/roster-cursor.test.js test/delivery-resolution.test.js test/launch-migration-continuation.test.js test/calendar-eligibility.test.js test/browser-environment.test.js test/community-operations.test.js test/legacy-analytics.test.js test/live-quiz.test.js test/community-deletion.test.js test/community-notifications.test.js test/push-tokens.test.js test/discovery-notifications.test.js test/backend-active-paths.test.js test/guest-retention.test.js test/event-entitlement.test.js test/public-profiles.test.js test/staff-profile-lookup.test.js test/analytics-trigger-transition.test.js test/attendance-questions.test.js test/qualification-isolation.test.js test/recovery-target.test.js ../tests/web_backend_tools.test.cjs ../tests/web_browser_pilot.test.cjs ../tests/web_browser_communications.test.cjs",
+    "test:rules": "firebase emulators:exec --config ../firebase.test.json --project demo-attendus-admin --only firestore,storage \"node --test --test-concurrency=1 test/firestore-rules.test.js test/storage-rules.test.js\"",
+    "test:integration": "node tools/run-integration-tests.js --project demo-attendus-admin",
+    "test:integration:repeat": "node tools/run-integration-tests.js --project demo-attendus-admin --repeat 3",
     "bootstrap:super-admin": "node admin/bootstrap-super-admin.js",
-    "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "deploy": "node -e \"console.error('Direct Functions deployment is disabled. Use the qualified web candidate, evidence, and promotion workflows.');process.exit(1)\"",
+    "logs": "firebase functions:log",
+    "biometrics:inventory": "node tools/biometric-retention.js",
+    "attendance:migrate": "node tools/migrate-attendance-v2.js",
+    "reminders:reconcile": "node tools/reconcile-scheduled-reminders.js",
+    "reminders:canary": "node tools/canary-scheduled-reminders.js",
+    "discovery:backfill": "node tools/backfill-discovery-marketplace.js",
+    "discovery:migrate-saves": "node tools/migrate-saved-events.js",
+    "discovery:validate-release": "node tools/validate-discovery-release.js",
+    "discovery:backfill-categories": "node tools/backfill-discovery-categories.js",
+    "public-web:backfill": "node tools/backfill-public-web.js",
+    "public-web:validate": "node tools/validate-public-web.js",
+    "public-web:rollout": "node tools/set-public-web-rollout.js",
+    "event-wizard:rollout": "node tools/set-event-creation-rollout.js",
+    "test:attendance": "firebase emulators:exec --config ../firebase.test.json --project demo-attendus-admin --only firestore \"node --test --test-concurrency=1 test/arrival-emulator.test.js\"",
+    "test:messaging": "firebase emulators:exec --config ../firebase.test.json --project demo-attendus-admin --only firestore \"node --test --test-concurrency=1 test/messaging-emulator.test.js test/firestore-rules.test.js\"",
+    "test:launch": "firebase emulators:exec --config ../firebase.test.json --project demo-attendus-admin --only firestore \"node --test --test-concurrency=1 test/launch-emulator.test.js test/launch-jobs-emulator.test.js test/account-deletion-emulator.test.js test/guest-deletion-guards-emulator.test.js test/launch-migration-continuation-emulator.test.js test/shared-conversation-deletion-emulator.test.js\""
   },
   "engines": {
     "node": "22"
   },
   "main": "index.js",
   "dependencies": {
-    "firebase-admin": "^12.6.0",
-    "firebase-functions": "^6.0.1",
-    "google-auth-library": "^9.14.1",
-    "jsonwebtoken": "^9.0.2",
+    "archiver": "^8.0.0",
+    "asn1js": "3.0.10",
+    "firebase-admin": "^14.2.0",
+    "firebase-functions": "^7.3.2",
+    "geofire-common": "^6.0.0",
+    "google-auth-library": "^11.0.0",
+    "googleapis": "^173.0.0",
+    "jsonwebtoken": "^9.0.3",
     "node-fetch": "^3.3.2",
-    "stripe": "^14.10.0",
-    "archiver": "^6.0.1",
-    "uuid": "^9.0.1",
-    "googleapis": "^128.0.0",
-    "twilio": "^4.21.0"
+    "pkijs": "3.4.1",
+    "qrcode": "^1.5.4",
+    "stripe": "^22.4.0"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",
     "eslint": "^8.15.0",
-    "eslint-config-google": "^0.14.0"
+    "firebase": "^11.10.0",
+    "firebase-tools": "15.25.1",
+    "node-forge": "1.4.0"
   },
   "private": true
 }

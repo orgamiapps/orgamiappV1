@@ -1,4 +1,68 @@
 import 'package:intl/intl.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:attendus/firebase_options.dart';
+
+/// Public links belong to the same environment as the records they identify.
+class PublicLinkConfiguration {
+  const PublicLinkConfiguration._(this.canonicalOrigin, this.acceptedOrigins);
+
+  final String canonicalOrigin;
+  final Set<String> acceptedOrigins;
+
+  factory PublicLinkConfiguration.forEnvironment(
+    String environment, {
+    String emulatorPublicOrigin = 'http://127.0.0.1:4173',
+    bool debug = false,
+  }) {
+    switch (environment) {
+      case 'production':
+        return const PublicLinkConfiguration._('https://attendus.app', {
+          'https://attendus.app',
+        });
+      case 'staging':
+        return const PublicLinkConfiguration._(
+          'https://attendus-staging.web.app',
+          {
+            'https://attendus-staging.web.app',
+            'https://attendus-staging.firebaseapp.com',
+          },
+        );
+      case 'emulator':
+        final uri = Uri.tryParse(emulatorPublicOrigin);
+        if (!debug ||
+            uri == null ||
+            uri.scheme != 'http' ||
+            !{'127.0.0.1', 'localhost', '::1', '[::1]'}.contains(uri.host) ||
+            uri.userInfo.isNotEmpty ||
+            (uri.path.isNotEmpty && uri.path != '/') ||
+            uri.hasQuery ||
+            uri.hasFragment ||
+            uri.port < 1 ||
+            uri.port > 65535) {
+          throw StateError(
+            'Emulator public links require a debug build and loopback HTTP origin.',
+          );
+        }
+        return PublicLinkConfiguration._(
+          uri.origin,
+          Set.unmodifiable({uri.origin}),
+        );
+      default:
+        throw StateError('Unsupported public link environment: $environment');
+    }
+  }
+
+  bool accepts(Uri uri) {
+    // Relative in-app routes already belong to the running Firebase project.
+    if (!uri.hasScheme && !uri.hasAuthority) return true;
+    if (!uri.hasAuthority ||
+        uri.userInfo.isNotEmpty ||
+        (uri.scheme != 'https' && uri.scheme != 'http')) {
+      return false;
+    }
+    return acceptedOrigins.contains(uri.origin);
+  }
+}
 
 class AppConstants {
   static const appName = 'Attendus';
@@ -15,12 +79,6 @@ class AppConstants {
   static DateFormat dateFormat1 = DateFormat("dd MMM yyyy");
   static DateFormat dateFormat2 = DateFormat("dd-MM-yyyy");
 
-  // Google Places API key used for client-side autocomplete in signup.
-  // NOTE: Keep this key restricted to Places APIs only. This mirrors the key
-  // present in AndroidManifest for Maps SDK usage.
-  static const String googlePlacesApiKey =
-      'AIzaSyAf1t5cToh1UoF7R52vTSJxMajw8CvmVUA';
-
   // Browser-exposed keys are expected to be HTTP-referrer restricted. Supply
   // this with --dart-define=GOOGLE_MAPS_WEB_API_KEY=... for web builds.
   static const String googleMapsWebApiKey = String.fromEnvironment(
@@ -29,10 +87,16 @@ class AppConstants {
   );
 
   // Public web/deep-link configuration.
-  static const String publicWebDomain = 'https://attendus.app';
-  static const String dynamicLinksDomain = 'https://attendus.app';
-  static const String androidPackageName = 'com.stormdeve.orgami';
-  static const String iosBundleId = 'com.stormdeve.orgami';
+  static final PublicLinkConfiguration publicLinks =
+      PublicLinkConfiguration.forEnvironment(
+        DefaultFirebaseOptions.environment,
+        emulatorPublicOrigin: const String.fromEnvironment(
+          'ATTENDUS_EMULATOR_PUBLIC_ORIGIN',
+          defaultValue: 'http://127.0.0.1:4173',
+        ),
+        debug: kDebugMode,
+      );
+  static String get publicWebDomain => publicLinks.canonicalOrigin;
   static const String stripeReturnUrl = 'attendus://callback';
   static const String stripeMerchantDisplayName = 'Attendus';
   static const String applePayMerchantIdentifier = 'merchant.app.attendus';
@@ -40,18 +104,22 @@ class AppConstants {
   // Feature flags
   // Apple Sign-In is hidden until the Apple Developer Service ID, callback URL,
   // and Firebase provider settings are configured for AttendUs.
-  static const bool enableAppleSignIn = false;
+  static const bool enableAppleSignIn = bool.fromEnvironment(
+    'ATTENDUS_ENABLE_APPLE_SIGN_IN',
+    defaultValue: false,
+  );
 
-  // Web App Check is intentionally opt-in until a real reCAPTCHA v3 key is
-  // configured in Firebase Console for attendus.app.
+  // Web App Check is enabled in production builds with the score-based
+  // reCAPTCHA Enterprise key registered for attendus.app.
   static const bool enableWebAppCheck = bool.fromEnvironment(
     'ATTENDUS_ENABLE_WEB_APP_CHECK',
     defaultValue: false,
   );
-  static const String appCheckWebRecaptchaSiteKey = String.fromEnvironment(
-    'ATTENDUS_RECAPTCHA_V3_SITE_KEY',
-    defaultValue: '',
-  );
+  static const String appCheckWebRecaptchaEnterpriseSiteKey =
+      String.fromEnvironment(
+        'ATTENDUS_RECAPTCHA_ENTERPRISE_SITE_KEY',
+        defaultValue: '',
+      );
   static const String appleServiceId = String.fromEnvironment(
     'ATTENDUS_APPLE_SERVICE_ID',
     defaultValue: '',
@@ -61,8 +129,11 @@ class AppConstants {
     defaultValue: '',
   );
 
-  static Uri buildInviteUri(String eventId) {
-    return Uri.parse('$publicWebDomain/invite?eventId=$eventId');
+  static Uri buildEventUri(String eventId, {PublicLinkConfiguration? links}) {
+    final encodedId = Uri.encodeComponent(eventId.trim());
+    return Uri.parse(
+      '${(links ?? publicLinks).canonicalOrigin}/event/$encodedId',
+    );
   }
 
   static String getMilesSliderLabel(double value) {

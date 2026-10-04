@@ -9,6 +9,7 @@ class MessageModel {
   String content;
   DateTime timestamp;
   bool isRead;
+  int sequence;
   String? messageType; // 'text', 'image', 'file'
   String? mediaUrl;
   String? fileName;
@@ -23,6 +24,7 @@ class MessageModel {
     required this.content,
     required this.timestamp,
     this.isRead = false,
+    this.sequence = 0,
     this.messageType = 'text',
     this.mediaUrl,
     this.fileName,
@@ -31,17 +33,24 @@ class MessageModel {
   });
 
   factory MessageModel.fromFirestore(DocumentSnapshot snap) {
-    Map d = snap.data() as Map<dynamic, dynamic>;
+    return MessageModel.fromMap(
+      snap.id,
+      Map<String, dynamic>.from(snap.data() as Map),
+    );
+  }
+
+  factory MessageModel.fromMap(String id, Map<String, dynamic> d) {
     return MessageModel(
-      id: snap.id,
+      id: id,
       senderId: d['senderId'],
       receiverId: d['receiverId'],
       conversationId: d['conversationId'] ?? _inferConversationId(d),
       content: d['content'],
-      timestamp: d['timestamp'] != null 
-          ? (d['timestamp'] as Timestamp).toDate() 
-          : DateTime.now(),
+      timestamp: d['timestamp'] != null
+          ? (d['timestamp'] as Timestamp).toDate()
+          : DateTime.fromMillisecondsSinceEpoch(0),
       isRead: d['isRead'] ?? false,
+      sequence: d['sequence'] ?? 0,
       messageType: d['messageType'] ?? 'text',
       mediaUrl: d['mediaUrl'],
       fileName: d['fileName'],
@@ -96,6 +105,7 @@ class ConversationModel {
   String? groupName;
   String? groupAvatarUrl;
   String? lastMessageSenderId;
+  Map<String, int> readSequences;
 
   ConversationModel({
     required this.id,
@@ -110,12 +120,27 @@ class ConversationModel {
     this.groupName,
     this.groupAvatarUrl,
     this.lastMessageSenderId,
+    this.readSequences = const {},
   });
 
-  factory ConversationModel.fromFirestore(DocumentSnapshot snap) {
-    Map d = snap.data() as Map<dynamic, dynamic>;
+  factory ConversationModel.fromFirestore(
+    DocumentSnapshot snap, {
+    String? currentUserId,
+  }) {
+    return ConversationModel.fromMap(
+      snap.id,
+      Map<String, dynamic>.from(snap.data() as Map),
+      currentUserId: currentUserId,
+    );
+  }
+
+  factory ConversationModel.fromMap(
+    String id,
+    Map<String, dynamic> d, {
+    String? currentUserId,
+  }) {
     return ConversationModel(
-      id: snap.id,
+      id: id,
       participant1Id: d['participant1Id'],
       participant2Id: d['participant2Id'],
       participantIds: d['participantIds'] != null
@@ -124,8 +149,11 @@ class ConversationModel {
       lastMessage: d['lastMessage'] ?? '',
       lastMessageTime: d['lastMessageTime'] != null
           ? (d['lastMessageTime'] as Timestamp).toDate()
-          : DateTime.now(),
-      unreadCount: d['unreadCount'] ?? 0,
+          : DateTime.fromMillisecondsSinceEpoch(0),
+      unreadCount: currentUserId == null
+          ? 0
+          : (d['unreadCounts']?[currentUserId] ?? 0),
+      readSequences: Map<String, int>.from(d['readSequences'] ?? {}),
       participantInfo: d['participantInfo'] ?? {},
       isGroup: d['isGroup'] ?? false,
       groupName: d['groupName'],

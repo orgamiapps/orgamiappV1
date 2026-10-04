@@ -1,3 +1,4 @@
+import 'package:attendus/config/safety_flags.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
@@ -100,6 +101,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
   }
 
   Future<void> _initializeServices() async {
+    if (!SafetyFlags.biometricCheckInEnabled) return;
     try {
       Logger.info('Initializing face recognition service...');
       await _faceService.initialize();
@@ -111,6 +113,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
   }
 
   Future<void> _initializeCamera() async {
+    if (!SafetyFlags.biometricCheckInEnabled) return;
     try {
       // Request camera permission first
       Logger.info('Requesting camera permission...');
@@ -511,6 +514,18 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (!SafetyFlags.biometricCheckInEnabled) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Check-in')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(SafetyFlags.biometricMaintenanceMessage),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(

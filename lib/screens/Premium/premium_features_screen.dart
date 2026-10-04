@@ -174,9 +174,9 @@ class _PremiumFeaturesScreenState extends State<PremiumFeaturesScreen> {
                     const SizedBox(height: 12),
                     _buildCompactActionsGrid([
                       _PremiumFeatureAction(
-                        icon: Icons.sms_rounded,
+                        icon: Icons.notifications_rounded,
                         title: 'Send Notifications',
-                        subtitle: 'SMS & In-App Alerts',
+                        subtitle: 'In-App Alerts',
                         color: const Color(0xFF10B981),
                         onTap: () => _openSendNotifications(),
                       ),

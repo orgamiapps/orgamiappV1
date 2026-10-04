@@ -1,3 +1,4 @@
+import 'package:attendus/Services/community_service.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -34,7 +35,7 @@ class EnhancedFeedTab extends StatefulWidget {
 class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
   // Core services
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final User? _currentUser = FirebaseAuth.instance.currentUser;
+  User? get _currentUser => FirebaseAuth.instance.currentUser;
 
   // Filter state
   String _selectedFilter = 'All';
@@ -85,7 +86,8 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
           .get();
 
       final createdBy = orgDoc.data()?['createdBy'];
-      if (createdBy == _currentUser.uid) {
+      if (createdBy == _currentUser!.uid) {
+        if (!mounted) return;
         setState(() => _isAdmin = true);
         return;
       }
@@ -94,11 +96,12 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
           .collection('Organizations')
           .doc(widget.organizationId)
           .collection('Members')
-          .doc(_currentUser.uid)
+          .doc(_currentUser!.uid)
           .get();
 
       if (memberDoc.exists) {
-        final role = memberDoc.data()?['role'];
+        final role = memberDoc.data()?['role']?.toString().toLowerCase();
+        if (!mounted) return;
         setState(() => _isAdmin = role == 'admin' || role == 'owner');
       }
     } catch (e) {
@@ -134,6 +137,10 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
       // Process feed posts
       for (var doc in feedSnapshot.docs) {
         final data = doc.data();
+        if (data['deleted'] == true ||
+            (data['isHidden'] == true && !_isAdmin)) {
+          continue;
+        }
         combinedPosts.add({
           'id': doc.id,
           'type': 'feed',
@@ -147,6 +154,10 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
       // Process events
       for (var doc in eventsSnapshot.docs) {
         final data = doc.data();
+        if (data['deleted'] == true ||
+            (data['isHidden'] == true && !_isAdmin)) {
+          continue;
+        }
         combinedPosts.add({
           'id': doc.id,
           'type': 'event',
@@ -200,15 +211,21 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
   }
 
   // Handle pin/unpin with optimistic UI updates
-  Future<void> _togglePin(String postId, bool isEvent, bool currentlyPinned) async {
+  Future<void> _togglePin(
+    String postId,
+    bool isEvent,
+    bool currentlyPinned,
+  ) async {
     if (!_isAdmin) return;
 
     try {
       // Optimistic update
       setState(() {
-        final index = _posts.indexWhere((post) =>
-            post['id'] == postId &&
-            (isEvent ? post['type'] == 'event' : post['type'] == 'feed'));
+        final index = _posts.indexWhere(
+          (post) =>
+              post['id'] == postId &&
+              (isEvent ? post['type'] == 'event' : post['type'] == 'feed'),
+        );
 
         if (index != -1) {
           _posts[index]['data']['isPinned'] = !currentlyPinned;
@@ -236,9 +253,9 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
         final collection = isEvent
             ? db.collection('Events')
             : db
-                .collection('Organizations')
-                .doc(widget.organizationId)
-                .collection('Feed');
+                  .collection('Organizations')
+                  .doc(widget.organizationId)
+                  .collection('Feed');
 
         final snap = await collection.where('isPinned', isEqualTo: true).get();
         int maxOrder = 0;
@@ -250,17 +267,10 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
         nextOrder = maxOrder + 1;
       }
 
-      final docRef = isEvent
-          ? db.collection('Events').doc(postId)
-          : db
-              .collection('Organizations')
-              .doc(widget.organizationId)
-              .collection('Feed')
-              .doc(postId);
-
-      await docRef.update({
-        'isPinned': !currentlyPinned,
-        'pinnedOrder': nextOrder,
+      await CommunityService().mutate(isEvent ? 'updateEvent' : 'updateFeed', {
+        'organizationId': widget.organizationId,
+        if (isEvent) 'eventId': postId else 'postId': postId,
+        'updates': {'isPinned': !currentlyPinned, 'pinnedOrder': nextOrder},
       });
 
       if (mounted) {
@@ -282,10 +292,7 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
       await _loadPosts();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -301,20 +308,12 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
           .collection('Feed')
           .doc(feedId);
 
-      await _db.runTransaction((transaction) async {
-        final snapshot = await transaction.get(docRef);
-        if (!snapshot.exists) return;
-
-        final data = snapshot.data()!;
-        final likes = List<String>.from(data['likes'] ?? []);
-
-        if (likes.contains(_currentUser.uid)) {
-          likes.remove(_currentUser.uid);
-        } else {
-          likes.add(_currentUser.uid);
-        }
-
-        transaction.update(docRef, {'likes': likes});
+      final snapshot = await docRef.get();
+      final likes = List<String>.from(snapshot.data()?['likes'] ?? []);
+      await CommunityService().mutate('setLike', {
+        'organizationId': widget.organizationId,
+        'postId': feedId,
+        'liked': !likes.contains(_currentUser?.uid),
       });
     } catch (e) {
       debugPrint('Error toggling like: $e');
@@ -327,20 +326,12 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
     try {
       final docRef = _db.collection('Events').doc(eventId);
 
-      await _db.runTransaction((transaction) async {
-        final snapshot = await transaction.get(docRef);
-        if (!snapshot.exists) return;
-
-        final data = snapshot.data()!;
-        final likes = List<String>.from(data['likes'] ?? []);
-
-        if (likes.contains(_currentUser.uid)) {
-          likes.remove(_currentUser.uid);
-        } else {
-          likes.add(_currentUser.uid);
-        }
-
-        transaction.update(docRef, {'likes': likes});
+      final snapshot = await docRef.get();
+      final likes = List<String>.from(snapshot.data()?['likes'] ?? []);
+      await CommunityService().mutate('setEventLike', {
+        'organizationId': widget.organizationId,
+        'eventId': eventId,
+        'liked': !likes.contains(_currentUser?.uid),
       });
     } catch (e) {
       debugPrint('Error toggling event like: $e');
@@ -351,41 +342,10 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
     if (_currentUser == null) return;
 
     try {
-      final docRef = _db
-          .collection('Organizations')
-          .doc(widget.organizationId)
-          .collection('Feed')
-          .doc(feedId);
-
-      await _db.runTransaction((transaction) async {
-        final snapshot = await transaction.get(docRef);
-        if (!snapshot.exists) return;
-
-        final data = snapshot.data()!;
-        final options = List<Map<String, dynamic>>.from(data['options']);
-        final voters = List<String>.from(data['voters'] ?? []);
-        final allowMultiple = data['allowMultipleVotes'] ?? false;
-
-        if (!allowMultiple && voters.contains(_currentUser.uid)) {
-          throw Exception('You have already voted in this poll');
-        }
-
-        final votes = List<String>.from(options[optionIndex]['votes'] ?? []);
-        if (!votes.contains(_currentUser.uid)) {
-          votes.add(_currentUser.uid);
-          options[optionIndex]['votes'] = votes;
-          options[optionIndex]['voteCount'] = votes.length;
-        }
-
-        if (!voters.contains(_currentUser.uid)) {
-          voters.add(_currentUser.uid);
-        }
-
-        transaction.update(docRef, {
-          'options': options,
-          'voters': voters,
-          'totalVotes': voters.length,
-        });
+      await CommunityService().mutate('votePoll', {
+        'organizationId': widget.organizationId,
+        'postId': feedId,
+        'optionIndex': optionIndex,
       });
 
       if (mounted) {
@@ -609,8 +569,9 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
       }
 
       final feedType = post['feedType'];
-      if (_selectedFilter == 'Announcements' && feedType == 'announcement')
+      if (_selectedFilter == 'Announcements' && feedType == 'announcement') {
         return true;
+      }
       if (_selectedFilter == 'Polls' && feedType == 'poll') return true;
       if (_selectedFilter == 'Photos' && feedType == 'photo') return true;
 
@@ -735,7 +696,11 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                       organizationId: widget.organizationId,
                       currentUserId: _currentUser?.uid,
                       onLike: () => _toggleEventLike(postId),
-                      onPin: () => _togglePin(postId, true, postData['isPinned'] ?? false),
+                      onPin: () => _togglePin(
+                        postId,
+                        true,
+                        postData['isPinned'] ?? false,
+                      ),
                       isAdmin: _isAdmin,
                     ),
                   );
@@ -755,7 +720,11 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                       currentUserId: _currentUser?.uid,
                       isAdmin: _isAdmin,
                       onLike: () => _toggleLike(postId),
-                      onPin: () => _togglePin(postId, false, postData['isPinned'] ?? false),
+                      onPin: () => _togglePin(
+                        postId,
+                        false,
+                        postData['isPinned'] ?? false,
+                      ),
                     ),
                   );
                 } else if (feedType == 'photo') {
@@ -768,7 +737,11 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                       organizationId: widget.organizationId,
                       currentUserId: _currentUser?.uid,
                       onLike: () => _toggleLike(postId),
-                      onPin: () => _togglePin(postId, false, postData['isPinned'] ?? false),
+                      onPin: () => _togglePin(
+                        postId,
+                        false,
+                        postData['isPinned'] ?? false,
+                      ),
                       isAdmin: _isAdmin,
                     ),
                   );
@@ -781,7 +754,11 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
                       docId: postId,
                       organizationId: widget.organizationId,
                       onLike: () => _toggleLike(postId),
-                      onPin: () => _togglePin(postId, false, postData['isPinned'] ?? false),
+                      onPin: () => _togglePin(
+                        postId,
+                        false,
+                        postData['isPinned'] ?? false,
+                      ),
                       isAdmin: _isAdmin,
                       currentUserId: _currentUser?.uid,
                     ),
@@ -2132,8 +2109,10 @@ class _PollCardState extends State<_PollCard>
                   children: [
                     const Icon(Icons.poll, color: Color(0xFF667EEA), size: 20),
                     const SizedBox(width: 8),
-                    const Text(
-                      'POLL',
+                    Text(
+                      CommunityService.isPollClosed(widget.data)
+                          ? 'POLL CLOSED'
+                          : 'POLL',
                       style: TextStyle(
                         color: Color(0xFF667EEA),
                         fontSize: 12,
@@ -2163,7 +2142,14 @@ class _PollCardState extends State<_PollCard>
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: InkWell(
-                      onTap: hasVoted ? null : () => widget.onVote(index),
+                      onTap:
+                          CommunityService.isPollClosed(widget.data) ||
+                              widget.currentUserId == null ||
+                              votes.contains(widget.currentUserId) ||
+                              (hasVoted &&
+                                  widget.data['allowMultipleVotes'] != true)
+                          ? null
+                          : () => widget.onVote(index),
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
                         decoration: BoxDecoration(

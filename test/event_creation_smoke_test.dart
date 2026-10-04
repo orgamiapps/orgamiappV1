@@ -1,140 +1,104 @@
 import 'package:attendus/Utils/attendus_theme.dart';
 import 'package:attendus/screens/Events/create_event_screen.dart';
+import 'package:attendus/screens/Events/event_creation_wizard_screen.dart';
 import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
+import 'package:attendus/models/event_wizard_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'support/wizard_fake.dart';
+
+Future<void> wizard(WidgetTester tester, {EventWizardDraft? draft}) async {
+  tester.view.physicalSize = const Size(1440, 1100);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: AttendUsTheme.light,
+      home: EventCreationWizardScreen(
+        service: TestWizardRepository(),
+        initialDraft: draft ?? EventWizardDraft.blank(),
+      ),
+    ),
+  );
+  await tester.pump();
+}
 
 void main() {
-  testWidgets('event creation does not require a subscription', (tester) async {
+  testWidgets('event entrypoint never adds a premium purchase gate', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: AttendUsTheme.light,
         home: const PremiumEventCreationWrapper(),
       ),
     );
-
-    expect(find.byType(CreateEventScreen), findsOneWidget);
+    expect(find.byType(EventCreationExperienceGate), findsOneWidget);
     expect(find.text('Premium Required'), findsNothing);
-    expect(find.text('Create event'), findsWidgets);
   });
-
-  testWidgets('create event form shell renders', (tester) async {
+  testWidgets('legacy create routes to a safe retry state without Firebase', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(theme: AttendUsTheme.light, home: const CreateEventScreen()),
     );
-
-    expect(find.text('Create event'), findsWidgets);
-    expect(find.text('Hosting as'), findsOneWidget);
+    expect(find.byType(EventCreationExperienceGate), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
+    expect(find.text('Hosting as'), findsNothing);
+  });
+  testWidgets('secure wizard shell keeps advanced attendance out of basics', (
+    tester,
+  ) async {
+    await wizard(tester);
     expect(find.text('Event title'), findsOneWidget);
-    expect(find.text('Date'), findsOneWidget);
-    expect(find.text('Starts'), findsOneWidget);
-    expect(find.text('Ends'), findsOneWidget);
-    expect(find.text('In person'), findsOneWidget);
-    expect(find.text('Select'), findsOneWidget);
-    expect(find.text('More options'), findsOneWidget);
+    expect(find.text('Date and time'), findsOneWidget);
+    expect(find.text('Advanced check-in & security'), findsNothing);
   });
-
-  testWidgets('advanced event options stay collapsed until requested', (
+  testWidgets('basics requires title and a valid in-person location', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      MaterialApp(theme: AttendUsTheme.light, home: const CreateEventScreen()),
-    );
-
-    expect(find.text('Description (optional)'), findsNothing);
-    await tester.ensureVisible(find.text('More options'));
-    await tester.tap(find.text('More options'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Description (optional)'), findsOneWidget);
-    expect(find.text('Regular'), findsOneWidget);
-    expect(find.text('Attendee questions'), findsOneWidget);
-  });
-
-  testWidgets('in-person quick create requires title and a selected pin', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(theme: AttendUsTheme.light, home: const CreateEventScreen()),
-    );
-
-    await tester.tap(find.text('Create event').last);
+    await wizard(tester);
+    await tester.tap(find.text('Continue'));
     await tester.pump();
-
-    expect(find.text('Enter an event title'), findsOneWidget);
-
+    expect(find.text('Add an event title to continue.'), findsOneWidget);
+    ScaffoldMessenger.of(
+      tester.element(find.byType(EventCreationWizardScreen)),
+    ).clearSnackBars();
+    await tester.pumpAndSettle();
     await tester.enterText(
-      find.byType(TextFormField).first,
+      find.widgetWithText(TextFormField, 'Event title'),
       'Community meetup',
     );
-    await tester.tap(find.text('Create event').last);
-    await tester.pump();
-
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
     expect(
-      find.text('Select a venue, address, or map pin for this event'),
+      find.text('Add a valid event location to continue.'),
       findsOneWidget,
     );
   });
-
-  testWidgets('online events require a meeting location instead of a pin', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(theme: AttendUsTheme.light, home: const CreateEventScreen()),
+  testWidgets('online basics requires a meeting location', (tester) async {
+    await wizard(
+      tester,
+      draft: EventWizardDraft.blank()
+        ..title = 'Online meetup'
+        ..locationType = 'online',
     );
-
-    await tester.ensureVisible(find.text('Online'));
-    await tester.tap(find.text('Online'));
+    await tester.tap(find.text('Continue'));
     await tester.pump();
-    expect(find.text('Online location or meeting link'), findsOneWidget);
-
-    await tester.enterText(
-      find.byType(TextFormField).first,
-      'Remote community meetup',
-    );
-    await tester.tap(find.text('Create event').last);
-    await tester.pump();
-
     expect(
-      find.text('Enter the online event location or meeting link'),
-      findsWidgets,
-    );
-    expect(
-      find.text('Select a venue, address, or map pin for this event'),
-      findsNothing,
+      find.text('Add a valid event location to continue.'),
+      findsOneWidget,
     );
   });
-
-  testWidgets('event date and time pickers open and select values', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(theme: AttendUsTheme.light, home: const CreateEventScreen()),
-    );
-
-    final dateField = find.text('Date');
-    await tester.ensureVisible(dateField);
-    await tester.tap(dateField);
+  testWidgets('canonical date picker opens and can cancel', (tester) async {
+    await wizard(tester);
+    await tester.ensureVisible(find.text('Starts'));
+    await tester.tap(find.text('Starts'));
     await tester.pumpAndSettle();
-
     expect(find.byType(DatePickerDialog), findsOneWidget);
-    expect(find.text('Choose event date'), findsOneWidget);
-
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
-
-    final startTimeField = find.text('Starts');
-    await tester.ensureVisible(startTimeField);
-    await tester.tap(startTimeField);
-    await tester.pumpAndSettle();
-
-    expect(find.byType(TimePickerDialog), findsOneWidget);
-    expect(find.text('Choose start time'), findsOneWidget);
-
-    await tester.tap(find.widgetWithText(TextButton, 'Select'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Starts'), findsOneWidget);
-    expect(find.text('Ends'), findsOneWidget);
+    expect(find.byType(DatePickerDialog), findsNothing);
   });
 }

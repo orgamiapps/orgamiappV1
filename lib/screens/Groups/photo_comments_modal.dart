@@ -1,8 +1,9 @@
+import 'package:attendus/controller/customer_controller.dart';
+import 'package:attendus/Services/community_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
-import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 
 /// Instagram-style comments modal for photo posts in group feed
@@ -27,8 +28,10 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
   final ScrollController _scrollController = ScrollController();
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseFirestoreHelper _firestoreHelper = FirebaseFirestoreHelper();
-  final User? _currentUser = FirebaseAuth.instance.currentUser;
-  
+  User? get _currentUser => FirebaseAuth.instance.currentUser;
+
+  String? _pendingCommentId;
+  String? _pendingCommentText;
   bool _isSubmitting = false;
   final FocusNode _focusNode = FocusNode();
 
@@ -49,36 +52,19 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
     });
 
     try {
-      final currentUserData = CustomerController.logeInCustomer;
-      final userName = currentUserData?.name ?? 
-                       currentUserData?.username ?? 
-                       'Anonymous';
-      final userPhotoUrl = currentUserData?.profilePictureUrl;
-
-      await _db
-          .collection('Organizations')
-          .doc(widget.organizationId)
-          .collection('Feed')
-          .doc(widget.postId)
-          .collection('Comments')
-          .add({
-        'userId': _currentUser.uid,
-        'userName': userName,
-        'userPhotoUrl': userPhotoUrl,
+      if (_pendingCommentText != text) {
+        _pendingCommentId = CommunityService.newId();
+        _pendingCommentText = text;
+      }
+      await CommunityService().mutate('addComment', {
+        'organizationId': widget.organizationId,
+        'postId': widget.postId,
+        'commentId': _pendingCommentId,
         'comment': text,
-        'createdAt': FieldValue.serverTimestamp(),
-        'likes': [],
       });
-
-      // Update comment count on the post
-      await _db
-          .collection('Organizations')
-          .doc(widget.organizationId)
-          .collection('Feed')
-          .doc(widget.postId)
-          .update({
-        'commentCount': FieldValue.increment(1),
-      });
+      if (!mounted) return;
+      _pendingCommentId = null;
+      _pendingCommentText = null;
 
       _commentController.clear();
       _focusNode.unfocus();
@@ -115,23 +101,10 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
 
   Future<void> _deleteComment(String commentId) async {
     try {
-      await _db
-          .collection('Organizations')
-          .doc(widget.organizationId)
-          .collection('Feed')
-          .doc(widget.postId)
-          .collection('Comments')
-          .doc(commentId)
-          .delete();
-
-      // Update comment count
-      await _db
-          .collection('Organizations')
-          .doc(widget.organizationId)
-          .collection('Feed')
-          .doc(widget.postId)
-          .update({
-        'commentCount': FieldValue.increment(-1),
+      await CommunityService().mutate('deleteComment', {
+        'organizationId': widget.organizationId,
+        'postId': widget.postId,
+        'commentId': commentId,
       });
 
       if (mounted) {
@@ -157,24 +130,14 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
   Future<void> _toggleLike(String commentId, List<String> currentLikes) async {
     if (_currentUser == null) return;
 
-    final isLiked = currentLikes.contains(_currentUser.uid);
-    final updatedLikes = List<String>.from(currentLikes);
-
-    if (isLiked) {
-      updatedLikes.remove(_currentUser.uid);
-    } else {
-      updatedLikes.add(_currentUser.uid);
-    }
-
+    final isLiked = currentLikes.contains(_currentUser!.uid);
     try {
-      await _db
-          .collection('Organizations')
-          .doc(widget.organizationId)
-          .collection('Feed')
-          .doc(widget.postId)
-          .collection('Comments')
-          .doc(commentId)
-          .update({'likes': updatedLikes});
+      await CommunityService().mutate('setLike', {
+        'organizationId': widget.organizationId,
+        'postId': widget.postId,
+        'commentId': commentId,
+        'liked': !isLiked,
+      });
     } catch (e) {
       debugPrint('Error toggling like: $e');
     }
@@ -196,9 +159,9 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading profile: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading profile: $e')));
       }
     }
   }
@@ -231,10 +194,7 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               border: Border(
-                bottom: BorderSide(
-                  color: Colors.grey.shade200,
-                  width: 1,
-                ),
+                bottom: BorderSide(color: Colors.grey.shade200, width: 1),
               ),
             ),
             child: Row(
@@ -249,8 +209,9 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
                       .collection('Comments')
                       .snapshots(),
                   builder: (context, snapshot) {
-                    final count = snapshot.data?.docs.length ?? 
-                                  widget.initialCommentCount;
+                    final count =
+                        snapshot.data?.docs.length ??
+                        widget.initialCommentCount;
                     return Text(
                       'Comments ($count)',
                       style: const TextStyle(
@@ -286,9 +247,7 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xFF667EEA),
-                    ),
+                    child: CircularProgressIndicator(color: Color(0xFF667EEA)),
                   );
                 }
 
@@ -339,8 +298,9 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
                     final commentText = data['comment'] as String? ?? '';
                     final createdAt = data['createdAt'] as Timestamp?;
                     final likes = List<String>.from(data['likes'] ?? []);
-                    final isLiked = _currentUser != null && 
-                                   likes.contains(_currentUser.uid);
+                    final isLiked =
+                        _currentUser != null &&
+                        likes.contains(_currentUser!.uid);
                     final isOwn = userId == _currentUser?.uid;
 
                     return _CommentItem(
@@ -372,10 +332,7 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border(
-                top: BorderSide(
-                  color: Colors.grey.shade200,
-                  width: 1,
-                ),
+                top: BorderSide(color: Colors.grey.shade200, width: 1),
               ),
               boxShadow: [
                 BoxShadow(
@@ -393,15 +350,18 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
                   CircleAvatar(
                     radius: 18,
                     backgroundColor: const Color(0xFF667EEA),
-                    backgroundImage: CustomerController
-                                .logeInCustomer?.profilePictureUrl != null
+                    backgroundImage:
+                        CustomerController.logeInCustomer?.profilePictureUrl !=
+                            null
                         ? NetworkImage(
                             CustomerController
-                                .logeInCustomer!.profilePictureUrl!,
+                                .logeInCustomer!
+                                .profilePictureUrl!,
                           )
                         : null,
-                    child: CustomerController
-                                .logeInCustomer?.profilePictureUrl == null
+                    child:
+                        CustomerController.logeInCustomer?.profilePictureUrl ==
+                            null
                         ? Text(
                             (CustomerController.logeInCustomer?.name ?? 'U')
                                 .substring(0, 1)
@@ -431,15 +391,11 @@ class _PhotoCommentsModalState extends State<PhotoCommentsModal> {
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(24),
-                            borderSide: BorderSide(
-                              color: Colors.grey.shade300,
-                            ),
+                            borderSide: BorderSide(color: Colors.grey.shade300),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(24),
-                            borderSide: BorderSide(
-                              color: Colors.grey.shade300,
-                            ),
+                            borderSide: BorderSide(color: Colors.grey.shade300),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(24),
@@ -691,4 +647,3 @@ class _CommentItem extends StatelessWidget {
     );
   }
 }
-

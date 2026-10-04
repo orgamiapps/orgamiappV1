@@ -7,6 +7,8 @@ import 'package:attendus/Utils/toast.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:attendus/Utils/app_constants.dart';
+import 'package:attendus/Utils/google_maps_bootstrap.dart';
 
 class EventLocationViewScreen extends StatefulWidget {
   final EventModel eventModel;
@@ -23,7 +25,15 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
   late final double _screenWidth = MediaQuery.of(context).size.width;
   late final double _screenHeight = MediaQuery.of(context).size.height;
 
-  late GoogleMapController mapController;
+  GoogleMapController? mapController;
+  bool get _hasCoordinates =>
+      widget.eventModel.latitude.isFinite &&
+      widget.eventModel.longitude.isFinite &&
+      widget.eventModel.latitude >= -90 &&
+      widget.eventModel.latitude <= 90 &&
+      widget.eventModel.longitude >= -180 &&
+      widget.eventModel.longitude <= 180 &&
+      !(widget.eventModel.latitude == 0 && widget.eventModel.longitude == 0);
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
   late AnimationController _slideController;
@@ -35,6 +45,8 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
   // Address lookup state
   String? _resolvedAddress;
   bool _isLoadingAddress = false;
+  bool _mapReady = false;
+  String? _mapError;
 
   @override
   void initState() {
@@ -62,12 +74,37 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
     _fadeController.forward();
     _slideController.forward();
 
+    _resolvedAddress = _savedEventAddress;
     _initializeMap();
-    _getAddressFromCoordinates();
+    _initializeMapRenderer();
+    if (_resolvedAddress == null) {
+      _getAddressFromCoordinates();
+    }
+  }
+
+  String? get _savedEventAddress {
+    final address = widget.eventModel.location.trim();
+    if (address.isEmpty) return null;
+
+    final normalized = address.toLowerCase();
+    if (normalized.startsWith('coordinates:') ||
+        normalized.startsWith('location coordinates:')) {
+      return null;
+    }
+    return address;
+  }
+
+  Future<void> _initializeMapRenderer() async {
+    await GoogleMapsBootstrap.initialize(AppConstants.googleMapsWebApiKey);
+    if (!mounted) return;
+    setState(() {
+      _mapReady = GoogleMapsBootstrap.isAvailable;
+      _mapError = GoogleMapsBootstrap.errorMessage;
+    });
   }
 
   void _initializeMap() {
-    if (widget.eventModel.latitude != 0 && widget.eventModel.longitude != 0) {
+    if (_hasCoordinates) {
       final eventLocation = widget.eventModel.getLatLng();
 
       setState(() {
@@ -102,6 +139,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
 
   @override
   void dispose() {
+    mapController?.dispose();
     _fadeController.dispose();
     _slideController.dispose();
     super.dispose();
@@ -220,6 +258,35 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
   }
 
   Widget _mapView() {
+    if (!_mapReady) {
+      return Container(
+        color: const Color(0xFFE8EDF3),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.all(32),
+        child: _mapError == null
+            ? const CircularProgressIndicator()
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.map_outlined, size: 42),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Map unavailable',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(_mapError!, textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: _openInMaps,
+                    icon: const Icon(Icons.open_in_new),
+                    label: const Text('Open in Maps'),
+                  ),
+                ],
+              ),
+      );
+    }
+
     return Stack(
       children: [
         // Map
@@ -227,13 +294,10 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
           zoomControlsEnabled: false,
           mapToolbarEnabled: false,
           onMapCreated: _onMapCreated,
-          initialCameraPosition: const CameraPosition(
-            target: LatLng(0, 0),
-            zoom: 1.3,
-          ),
+          initialCameraPosition: _eventCameraPosition,
           markers: markers,
           circles: circles,
-          myLocationEnabled: true,
+          myLocationEnabled: false,
           myLocationButtonEnabled: false,
         ),
         // Map controls
@@ -271,7 +335,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
                         return;
                       }
                       final latLng = widget.eventModel.getLatLng();
-                      mapController.animateCamera(
+                      mapController?.animateCamera(
                         CameraUpdate.newCameraPosition(
                           CameraPosition(target: latLng, zoom: 16),
                         ),
@@ -306,7 +370,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
                   child: InkWell(
                     borderRadius: BorderRadius.circular(12),
                     onTap: () {
-                      mapController.animateCamera(CameraUpdate.zoomIn());
+                      mapController?.animateCamera(CameraUpdate.zoomIn());
                     },
                     child: const Icon(
                       Icons.add,
@@ -338,7 +402,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
                   child: InkWell(
                     borderRadius: BorderRadius.circular(12),
                     onTap: () {
-                      mapController.animateCamera(CameraUpdate.zoomOut());
+                      mapController?.animateCamera(CameraUpdate.zoomOut());
                     },
                     child: const Icon(
                       Icons.remove,
@@ -677,18 +741,25 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
 
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
-    // Start with a globe view; do not auto-zoom to event
-    mapController.moveCamera(
-      CameraUpdate.newCameraPosition(
-        const CameraPosition(target: LatLng(0, 0), zoom: 1.3),
-      ),
+    mapController?.moveCamera(
+      CameraUpdate.newCameraPosition(_eventCameraPosition),
+    );
+  }
+
+  CameraPosition get _eventCameraPosition {
+    final hasCoordinates = _hasCoordinates;
+    return CameraPosition(
+      target: hasCoordinates
+          ? widget.eventModel.getLatLng()
+          : const LatLng(0, 0),
+      zoom: hasCoordinates ? 15 : 1.3,
     );
   }
 
   /// Gets the address from latitude and longitude coordinates using reverse geocoding
   Future<void> _getAddressFromCoordinates() async {
     // Only attempt if coordinates are available
-    if (widget.eventModel.latitude == 0 || widget.eventModel.longitude == 0) {
+    if (!_hasCoordinates) {
       return;
     }
 
@@ -734,8 +805,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
           } else if (place.locality?.isNotEmpty == true) {
             formattedAddress = place.locality!;
           } else {
-            formattedAddress =
-                'Location coordinates: ${widget.eventModel.latitude.toStringAsFixed(6)}, ${widget.eventModel.longitude.toStringAsFixed(6)}';
+            formattedAddress = 'Address unavailable';
           }
         }
 
@@ -750,9 +820,7 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
       if (mounted) {
         setState(() {
           _isLoadingAddress = false;
-          // Fallback to coordinates display
-          _resolvedAddress =
-              'Coordinates: ${widget.eventModel.latitude.toStringAsFixed(6)}, ${widget.eventModel.longitude.toStringAsFixed(6)}';
+          _resolvedAddress = _savedEventAddress ?? 'Address unavailable';
         });
       }
     }
@@ -804,7 +872,9 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
           'Maps: https://www.google.com/maps/search/?api=1&query=$lat,$lng';
 
       // Use the existing share functionality
-      await Share.share(shareText, subject: 'Event Location: $eventTitle');
+      await SharePlus.instance.share(
+        ShareParams(text: shareText, subject: 'Event Location: $eventTitle'),
+      );
     } catch (e) {
       if (!mounted) return;
       ShowToast().showSnackBar('Unable to share location', context);

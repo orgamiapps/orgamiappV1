@@ -1,3 +1,12 @@
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:attendus/widgets/event_practical_details.dart';
+import 'dart:convert';
+import 'package:attendus/Services/artifact_download_service.dart';
+import 'package:attendus/Services/public_registration_service.dart';
+import 'package:attendus/models/event_schedule.dart';
+import 'package:attendus/widgets/public_registration_card.dart';
+import 'package:attendus/widgets/smart_arrival_card.dart';
+import 'package:attendus/screens/Events/Attendance/attendance_wallet_pass_screen.dart';
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
@@ -18,17 +27,17 @@ import 'package:attendus/Utils/geocoding_compat.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/Utils/location_helper.dart';
-import 'package:attendus/firebase/dwell_time_tracker.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/models/attendance_model.dart';
 
 import 'package:attendus/models/event_model.dart';
+import 'package:attendus/models/check_in_policy.dart';
 import 'package:attendus/models/event_question_model.dart';
-import 'package:attendus/screens/Events/Attendance/attendance_sheet_screen.dart';
+import 'package:attendus/screens/Events/Attendance/check_in_console_screen.dart';
+import 'package:attendus/screens/Events/Attendance/personal_attendance_pass_screen.dart';
 
 import 'package:attendus/screens/Events/Widget/comments_section.dart';
 
-import 'package:attendus/screens/Events/ticket_management_screen.dart';
 import 'package:attendus/screens/Events/ticket_scanner_screen.dart';
 import 'package:attendus/screens/Events/event_analytics_screen.dart';
 import 'package:attendus/screens/Events/event_feedback_screen.dart';
@@ -39,14 +48,15 @@ import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 
 // import 'package:attendus/screens/QRScanner/QrScannerScreenForLogedIn.dart';
 import 'package:attendus/screens/QRScanner/qr_scanner_flow_screen.dart';
-import 'package:attendus/screens/QRScanner/ans_questions_to_sign_in_event_screen.dart';
 import 'package:attendus/Utils/colors.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Services/ticket_payment_service.dart';
 import 'package:attendus/Services/face_recognition_service.dart';
+import 'package:attendus/Services/ticket_issuance_service.dart';
 import 'package:attendus/Services/live_quiz_service.dart';
+import 'package:attendus/config/safety_flags.dart';
 import 'package:attendus/screens/LiveQuiz/quiz_builder_screen.dart';
 import 'package:attendus/screens/LiveQuiz/quiz_host_screen.dart';
 import 'package:attendus/screens/LiveQuiz/quiz_participant_screen.dart';
@@ -54,12 +64,9 @@ import 'package:attendus/models/live_quiz_model.dart';
 
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
-import 'package:attendus/screens/Events/chose_location_in_map_screen.dart';
 import 'package:attendus/screens/Events/feature_event_screen.dart';
-import 'package:attendus/screens/Events/edit_event_screen.dart';
+import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:attendus/screens/Events/event_location_view_screen.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:attendus/screens/Events/Widget/qr_dialogue.dart';
 import 'package:attendus/screens/Events/Widget/access_list_management_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -69,13 +76,28 @@ import 'package:attendus/screens/FaceRecognition/picture_face_enrollment_screen.
 import 'package:attendus/widgets/app_scaffold_wrapper.dart';
 import 'package:attendus/screens/Events/Widget/delete_event_dialogue.dart';
 import 'package:attendus/Services/event_flyer_generator.dart';
+import 'package:attendus/Services/event_share_service.dart';
 import 'package:attendus/Utils/attendus_theme.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
-import 'dart:io';
+import 'package:attendus/Services/guest_mode_service.dart';
+import 'package:attendus/Services/guest_attendance_service.dart';
+import 'package:attendus/Services/account_access_service.dart';
+import 'package:attendus/Services/product_funnel_service.dart';
+import 'package:attendus/Services/attendance_check_in_service.dart';
+import 'package:attendus/widgets/account_required_sheet.dart';
 
 class SingleEventScreen extends StatefulWidget {
   final EventModel eventModel;
-  const SingleEventScreen({super.key, required this.eventModel});
+  final String? initialAction;
+  final String? registrationId;
+  final String? ticketId;
+  const SingleEventScreen({
+    super.key,
+    required this.eventModel,
+    this.initialAction,
+    this.registrationId,
+    this.ticketId,
+  });
 
   @override
   State<SingleEventScreen> createState() => _SingleEventScreenState();
@@ -83,7 +105,59 @@ class SingleEventScreen extends StatefulWidget {
 
 class _SingleEventScreenState extends State<SingleEventScreen>
     with TickerProviderStateMixin, WidgetsBindingObserver {
+  String? _selectedRegistrationId;
+  String? _selectedTicketId;
+  String? _selectionUid;
+  int _rsvpStatusGeneration = 0;
+  StreamSubscription<User?>? _selectionAuth;
+  void _selectAdmission(Map<String, dynamic> admission) {
+    setState(() {
+      _selectedRegistrationId = admission['registrationId'] as String?;
+      _selectedTicketId = admission['ticketId'] as String?;
+    });
+  }
+
+  void _openSelectedAttendancePass() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PersonalAttendancePassScreen(
+          event: eventModel,
+          registrationId: _selectedRegistrationId,
+          ticketId: _selectedTicketId,
+        ),
+      ),
+    );
+  }
+
   late EventModel eventModel;
+  String? _capabilityUid;
+  bool _serverManager = false;
+  bool _hasManagementPermissions(String? uid) =>
+      uid != null && uid == _capabilityUid && _serverManager;
+  Future<void> _loadCapabilities() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      final result = await FirebaseFunctions.instance
+          .httpsCallable('getEventCapabilitiesV1')
+          .call({'eventId': eventModel.id})
+          .timeout(const Duration(seconds: 15));
+      if (mounted && FirebaseAuth.instance.currentUser?.uid == uid) {
+        setState(() {
+          _capabilityUid = uid;
+          _serverManager = result.data['permissions']['manageEvent'] == true;
+        });
+      }
+    } catch (_) {
+      if (mounted && FirebaseAuth.instance.currentUser?.uid == uid) {
+        setState(() {
+          _capabilityUid = uid;
+          _serverManager = false;
+        });
+      }
+    }
+  }
+
   StreamSubscription<DocumentSnapshot>? _eventSubscription;
   Timer? _streamDebounceTimer;
 
@@ -98,8 +172,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   bool _isGettingTicket = false;
   bool _hasTicket = false;
   bool _isCheckingTicket = false;
-  bool _justSignedIn =
-      false; // Flag to prevent showing sign-in dialog immediately after sign-in
+  bool _initialActionHandled = false;
   bool _isFacialRecognitionInProgress =
       false; // Flag to prevent repeated facial recognition dialogs
   // Tab index removed - no longer using tabs
@@ -112,11 +185,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
   // _isLoading removed - no longer needed after removing manual code input
 
-  // Dwell time tracking variables
-  // ignore: unused_field
-  bool _isDwellTrackingActive = false;
-  // ignore: unused_field
-  String _dwellStatusMessage = '';
+  final AttendanceCheckInService _attendanceCheckInService =
+      AttendanceCheckInService();
 
   // Animation controllers
   late AnimationController _fadeController;
@@ -255,17 +325,33 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   }
 
   Future<void> _checkRsvpStatus() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final generation = ++_rsvpStatusGeneration;
+    bool current() =>
+        mounted &&
+        generation == _rsvpStatusGeneration &&
+        FirebaseAuth.instance.currentUser?.uid == uid;
     try {
+      if (!eventModel.private && (eventModel.ticketPrice ?? 0) <= 0) {
+        final state = await PublicRegistrationService().status(eventModel.id);
+        if (current()) {
+          setState(() {
+            _isRsvped = state['status'] == 'confirmed';
+            _isRsvpStatusLoading = false;
+          });
+        }
+        return;
+      }
       final isRegistered = await FirebaseFirestoreHelper()
           .checkIfUserIsRegistered(eventModel.id);
-      if (mounted) {
+      if (current()) {
         setState(() {
           _isRsvped = isRegistered;
           _isRsvpStatusLoading = false; // Mark status loading as complete
         });
       }
     } catch (_) {
-      if (mounted) {
+      if (current()) {
         setState(() {
           _isRsvpStatusLoading =
               false; // Mark status loading as complete even on error
@@ -275,7 +361,21 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   }
 
   Future<void> _rsvpForEvent() async {
+    if (!eventModel.private && (eventModel.ticketPrice ?? 0) <= 0) {
+      await PublicRegistrationCard.showForm(context, eventModel);
+      await _checkRsvpStatus();
+      return;
+    }
     if (_isRsvpLoading) return;
+    if (AccountAccessService.isGuest) {
+      await showAccountRequiredSheet(
+        context: context,
+        feature: AccountFeature.registration,
+        sharedEventId: eventModel.id,
+        eventAction: 'rsvp',
+      );
+      return;
+    }
     final currentUser = CustomerController.logeInCustomer;
     if (currentUser == null) {
       ShowToast().showSnackBar('Please sign in to RSVP', context);
@@ -292,6 +392,13 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         await _unrsvpFromEvent();
       } else {
         // User wants to RSVP
+        ProductFunnelService().record(
+          'discovery_registration_start',
+          dimensions: {
+            'accessMode': 'rsvp',
+            'category': eventModel.categories.firstOrNull ?? 'uncategorized',
+          },
+        );
         // Avoid duplicate RSVP
         final already = await FirebaseFirestoreHelper().checkIfUserIsRegistered(
           eventModel.id,
@@ -324,8 +431,31 @@ class _SingleEventScreenState extends State<SingleEventScreen>
           });
         }
         if (mounted) {
-          ShowToast().showSnackBar("You've RSVP'd", context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text("You're registered"),
+              action: SnackBarAction(
+                label: 'My event pass',
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => AttendanceWalletPassScreen(
+                      eventId: eventModel.id,
+                      registrationId: _selectedRegistrationId,
+                      ticketId: _selectedTicketId,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
         }
+        ProductFunnelService().record(
+          'discovery_registration_complete',
+          dimensions: {
+            'accessMode': 'rsvp',
+            'category': eventModel.categories.firstOrNull ?? 'uncategorized',
+          },
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -376,8 +506,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     }
   }
 
-  bool isInInRadius(LatLng center, double radiusInFeet, LatLng point) {
-    double radiusInMeters = radiusInFeet * 0.3048; // Convert feet to meters
+  bool isInInRadius(LatLng center, double radiusInMeters, LatLng point) {
     double earthRadius = 6378137; // Earth's radius in meters
 
     double dLat = radians(point.latitude - center.latitude);
@@ -395,65 +524,24 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   }
 
   Future<void> getAttendance() async {
-    await FirebaseFirestoreHelper().checkIfUserIsSignedIn(eventModel.id).then((
-      value,
-    ) {
-      Logger.debug('Exist value is $value');
-
-      // Add mounted check before setState
-      if (!mounted) return;
-
-      setState(() {
-        signedIn = value;
-      });
-
-      // Only show sign-in dialog if user is not signed in and meets all conditions
-      // and hasn't just signed in (to prevent showing dialog immediately after sign-in)
-      if (!signedIn! &&
-          !_justSignedIn &&
-          eventModel.getLocation &&
-          eventModel.customerUid != CustomerController.logeInCustomer!.uid &&
-          isInEventInTime()) {
-        _getCurrentLocation();
-      }
-
-      // Check dwell tracking status if user is signed in
-      if (signedIn! && CustomerController.logeInCustomer != null) {
-        _checkDwellTrackingStatus();
-      }
-    });
-  }
-
-  /// Checks if dwell tracking is active for the current user
-  Future<void> _checkDwellTrackingStatus() async {
-    if (CustomerController.logeInCustomer == null) return;
-
-    try {
-      final attendanceList = await FirebaseFirestoreHelper().getAttendance(
-        eventId: eventModel.id,
-      );
-
-      final userAttendance = attendanceList.firstWhere(
-        (attendance) =>
-            attendance.customerUid == CustomerController.logeInCustomer!.uid,
-        orElse: () => AttendanceModel(
-          id: '',
-          userName: '',
-          eventId: '',
-          customerUid: '',
-          attendanceDateTime: DateTime.now(),
-          answers: [],
-        ),
-      );
-
-      if (mounted) {
-        setState(() {
-          _isDwellTrackingActive = userAttendance.isDwellActive;
-        });
-      }
-    } catch (e) {
-      Logger.error('Error checking dwell tracking status: $e');
+    if (AccountAccessService.isGuest ||
+        CustomerController.logeInCustomer == null) {
+      if (mounted) setState(() => signedIn = false);
+      return;
     }
+    await FirebaseFirestoreHelper()
+        .checkIfUserIsSignedIn(eventModel.id)
+        .timeout(const Duration(seconds: 12))
+        .then((value) {
+          Logger.debug('Exist value is $value');
+
+          // Add mounted check before setState
+          if (!mounted) return;
+
+          setState(() {
+            signedIn = value;
+          });
+        });
   }
 
   bool isInEventInTime() {
@@ -488,6 +576,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     return answer;
   }
 
+  // ignore: unused_element
   Future<void> _getCurrentLocation() async {
     bool serviceEnabled;
     LocationPermission permission;
@@ -511,6 +600,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
         'Location permissions are permanently denied, we cannot request permissions.',
       );
     }
+
+    if (!mounted) return;
 
     try {
       final position = await LocationHelper.getCurrentLocation(
@@ -837,51 +928,11 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   }
 
   Future<void> _performSignIn(AttendanceModel attendanceModel) async {
-    try {
-      Logger.debug('Saving attendance to Firestore...');
-      await FirebaseFirestore.instance
-          .collection(AttendanceModel.firebaseKey)
-          .doc(attendanceModel.id)
-          .set(attendanceModel.toJson());
-
-      Logger.debug('Attendance saved successfully!');
-      _btnCtlr.success();
-      ShowToast().showNormalToast(msg: 'Signed In Successfully!');
-
-      // Pop the sign-in dialog
-      if (!mounted) return;
-      if (Navigator.canPop(context)) {
-        Navigator.of(context).pop();
-      }
-
-      // Refresh event details to update UI
-
-      setState(() {
-        _justSignedIn = true;
-      });
-
-      // Reset the button and the flag after a delay
-      Future.delayed(const Duration(seconds: 2), () {
-        if (!mounted) return;
-        _btnCtlr.reset();
-        setState(() {
-          _justSignedIn = false;
-        });
-      });
-
-      // Automatically start dwell tracking if event has location enabled
-      // Since user has already granted location permission to sign in
-      if (eventModel.getLocation && !_isDwellTrackingActive) {
-        _startDwellTracking();
-      }
-    } catch (firestoreError) {
-      Logger.error('Firestore error during sign-in: $firestoreError');
-      _btnCtlr.error();
-      ShowToast().showNormalToast(
-        msg: 'Failed to save attendance: $firestoreError. Please try again.',
-      );
-      Future.delayed(const Duration(seconds: 2), () => _btnCtlr.reset());
-    }
+    _btnCtlr.reset();
+    ShowToast().showNormalToast(
+      msg:
+          'This older check-in path has expired. Scan the live venue QR or ask event staff for help.',
+    );
   }
 
   void _showSignInQuestionsModal(
@@ -1223,9 +1274,25 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   @override
   void initState() {
     super.initState();
+    _selectedRegistrationId = widget.registrationId;
+    _selectedTicketId = widget.ticketId;
+    _selectionUid = FirebaseAuth.instance.currentUser?.uid;
+    _selectionAuth = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (user?.uid != _selectionUid && mounted) {
+        setState(() {
+          _selectionUid = user?.uid;
+          _selectedRegistrationId = null;
+          _selectedTicketId = null;
+          _isRsvped = false;
+          _isRsvpStatusLoading = true;
+        });
+        _checkRsvpStatus();
+      }
+    });
 
     // Initialize event model
     eventModel = widget.eventModel;
+    unawaited(_loadCapabilities());
 
     // Initialize animation controllers first for immediate UI response
     _initAnimationControllers();
@@ -1244,8 +1311,27 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
     // Load data progressively to prevent UI blocking
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadDataProgressively();
+      _loadDataProgressively().then((_) => _handleInitialAction());
     });
+  }
+
+  Future<void> _handleInitialAction() async {
+    if (!mounted || _initialActionHandled) return;
+    _initialActionHandled = true;
+    if (eventModel.private || (eventModel.ticketPrice ?? 0) > 0) {
+      if (widget.initialAction != null) {
+        ShowToast().showSnackBar(
+          'Review the event and choose an action to continue.',
+          context,
+        );
+      }
+      return;
+    }
+    if (widget.initialAction == 'rsvp' && !eventModel.ticketsEnabled) {
+      await _rsvpForEvent();
+    } else if (widget.initialAction == 'ticket' && eventModel.ticketsEnabled) {
+      await _getTicket();
+    }
   }
 
   void _initAnimationControllers() {
@@ -1359,7 +1445,11 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     if (!mounted) return;
 
     // Load attendance status first (needed for sign-in functionality)
-    await getAttendance();
+    try {
+      await getAttendance();
+    } catch (_) {
+      if (mounted) setState(() => signedIn = false);
+    }
 
     // Small delay to prevent blocking
     await Future.delayed(const Duration(milliseconds: 50));
@@ -1458,7 +1548,10 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
   Future<void> _toggleFavorite() async {
     if (CustomerController.logeInCustomer == null) {
-      ShowToast().showNormalToast(msg: 'Please log in to save events');
+      await showAccountRequiredSheet(
+        context: context,
+        feature: AccountFeature.favorites,
+      );
       return;
     }
 
@@ -1633,6 +1726,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
   @override
   void dispose() {
+    _selectionAuth?.cancel();
     // Cancel debounce timer
     _streamDebounceTimer?.cancel();
 
@@ -1691,6 +1785,14 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       }
       return;
     }
+
+    ProductFunnelService().record(
+      'discovery_registration_start',
+      dimensions: {
+        'accessMode': 'ticket',
+        'category': eventModel.categories.firstOrNull ?? 'uncategorized',
+      },
+    );
 
     if (updateUI) {
       setState(() {
@@ -1817,8 +1919,31 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                               Navigator.pop(context);
                               RouterClass.nextScreenNormal(
                                 context,
-                                EditEventScreen(eventModel: eventModel),
+                                EventCreationExperienceGate(event: eventModel),
                               );
+                            },
+                          ),
+                          _CompactAction(
+                            icon: Icons.schedule,
+                            title: 'Reschedule',
+                            subtitle: 'Review and notify attendees',
+                            color: const Color(0xFF667EEA),
+                            onTap: () {
+                              Navigator.pop(context);
+                              RouterClass.nextScreenNormal(
+                                context,
+                                EventCreationExperienceGate(event: eventModel),
+                              );
+                            },
+                          ),
+                          _CompactAction(
+                            icon: Icons.copy_all_outlined,
+                            title: 'Duplicate',
+                            subtitle: 'Create a safe copy',
+                            color: const Color(0xFF475569),
+                            onTap: () {
+                              Navigator.pop(context);
+                              openDuplicateEventWizard(context, eventModel);
                             },
                           ),
                           _CompactAction(
@@ -1831,9 +1956,10 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => TicketManagementScreen(
-                                    eventModel: eventModel,
-                                  ),
+                                  builder: (context) =>
+                                      EventCreationExperienceGate(
+                                        event: eventModel,
+                                      ),
                                 ),
                               ).then((_) => _showEventManagementModal());
                             },
@@ -1858,25 +1984,24 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                           ),
                           _CompactAction(
                             icon: Icons.people,
-                            title: 'Attendance',
-                            subtitle: 'View Records',
+                            title: 'Check-in',
+                            subtitle: 'Live Console',
                             color: const Color(0xFFEC4899),
                             onTap: () {
                               Navigator.pop(context);
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => AttendanceSheetScreen(
-                                    eventModel: eventModel,
-                                  ),
+                                  builder: (context) =>
+                                      CheckInConsoleScreen(event: eventModel),
                                 ),
                               ).then((_) => _showEventManagementModal());
                             },
                           ),
                           _CompactAction(
                             icon: Icons.qr_code,
-                            title: 'Sign-In QR',
-                            subtitle: 'Share Code',
+                            title: 'Event Share QR',
+                            subtitle: 'Event Page',
                             color: const Color(0xFFFF9800),
                             onTap: () {
                               Navigator.pop(context);
@@ -1911,7 +2036,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) =>
-                                      const AttendeeNotificationScreen(),
+                                      AttendeeNotificationScreen(
+                                        eventId: eventModel.id,
+                                      ),
                                 ),
                               ).then((_) => _showEventManagementModal());
                             },
@@ -1967,12 +2094,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) =>
-                                      ChoseLocationInMapScreen(
-                                        selectedDateTime:
-                                            eventModel.selectedDateTime,
-                                        eventDurationHours:
-                                            eventModel.eventDuration,
-                                        eventModel: eventModel,
+                                      EventCreationExperienceGate(
+                                        event: eventModel,
                                       ),
                                 ),
                               );
@@ -2148,8 +2271,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                         ],
 
                         // Delete Event button at bottom of scrollable content
-                        if (eventModel.hasManagementPermissions(
-                          FirebaseAuth.instance.currentUser!.uid,
+                        if (_hasManagementPermissions(
+                          (FirebaseAuth.instance.currentUser?.uid ?? ''),
                         )) ...[
                           const SizedBox(height: 24),
                           Container(
@@ -2388,6 +2511,60 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   }
 
   Future<void> _shareEventDetails() async {
+    await showAttendUsBottomSheet<void>(
+      context: context,
+      title: 'Share event',
+      subtitle: 'Send a link that opens this event in Attendus.',
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.share_outlined),
+            title: const Text('Share event link'),
+            subtitle: const Text(
+              'Send through Messages, email, or another app',
+            ),
+            onTap: () async {
+              Navigator.of(context).pop();
+              try {
+                await EventShareService.shareLink(eventModel);
+              } catch (error) {
+                Logger.error('Unable to share event link', error);
+                if (!mounted) return;
+                ShowToast().showNormalToast(
+                  msg: 'Unable to open sharing. You can copy the link instead.',
+                );
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.link),
+            title: const Text('Copy link'),
+            subtitle: Text(
+              EventShareService.eventUri(eventModel.id).toString(),
+            ),
+            onTap: () async {
+              await EventShareService.copyLink(eventModel);
+              if (!mounted) return;
+              Navigator.of(context).pop();
+              ShowToast().showNormalToast(msg: 'Event link copied');
+            },
+          ),
+          if (!kIsWeb)
+            ListTile(
+              leading: const Icon(Icons.image_outlined),
+              title: const Text('Share flyer'),
+              subtitle: const Text('Generate an image with an event QR code'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _shareEventFlyerPreview();
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _shareEventFlyerPreview() async {
     final GlobalKey flyerKey = GlobalKey();
 
     try {
@@ -2497,87 +2674,115 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     GlobalKey flyerKey,
     BuildContext dialogContext,
   ) async {
-    File? flyerFile;
+    final origin = artifactShareOrigin(dialogContext);
     try {
-      // Generate the flyer image BEFORE closing the preview dialog
-      // This keeps the widget tree alive during capture
-      flyerFile = await EventFlyerGenerator.generateEventFlyer(
+      final flyer = await EventFlyerGenerator.generateEventFlyer(
         eventModel,
         flyerKey,
       );
-
-      // Close the preview dialog after successful generation
+      if (!mounted) return;
+      if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+      final outcome = await downloadArtifact(
+        flyer,
+        'event_flyer_${eventModel.id}.png',
+        'image/png',
+        sharePositionOrigin: origin,
+      );
+      if (mounted) ShowToast().showNormalToast(msg: outcome.message);
+    } catch (error) {
       if (mounted) {
-        Navigator.of(dialogContext).pop();
+        ShowToast().showNormalToast(
+          msg: 'Failed to generate event flyer. Please try again.',
+        );
       }
-
-      // Share the flyer image
-      await Share.shareXFiles(
-        [XFile(flyerFile.path)],
-        text:
-            '${eventModel.title}\n\nJoin us at: https://attendus.app/event/${eventModel.id}',
-      );
-
-      // Clean up the temporary file after sharing
-      try {
-        await flyerFile.delete();
-      } catch (e) {
-        // Ignore cleanup errors
-      }
-    } catch (e) {
-      print('Error in _generateAndShareFlyer: $e');
-
-      // Close the preview dialog if still open
-      if (mounted && Navigator.of(dialogContext).canPop()) {
-        Navigator.of(dialogContext).pop();
-      }
-
-      // Show error message
-      ShowToast().showNormalToast(
-        msg: 'Failed to generate event flyer. Please try again.',
-      );
-
-      // Clean up file if it was created
-      if (flyerFile != null) {
-        try {
-          await flyerFile.delete();
-        } catch (e) {
-          // Ignore cleanup errors
-        }
-      }
-
-      // Fallback to text sharing
-      final eventUrl = 'https://attendus.app/event/${eventModel.id}';
-      final shareText =
-          '''
-${eventModel.title}
-
-${eventModel.description}
-
-📅 ${DateFormat('EEEE, MMMM d, y').format(eventModel.selectedDateTime)}
-⏰ ${DateFormat('h:mm a').format(eventModel.selectedDateTime)} – ${DateFormat('h:mm a').format(eventModel.eventEndTime)}
-📍 ${eventModel.location}
-
-Join us at: $eventUrl
-''';
-
-      Share.share(shareText);
     }
   }
 
   void _handleSignIn() {
-    // Check if already signed in
-    if (signedIn == null || signedIn!) {
+    if (signedIn == null) {
+      ShowToast().showNormalToast(
+        msg: 'Checking attendance. Please retry in a moment.',
+      );
+      return;
+    }
+    if (signedIn!) {
+      if (eventModel.checkInPolicy.checkoutEnabled) {
+        _handleAttendeeCheckout();
+        return;
+      }
       ShowToast().showNormalToast(
         msg: 'You\'re already signed in for this event.',
       );
       return;
     }
 
-    // Show sign-in method selector
-    _showSignInMethodSelector();
+    if (eventModel.checkInPolicy.needsOrganizerReview) {
+      ShowToast().showNormalToast(
+        msg: 'The organizer must review this event’s arrival settings.',
+      );
+      return;
+    }
+    if (eventModel.checkInPolicy.profile == CheckInProfile.staffEntry) {
+      if (GuestModeService().isGuestMode ||
+          FirebaseAuth.instance.currentUser?.isAnonymous == true) {
+        ShowToast().showNormalToast(
+          msg: 'Ask event staff to check you in from the roster.',
+        );
+        return;
+      }
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PersonalAttendancePassScreen(
+            event: eventModel,
+            registrationId: _selectedRegistrationId,
+            ticketId: _selectedTicketId,
+          ),
+        ),
+      );
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const QRScannerFlowScreen()),
+    );
   }
 
+  Future<void> _handleAttendeeCheckout() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.isAnonymous) {
+      ShowToast().showNormalToast(msg: 'Ask event staff to check you out.');
+      return;
+    }
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('Attendance')
+          .where('eventId', isEqualTo: eventModel.id)
+          .where('customerUid', isEqualTo: user.uid)
+          .limit(1)
+          .get();
+      if (snapshot.docs.isEmpty) {
+        throw StateError('Your active attendance record was not found.');
+      }
+      final sessionId = snapshot.docs.first.data()['sessionId']?.toString();
+      if (sessionId == null || sessionId.isEmpty) {
+        throw StateError('This older attendance record cannot be checked out.');
+      }
+      await _attendanceCheckInService.checkout(
+        eventId: eventModel.id,
+        sessionId: sessionId,
+      );
+      if (!mounted) return;
+      setState(() => signedIn = false);
+      ShowToast().showNormalToast(msg: 'Checked out successfully.');
+    } catch (error) {
+      ShowToast().showNormalToast(msg: error.toString());
+    }
+  }
+
+  // Retained only for reading legacy attendance records; Attendance 2.0 no
+  // longer presents a technical method-selection sheet to attendees.
+  // ignore: unused_element
   void _showSignInMethodSelector() {
     final availableMethods = eventModel.getAvailableSignInMethods();
 
@@ -2772,17 +2977,56 @@ Join us at: $eventUrl
         );
         break;
       case 'geofence':
-        // Geofence is handled automatically by location services
-        ShowToast().showNormalToast(
-          msg:
-              'Geofence sign-in is automatic when you\'re near the event location.',
-        );
+        _handleGuestGeofenceSignIn();
         break;
+    }
+  }
+
+  Future<void> _handleGuestGeofenceSignIn() async {
+    if (!GuestModeService().isGuestMode) {
+      ShowToast().showNormalToast(
+        msg: 'Geofence check-in starts automatically near the event location.',
+      );
+      return;
+    }
+    try {
+      final position = await LocationHelper.getCurrentLocation(
+        context: context,
+        showErrorDialog: true,
+      );
+      if (position == null || !mounted) return;
+      final fullName = await GuestAttendanceService().promptForFullName(
+        context,
+      );
+      if (fullName == null || !mounted) return;
+      await GuestAttendanceService().submit(
+        eventId: eventModel.id,
+        method: 'geofence',
+        fullName: fullName,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        accuracyMeters: position.accuracy,
+      );
+      ShowToast().showNormalToast(msg: 'Signed in successfully!');
+    } on GuestAttendanceException catch (error) {
+      ShowToast().showNormalToast(msg: error.message);
+    } catch (error) {
+      Logger.error('Guest geofence check-in failed', error);
+      ShowToast().showNormalToast(
+        msg: 'Location check-in is temporarily unavailable.',
+      );
     }
   }
 
   /// Handles the Most Secure sign-in method (geofence + facial recognition)
   void _handleMostSecureSignIn() async {
+    if (!SafetyFlags.biometricCheckInEnabled) {
+      ShowToast().showNormalToast(
+        msg:
+            'Facial check-in is unavailable. Ask the organizer for another check-in method.',
+      );
+      return;
+    }
     // Check if user is logged in
     if (FirebaseAuth.instance.currentUser == null) {
       ShowToast().showNormalToast(
@@ -2843,6 +3087,13 @@ Join us at: $eventUrl
   }
 
   void _handleFacialRecognitionSignIn() async {
+    if (!SafetyFlags.biometricCheckInEnabled) {
+      ShowToast().showNormalToast(
+        msg:
+            'Facial check-in is unavailable. Ask the organizer for another check-in method.',
+      );
+      return;
+    }
     // Prevent multiple simultaneous facial recognition flows
     if (_isFacialRecognitionInProgress) {
       Logger.debug('Facial recognition already in progress, skipping');
@@ -2909,6 +3160,13 @@ Join us at: $eventUrl
 
   /// Handle facial recognition sign-in triggered from geofence popup
   void _handleGeofenceFacialRecognitionSignIn() async {
+    if (!SafetyFlags.biometricCheckInEnabled) {
+      ShowToast().showNormalToast(
+        msg:
+            'Facial check-in is unavailable. Ask the organizer for another check-in method.',
+      );
+      return;
+    }
     // Prevent multiple simultaneous facial recognition flows
     if (_isFacialRecognitionInProgress) {
       Logger.debug('Facial recognition already in progress, skipping');
@@ -2986,88 +3244,7 @@ Join us at: $eventUrl
 
   /// Complete the sign-in after successful facial recognition
   Future<void> _completeFacialRecognitionSignIn() async {
-    try {
-      if (CustomerController.logeInCustomer == null) {
-        ShowToast().showNormalToast(msg: 'Please log in to sign in.');
-        return;
-      }
-
-      // Create attendance record
-      final docId =
-          '${eventModel.id}-${CustomerController.logeInCustomer!.uid}';
-
-      final attendanceModel = AttendanceModel(
-        id: docId,
-        eventId: eventModel.id,
-        userName: _isAnonymousSignIn
-            ? 'Anonymous'
-            : CustomerController.logeInCustomer!.name,
-        customerUid: CustomerController.logeInCustomer!.uid,
-        attendanceDateTime: DateTime.now(),
-        answers: [],
-        isAnonymous: _isAnonymousSignIn,
-        signInMethod: 'location_facial_recognition',
-        realName: _isAnonymousSignIn
-            ? CustomerController.logeInCustomer!.name
-            : null,
-        dwellNotes: 'Geofence + Facial Recognition sign-in',
-        entryTimestamp: eventModel.getLocation ? DateTime.now() : null,
-        dwellStatus: eventModel.getLocation ? 'active' : null,
-      );
-
-      // Check for sign-in questions first
-      final eventQuestions = await FirebaseFirestoreHelper().getEventQuestions(
-        eventId: eventModel.id,
-      );
-
-      if (eventQuestions.isNotEmpty) {
-        // Navigate to questions screen
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => AnsQuestionsToSignInEventScreen(
-                eventModel: eventModel,
-                newAttendance: attendanceModel,
-                nextPageRoute: 'event_details',
-              ),
-            ),
-          );
-        }
-      } else {
-        // Direct sign-in without questions
-        await FirebaseFirestore.instance
-            .collection(AttendanceModel.firebaseKey)
-            .doc(docId)
-            .set(attendanceModel.toJson());
-
-        ShowToast().showNormalToast(
-          msg: 'Successfully signed in with location + facial recognition!',
-        );
-
-        // Set flag to prevent showing dialog again immediately
-        setState(() {
-          _justSignedIn = true;
-        });
-
-        // Refresh attendance status
-        await getAttendance();
-
-        // Clear the flag after a delay
-        Future.delayed(const Duration(seconds: 3), () {
-          if (mounted) {
-            setState(() {
-              _justSignedIn = false;
-            });
-          }
-        });
-      }
-    } catch (e) {
-      Logger.error('Error completing facial recognition sign-in: $e');
-      ShowToast().showNormalToast(
-        msg: 'Failed to complete sign-in. Please try again.',
-      );
-    }
+    ShowToast().showNormalToast(msg: SafetyFlags.biometricMaintenanceMessage);
   }
 
   /// Show face enrollment dialog for geofence sign-in
@@ -3352,44 +3529,75 @@ Join us at: $eventUrl
   }
 
   void _openGoogleCalendar() async {
-    final eventUrl = Uri.encodeFull('''
-https://calendar.google.com/calendar/render?action=TEMPLATE&text=${Uri.encodeComponent(eventModel.title)}&dates=${DateFormat('yyyyMMddTHHmmss').format(eventModel.selectedDateTime)}/${DateFormat('yyyyMMddTHHmmss').format(eventModel.eventEndTime)}&details=${Uri.encodeComponent(eventModel.description)}&location=${Uri.encodeComponent(eventModel.location)}
-''');
-
-    if (await canLaunchUrl(Uri.parse(eventUrl))) {
-      await launchUrl(Uri.parse(eventUrl));
-    } else {
-      ShowToast().showNormalToast(msg: 'Could not open Google Calendar');
+    final end = eventModel.schedule.end;
+    if (end == null) {
+      ShowToast().showNormalToast(
+        msg: 'Ask the organizer to confirm the end time.',
+      );
+      return;
     }
+    await launchUrl(
+      Uri.https('calendar.google.com', '/calendar/render', {
+        'action': 'TEMPLATE',
+        'text': eventModel.title,
+        'dates':
+            '${EventSchedule.compact(eventModel.selectedDateTime)}/${EventSchedule.compact(end)}',
+        'details': eventModel.description,
+        'location': eventModel.location,
+      }),
+    );
   }
 
   void _openAppleCalendar() async {
-    final eventUrl = Uri.encodeFull('''
-https://calendar.google.com/calendar/render?action=TEMPLATE&text=${Uri.encodeComponent(eventModel.title)}&dates=${DateFormat('yyyyMMddTHHmmss').format(eventModel.selectedDateTime)}/${DateFormat('yyyyMMddTHHmmss').format(eventModel.eventEndTime)}&details=${Uri.encodeComponent(eventModel.description)}&location=${Uri.encodeComponent(eventModel.location)}
-''');
-
-    if (await canLaunchUrl(Uri.parse(eventUrl))) {
-      await launchUrl(Uri.parse(eventUrl));
-    } else {
-      ShowToast().showNormalToast(msg: 'Could not open Apple Calendar');
+    try {
+      final value = EventShareService.calendarText(eventModel);
+      final outcome = await downloadArtifact(
+        Uint8List.fromList(utf8.encode(value)),
+        'attendus-event.ics',
+        'text/calendar',
+        sharePositionOrigin: artifactShareOrigin(context),
+      );
+      if (mounted) ShowToast().showNormalToast(msg: outcome.message);
+    } catch (_) {
+      ShowToast().showNormalToast(
+        msg:
+            'Could not export the calendar. Check the event schedule and retry.',
+      );
     }
   }
 
   void _openOutlookCalendar() async {
-    final eventUrl = Uri.encodeFull('''
-https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeComponent(eventModel.title)}&body=${Uri.encodeComponent(eventModel.description)}&startdt=${DateFormat('yyyy-MM-ddTHH:mm:ss').format(eventModel.selectedDateTime)}&enddt=${DateFormat('yyyy-MM-ddTHH:mm:ss').format(eventModel.eventEndTime)}
-''');
-
-    if (await canLaunchUrl(Uri.parse(eventUrl))) {
-      await launchUrl(Uri.parse(eventUrl));
-    } else {
-      ShowToast().showNormalToast(msg: 'Could not open Outlook Calendar');
+    final end = eventModel.schedule.end;
+    if (end == null) {
+      ShowToast().showNormalToast(
+        msg: 'Ask the organizer to confirm the end time.',
+      );
+      return;
     }
+    await launchUrl(
+      Uri.https('outlook.live.com', '/calendar/0/deeplink/compose', {
+        'subject': eventModel.title,
+        'body': eventModel.description,
+        'startdt': eventModel.selectedDateTime.toUtc().toIso8601String(),
+        'enddt': end.toUtc().toIso8601String(),
+        'location': eventModel.location,
+      }),
+    );
   }
 
   Future<void> _getTicket() async {
+    if (!eventModel.private && (eventModel.ticketPrice ?? 0) <= 0) {
+      await PublicRegistrationCard.showForm(context, eventModel);
+      await _checkRsvpStatus();
+      return;
+    }
     if (CustomerController.logeInCustomer == null) {
-      ShowToast().showNormalToast(msg: 'Please log in to get a ticket');
+      await showAccountRequiredSheet(
+        context: context,
+        feature: AccountFeature.tickets,
+        sharedEventId: eventModel.id,
+        eventAction: 'ticket',
+      );
       return;
     }
 
@@ -3406,16 +3614,20 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
     try {
       // Check if the event has a ticket price
       if (eventModel.ticketPrice != null && eventModel.ticketPrice! > 0) {
+        if (!SafetyFlags.paidCheckoutEnabled) {
+          if (mounted) {
+            setState(() => _isGettingTicket = false);
+          }
+          ShowToast().showNormalToast(
+            msg: SafetyFlags.paymentMaintenanceMessage,
+          );
+          return;
+        }
         // Handle paid ticket
         await _purchaseTicket();
       } else {
         // Handle free ticket
-        await FirebaseFirestoreHelper().issueTicket(
-          customerUid: CustomerController.logeInCustomer!.uid,
-          eventId: eventModel.id,
-          customerName: CustomerController.logeInCustomer!.name,
-          eventModel: eventModel,
-        );
+        await TicketIssuanceService.issueFreeTicket(eventId: eventModel.id);
 
         if (mounted) {
           setState(() {
@@ -3423,6 +3635,13 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
           });
 
           ShowToast().showNormalToast(msg: 'Ticket obtained successfully!');
+          ProductFunnelService().record(
+            'discovery_registration_complete',
+            dimensions: {
+              'accessMode': 'ticket',
+              'category': eventModel.categories.firstOrNull ?? 'uncategorized',
+            },
+          );
           // Refresh ticket status
           checkUserTicket(updateUI: true);
         }
@@ -3461,22 +3680,10 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
 
   Future<void> _purchaseTicket() async {
     try {
-      // Create a temporary ticket ID
-      final ticketId = FirebaseFirestore.instance
-          .collection('Tickets')
-          .doc()
-          .id;
-
       // Create payment intent
       final paymentData = await TicketPaymentService.createTicketPaymentIntent(
         eventId: eventModel.id,
-        ticketId: ticketId,
-        amount: eventModel.ticketPrice!,
-        customerUid: CustomerController.logeInCustomer!.uid,
-        customerName: CustomerController.logeInCustomer!.name,
-        customerEmail: CustomerController.logeInCustomer!.email,
-        creatorUid: eventModel.customerUid,
-        eventTitle: eventModel.title,
+        ticketTypeId: 'general',
       );
 
       // Process payment
@@ -3486,28 +3693,22 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
       );
 
       if (paymentSuccess) {
-        // Confirm payment and issue ticket
-        await TicketPaymentService.confirmTicketPayment(
-          paymentIntentId: paymentData['paymentIntentId'],
-          ticketId: ticketId,
-          eventId: eventModel.id,
+        ProductFunnelService().record(
+          'discovery_registration_complete',
+          dimensions: {
+            'accessMode': 'ticket',
+            'category': eventModel.categories.firstOrNull ?? 'uncategorized',
+          },
         );
-
-        // Issue the paid ticket
-        await TicketPaymentService.issuePaidTicket(
-          eventId: eventModel.id,
-          customerUid: CustomerController.logeInCustomer!.uid,
-          customerName: CustomerController.logeInCustomer!.name,
-          eventModel: eventModel,
-          paymentIntentId: paymentData['paymentIntentId'],
-        );
-
         if (mounted) {
           setState(() {
             _isGettingTicket = false;
           });
 
-          ShowToast().showNormalToast(msg: 'Ticket purchased successfully!');
+          ShowToast().showNormalToast(
+            msg:
+                'Payment received. Your ticket will appear after verification.',
+          );
           // Refresh ticket status
           checkUserTicket(updateUI: true);
 
@@ -3638,8 +3839,8 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
       selectedBottomNavIndex: 1, // Groups tab
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       floatingActionButton:
-          eventModel.hasManagementPermissions(
-            FirebaseAuth.instance.currentUser!.uid,
+          eventModel.hasCheckInPermissions(
+            (FirebaseAuth.instance.currentUser?.uid ?? ''),
           )
           ? _buildFloatingActionButton()
           : null,
@@ -3650,10 +3851,19 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
   }
 
   Widget _buildFloatingActionButton() {
+    final userId = (FirebaseAuth.instance.currentUser?.uid ?? '');
+    final organizer = _hasManagementPermissions(userId);
     return FloatingActionButton.extended(
-      onPressed: _showEventManagementModal,
-      icon: const Icon(Icons.dashboard_outlined),
-      label: const Text('Manage event'),
+      onPressed: organizer
+          ? _showEventManagementModal
+          : () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CheckInConsoleScreen(event: eventModel),
+              ),
+            ),
+      icon: Icon(organizer ? Icons.dashboard_outlined : Icons.qr_code_scanner),
+      label: Text(organizer ? 'Manage event' : 'Door console'),
     );
   }
 
@@ -3666,7 +3876,24 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
           children: [
             _headerView(),
             Expanded(child: _contentView()),
-            // Remove the large action buttons section from bottom
+            if (_screenWidth < 768 &&
+                !eventModel.private &&
+                (eventModel.ticketPrice ?? 0) <= 0 &&
+                !_hasManagementPermissions(
+                  FirebaseAuth.instance.currentUser?.uid ?? '',
+                ))
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: PublicRegistrationCard(
+                  key: ValueKey('mobile-${eventModel.id}'),
+                  event: eventModel,
+                  onCheckIn: _handleSignIn,
+                  registrationId: _selectedRegistrationId,
+                  ticketId: _selectedTicketId,
+                  onAdmissionSelected: _selectAdmission,
+                  onViewPass: _openSelectedAttendancePass,
+                ),
+              ),
           ],
         ),
       ),
@@ -3675,8 +3902,8 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
 
   Widget _headerView() {
     final theme = Theme.of(context);
-    final isManager = eventModel.hasManagementPermissions(
-      FirebaseAuth.instance.currentUser!.uid,
+    final isManager = _hasManagementPermissions(
+      (FirebaseAuth.instance.currentUser?.uid ?? ''),
     );
     return Container(
       width: double.infinity,
@@ -3707,9 +3934,17 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                 ),
                 if (!isManager)
                   IconButton(
-                    tooltip: 'Check in',
+                    tooltip:
+                        signedIn == true &&
+                            eventModel.checkInPolicy.checkoutEnabled
+                        ? 'Check out'
+                        : 'Check in',
                     onPressed: _handleSignIn,
-                    icon: const Icon(Icons.fact_check_outlined),
+                    icon:
+                        signedIn == true &&
+                            eventModel.checkInPolicy.checkoutEnabled
+                        ? const Icon(Icons.logout)
+                        : const Icon(Icons.fact_check_outlined),
                   ),
                 IconButton(
                   tooltip: 'Add to calendar',
@@ -3913,6 +4148,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         _buildPrimaryActionSection(),
         const SizedBox(height: 18),
         _buildModernEventDetailsCard(),
+        EventPracticalDetails(event: eventModel),
         const SizedBox(height: 18),
         if (eventModel.categories.isNotEmpty) ...[
           _buildModernCategoriesCard(),
@@ -3947,6 +4183,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
           child: Column(
             children: [
               _buildModernEventDetailsCard(),
+              EventPracticalDetails(event: eventModel),
               const SizedBox(height: 18),
               _buildSecondaryEventSections(),
             ],
@@ -3999,14 +4236,14 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
   Widget _buildPrimaryActionSection() {
     return AttendUsPageSection(
       title:
-          eventModel.hasManagementPermissions(
-            FirebaseAuth.instance.currentUser!.uid,
+          _hasManagementPermissions(
+            (FirebaseAuth.instance.currentUser?.uid ?? ''),
           )
           ? 'Organizer actions'
           : 'Attend this event',
       subtitle:
-          eventModel.hasManagementPermissions(
-            FirebaseAuth.instance.currentUser!.uid,
+          _hasManagementPermissions(
+            (FirebaseAuth.instance.currentUser?.uid ?? ''),
           )
           ? 'Manage check-in, tickets, quiz, analytics, and event settings.'
           : 'RSVP, get a ticket, or check in when the event is ready.',
@@ -4020,15 +4257,49 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             _buildLiveQuizCard(),
             const SizedBox(height: 14),
           ],
-          _buildRsvpButton(),
-          if (!eventModel.hasManagementPermissions(
-            FirebaseAuth.instance.currentUser!.uid,
-          )) ...[
-            const SizedBox(height: 14),
-            _buildTabbedContentSection(),
+          if (!eventModel.private &&
+              (eventModel.ticketPrice ?? 0) <= 0 &&
+              !_hasManagementPermissions(
+                FirebaseAuth.instance.currentUser?.uid ?? '',
+              )) ...[
+            if (_screenWidth >= 768)
+              PublicRegistrationCard(
+                key: ValueKey(eventModel.id),
+                event: eventModel,
+                onCheckIn: _handleSignIn,
+                registrationId: _selectedRegistrationId,
+                ticketId: _selectedTicketId,
+                onAdmissionSelected: _selectAdmission,
+                onViewPass: _openSelectedAttendancePass,
+              ),
+          ] else ...[
+            _buildRsvpButton(),
+            if (!_hasManagementPermissions(
+              (FirebaseAuth.instance.currentUser?.uid ?? ''),
+            )) ...[
+              const SizedBox(height: 14),
+              _buildAttendancePrimaryAction(),
+              if (eventModel.checkInPolicy.smartArrivalEnabled)
+                SmartArrivalCard(eventId: eventModel.id),
+              TextButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => AttendanceWalletPassScreen(
+                      eventId: eventModel.id,
+                      registrationId: _selectedRegistrationId,
+                      ticketId: _selectedTicketId,
+                    ),
+                  ),
+                ),
+                icon: const Icon(Icons.wallet_outlined),
+                label: const Text('My event pass'),
+              ),
+              const SizedBox(height: 14),
+              _buildTabbedContentSection(),
+            ],
           ],
-          if (eventModel.hasManagementPermissions(
-            FirebaseAuth.instance.currentUser!.uid,
+          if (_hasManagementPermissions(
+            (FirebaseAuth.instance.currentUser?.uid ?? ''),
           )) ...[
             const SizedBox(height: 14),
             AttendUsButton.primary(
@@ -4039,6 +4310,33 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildAttendancePrimaryAction() {
+    final isGuest =
+        GuestModeService().isGuestMode ||
+        FirebaseAuth.instance.currentUser?.isAnonymous == true;
+    final String label;
+    final IconData icon;
+    if (signedIn == true) {
+      label = eventModel.checkInPolicy.checkoutEnabled
+          ? 'Check out'
+          : 'Checked in';
+      icon = eventModel.checkInPolicy.checkoutEnabled
+          ? Icons.logout
+          : Icons.check_circle;
+    } else if (eventModel.checkInPolicy.profile == CheckInProfile.staffEntry) {
+      label = isGuest ? 'Ask staff to check you in' : 'Show my pass';
+      icon = isGuest ? Icons.support_agent : Icons.badge_outlined;
+    } else {
+      label = 'Check in';
+      icon = Icons.fact_check_outlined;
+    }
+    return AttendUsButton.primary(
+      label: label,
+      icon: icon,
+      onPressed: _handleSignIn,
     );
   }
 
@@ -4133,18 +4431,17 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
           const SizedBox(height: 16),
           AttendUsListTile(
             leadingIcon: Icons.calendar_month_rounded,
-            title: DateFormat(
-              'EEEE, MMMM d, yyyy',
-            ).format(eventModel.selectedDateTime),
+            title: eventModel.schedule.dateLabel,
             subtitle: 'Date',
             dense: true,
           ),
           const SizedBox(height: 10),
           AttendUsListTile(
             leadingIcon: Icons.access_time_rounded,
-            title:
-                '${DateFormat('h:mm a').format(eventModel.selectedDateTime)} - ${DateFormat('h:mm a').format(eventModel.eventEndTime)}',
-            subtitle: 'Time',
+            title: eventModel.schedule.timeLabel,
+            subtitle: eventModel.locationType == 'online'
+                ? 'Your time: ${eventModel.schedule.localLabel}'
+                : 'Event time',
             dense: true,
           ),
           const SizedBox(height: 10),
@@ -4165,9 +4462,11 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               style: theme.textTheme.bodyLarge,
             ),
           ),
-          if (!eventModel.hasManagementPermissions(
-            FirebaseAuth.instance.currentUser!.uid,
-          )) ...[
+          if (signedIn == true &&
+              DateTime.now().isAfter(eventModel.eventEndTime) &&
+              !_hasManagementPermissions(
+                (FirebaseAuth.instance.currentUser?.uid ?? ''),
+              )) ...[
             const SizedBox(height: 16),
             _buildFeedbackButton(),
           ],
@@ -4192,51 +4491,6 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         ],
       ),
     );
-  }
-
-  Future<void> _startDwellTracking() async {
-    if (CustomerController.logeInCustomer == null) {
-      ShowToast().showNormalToast(
-        msg: 'Please log in to enable dwell tracking',
-      );
-      return;
-    }
-
-    try {
-      await DwellTimeTracker.startDwellTracking(eventModel.id);
-      // Start monitoring location to track exit/away automatically
-      DwellTimeTracker.startLocationMonitoring(eventModel.id);
-
-      if (mounted) {
-        setState(() {
-          _isDwellTrackingActive = true;
-        });
-      }
-
-      ShowToast().showNormalToast(msg: 'Dwell tracking started');
-    } catch (e) {
-      ShowToast().showNormalToast(msg: 'Failed to start dwell tracking: $e');
-    }
-  }
-
-  // ignore: unused_element
-  Future<void> _stopDwellTracking() async {
-    if (CustomerController.logeInCustomer == null) return;
-
-    try {
-      await DwellTimeTracker.stopDwellTracking(eventModel.id);
-
-      if (mounted) {
-        setState(() {
-          _isDwellTrackingActive = false;
-          _dwellStatusMessage = '';
-        });
-      }
-
-      ShowToast().showNormalToast(msg: 'Dwell tracking stopped');
-    } catch (e) {
-      ShowToast().showNormalToast(msg: 'Failed to stop dwell tracking: $e');
-    }
   }
 
   Widget _buildEventImage() {
@@ -4272,12 +4526,12 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(24),
-                child: CachedNetworkImage(
+                child: AttendUsEventImage(
                   imageUrl: eventModel.imageUrl,
                   fit: BoxFit.cover,
                   width: double.infinity,
                   height: 220,
-                  placeholder: (context, url) => Container(
+                  loadingBuilder: (context) => Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
@@ -4307,7 +4561,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                       ),
                     ),
                   ),
-                  errorWidget: (context, url, error) => Container(
+                  errorBuilder: (context, retry) => Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
@@ -4350,6 +4604,12 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                               fontSize: 14,
                               fontFamily: 'Roboto',
                             ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextButton.icon(
+                            onPressed: retry,
+                            icon: const Icon(Icons.refresh, size: 18),
+                            label: const Text('Retry'),
                           ),
                         ],
                       ),
@@ -4657,8 +4917,8 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
               ),
               const SizedBox(height: 20),
               // Feedback Button (for attendees only)
-              if (!eventModel.hasManagementPermissions(
-                FirebaseAuth.instance.currentUser!.uid,
+              if (!_hasManagementPermissions(
+                (FirebaseAuth.instance.currentUser?.uid ?? ''),
               ))
                 _buildFeedbackButton(),
             ],
@@ -4990,7 +5250,14 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
         return GestureDetector(
           onTap: hasSubmittedFeedback
               ? null
-              : () {
+              : () async {
+                  if (AccountAccessService.isGuest) {
+                    await showAccountRequiredSheet(
+                      context: context,
+                      feature: AccountFeature.feedback,
+                    );
+                    return;
+                  }
                   RouterClass.nextScreenNormal(
                     context,
                     EventFeedbackScreen(eventModel: eventModel),
@@ -5703,7 +5970,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
   Widget _buildRsvpButton() {
     // Hide for event managers
     final String uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-    final bool isManager = eventModel.hasManagementPermissions(uid);
+    final bool isManager = _hasManagementPermissions(uid);
     if (isManager) return const SizedBox.shrink();
 
     return Container(
@@ -5859,8 +6126,8 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
-          if (eventModel.hasManagementPermissions(
-            FirebaseAuth.instance.currentUser!.uid,
+          if (_hasManagementPermissions(
+            (FirebaseAuth.instance.currentUser?.uid ?? ''),
           ))
             SizedBox(
               width: double.infinity,
@@ -5869,7 +6136,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                   Navigator.pop(context);
                   RouterClass.nextScreenNormal(
                     context,
-                    EditEventScreen(eventModel: eventModel),
+                    EventCreationExperienceGate(event: eventModel),
                   );
                 },
                 icon: const Icon(Icons.edit, size: 18),
@@ -6001,7 +6268,7 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
                                     .getSingleCustomer(
                                       customerId: attendee.customerUid,
                                     );
-                                if (customer != null && mounted) {
+                                if (customer != null && context.mounted) {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
@@ -6517,6 +6784,14 @@ https://outlook.live.com/calendar/0/deeplink/compose?subject=${Uri.encodeCompone
             icon: const Icon(Icons.lock_open),
             label: const Text('Request Access'),
             onPressed: () async {
+              if (AccountAccessService.isGuest) {
+                await showAccountRequiredSheet(
+                  context: context,
+                  feature: AccountFeature.accessRequest,
+                  sharedEventId: eventModel.id,
+                );
+                return;
+              }
               await FirebaseFirestoreHelper().requestEventAccess(
                 eventId: eventModel.id,
               );

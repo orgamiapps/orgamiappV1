@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:attendus/models/payment_model.dart';
 import 'package:attendus/Utils/logger.dart';
+import 'package:attendus/config/safety_flags.dart';
 
 class PaymentService {
   static final FirebaseFunctions _functions = FirebaseFunctions.instance;
@@ -20,23 +21,17 @@ class PaymentService {
   static Future<Map<String, dynamic>> createPaymentIntent({
     required String eventId,
     required int durationDays,
-    required String customerUid,
   }) async {
+    if (!SafetyFlags.eventFeaturingEnabled) {
+      throw StateError(SafetyFlags.paymentMaintenanceMessage);
+    }
     try {
       Logger.debug('Creating payment intent for event: $eventId');
-
-      // Calculate amount based on duration
-      final amount = FeaturePaymentModel.getPriceForDays(durationDays);
-      final amountInCents = (amount * 100)
-          .round(); // Convert to cents for Stripe
 
       final callable = _functions.httpsCallable('createFeaturePaymentIntent');
       final result = await callable.call({
         'eventId': eventId,
-        'durationDays': durationDays,
-        'customerUid': customerUid,
-        'amount': amountInCents,
-        'currency': 'usd',
+        'featurePlanId': 'days_$durationDays',
       });
 
       Logger.debug('Payment intent created successfully');
@@ -55,6 +50,7 @@ class PaymentService {
     required String clientSecret,
     required String eventId,
   }) async {
+    if (!SafetyFlags.eventFeaturingEnabled) return false;
     try {
       Logger.debug('Initializing payment sheet');
 
@@ -101,22 +97,9 @@ class PaymentService {
     required int durationDays,
     required bool untilEvent,
   }) async {
-    try {
-      Logger.debug('Confirming feature payment for event: $eventId');
-
-      final callable = _functions.httpsCallable('confirmFeaturePayment');
-      await callable.call({
-        'paymentIntentId': paymentIntentId,
-        'eventId': eventId,
-        'durationDays': durationDays,
-        'untilEvent': untilEvent,
-      });
-
-      Logger.success('Feature payment confirmed');
-    } catch (e) {
-      Logger.error('Failed to confirm feature payment: $e', e);
-      throw Exception('Failed to confirm payment: ${e.toString()}');
-    }
+    throw UnsupportedError(
+      'Client feature confirmation is disabled. Feature status is webhook-owned.',
+    );
   }
 
   /// Get payment history for a user

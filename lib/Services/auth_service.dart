@@ -9,8 +9,10 @@ import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Services/firebase_initializer.dart';
 import 'package:attendus/firebase/firebase_google_auth_helper.dart';
+import 'package:attendus/firebase/firebase_messaging_helper.dart';
 import 'package:attendus/Utils/firebase_retry_helper.dart';
 import 'package:attendus/Services/guest_mode_service.dart';
+import 'package:attendus/Services/product_funnel_service.dart';
 import 'package:attendus/Services/navigation_state_service.dart';
 
 /// Authentication service that handles persistent login functionality
@@ -18,11 +20,54 @@ import 'package:attendus/Services/navigation_state_service.dart';
 class AuthService extends ChangeNotifier {
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
-  AuthService._internal();
+  AuthService._internal()
+    : _authOverride = null,
+      _storageOverride = null,
+      _loadCustomerOverride = null,
+      _initializeFirebaseOverride = null,
+      _onAuthenticatedSessionOverride = null,
+      _onLogoutOverride = null;
 
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  @visibleForTesting
+  AuthService.forTesting({
+    required FirebaseAuth auth,
+    required FlutterSecureStorage storage,
+    required Future<CustomerModel?> Function(String) loadCustomer,
+    Future<void> Function()? initializeFirebase,
+    Future<void> Function()? onAuthenticatedSession,
+    Future<void> Function()? onLogout,
+  }) : _authOverride = auth,
+       _storageOverride = storage,
+       _loadCustomerOverride = loadCustomer,
+       _initializeFirebaseOverride = initializeFirebase,
+       _onAuthenticatedSessionOverride = onAuthenticatedSession,
+       _onLogoutOverride = onLogout;
+
+  final FirebaseAuth? _authOverride;
+  final FlutterSecureStorage? _storageOverride;
+  final Future<CustomerModel?> Function(String)? _loadCustomerOverride;
+  final Future<void> Function()? _initializeFirebaseOverride;
+  final Future<void> Function()? _onAuthenticatedSessionOverride;
+  final Future<void> Function()? _onLogoutOverride;
+  FirebaseAuth get _auth => _authOverride ?? FirebaseAuth.instance;
+  FlutterSecureStorage get _storage => _storageOverride ?? _secureStorage;
+  StreamSubscription<User?>? _authSubscription;
+  int _authRevision = 0;
+  bool _disposed = false;
+  Future<void> _sessionWrites = Future.value();
+
+  Future<CustomerModel?> _loadCustomer(String uid) =>
+      _loadCustomerOverride?.call(uid) ??
+      FirebaseFirestoreHelper().getSingleCustomer(customerId: uid);
+
+  bool _isCurrent(User user, [int? revision]) =>
+      !_disposed &&
+      !user.isAnonymous &&
+      _auth.currentUser?.isAnonymous == false &&
+      _auth.currentUser?.uid == user.uid &&
+      (revision == null || revision == _authRevision);
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    aOptions: AndroidOptions(),
     iOptions: IOSOptions(
       accessibility: KeychainAccessibility.first_unlock_this_device,
     ),
@@ -42,10 +87,14 @@ class AuthService extends ChangeNotifier {
 
   User? get currentUser => _auth.currentUser;
   bool get isLoggedIn =>
-      currentUser != null && CustomerController.logeInCustomer != null;
+      currentUser?.isAnonymous == false &&
+      CustomerController.logeInCustomer?.uid == currentUser?.uid;
 
   /// Ensure Firebase is initialized before any auth operations
   Future<void> _ensureFirebaseInitialized() async {
+    if (_initializeFirebaseOverride != null) {
+      return _initializeFirebaseOverride();
+    }
     try {
       await FirebaseInitializer.initializeOnce();
       Logger.info('Firebase initialized via FirebaseInitializer (AuthService)');
@@ -85,14 +134,19 @@ class AuthService extends ChangeNotifier {
       );
 
       // If a user is present but local model is missing, set a minimal profile immediately
-      if (_auth.currentUser != null &&
-          CustomerController.logeInCustomer == null) {
+      if (_auth.currentUser?.isAnonymous == false &&
+          CustomerController.logeInCustomer?.uid != _auth.currentUser?.uid) {
         _setMinimalCustomerFromFirebaseUser(_auth.currentUser!);
         await _saveUserSession(_auth.currentUser!);
+      } else if (_auth.currentUser?.isAnonymous != false) {
+        CustomerController.logeInCustomer = null;
+        notifyListeners();
       }
 
       // Listen to auth state changes
-      _auth.authStateChanges().listen(_onAuthStateChanged);
+      _authSubscription ??= _auth.authStateChanges().listen(
+        _onAuthStateChanged,
+      );
 
       // Check if auto-login is enabled with timeout
       final autoLoginEnabled = await getAutoLoginEnabled().timeout(
@@ -151,7 +205,8 @@ class AuthService extends ChangeNotifier {
 
   void _setMinimalCustomerFromFirebaseUser(User user) {
     try {
-      if (CustomerController.logeInCustomer != null) return;
+      if (!_isCurrent(user)) return;
+      if (CustomerController.logeInCustomer?.uid == user.uid) return;
       final minimalCustomer = CustomerModel(
         uid: user.uid,
         name: user.displayName ?? '',
@@ -170,12 +225,13 @@ class AuthService extends ChangeNotifier {
   /// Ensure an in-memory user model exists when Firebase has a current user
   Future<bool> ensureInMemoryUserModel() async {
     try {
-      if (_auth.currentUser == null) return false;
-      if (CustomerController.logeInCustomer == null) {
-        _setMinimalCustomerFromFirebaseUser(_auth.currentUser!);
-        await _saveUserSession(_auth.currentUser!);
+      final user = _auth.currentUser;
+      if (user == null || !_isCurrent(user)) return false;
+      if (CustomerController.logeInCustomer?.uid != user.uid) {
+        _setMinimalCustomerFromFirebaseUser(user);
+        await _saveUserSession(user);
       }
-      return true;
+      return _isCurrent(user);
     } catch (e) {
       Logger.warning('ensureInMemoryUserModel failed: $e');
       return false;
@@ -186,21 +242,17 @@ class AuthService extends ChangeNotifier {
   /// This method will wait for CustomerController to be populated from Firestore
   Future<bool> ensureUserDataLoaded() async {
     try {
+      final user = _auth.currentUser;
+      final revision = _authRevision;
+      if (user == null || !_isCurrent(user, revision)) return false;
       Logger.info('Ensuring user data is loaded for facial recognition...');
 
       // If already loaded, return immediately
-      if (CustomerController.logeInCustomer != null) {
+      if (CustomerController.logeInCustomer?.uid == user.uid) {
         Logger.info(
           'User data already loaded: ${CustomerController.logeInCustomer!.name}',
         );
         return true;
-      }
-
-      // Check Firebase Auth
-      final user = _auth.currentUser;
-      if (user == null) {
-        Logger.warning('No Firebase Auth user found');
-        return false;
       }
 
       // Try to load from Firestore with timeout
@@ -208,20 +260,19 @@ class AuthService extends ChangeNotifier {
       CustomerModel? userData;
 
       try {
-        userData = await FirebaseFirestoreHelper()
-            .getSingleCustomer(customerId: user.uid)
-            .timeout(
-              const Duration(seconds: 5),
-              onTimeout: () {
-                Logger.warning('User data fetch timed out after 5 seconds');
-                return null;
-              },
-            );
+        userData = await _loadCustomer(user.uid).timeout(
+          const Duration(seconds: 5),
+          onTimeout: () {
+            Logger.warning('User data fetch timed out after 5 seconds');
+            return null;
+          },
+        );
       } catch (e) {
         Logger.warning('Failed to load user data from Firestore: $e');
       }
 
-      if (userData != null) {
+      if (!_isCurrent(user, revision)) return false;
+      if (userData != null && userData.uid == user.uid) {
         CustomerController.logeInCustomer = userData;
         Logger.success('User data loaded successfully: ${userData.name}');
         notifyListeners();
@@ -240,11 +291,19 @@ class AuthService extends ChangeNotifier {
 
   /// Handle Firebase auth state changes
   void _onAuthStateChanged(User? user) async {
-    if (user != null) {
+    _authRevision++;
+    FirebaseFirestoreHelper.clearCache();
+    if (user != null && !user.isAnonymous) {
+      _setMinimalCustomerFromFirebaseUser(user);
+      // The initial auth emission can race startup restoration. Always fetch
+      // the profile for this identity; refreshUserData fences late responses.
+      unawaited(refreshUserData());
       // User signed in, save session data
       await _saveUserSession(user);
       Logger.info('User signed in: ${user.uid}');
     } else {
+      CustomerController.logeInCustomer = null;
+      notifyListeners();
       // User signed out, clear session data
       await _clearUserSession();
       Logger.info('User signed out');
@@ -256,28 +315,28 @@ class AuthService extends ChangeNotifier {
   Future<bool> _restoreUserSession() async {
     try {
       final user = _auth.currentUser;
-      if (user == null) {
+      final revision = _authRevision;
+      if (user == null || !_isCurrent(user, revision)) {
         Logger.info('No Firebase user found');
         return false;
       }
 
       // Verify stored user ID matches current user
-      final storedUserId = await _secureStorage.read(key: _keyUserId);
+      final storedUserId = await _storage.read(key: _keyUserId);
+      if (!_isCurrent(user, revision)) return false;
       if (storedUserId != user.uid) {
         Logger.warning(
           'Stored user ID does not match current user, clearing session',
         );
         // Do not force sign-out on startup; prefer keeping Firebase session
         // Clear only local session data and re-save with current user
-        await _clearUserSession();
         await _saveUserSession(user);
         // Continue with user data fetch below
       }
 
       // Check if session is still valid (optional: implement session timeout)
-      final lastLoginTimeStr = await _secureStorage.read(
-        key: _keyLastLoginTime,
-      );
+      final lastLoginTimeStr = await _storage.read(key: _keyLastLoginTime);
+      if (!_isCurrent(user, revision)) return false;
       if (lastLoginTimeStr != null) {
         final lastLoginTime = DateTime.parse(lastLoginTimeStr);
         final sessionAge = DateTime.now().difference(lastLoginTime);
@@ -294,8 +353,7 @@ class AuthService extends ChangeNotifier {
       CustomerModel? userData;
       try {
         userData = await FirebaseRetryHelper.executeWithRetry<CustomerModel?>(
-          () =>
-              FirebaseFirestoreHelper().getSingleCustomer(customerId: user.uid),
+          () => _loadCustomer(user.uid),
           timeout: const Duration(seconds: 8),
           operationName: 'User data fetch',
         );
@@ -306,7 +364,8 @@ class AuthService extends ChangeNotifier {
         userData = null;
       }
 
-      if (userData != null) {
+      if (!_isCurrent(user, revision)) return false;
+      if (userData != null && userData.uid == user.uid) {
         CustomerController.logeInCustomer = userData;
         Logger.info('User session restored successfully');
         notifyListeners();
@@ -330,54 +389,63 @@ class AuthService extends ChangeNotifier {
   }
 
   /// Save user session data securely
-  Future<void> _saveUserSession(User user) async {
-    try {
-      await _secureStorage.write(key: _keyUserId, value: user.uid);
-      await _secureStorage.write(key: _keyUserEmail, value: user.email ?? '');
-      await _secureStorage.write(
-        key: _keyLastLoginTime,
-        value: DateTime.now().toIso8601String(),
-      );
+  Future<void> _saveUserSession(User user) {
+    final revision = _authRevision;
+    return _sessionWrites = _sessionWrites.then((_) async {
+      if (!_isCurrent(user, revision)) return;
+      try {
+        await _storage.write(key: _keyUserId, value: user.uid);
+        if (!_isCurrent(user, revision)) return;
+        await _storage.write(key: _keyUserEmail, value: user.email ?? '');
+        if (!_isCurrent(user, revision)) return;
+        await _storage.write(
+          key: _keyLastLoginTime,
+          value: DateTime.now().toIso8601String(),
+        );
 
-      // Disable guest mode when user logs in
-      await GuestModeService().disableGuestMode();
+        if (!_isCurrent(user, revision)) return;
+        if (_onAuthenticatedSessionOverride != null) {
+          await _onAuthenticatedSessionOverride();
+          return;
+        }
+        // Disable guest mode when user logs in
+        await GuestModeService().disableGuestMode();
+        if (!_isCurrent(user, revision)) return;
+        await GuestModeService().clearGuestDisplayName();
+        if (!_isCurrent(user, revision)) return;
+        await ProductFunnelService().record(
+          'guest_auth_completed',
+          dimensions: {'result': 'success'},
+        );
+        await ProductFunnelService().rotateSession();
 
-      Logger.info('User session saved');
-    } catch (e) {
-      Logger.error('Error saving user session', e);
-    }
+        Logger.info('User session saved');
+      } catch (e) {
+        Logger.error('Error saving user session', e);
+      }
+    });
   }
 
   /// Complete post sign-in setup without blocking the UI
   Future<void> _completePostSignIn(User user) async {
+    final revision = _authRevision;
+    if (!_isCurrent(user, revision)) return;
     try {
-      final userData = await FirebaseFirestoreHelper()
-          .getSingleCustomer(customerId: user.uid)
-          .timeout(
-            const Duration(seconds: 3),
-            onTimeout: () {
-              Logger.warning('Post sign-in user data fetch timed out');
-              return null;
-            },
-          );
+      final userData = await _loadCustomer(user.uid).timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          Logger.warning('Post sign-in user data fetch timed out');
+          return null;
+        },
+      );
 
-      if (userData != null) {
-        // Ensure user profile completeness (non-blocking importance)
-        await FirebaseFirestoreHelper().ensureUserProfileCompleteness(user.uid);
+      if (!_isCurrent(user, revision)) return;
+      if (userData != null && userData.uid == user.uid) {
         CustomerController.logeInCustomer = userData;
       } else {
-        // Create minimal profile if none exists
-        final newCustomer = CustomerModel(
-          uid: user.uid,
-          name: user.displayName ?? '',
-          email: user.email ?? '',
-          createdAt: DateTime.now(),
-        );
-        await FirebaseFirestore.instance
-            .collection(CustomerModel.firebaseKey)
-            .doc(newCustomer.uid)
-            .set(CustomerModel.getMap(newCustomer));
-        CustomerController.logeInCustomer = newCustomer;
+        // A failed or timed-out read does not establish that a profile is absent.
+        // Keep a local fallback; registration owns creation of persisted data.
+        _setMinimalCustomerFromFirebaseUser(user);
       }
 
       await _saveUserSession(user);
@@ -389,20 +457,28 @@ class AuthService extends ChangeNotifier {
   }
 
   /// Clear all stored session data
-  Future<void> _clearUserSession() async {
-    try {
-      await _secureStorage.delete(key: _keyUserId);
-      await _secureStorage.delete(key: _keyUserEmail);
-      await _secureStorage.delete(key: _keyLastLoginTime);
+  Future<void> _clearUserSession() {
+    if (_auth.currentUser?.isAnonymous != false) {
       CustomerController.logeInCustomer = null;
-
-      // Clear navigation state on logout
-      await NavigationStateService().onLogout();
-
-      Logger.info('User session cleared');
-    } catch (e) {
-      Logger.error('Error clearing user session', e);
     }
+    return _sessionWrites = _sessionWrites.then((_) async {
+      if (_auth.currentUser?.isAnonymous == false) return;
+      try {
+        await _storage.delete(key: _keyUserId);
+        await _storage.delete(key: _keyUserEmail);
+        await _storage.delete(key: _keyLastLoginTime);
+
+        // Clear navigation state on logout
+        if (_auth.currentUser?.isAnonymous != false) {
+          await (_onLogoutOverride?.call() ??
+              NavigationStateService().onLogout());
+        }
+
+        Logger.info('User session cleared');
+      } catch (e) {
+        Logger.error('Error clearing user session', e);
+      }
+    });
   }
 
   /// Sign in with email and password
@@ -429,15 +505,14 @@ class AuthService extends ChangeNotifier {
 
         // Set minimal customer model immediately for fast navigation
         // This prevents the app from freezing when trying to access user data
-        if (CustomerController.logeInCustomer == null) {
-          _setMinimalCustomerFromFirebaseUser(credential.user!);
-        }
+        _setMinimalCustomerFromFirebaseUser(credential.user!);
 
         // Do remaining work in background to avoid blocking UI
         Future.microtask(() => _completePostSignIn(credential.user!));
       }
 
-      return credential.user;
+      final user = credential.user;
+      return user != null && _isCurrent(user) ? user : null;
     } catch (e) {
       Logger.error('Email/password sign in failed', e);
       rethrow;
@@ -447,6 +522,9 @@ class AuthService extends ChangeNotifier {
   /// Sign out user and clear all session data
   Future<void> signOut() async {
     try {
+      if (_authOverride == null) {
+        await FirebaseMessagingHelper().clearForSignOut();
+      }
       await _auth.signOut();
       await _clearUserSession();
       Logger.info('User signed out successfully');
@@ -473,9 +551,9 @@ class AuthService extends ChangeNotifier {
   Future<Map<String, String?>> getStoredUserInfo() async {
     try {
       return {
-        'userId': await _secureStorage.read(key: _keyUserId),
-        'email': await _secureStorage.read(key: _keyUserEmail),
-        'lastLoginTime': await _secureStorage.read(key: _keyLastLoginTime),
+        'userId': await _storage.read(key: _keyUserId),
+        'email': await _storage.read(key: _keyUserEmail),
+        'lastLoginTime': await _storage.read(key: _keyLastLoginTime),
       };
     } catch (e) {
       Logger.error('Error reading stored user info', e);
@@ -488,7 +566,7 @@ class AuthService extends ChangeNotifier {
     try {
       if (currentUser == null) return false;
 
-      final storedUserId = await _secureStorage.read(key: _keyUserId);
+      final storedUserId = await _storage.read(key: _keyUserId);
       return storedUserId == currentUser!.uid;
     } catch (e) {
       Logger.error('Error checking session validity', e);
@@ -499,13 +577,14 @@ class AuthService extends ChangeNotifier {
   /// Refresh user data from Firestore
   Future<bool> refreshUserData() async {
     try {
-      if (currentUser == null) return false;
+      final user = currentUser;
+      final revision = _authRevision;
+      if (user == null || !_isCurrent(user, revision)) return false;
 
-      final userData = await FirebaseFirestoreHelper().getSingleCustomer(
-        customerId: currentUser!.uid,
-      );
+      final userData = await _loadCustomer(user.uid);
 
-      if (userData != null) {
+      if (!_isCurrent(user, revision)) return false;
+      if (userData != null && userData.uid == user.uid) {
         CustomerController.logeInCustomer = userData;
         notifyListeners();
         return true;
@@ -520,13 +599,14 @@ class AuthService extends ChangeNotifier {
 
   /// Handle successful social login (Google, Apple, etc.)
   Future<void> handleSocialLoginSuccess(User user) async {
+    final revision = _authRevision;
+    if (!_isCurrent(user, revision)) return;
     try {
       // Check if user exists in Firestore
-      final userData = await FirebaseFirestoreHelper().getSingleCustomer(
-        customerId: user.uid,
-      );
+      final userData = await _loadCustomer(user.uid);
 
-      if (userData != null) {
+      if (!_isCurrent(user, revision)) return;
+      if (userData != null && userData.uid == user.uid) {
         // Existing user
         CustomerController.logeInCustomer = userData;
       } else {
@@ -538,12 +618,9 @@ class AuthService extends ChangeNotifier {
           createdAt: DateTime.now(),
         );
 
-        await FirebaseFirestore.instance
-            .collection(CustomerModel.firebaseKey)
-            .doc(newCustomerModel.uid)
-            .set(CustomerModel.getMap(newCustomerModel));
-
-        CustomerController.logeInCustomer = newCustomerModel;
+        final savedCustomer = await _saveNewSocialUserProfile(newCustomerModel);
+        if (!_isCurrent(user, revision)) return;
+        CustomerController.logeInCustomer = savedCustomer;
       }
 
       await _saveUserSession(user);
@@ -562,6 +639,8 @@ class AuthService extends ChangeNotifier {
   ) async {
     try {
       final user = profileData['user'] as User;
+      final revision = _authRevision;
+      if (!_isCurrent(user, revision)) return;
 
       // Log if this was an anonymous user upgrade
       if (profileData.containsKey('wasAnonymous') &&
@@ -572,17 +651,16 @@ class AuthService extends ChangeNotifier {
       }
 
       // Check if user exists in Firestore with timeout
-      final userData = await FirebaseFirestoreHelper()
-          .getSingleCustomer(customerId: user.uid)
-          .timeout(
-            const Duration(seconds: 3),
-            onTimeout: () {
-              Logger.warning('User lookup timed out during social login');
-              return null;
-            },
-          );
+      final userData = await _loadCustomer(user.uid).timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          Logger.warning('User lookup timed out during social login');
+          return null;
+        },
+      );
 
-      if (userData != null) {
+      if (!_isCurrent(user, revision)) return;
+      if (userData != null && userData.uid == user.uid) {
         // Existing user - set immediately for fast navigation
         CustomerController.logeInCustomer = userData;
         Logger.info('Existing user logged in: ${user.uid}');
@@ -604,8 +682,10 @@ class AuthService extends ChangeNotifier {
           profileData,
         );
 
-        await _saveNewSocialUserProfile(newCustomerModel);
-        CustomerController.logeInCustomer = newCustomerModel;
+        if (!_isCurrent(user, revision)) return;
+        final savedCustomer = await _saveNewSocialUserProfile(newCustomerModel);
+        if (!_isCurrent(user, revision)) return;
+        CustomerController.logeInCustomer = savedCustomer;
       }
 
       await _saveUserSession(user);
@@ -877,23 +957,41 @@ class AuthService extends ChangeNotifier {
     );
   }
 
-  Future<void> _saveNewSocialUserProfile(CustomerModel customer) async {
-    Future<void> writeProfile() {
-      return FirebaseFirestore.instance
+  Future<CustomerModel> _saveNewSocialUserProfile(
+    CustomerModel customer,
+  ) async {
+    Future<CustomerModel> writeProfile() {
+      final reference = FirebaseFirestore.instance
           .collection(CustomerModel.firebaseKey)
-          .doc(customer.uid)
-          .set(CustomerModel.getMap(customer), SetOptions(merge: true))
+          .doc(customer.uid);
+      return FirebaseFirestore.instance
+          .runTransaction((transaction) async {
+            final snapshot = await transaction.get(reference);
+            if (_auth.currentUser?.uid != customer.uid ||
+                _auth.currentUser?.isAnonymous != false) {
+              throw StateError(
+                'The signed-in account changed. Please try again.',
+              );
+            }
+            if (snapshot.exists) {
+              return CustomerModel.fromFirestore(snapshot);
+            }
+            transaction.set(reference, CustomerModel.getMap(customer));
+            return customer;
+          })
           .timeout(const Duration(seconds: 8));
     }
 
     try {
-      await writeProfile();
+      final saved = await writeProfile();
       Logger.info('New social user profile saved to Firestore');
+      return saved;
     } catch (error) {
       Logger.warning('Initial social profile save failed: $error');
       await Future.delayed(const Duration(milliseconds: 800));
-      await writeProfile();
+      final saved = await writeProfile();
       Logger.info('New social user profile saved to Firestore on retry');
+      return saved;
     }
   }
 
@@ -906,6 +1004,8 @@ class AuthService extends ChangeNotifier {
     try {
       Map<String, dynamic> updates = {};
       final user = profileData['user'] as User;
+      final revision = _authRevision;
+      if (!_isCurrent(user, revision) || existingUser.uid != user.uid) return;
 
       Logger.info('=== PROFILE UPDATE (Background) ===');
       Logger.info('Current customer name: "${existingUser.name}"');
@@ -985,6 +1085,7 @@ class AuthService extends ChangeNotifier {
       }
 
       // Update the controller with the latest data
+      if (!_isCurrent(user, revision)) return;
       CustomerController.logeInCustomer = existingUser;
       notifyListeners();
     } catch (e) {
@@ -1010,7 +1111,7 @@ class AuthService extends ChangeNotifier {
       await currentFirebaseUser.reload();
       final refreshedUser = _auth.currentUser;
 
-      if (refreshedUser != null) {
+      if (refreshedUser != null && refreshedUser.uid == currentCustomer.uid) {
         Logger.info('Current displayName: "${refreshedUser.displayName}"');
         Logger.info('Current email: "${refreshedUser.email}"');
         Logger.info('Current photoURL: "${refreshedUser.photoURL}"');
@@ -1048,5 +1149,18 @@ class AuthService extends ChangeNotifier {
       Logger.error('Error in aggressive profile update', e);
       return false;
     }
+  }
+
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _authRevision++;
+    _authSubscription?.cancel();
+    super.dispose();
   }
 }

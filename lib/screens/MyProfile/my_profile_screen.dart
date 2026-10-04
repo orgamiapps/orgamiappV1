@@ -1,3 +1,5 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:attendus/screens/Events/Attendance/attendance_wallet_pass_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/models/customer_model.dart';
@@ -13,9 +15,9 @@ import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 import 'package:attendus/screens/MyProfile/Widgets/professional_badge_widget.dart';
 import 'package:attendus/models/badge_model.dart';
 import 'package:attendus/Services/badge_service.dart';
+import 'package:attendus/Services/auth_service.dart';
 import 'package:attendus/screens/Home/account_details_screen_v2.dart';
-import 'package:cloud_functions/cloud_functions.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:attendus/screens/Home/settings_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/Utils/attendus_theme.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
@@ -33,8 +35,13 @@ enum SortOption {
 
 class MyProfileScreen extends StatefulWidget {
   final bool showBackButton;
+  final int initialTab;
 
-  const MyProfileScreen({super.key, this.showBackButton = true});
+  const MyProfileScreen({
+    super.key,
+    this.showBackButton = true,
+    this.initialTab = 1,
+  });
 
   @override
   State<MyProfileScreen> createState() => _MyProfileScreenState();
@@ -52,7 +59,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   // Pagination state for each tab
   Map<int, DocumentSnapshot?> _lastDocuments = {};
   Map<int, bool> _hasMore = {1: true, 2: true, 3: true};
-  Map<int, bool> _isFetchingMore = {1: false, 2: false, 3: false};
+  final Map<int, bool> _isFetchingMore = {1: false, 2: false, 3: false};
 
   // Badge related fields
   UserBadgeModel? _userBadge;
@@ -87,6 +94,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   @override
   void initState() {
     super.initState();
+    selectedTab = widget.initialTab.clamp(1, 3);
     debugPrint('MY_PROFILE_SCREEN: initState called');
     _initializeAnimations();
 
@@ -325,12 +333,15 @@ class _MyProfileScreenState extends State<MyProfileScreen>
 
   Future<void> _refreshUserDataInBackground() async {
     try {
-      final user = await FirebaseFirestoreHelper()
-          .getSingleCustomer(customerId: CustomerController.logeInCustomer!.uid)
-          .timeout(const Duration(seconds: 5));
-      if (user != null && mounted) {
+      final uid = CustomerController.logeInCustomer?.uid;
+      if (uid == null) return;
+      final refreshed = await AuthService().refreshUserData().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => false,
+      );
+      final user = CustomerController.logeInCustomer;
+      if (refreshed && user != null && user.uid == uid && mounted) {
         setState(() {
-          CustomerController.logeInCustomer = user;
           isDiscoverable = user.isDiscoverable;
         });
         debugPrint('✅ User data refreshed in background.');
@@ -586,29 +597,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                         fontFamily: 'Roboto',
                       ),
                     ),
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                const AccountDetailsScreenV2(),
-                          ),
-                        );
-                      },
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: Color(0xFFF3F4F6),
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: const Icon(
-                          Icons.edit,
-                          color: Colors.black87,
-                          size: 18,
-                        ),
-                      ),
-                    ),
+                    _buildProfileActions(),
                   ],
                 ),
               if (widget.showBackButton || isSelectionMode)
@@ -766,34 +755,48 @@ class _MyProfileScreenState extends State<MyProfileScreen>
 
           // Overlay edit button when no back button
           if (!widget.showBackButton && !isSelectionMode)
-            Positioned(
-              top: 8,
-              right: 16,
-              child: GestureDetector(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const AccountDetailsScreenV2(),
-                    ),
-                  );
-                },
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: const Icon(
-                    Icons.edit,
-                    color: Colors.black87,
-                    size: 18,
-                  ),
-                ),
-              ),
-            ),
+            Positioned(top: 8, right: 16, child: _buildProfileActions()),
         ],
       ),
+    );
+  }
+
+  Widget _buildProfileActions() {
+    final showSettingsLabel = MediaQuery.sizeOf(context).width >= 600;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (showSettingsLabel)
+          OutlinedButton.icon(
+            onPressed: _openSettings,
+            icon: const Icon(Icons.settings_outlined, size: 18),
+            label: const Text('Settings'),
+          )
+        else
+          IconButton.outlined(
+            tooltip: 'Settings',
+            onPressed: _openSettings,
+            icon: const Icon(Icons.settings_outlined, size: 18),
+          ),
+        const SizedBox(width: 8),
+        IconButton.outlined(
+          tooltip: 'Edit profile',
+          onPressed: _openAccountDetails,
+          icon: const Icon(Icons.edit_outlined, size: 18),
+        ),
+      ],
+    );
+  }
+
+  void _openSettings() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (context) => const SettingsScreen()));
+  }
+
+  void _openAccountDetails() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const AccountDetailsScreenV2()),
     );
   }
 
@@ -827,7 +830,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       child: AttendUsPageSection(
         title: 'Professional Badge',
-        subtitle: 'Your scannable Attendus identity badge.',
+        subtitle: 'Your profile badge and personal attendance pass.',
         icon: Icons.military_tech,
         framed: true,
         actions: [
@@ -956,16 +959,28 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         subtitle: 'View QR passes and event admission history.',
         icon: Icons.confirmation_number_outlined,
         framed: true,
-        child: AttendUsActionTile(
-          icon: Icons.wallet_outlined,
-          title: 'My Tickets',
-          subtitle: 'View and manage your event tickets',
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const MyTicketsScreen()),
-            );
-          },
+        child: Column(
+          children: [
+            AttendUsActionTile(
+              icon: Icons.wallet_outlined,
+              title: 'My Tickets',
+              subtitle: 'View and manage your event tickets',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const MyTicketsScreen(),
+                  ),
+                );
+              },
+            ),
+            AttendUsActionTile(
+              icon: Icons.badge_outlined,
+              title: 'My Attendus pass',
+              subtitle: 'Your reusable personal attendance pass',
+              onTap: () => _saveToWallet(context),
+            ),
+          ],
         ),
       ),
     );
@@ -1577,7 +1592,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           ),
         ),
         content: Text(
-          'Are you sure you want to delete ${selectedEventIds.length} selected event${selectedEventIds.length == 1 ? '' : 's'}? This action cannot be undone.',
+          'Are you sure you want to delete ${selectedEventIds.length} selected event${selectedEventIds.length == 1 ? '' : 's'}? Only empty events can be deleted. Events with registrations must be cancelled from their event page.',
           style: const TextStyle(fontSize: 16, fontFamily: 'Roboto'),
         ),
         actions: [
@@ -1613,7 +1628,9 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       ),
     );
 
-    if (confirm != true) return;
+    if (!mounted || confirm != true) return;
+    final eventIds = selectedEventIds.toList();
+    var deletedCount = 0;
 
     setState(() {
       isLoading = true;
@@ -1621,8 +1638,10 @@ class _MyProfileScreenState extends State<MyProfileScreen>
 
     try {
       // Delete events from Firebase
-      for (String eventId in selectedEventIds) {
+      for (String eventId in eventIds) {
         await FirebaseFirestoreHelper().deleteEvent(eventId);
+        deletedCount += 1;
+        if (mounted) setState(() => selectedEventIds.remove(eventId));
       }
 
       if (mounted) {
@@ -1633,7 +1652,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         });
         ShowToast().showNormalToast(
           msg:
-              '${selectedEventIds.length} event${selectedEventIds.length == 1 ? '' : 's'} deleted successfully',
+              '$deletedCount event${deletedCount == 1 ? '' : 's'} deleted successfully',
         );
         // Reload profile data to refresh the lists
         _loadProfileData();
@@ -1643,7 +1662,10 @@ class _MyProfileScreenState extends State<MyProfileScreen>
         setState(() {
           isLoading = false;
         });
-        ShowToast().showNormalToast(msg: 'Failed to delete events: $e');
+        ShowToast().showNormalToast(
+          msg: '$deletedCount deleted. Remaining events were kept: $e',
+        );
+        _loadProfileData();
       }
     }
   }
@@ -1661,6 +1683,10 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       });
 
       final badge = await _badgeService.getOrGenerateBadge(userId);
+      if (FirebaseAuth.instance.currentUser?.uid != userId ||
+          CustomerController.logeInCustomer?.uid != userId) {
+        return;
+      }
 
       if (mounted) {
         setState(() {
@@ -1747,7 +1773,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                           Icon(Icons.account_balance_wallet_outlined, size: 24),
                           SizedBox(width: 12),
                           Text(
-                            'Save to Wallet',
+                            'My Attendus pass',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
@@ -1770,94 +1796,9 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   }
 
   Future<void> _saveToWallet(BuildContext context) async {
-    try {
-      // Show loading indicator
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667EEA)),
-          ),
-        ),
-      );
-
-      // Determine platform for backend processing
-      final platform = Theme.of(context).platform;
-      final isApple =
-          platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
-
-      final callable = FirebaseFunctions.instance.httpsCallable(
-        'generateUserBadgePass',
-      );
-
-      final result = await callable.call({
-        'uid': CustomerController.logeInCustomer?.uid ?? '',
-        'platform': isApple ? 'apple' : 'google',
-      });
-
-      final urlString = result.data['url'] as String;
-
-      // Dismiss loading indicator
-      if (context.mounted) {
-        Navigator.pop(context);
-      }
-
-      if (urlString.startsWith('data:text/plain,')) {
-        // Handle error messages
-        final message = urlString.substring('data:text/plain,'.length);
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(Uri.decodeComponent(message)),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      final url = Uri.parse(urlString);
-
-      if (await canLaunchUrl(url)) {
-        await launchUrl(
-          url,
-          mode: urlString.startsWith('data:')
-              ? LaunchMode.inAppWebView
-              : LaunchMode.externalApplication,
-        );
-
-        if (!context.mounted) return;
-        Navigator.pop(context);
-
-        // Show success message
-        const successMessage =
-            'Badge generated successfully! You can now add it to your wallet.';
-
-        ShowToast().showNormalToast(msg: successMessage);
-      } else {
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Unable to open wallet pass. Please try again.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (error) {
-      // Dismiss loading indicator if still showing
-      if (context.mounted && ModalRoute.of(context)?.isCurrent == false) {
-        Navigator.pop(context);
-      }
-
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Unable to add to wallet: ${error.toString()}'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 5),
-        ),
-      );
-    }
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const AttendanceWalletPassScreen()),
+    );
   }
 }
 

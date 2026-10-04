@@ -53,10 +53,12 @@ class PerformanceMonitor {
   void _checkFrameRate() {
     // Calculate actual FPS based on time period (3 seconds)
     final fps = _frameCount / 3.0;
-    
+
     if (fps < _minFrameRate) {
       if (kDebugMode) {
-        debugPrint('⚠️ WARNING: Low frame rate detected: ${fps.toStringAsFixed(1)} fps');
+        debugPrint(
+          '⚠️ WARNING: Low frame rate detected: ${fps.toStringAsFixed(1)} fps',
+        );
       }
       _handleFrameRateWarning();
     }

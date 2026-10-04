@@ -22,7 +22,7 @@ A new screen that:
 
 #### Currently Included Premium Features:
 1. **Analytics Dashboard** - Comprehensive insights across all events
-2. **Send Notifications** - SMS and in-app notification tools
+2. **Send Notifications** - In-app notification tools
 
 ### 2. Account Screen Updates
 **File:** `lib/screens/Home/account_screen.dart`
@@ -227,4 +227,3 @@ Based on the premium subscription model, potential features to add:
 - All imports are organized and unused imports removed
 - Code follows the app's existing design patterns
 - Theme-aware implementation ensures consistency across light/dark modes
-

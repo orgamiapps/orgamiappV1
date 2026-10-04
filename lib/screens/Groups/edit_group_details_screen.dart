@@ -4,7 +4,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/models/organization_model.dart';
 import 'package:attendus/firebase/organization_helper.dart';
 import 'package:attendus/firebase/firebase_storage_helper.dart';
-import 'dart:io';
 
 class EditGroupDetailsScreen extends StatefulWidget {
   final String organizationId;
@@ -33,10 +32,11 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
   String _selectedPhotoVisibility = 'public';
   bool _isLoading = false;
   bool _hasChanges = false;
+  bool _publicPageEnabled = false;
 
   // Image management
-  File? _logoFile;
-  File? _bannerFile;
+  SelectedImageData? _logoFile;
+  SelectedImageData? _bannerFile;
   String? _currentLogoUrl;
   String? _currentBannerUrl;
 
@@ -102,6 +102,7 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
         final website = data['website']?.toString() ?? '';
         final logoUrl = data['logoUrl']?.toString();
         final bannerUrl = data['bannerUrl']?.toString();
+        final publicPageEnabled = data['publicPageEnabled'] == true;
 
         // Load visibility settings or use defaults
         final announcementVisibility =
@@ -121,6 +122,7 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
           _selectedAnnouncementVisibility = announcementVisibility;
           _selectedPollVisibility = pollVisibility;
           _selectedPhotoVisibility = photoVisibility;
+          _publicPageEnabled = publicPageEnabled;
         });
       }
     } catch (e) {
@@ -179,6 +181,8 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
         'defaultPollVisibility': _selectedPollVisibility,
         'defaultPhotoVisibility': _selectedPhotoVisibility,
         'website': _websiteController.text.trim(),
+        'publicPageEnabled': _publicPageEnabled,
+        'publicPageUpdatedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
         'updatedBy': user.uid,
       };
@@ -556,6 +560,25 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
                     ),
                     const SizedBox(height: 24),
 
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      value: _publicPageEnabled,
+                      title: const Text('Public community page'),
+                      subtitle: const Text(
+                        'Make this community’s name, description, location, '
+                        'branding, and public events available on the web and '
+                        'eligible for search engines.',
+                      ),
+                      onChanged: (value) {
+                        setState(() {
+                          _publicPageEnabled = value;
+                          _onFieldChanged();
+                        });
+                      },
+                    ),
+
+                    const Divider(height: 32),
+
                     // Events Visibility
                     _buildVisibilitySection(
                       title: 'Events',
@@ -774,7 +797,7 @@ class _EditGroupDetailsScreenState extends State<EditGroupDetailsScreen> {
 class _ImagePickerTile extends StatelessWidget {
   final String label;
   final String hint;
-  final File? file;
+  final SelectedImageData? file;
   final String? currentImageUrl;
   final VoidCallback onClear;
   final VoidCallback onPick;
@@ -856,8 +879,8 @@ class _ImagePickerTile extends StatelessWidget {
       // Show selected file
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: Image.file(
-          file!,
+        child: Image(
+          image: file!.imageProvider,
           width: double.infinity,
           height: isBanner ? 120 : 100,
           fit: BoxFit.cover,

@@ -1,14 +1,23 @@
+import 'package:attendus/widgets/deferred_shared_community_screen.dart';
+import 'package:attendus/widgets/deferred_conversation_screen.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:attendus/screens/Home/dashboard_screen.dart'
     deferred as dashboard;
 import 'package:attendus/main.dart' show appNavigatorKey;
-import 'package:attendus/screens/Splash/second_splash_screen.dart';
 import 'package:attendus/Utils/logger.dart';
+import 'package:attendus/Utils/deferred_load_recovery.dart';
+import 'package:attendus/widgets/auth_gate.dart';
+import 'package:attendus/Services/pending_auth_intent_service.dart';
+import 'package:attendus/widgets/deferred_premium_event_creation.dart';
+import 'package:attendus/Services/product_funnel_service.dart';
+import 'package:attendus/Services/discovery_marketplace_service.dart';
+import 'package:attendus/widgets/deferred_shared_event_screen.dart';
 
 /// Optimized router class with faster transitions and better performance
 class RouterClass {
   static late BuildContext splashContext;
+  final DeferredLoadRecovery _deferredRecovery = createDeferredLoadRecovery();
 
   // Optimized transition duration constants
   static const Duration _transitionDuration = Duration(milliseconds: 180);
@@ -20,7 +29,7 @@ class RouterClass {
       Navigator.of(context, rootNavigator: false).pushAndRemoveUntil(
         CupertinoPageRoute(
           builder: (BuildContext context) {
-            return const SecondSplashScreen();
+            return const AuthGate();
           },
         ),
         (_) => false,
@@ -29,27 +38,45 @@ class RouterClass {
   Future<T?> appRest<T>({required BuildContext context}) =>
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (context) => const SecondSplashScreen()),
+        MaterialPageRoute(builder: (context) => const AuthGate()),
         (route) => false,
       );
 
   Future<T?> secondSplashScreenRoute<T>({required BuildContext context}) =>
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder: (splashContext) => const SecondSplashScreen(),
-        ),
+        MaterialPageRoute(builder: (splashContext) => const AuthGate()),
       );
 
   Future<T?> homeScreenRoute<T>({required BuildContext context}) async {
-    await dashboard.loadLibrary();
+    final pendingIntent = await PendingAuthIntentService.consume();
+    if (pendingIntent != null) {
+      ProductFunnelService().record(
+        'guest_intent_resumed',
+        dimensions: {'feature': pendingIntent.sourceFeature.name},
+      );
+    }
+    try {
+      await dashboard.loadLibrary();
+      _deferredRecovery.clearRecoveryGuard('dashboard');
+    } catch (error) {
+      Logger.warning('Deferred dashboard route failed to load: $error');
+      if (!_deferredRecovery.claimAutomaticRefresh('dashboard')) rethrow;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _deferredRecovery.refreshApp();
+      });
+      return null;
+    }
+    if (!context.mounted) return null;
     final navigator =
         appNavigatorKey.currentState ??
         Navigator.of(context, rootNavigator: true);
-    return navigator.pushAndRemoveUntil(
-      PageRouteBuilder(
-        pageBuilder: (ctx, a, b) =>
-            dashboard.DashboardScreen(restoreSavedTab: false),
+    final Future<T?> routeFuture = navigator.pushAndRemoveUntil<T>(
+      PageRouteBuilder<T>(
+        pageBuilder: (ctx, a, b) => dashboard.DashboardScreen(
+          initialIndex: pendingIntent?.dashboardTab ?? 0,
+          restoreSavedTab: false,
+        ),
         transitionsBuilder: (ctx, animation, secondaryAnimation, child) {
           // Optimized fade transition with faster curve
           return FadeTransition(
@@ -64,6 +91,71 @@ class RouterClass {
       ),
       (route) => false,
     );
+    if (pendingIntent?.action == PendingAuthAction.createEvent) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final rootContext = appNavigatorKey.currentContext;
+        if (rootContext == null) return;
+        Navigator.of(rootContext, rootNavigator: true).push(
+          MaterialPageRoute(
+            builder: (_) => const DeferredPremiumEventCreation(),
+          ),
+        );
+      });
+    } else if (pendingIntent?.action == PendingAuthAction.sharedCommunity &&
+        pendingIntent?.communityId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        appNavigatorKey.currentState?.push(
+          MaterialPageRoute(
+            builder: (_) => DeferredSharedCommunityScreen(
+              organizationId: pendingIntent!.communityId!,
+            ),
+          ),
+        );
+      });
+    } else if (pendingIntent?.action == PendingAuthAction.sharedConversation &&
+        pendingIntent?.conversationId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (appNavigatorKey.currentState == null) return;
+        appNavigatorKey.currentState!.push(
+          MaterialPageRoute(
+            builder: (_) => DeferredConversationScreen(
+              conversationId: pendingIntent!.conversationId!,
+            ),
+          ),
+        );
+      });
+    } else if (pendingIntent?.action == PendingAuthAction.sharedEvent &&
+        pendingIntent?.eventId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final rootContext = appNavigatorKey.currentContext;
+        if (rootContext == null) return;
+        Navigator.of(rootContext, rootNavigator: true).push(
+          MaterialPageRoute(
+            builder: (_) => DeferredSharedEventScreen(
+              eventId: pendingIntent!.eventId!,
+              initialAction: pendingIntent.eventAction,
+            ),
+          ),
+        );
+      });
+    } else if (pendingIntent?.action == PendingAuthAction.saveEvent &&
+        pendingIntent?.eventId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        try {
+          await DiscoveryMarketplaceService().setSaved(
+            pendingIntent!.eventId!,
+            true,
+          );
+          ProductFunnelService().record(
+            'discovery_save',
+            dimensions: {'source': 'post_auth_resume'},
+          );
+        } catch (error) {
+          Logger.warning('Could not resume saved event action: $error');
+        }
+      });
+    }
+    return routeFuture;
   }
 
   /// Optimized page route with faster transitions

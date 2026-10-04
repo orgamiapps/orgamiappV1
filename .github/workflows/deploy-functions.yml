@@ -1,0 +1,13 @@
+name: Functions changes require the qualified web release
+'on':
+  workflow_dispatch: null
+permissions:
+  contents: read
+jobs:
+  release-instructions:
+    runs-on: ubuntu-latest
+    steps:
+    - run: 'echo ''Use Freeze web candidates and deploy staging, then 24-hour qualification and explicit production
+        promotion. Standalone promotion is disabled.''
+
+        exit 1'

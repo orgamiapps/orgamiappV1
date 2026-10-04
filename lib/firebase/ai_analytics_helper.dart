@@ -6,6 +6,18 @@ import 'package:attendus/models/event_model.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/Utils/logger.dart';
 
+String analyticsConfidenceLabel(Map<String, dynamic> analysis) {
+  final value = analysis['confidence'];
+  if (analysis['confidenceAvailable'] != true ||
+      value is! num ||
+      !value.isFinite ||
+      value < 0 ||
+      value > 1) {
+    return 'Unavailable';
+  }
+  return '${(value * 100).toStringAsFixed(1)}%';
+}
+
 // AI Insights Data Structure
 class AIInsights {
   final Map<String, dynamic> peakHoursAnalysis;
@@ -25,6 +37,9 @@ class AIInsights {
   dwellInsights; // {avgMinutes, highEngagementPercent}
   final List<Map<String, dynamic>>? anomalies; // Outlier events
   final String? naturalSummary; // Narrative overview
+  final String method;
+  final bool isPredictiveModel;
+  final int feedbackSampleSize;
 
   AIInsights({
     required this.peakHoursAnalysis,
@@ -41,6 +56,9 @@ class AIInsights {
     this.dwellInsights,
     this.anomalies,
     this.naturalSummary,
+    this.method = 'descriptive_heuristics',
+    this.isPredictiveModel = false,
+    this.feedbackSampleSize = 0,
   });
 
   Map<String, dynamic> toMap() {
@@ -59,6 +77,9 @@ class AIInsights {
       'dwellInsights': dwellInsights,
       'anomalies': anomalies,
       'naturalSummary': naturalSummary,
+      'method': method,
+      'isPredictiveModel': isPredictiveModel,
+      'feedbackSampleSize': feedbackSampleSize,
     };
   }
 
@@ -100,6 +121,9 @@ class AIInsights {
           ? List<Map<String, dynamic>>.from(map['anomalies'])
           : null,
       naturalSummary: map['naturalSummary'] as String?,
+      method: map['method']?.toString() ?? 'descriptive_heuristics',
+      isPredictiveModel: map['isPredictiveModel'] == true,
+      feedbackSampleSize: (map['feedbackSampleSize'] as num?)?.toInt() ?? 0,
     );
   }
 }
@@ -119,7 +143,8 @@ class AIAnalyticsHelper {
           'peakHour': null,
           'peakCount': 0,
           'recommendation': 'Insufficient data for peak hour analysis',
-          'confidence': 0.0,
+          'confidence': null,
+          'confidenceAvailable': false,
         };
       }
 
@@ -138,12 +163,14 @@ class AIAnalyticsHelper {
         }
       }
 
-      // Calculate confidence based on data distribution
+      // Observed share is descriptive; it is not predictive confidence.
       final totalSignIns = sortedHours.fold<int>(
         0,
         (total, entry) => total + (entry.value as num).toInt(),
       );
-      final confidence = totalSignIns > 0 ? (peakCount / totalSignIns) : 0.0;
+      final observedShare = totalSignIns > 0
+          ? (peakCount / totalSignIns)
+          : null;
 
       // Generate recommendation
       String recommendation = '';
@@ -151,16 +178,15 @@ class AIAnalyticsHelper {
         final hour = int.tryParse(peakHour.split(':')[0]) ?? 0;
         if (hour >= 9 && hour <= 11) {
           recommendation =
-              'Morning events (9-11 AM) show highest engagement. Consider scheduling future events during this time.';
+              'The most recorded check-ins occurred in the morning (9-11 AM). This does not estimate the effect of changing future schedules.';
         } else if (hour >= 12 && hour <= 14) {
           recommendation =
-              'Lunch time (12-2 PM) is your peak period. Lunch-and-learn events could be highly successful.';
+              'The most recorded check-ins occurred at lunch time (12-2 PM). Compare event schedules before drawing conclusions.';
         } else if (hour >= 17 && hour <= 19) {
           recommendation =
-              'Evening hours (5-7 PM) are most popular. After-work events align well with attendee preferences.';
+              'The most recorded check-ins occurred in the evening (5-7 PM). This is an observed count, not a measure of attendee preferences.';
         } else {
-          recommendation =
-              'Peak attendance at $peakHour. Consider this timing for future events.';
+          recommendation = 'The most recorded check-ins occurred at $peakHour.';
         }
       }
 
@@ -168,7 +194,9 @@ class AIAnalyticsHelper {
         'peakHour': peakHour,
         'peakCount': peakCount,
         'recommendation': recommendation,
-        'confidence': confidence,
+        'observedShare': observedShare,
+        'confidence': null,
+        'confidenceAvailable': false,
         'totalSignIns': totalSignIns,
         'hourlyDistribution': hourlySignIns,
       };
@@ -178,7 +206,8 @@ class AIAnalyticsHelper {
         'peakHour': null,
         'peakCount': 0,
         'recommendation': 'Analysis failed',
-        'confidence': 0.0,
+        'confidence': null,
+        'confidenceAvailable': false,
       };
     }
   }
@@ -192,10 +221,12 @@ class AIAnalyticsHelper {
         return {
           'positiveRatio': 0.0,
           'negativeRatio': 0.0,
-          'neutralRatio': 1.0,
-          'overallSentiment': 'neutral',
+          'neutralRatio': 0.0,
+          'overallSentiment': 'unavailable',
+          'feedbackSampleSize': 0,
           'recommendation': 'No comments available for sentiment analysis',
-          'confidence': 0.0,
+          'confidence': null,
+          'confidenceAvailable': false,
         };
       }
 
@@ -249,7 +280,12 @@ class AIAnalyticsHelper {
       ];
 
       for (final comment in comments) {
-        final text = (comment['text'] as String?)?.toLowerCase() ?? '';
+        final text =
+            (comment['comment'] ?? comment['text'])
+                ?.toString()
+                .trim()
+                .toLowerCase() ??
+            '';
         if (text.isEmpty) continue;
 
         int positiveScore = 0;
@@ -277,7 +313,7 @@ class AIAnalyticsHelper {
       final negativeRatio = total > 0 ? negativeCount / total : 0.0;
       final neutralRatio = total > 0 ? neutralCount / total : 0.0;
 
-      String overallSentiment = 'neutral';
+      String overallSentiment = total == 0 ? 'unavailable' : 'neutral';
       if (positiveRatio > 0.6) {
         overallSentiment = 'positive';
       } else if (negativeRatio > 0.6) {
@@ -287,13 +323,14 @@ class AIAnalyticsHelper {
       String recommendation = '';
       if (overallSentiment == 'positive') {
         recommendation =
-            'Excellent feedback! Attendees are highly satisfied. Consider expanding similar event formats.';
+            'Positive keywords appeared more often in the sampled comments. Review the comments for context; keyword matching does not measure satisfaction.';
       } else if (overallSentiment == 'negative') {
         recommendation =
-            'Address attendee concerns. Consider gathering more detailed feedback to improve future events.';
+            'Negative keywords appeared more often in the sampled comments. Review the original comments before choosing a response.';
       } else {
-        recommendation =
-            'Mixed feedback received. Consider implementing feedback surveys to better understand attendee needs.';
+        recommendation = total == 0
+            ? 'No text comments available for analysis.'
+            : 'Keyword matches were mixed or absent. Review the original comments for context.';
       }
 
       return {
@@ -302,8 +339,11 @@ class AIAnalyticsHelper {
         'neutralRatio': neutralRatio,
         'overallSentiment': overallSentiment,
         'recommendation': recommendation,
-        'confidence': total > 0 ? 0.8 : 0.0,
+        'confidence': null,
+        'confidenceAvailable': false,
         'totalComments': total,
+        'feedbackSampleSize': total,
+        'method': 'keyword_counts',
         'positiveCount': positiveCount,
         'negativeCount': negativeCount,
         'neutralCount': neutralCount,
@@ -316,12 +356,13 @@ class AIAnalyticsHelper {
         'neutralRatio': 1.0,
         'overallSentiment': 'neutral',
         'recommendation': 'Analysis failed',
-        'confidence': 0.0,
+        'confidence': null,
+        'confidenceAvailable': false,
       };
     }
   }
 
-  /// Generate optimization predictions
+  /// Suggest experiments from observed data without estimating their impact.
   Future<List<Map<String, dynamic>>> generateOptimizations(
     Map<String, dynamic> analyticsData,
     Map<String, dynamic> peakHoursAnalysis,
@@ -345,9 +386,10 @@ class AIAnalyticsHelper {
             'type': 'timing',
             'title': 'Optimize Event Timing',
             'description':
-                'Shift events to morning hours (9-11 AM) for +35% attendance',
-            'impact': 'High',
-            'confidence': peakHoursAnalysis['confidence'] ?? 0.0,
+                'Recorded check-ins peaked in the morning. Compare similar events before testing a schedule change.',
+            'impact': 'Not estimated',
+            'confidence': null,
+            'confidenceAvailable': false,
             'implementation':
                 'Schedule future events during peak morning hours',
           });
@@ -355,9 +397,11 @@ class AIAnalyticsHelper {
           optimizations.add({
             'type': 'timing',
             'title': 'Evening Event Strategy',
-            'description': 'Leverage evening peak (5-7 PM) for +25% attendance',
-            'impact': 'Medium',
-            'confidence': peakHoursAnalysis['confidence'] ?? 0.0,
+            'description':
+                'Recorded check-ins peaked in the evening. Compare similar events before testing a schedule change.',
+            'impact': 'Not estimated',
+            'confidence': null,
+            'confidenceAvailable': false,
             'implementation':
                 'Focus on after-work events and networking sessions',
           });
@@ -369,10 +413,13 @@ class AIAnalyticsHelper {
         optimizations.add({
           'type': 'scheduling',
           'title': 'Weekend Events',
-          'description': 'Shift to weekends for +40% attendance potential',
-          'impact': 'High',
-          'confidence': 0.7,
-          'implementation': 'Schedule events on Saturdays or Sundays',
+          'description':
+              'Compare weekday and weekend events with similar formats. These records do not estimate a scheduling benefit.',
+          'impact': 'Not estimated',
+          'confidence': null,
+          'confidenceAvailable': false,
+          'implementation':
+              'Review attendance alongside event schedules and capacity.',
         });
       }
 
@@ -381,10 +428,13 @@ class AIAnalyticsHelper {
         optimizations.add({
           'type': 'engagement',
           'title': 'Reduce Dropout Rate',
-          'description': 'Implement reminder system to reduce dropout by 30%',
-          'impact': 'Medium',
-          'confidence': 0.8,
-          'implementation': 'Send SMS/email reminders 24h and 1h before events',
+          'description':
+              'Review registration and attendance differences. Reminder impact has not been estimated.',
+          'impact': 'Not estimated',
+          'confidence': null,
+          'confidenceAvailable': false,
+          'implementation':
+              'Send email and in-app reminders 24h and 1h before events',
         });
       }
 
@@ -396,9 +446,10 @@ class AIAnalyticsHelper {
             'type': 'retention',
             'title': 'Increase Repeat Attendance',
             'description':
-                'Implement loyalty program for +50% repeat attendance',
-            'impact': 'High',
-            'confidence': 0.6,
+                'Review repeat attendance and ask attendees what would encourage them to return.',
+            'impact': 'Not estimated',
+            'confidence': null,
+            'confidenceAvailable': false,
             'implementation':
                 'Create member benefits and early access programs',
           });
@@ -410,9 +461,11 @@ class AIAnalyticsHelper {
         optimizations.add({
           'type': 'feedback',
           'title': 'Improve Event Quality',
-          'description': 'Address feedback to improve satisfaction by 40%',
-          'impact': 'High',
-          'confidence': 0.9,
+          'description':
+              'Review negative keyword matches in context and ask attendees for specific feedback.',
+          'impact': 'Not estimated',
+          'confidence': null,
+          'confidenceAvailable': false,
           'implementation': 'Conduct post-event surveys and implement feedback',
         });
       }
@@ -425,7 +478,8 @@ class AIAnalyticsHelper {
           'title': 'Analysis Error',
           'description': 'Failed to generate optimizations: $e',
           'impact': 'Unknown',
-          'confidence': 0.0,
+          'confidence': null,
+          'confidenceAvailable': false,
           'implementation': 'Check data quality and retry analysis',
         },
       ];
@@ -461,7 +515,8 @@ class AIAnalyticsHelper {
             ? 'Medium'
             : 'Low',
         'totalAttendees': totalAttendees,
-        'confidence': 0.8,
+        'confidence': null,
+        'confidenceAvailable': false,
       };
     } catch (e) {
       return {
@@ -469,7 +524,8 @@ class AIAnalyticsHelper {
         'dropoutRate': 0.0,
         'recommendation': 'Analysis failed',
         'severity': 'Unknown',
-        'confidence': 0.0,
+        'confidence': null,
+        'confidenceAvailable': false,
       };
     }
   }
@@ -504,7 +560,8 @@ class AIAnalyticsHelper {
         'repeatAttendees': repeatAttendees,
         'totalAttendees': totalAttendees,
         'recommendation': recommendation,
-        'confidence': 0.8,
+        'confidence': null,
+        'confidenceAvailable': false,
       };
     } catch (e) {
       return {
@@ -513,7 +570,8 @@ class AIAnalyticsHelper {
         'repeatAttendees': 0,
         'totalAttendees': 0,
         'recommendation': 'Analysis failed',
-        'confidence': 0.0,
+        'confidence': null,
+        'confidenceAvailable': false,
       };
     }
   }
@@ -579,6 +637,8 @@ class AIAnalyticsHelper {
         dropoutAnalysis: dropoutAnalysis,
         repeatAttendeeAnalysis: repeatAttendeeAnalysis,
         lastUpdated: DateTime.now(),
+        feedbackSampleSize:
+            (sentimentAnalysis['feedbackSampleSize'] as num?)?.toInt() ?? 0,
       );
     } catch (e) {
       throw Exception('Failed to generate AI insights: $e');
@@ -622,7 +682,7 @@ class AIAnalyticsHelper {
 
       // Limit number of events analyzed to reduce load on low-end devices
       final List<EventModel> toAnalyze = events.length > 60
-          ? (events..sort(
+          ? (List<EventModel>.from(events)..sort(
                   (a, b) => b.selectedDateTime.compareTo(a.selectedDateTime),
                 ))
                 .take(60)
@@ -632,6 +692,7 @@ class AIAnalyticsHelper {
       // Aggregate data from selected events
       int totalAttendees = 0;
       int totalRepeatAttendees = 0;
+      int coveredEvents = 0;
       Map<String, int> categoryCounts = {};
       Map<String, int> monthlyTrends = {};
       // New aggregations
@@ -649,8 +710,14 @@ class AIAnalyticsHelper {
 
           if (analyticsDoc.exists) {
             final eventData = analyticsDoc.data() as Map<String, dynamic>;
-            final attendees = (eventData['totalAttendees'] ?? 0) as int;
-            final repeatAttendees = (eventData['repeatAttendees'] ?? 0) as int;
+            if (eventData['totalAttendees'] is! num ||
+                eventData['repeatAttendees'] is! num) {
+              continue;
+            }
+            final attendees = (eventData['totalAttendees'] as num).toInt();
+            final repeatAttendees = (eventData['repeatAttendees'] as num)
+                .toInt();
+            coveredEvents++;
 
             totalAttendees += attendees;
             totalRepeatAttendees += repeatAttendees;
@@ -689,19 +756,21 @@ class AIAnalyticsHelper {
         }
       }
 
-      // Calculate performance metrics
+      if (coveredEvents == 0) {
+        throw StateError('Analytics are unavailable for these events.');
+      }
+      // Calculate performance metrics only from available records.
       final performanceScore = totalAttendees > 0
           ? (totalRepeatAttendees / totalAttendees) * 100
           : 0.0;
 
-      final growthRate = toAnalyze.length > 1
-          ? 15.0
-          : 0.0; // Simplified calculation
-
       // Generate global performance analysis
       final globalPerformanceAnalysis = {
         'performanceScore': performanceScore,
-        'growthRate': growthRate,
+        'growthRate': null,
+        'growthRateAvailable': false,
+        'coveredEvents': coveredEvents,
+        'requestedEvents': toAnalyze.length,
         'totalEvents': toAnalyze.length,
         'totalAttendees': totalAttendees,
         'recommendation': _generateGlobalRecommendation(
@@ -762,7 +831,8 @@ class AIAnalyticsHelper {
         'bestDay': null,
         'distribution': {},
         'recommendation': 'Insufficient data for weekday analysis',
-        'confidence': 0.0,
+        'confidence': null,
+        'confidenceAvailable': false,
       };
     }
     final names = {
@@ -784,13 +854,15 @@ class AIAnalyticsHelper {
         bestKey = k;
       }
     });
-    final confidence = total > 0 ? bestVal / total : 0.0;
+    final observedShare = total > 0 ? bestVal / total : null;
     return {
       'bestDay': names[bestKey],
       'distribution': weekdayAttendance.map((k, v) => MapEntry(names[k]!, v)),
       'recommendation':
-          'Best day to host events appears to be ${names[bestKey]}',
-      'confidence': confidence,
+          'The largest observed attendance total was on ${names[bestKey]}.',
+      'observedShare': observedShare,
+      'confidence': null,
+      'confidenceAvailable': false,
     };
   }
 
@@ -800,7 +872,8 @@ class AIAnalyticsHelper {
         'bestHourRange': null,
         'distribution': {},
         'recommendation': 'Insufficient data for time-of-day analysis',
-        'confidence': 0.0,
+        'confidence': null,
+        'confidenceAvailable': false,
       };
     }
     // Smooth by grouping into 2-hour buckets
@@ -821,48 +894,25 @@ class AIAnalyticsHelper {
         best = label;
       }
     });
-    final confidence = total > 0 ? bestVal / total : 0.0;
+    final observedShare = total > 0 ? bestVal / total : null;
     return {
       'bestHourRange': best,
       'distribution': buckets,
-      'recommendation': 'Highest attendance tends to be during $best',
-      'confidence': confidence,
+      'recommendation':
+          'The largest observed attendance total was during $best.',
+      'observedShare': observedShare,
+      'confidence': null,
+      'confidenceAvailable': false,
     };
   }
 
-  Map<String, dynamic> _computeForecast(Map<String, int> monthlyTrends) {
-    if (monthlyTrends.isEmpty) {
-      return {'nextMonth': 0, 'method': 'moving_average', 'confidence': 0.0};
-    }
-    final sorted = monthlyTrends.entries.toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
-    // Use simple weighted moving average of last up to 4 months
-    final last = sorted.length <= 4
-        ? sorted
-        : sorted.sublist(sorted.length - 4);
-    int denom = 0;
-    double num = 0;
-    for (int i = 0; i < last.length; i++) {
-      final weight = (i + 1); // 1..4 with most recent highest
-      denom += weight;
-      num += last[last.length - 1 - i].value * weight;
-    }
-    final prediction = denom == 0 ? 0 : (num / denom).round();
-    // Confidence: more months -> higher; normalized variance
-    final values = sorted.map((e) => e.value.toDouble()).toList();
-    final mean = values.reduce((a, b) => a + b) / values.length;
-    final variance = values.length > 1
-        ? values.map((v) => (v - mean) * (v - mean)).reduce((a, b) => a + b) /
-              (values.length - 1)
-        : 0.0;
-    final volatility = mean == 0 ? 0.0 : (variance / (mean.abs() + 1e-9));
-    final confidence = (0.6 + (0.2 / (1 + volatility))).clamp(0.0, 0.95);
-    return {
-      'nextMonth': prediction,
-      'method': 'weighted_moving_average',
-      'confidence': confidence,
-    };
-  }
+  Map<String, dynamic> _computeForecast(Map<String, int> monthlyTrends) => {
+    'nextMonth': null,
+    'method': 'unavailable',
+    'confidence': null,
+    'confidenceAvailable': false,
+    'observedMonths': monthlyTrends.length,
+  };
 
   List<Map<String, dynamic>> _detectAttendanceAnomalies(
     List<Map<String, dynamic>> perEvent,
@@ -949,12 +999,10 @@ class AIAnalyticsHelper {
     final bestHour = timeOfDay['bestHourRange'] ?? 'N/A';
     final perf =
         (performance['performanceScore'] as num?)?.toStringAsFixed(1) ?? '0.0';
-    final next = forecast['nextMonth'] ?? 0;
-    final conf = ((forecast['confidence'] ?? 0.0) as num).toDouble();
     final dwellStr = dwell == null
         ? 'Dwell data not available.'
         : 'Average dwell time ${(dwell['avgMinutes'] as num).toStringAsFixed(0)}m with ${(dwell['highEngagementPercent'] as num).toStringAsFixed(0)}% staying >45m.';
-    return 'Engagement score sits at $perf%. Best scheduling signals point to $bestDay around $bestHour. Next month is projected to bring ~$next attendees (confidence ${(conf * 100).toStringAsFixed(0)}%). $dwellStr';
+    return 'Observed repeat attendance is $perf% of recorded attendance. The largest attendance totals were on $bestDay around $bestHour. Coverage: ${performance['coveredEvents']} of ${performance['requestedEvents']} requested events. Forecasts and causal effects are unavailable. $dwellStr';
   }
 
   /// Very lightweight question answering over computed insights.
@@ -971,11 +1019,7 @@ class AIAnalyticsHelper {
     if (q.contains('forecast') ||
         q.contains('next month') ||
         q.contains('predict')) {
-      final next = insights.forecast?['nextMonth'];
-      final conf = insights.forecast?['confidence'];
-      return next == null
-          ? 'Not enough history to forecast yet.'
-          : 'Projected next-month attendance: $next (confidence ${(conf * 100).toStringAsFixed(0)}%).';
+      return 'Attendance forecasts and predictive confidence are unavailable. These insights summarize observed records only.';
     }
     if (q.contains('engagement') || q.contains('score')) {
       final perf =
@@ -1029,9 +1073,10 @@ class AIAnalyticsHelper {
         'type': 'engagement',
         'title': 'Improve Attendee Engagement',
         'description':
-            'Focus on interactive elements and follow-up strategies to increase repeat attendance by 40%',
-        'impact': 'High',
-        'confidence': 0.8,
+            'Review interactive elements and follow-up strategies as experiments; any attendance benefit is not estimated',
+        'impact': 'Not estimated',
+        'confidence': null,
+        'confidenceAvailable': false,
       });
     }
 
@@ -1042,8 +1087,9 @@ class AIAnalyticsHelper {
         'title': 'Diversify Event Types',
         'description':
             'Try different event categories to reach broader audiences and increase overall attendance',
-        'impact': 'Medium',
-        'confidence': 0.7,
+        'impact': 'Not estimated',
+        'confidence': null,
+        'confidenceAvailable': false,
       });
     }
 
@@ -1054,8 +1100,9 @@ class AIAnalyticsHelper {
         'title': 'Optimize Event Timing',
         'description':
             'Schedule events during peak attendance months for better turnout',
-        'impact': 'Medium',
-        'confidence': 0.6,
+        'impact': 'Not estimated',
+        'confidence': null,
+        'confidenceAvailable': false,
       });
     }
 
@@ -1066,8 +1113,9 @@ class AIAnalyticsHelper {
         'title': 'Expand Marketing Reach',
         'description':
             'Increase marketing efforts to reach more potential attendees',
-        'impact': 'High',
-        'confidence': 0.9,
+        'impact': 'Not estimated',
+        'confidence': null,
+        'confidenceAvailable': false,
       });
     }
 

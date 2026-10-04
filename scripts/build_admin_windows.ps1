@@ -13,17 +13,28 @@ $distRoot = Join-Path $repoRoot "dist"
 if ([string]::IsNullOrWhiteSpace($env:ATTENDUS_FIREBASE_API_KEY)) {
   throw "Set ATTENDUS_FIREBASE_API_KEY to the Firebase web API key after restricting it to required Firebase APIs and the distributed application."
 }
-if ([string]::IsNullOrWhiteSpace($env:ATTENDUS_GOOGLE_OAUTH_CLIENT_ID) -or $env:ATTENDUS_GOOGLE_OAUTH_CLIENT_ID -notmatch '^[A-Za-z0-9-]+\.apps\.googleusercontent\.com$') {
-  throw "Set ATTENDUS_GOOGLE_OAUTH_CLIENT_ID to a Google OAuth 2.0 Desktop app client ID for orgami-66nxok."
+if (-not [string]::IsNullOrWhiteSpace($env:ATTENDUS_GOOGLE_OAUTH_CLIENT_ID) -and $env:ATTENDUS_GOOGLE_OAUTH_CLIENT_ID -notmatch '^[A-Za-z0-9-]+\.apps\.googleusercontent\.com$') {
+  throw "ATTENDUS_GOOGLE_OAUTH_CLIENT_ID must be a valid Google OAuth 2.0 Desktop app client ID."
 }
 if (-not (Get-Command flutter -ErrorAction SilentlyContinue)) { throw "Flutter is required on the build machine." }
 
+function Invoke-AdminFlutter {
+  param([string[]]$FlutterArguments)
+  & flutter @FlutterArguments
+  if ($LASTEXITCODE -ne 0) {
+    throw "Flutter $($FlutterArguments[0]) failed (exit $LASTEXITCODE). Packaging stopped."
+  }
+}
+
 Push-Location $appRoot
 try {
-  flutter pub get
-  if (-not $SkipTests) { flutter test }
-  flutter analyze
-  flutter build windows --release --build-name $Version --dart-define="ATTENDUS_FIREBASE_API_KEY=$($env:ATTENDUS_FIREBASE_API_KEY)" --dart-define="ATTENDUS_GOOGLE_OAUTH_CLIENT_ID=$($env:ATTENDUS_GOOGLE_OAUTH_CLIENT_ID)" --dart-define="ATTENDUS_ADMIN_API_URL=$ApiUrl"
+  Invoke-AdminFlutter -FlutterArguments @('pub', 'get', '--enforce-lockfile')
+  if (-not $SkipTests) { Invoke-AdminFlutter -FlutterArguments @('test') }
+  Invoke-AdminFlutter -FlutterArguments @('analyze')
+  Invoke-AdminFlutter -FlutterArguments @('build', 'windows', '--release', '--build-name', $Version,
+    "--dart-define=ATTENDUS_FIREBASE_API_KEY=$($env:ATTENDUS_FIREBASE_API_KEY)",
+    "--dart-define=ATTENDUS_GOOGLE_OAUTH_CLIENT_ID=$($env:ATTENDUS_GOOGLE_OAUTH_CLIENT_ID)",
+    "--dart-define=ATTENDUS_ADMIN_API_URL=$ApiUrl")
 } finally { Pop-Location }
 
 $exe = Join-Path $releaseRoot "attendus_admin.exe"
@@ -40,6 +51,7 @@ $isccCandidates = @(@(
 New-Item -ItemType Directory -Force -Path $distRoot | Out-Null
 if ($isccCandidates.Count -gt 0) {
   & $isccCandidates[0] "/DMyAppVersion=$Version" "/DBuildRoot=$releaseRoot" "/DOutputRoot=$distRoot" (Join-Path $repoRoot "installer\attendus_admin.iss")
+  if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed (exit $LASTEXITCODE). Packaging stopped." }
   $installer = Join-Path $distRoot "AttendusAdmin-$Version-windows-x64-setup.exe"
 } else {
   & (Join-Path $repoRoot "scripts\package_admin_msix.ps1") -Version $Version

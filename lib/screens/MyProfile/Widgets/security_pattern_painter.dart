@@ -88,4 +88,3 @@ class SecurityPatternPainter extends CustomPainter {
   bool shouldRepaint(SecurityPatternPainter oldDelegate) =>
       color != oldDelegate.color || opacity != oldDelegate.opacity;
 }
-

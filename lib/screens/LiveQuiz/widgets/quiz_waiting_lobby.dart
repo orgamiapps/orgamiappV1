@@ -28,6 +28,7 @@ class QuizWaitingLobby extends StatefulWidget {
 class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
     with TickerProviderStateMixin {
   final _liveQuizService = LiveQuizService();
+  bool _connectionFailed = false;
   List<QuizParticipantModel> _participants = [];
   StreamSubscription<List<QuizParticipantModel>>? _participantsSubscription;
 
@@ -84,11 +85,18 @@ class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
   void _setupParticipantsStream() {
     _participantsSubscription = _liveQuizService
         .getParticipantsStream(widget.quizId)
-        .listen((participants) {
-          if (mounted) {
-            setState(() => _participants = participants);
-          }
-        });
+        .listen(
+          (participants) {
+            if (!mounted) return;
+            _connectionFailed = false;
+            if (mounted) {
+              setState(() => _participants = participants);
+            }
+          },
+          onError: (Object _) {
+            if (mounted) setState(() => _connectionFailed = true);
+          },
+        );
   }
 
   @override
@@ -102,6 +110,11 @@ class _QuizWaitingLobbyState extends State<QuizWaitingLobby>
 
   @override
   Widget build(BuildContext context) {
+    if (_connectionFailed) {
+      return const Center(
+        child: Text('Quiz lobby connection interrupted. Retrying...'),
+      );
+    }
     return FadeTransition(
       opacity: _fadeAnimation,
       child: SlideTransition(

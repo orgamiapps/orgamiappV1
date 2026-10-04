@@ -1,13 +1,13 @@
+import 'package:attendus/widgets/smart_arrival_card.dart';
 import 'package:flutter/material.dart';
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
-import 'package:attendus/models/attendance_model.dart';
 import 'package:attendus/models/event_model.dart';
-import 'package:attendus/screens/QRScanner/ans_questions_to_sign_in_event_screen.dart';
 import 'package:attendus/screens/QRScanner/modern_qr_scanner_screen.dart';
 import 'package:attendus/Utils/router.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/screens/Events/single_event_screen.dart';
 import 'package:attendus/Services/geofence_event_detector.dart';
 import 'package:attendus/Utils/location_helper.dart';
@@ -15,6 +15,11 @@ import 'package:attendus/screens/FaceRecognition/picture_face_scanner_screen.dar
 import 'package:attendus/Services/face_recognition_service.dart';
 import 'package:attendus/screens/FaceRecognition/picture_face_enrollment_screen.dart';
 import 'package:attendus/Services/guest_mode_service.dart';
+import 'package:attendus/Services/guest_attendance_service.dart';
+import 'package:attendus/config/safety_flags.dart';
+import 'package:attendus/Services/attendance_check_in_service.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:intl/intl.dart';
 
 /// Modern, streamlined sign-in flow screen
 /// Professional UI/UX following Material Design 3 principles
@@ -34,6 +39,8 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
   bool _isAnonymousSignIn = false;
   bool _isLoading = false;
   bool _isLocationCheckLoading = false;
+  final AttendanceCheckInService _attendanceService =
+      AttendanceCheckInService();
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -42,6 +49,7 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
   @override
   void initState() {
     super.initState();
+    _nameController.text = GuestModeService().guestDisplayName ?? '';
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,
@@ -86,6 +94,7 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
                       children: [
                         _buildWelcomeSection(),
                         const SizedBox(height: 32),
+                        const SmartArrivalCard(),
                         _buildSignInMethods(),
                         const SizedBox(height: 32),
                         _buildQuickTips(),
@@ -296,13 +305,11 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
   }
 
   Widget _buildSignInMethods() {
-    final isGuestMode = GuestModeService().isGuestMode;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Choose Sign-In Method',
+          'Check in',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
@@ -313,7 +320,7 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
         ),
         const SizedBox(height: 4),
         Text(
-          'Select how you\'d like to check in',
+          'Scan the venue code. If the camera is unavailable, enter its short code.',
           style: TextStyle(
             fontSize: 14,
             color: Colors.grey[600],
@@ -321,20 +328,6 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
           ),
         ),
         const SizedBox(height: 20),
-        // Location + facial recognition available to all (guests need to input name)
-        _buildMethodCard(
-          icon: Icons.location_on,
-          iconColor: const Color(0xFF10B981),
-          title: 'Location & Facial Recognition',
-          subtitle: isGuestMode
-              ? 'Secure verification (name required)'
-              : 'Automatic detection & biometric',
-          badge: 'MOST SECURE',
-          badgeColor: const Color(0xFF10B981),
-          isLoading: _isLocationCheckLoading,
-          onTap: _handleLocationFacialSignIn,
-        ),
-        const SizedBox(height: 16),
         _buildMethodCard(
           icon: Icons.qr_code_scanner,
           iconColor: const Color(0xFF667EEA),
@@ -342,19 +335,7 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
           subtitle: 'Quick camera scan',
           badge: 'FASTEST',
           badgeColor: const Color(0xFF667EEA),
-          onTap: () async {
-            final result = await Navigator.push<String>(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const ModernQRScannerScreen(),
-              ),
-            );
-
-            if (result != null && mounted) {
-              _codeController.text = result;
-              _handleSignIn();
-            }
-          },
+          onTap: _openScanner,
         ),
         const SizedBox(height: 16),
         _buildMethodCard(
@@ -368,6 +349,18 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
         ),
       ],
     );
+  }
+
+  Future<void> _openScanner() async {
+    if (!mounted || _isLoading) return;
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const ModernQRScannerScreen()),
+    );
+    if (result != null && mounted) {
+      _codeController.text = result;
+      await _handleSignIn();
+    }
   }
 
   Widget _buildMethodCard({
@@ -678,7 +671,8 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
                       const SizedBox(height: 16),
 
                       // Anonymous Toggle
-                      _buildAnonymousCheckbox(),
+                      if (!GuestModeService().isGuestMode)
+                        _buildAnonymousCheckbox(),
                     ],
 
                     const SizedBox(height: 24),
@@ -894,7 +888,31 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
       return;
     }
 
-    if (CustomerController.logeInCustomer == null &&
+    if (_codeController.text.startsWith('attendus_event:v1:')) {
+      final eventId = _codeController.text.substring(
+        'attendus_event:v1:'.length,
+      );
+      final event = await FirebaseFirestoreHelper().getSingleEvent(eventId);
+      if (!mounted) return;
+      if (event == null) {
+        ShowToast().showNormalToast(msg: 'That event could not be found.');
+        return;
+      }
+      RouterClass.nextScreenAndReplacement(
+        context,
+        SingleEventScreen(eventModel: event),
+      );
+      return;
+    }
+
+    final isGuest =
+        GuestModeService().isGuestMode ||
+        FirebaseAuth.instance.currentUser?.isAnonymous == true;
+    if (isGuest && _nameController.text.trim().isEmpty) {
+      final name = await GuestAttendanceService().promptForFullName(context);
+      if (name == null || !mounted) return;
+      _nameController.text = name;
+    } else if (CustomerController.logeInCustomer == null &&
         _nameController.text.isEmpty &&
         !_isAnonymousSignIn) {
       ShowToast().showNormalToast(msg: 'Please enter your name!');
@@ -904,76 +922,38 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
     setState(() => _isLoading = true);
 
     try {
-      String docId;
-      if (CustomerController.logeInCustomer != null) {
-        docId =
-            '${_codeController.text}-${CustomerController.logeInCustomer!.uid}';
-      } else {
-        docId = FirebaseFirestore.instance
-            .collection(AttendanceModel.firebaseKey)
-            .doc()
-            .id;
-      }
-
-      AttendanceModel newAttendanceModel = AttendanceModel(
-        id: docId,
-        eventId: _codeController.text,
-        userName: _isAnonymousSignIn
-            ? 'Anonymous'
-            : (CustomerController.logeInCustomer?.name ?? _nameController.text),
-        customerUid: CustomerController.logeInCustomer?.uid ?? 'without_login',
-        attendanceDateTime: DateTime.now(),
-        answers: [],
-        isAnonymous: _isAnonymousSignIn,
-        signInMethod: 'qr_code', // or 'manual_code'
-        realName: _isAnonymousSignIn
-            ? (CustomerController.logeInCustomer?.name ?? _nameController.text)
-            : null,
+      final resolved = await _attendanceService.resolveCredential(
+        _codeController.text.trim(),
       );
-
-      final eventExist = await FirebaseFirestoreHelper().getSingleEvent(
-        newAttendanceModel.eventId,
+      final event = await FirebaseFirestoreHelper().getSingleEvent(
+        resolved.eventId,
       );
-
-      if (eventExist != null) {
-        // Check for sign-in prompts
-        final questions = await FirebaseFirestoreHelper().getEventQuestions(
-          eventId: eventExist.id,
-        );
-
-        if (questions.isNotEmpty) {
-          _codeController.text = '';
-          if (!mounted) return;
-          RouterClass.nextScreenAndReplacement(
-            context,
-            AnsQuestionsToSignInEventScreen(
-              eventModel: eventExist,
-              newAttendance: newAttendanceModel,
-              nextPageRoute: 'qrScannerFlow',
-            ),
-          );
-        } else {
-          // No prompts, sign in directly
-          await FirebaseFirestore.instance
-              .collection(AttendanceModel.firebaseKey)
-              .doc(newAttendanceModel.id)
-              .set(newAttendanceModel.toJson());
-
-          ShowToast().showNormalToast(msg: 'Signed In Successfully!');
-
-          // Navigate to event details after a short delay
-          await Future.delayed(const Duration(milliseconds: 800));
-          if (!mounted) return;
-          RouterClass.nextScreenAndReplacement(
-            context,
-            SingleEventScreen(eventModel: eventExist),
-          );
-        }
-      } else {
-        ShowToast().showNormalToast(
-          msg: 'Event not found. Please check the code and try again.',
-        );
+      if (event == null) {
+        throw StateError('The event could not be loaded.');
       }
+      final answers = await _collectAttendanceAnswers(event.id);
+      if (answers == null || !mounted) return;
+      final receipt = await _attendanceService.submitCheckIn(
+        eventId: resolved.eventId,
+        sessionId: resolved.sessionId,
+        credential: {
+          'type': 'venue_token',
+          'value': resolved.normalizedCredential,
+          if (isGuest) 'fullName': _nameController.text.trim(),
+        },
+        answers: answers,
+      );
+      if (!mounted) return;
+      await _showCheckInReceipt(event, receipt);
+      if (!mounted) return;
+      RouterClass.nextScreenAndReplacement(
+        context,
+        SingleEventScreen(eventModel: event),
+      );
+    } on FirebaseFunctionsException catch (error) {
+      ShowToast().showNormalToast(
+        msg: error.message ?? 'This check-in could not be accepted.',
+      );
     } catch (e) {
       debugPrint('Error signing in: $e');
       ShowToast().showNormalToast(msg: 'Failed to sign in. Please try again.');
@@ -984,9 +964,118 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
     }
   }
 
+  Future<List<String>?> _collectAttendanceAnswers(String eventId) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('Events')
+        .doc(eventId)
+        .collection('EventQuestions')
+        .get();
+    if (snapshot.docs.isEmpty) return const [];
+    if (!mounted) return null;
+    final controllers = {
+      for (final question in snapshot.docs)
+        question.id: TextEditingController(),
+    };
+    final result = await showDialog<List<String>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('A few event questions'),
+        content: SizedBox(
+          width: 480,
+          child: ListView(
+            shrinkWrap: true,
+            children: snapshot.docs.map((question) {
+              final data = question.data();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: TextField(
+                  controller: controllers[question.id],
+                  decoration: InputDecoration(
+                    labelText:
+                        '${data['questionTitle']}${data['required'] == true ? ' *' : ''}',
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final missing = snapshot.docs.any(
+                (question) =>
+                    question.data()['required'] == true &&
+                    controllers[question.id]!.text.trim().isEmpty,
+              );
+              if (missing) return;
+              Navigator.pop(
+                context,
+                snapshot.docs
+                    .map(
+                      (question) =>
+                          '${question.data()['questionTitle']}--ans--${controllers[question.id]!.text.trim()}',
+                    )
+                    .toList(),
+              );
+            },
+            child: const Text('Check in'),
+          ),
+        ],
+      ),
+    );
+    for (final controller in controllers.values) {
+      controller.dispose();
+    }
+    return result;
+  }
+
+  Future<void> _showCheckInReceipt(EventModel event, CheckInReceipt receipt) =>
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          icon: const Icon(Icons.check_circle, color: Colors.green, size: 58),
+          title: const Text('You’re checked in'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                event.title,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 8),
+              Text(receipt.attendeeName),
+              Text(
+                DateFormat(
+                  'MMM d, y · h:mm:ss a',
+                ).format(receipt.checkedInAt.toLocal()),
+              ),
+              const SizedBox(height: 8),
+              const Chip(label: Text('Entry accepted')),
+            ],
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Done'),
+            ),
+          ],
+        ),
+      );
+
   /// Handle Location and Facial Recognition Sign-In
   /// This is the most secure method combining geofence and biometric verification
   Future<void> _handleLocationFacialSignIn() async {
+    if (!SafetyFlags.biometricCheckInEnabled) {
+      ShowToast().showNormalToast(msg: SafetyFlags.biometricMaintenanceMessage);
+      return;
+    }
     // Prevent multiple simultaneous requests
     if (_isLocationCheckLoading) return;
 
@@ -1375,6 +1464,10 @@ class _ModernSignInFlowScreenState extends State<ModernSignInFlowScreen>
 
   /// Handle facial recognition for a specific event
   Future<void> _handleFacialRecognitionForEvent(EventModel event) async {
+    if (!SafetyFlags.biometricCheckInEnabled) {
+      ShowToast().showNormalToast(msg: SafetyFlags.biometricMaintenanceMessage);
+      return;
+    }
     try {
       final isGuestMode = GuestModeService().isGuestMode;
 

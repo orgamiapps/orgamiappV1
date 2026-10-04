@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/models/event_feedback_model.dart';
@@ -8,8 +10,17 @@ import 'package:attendus/Utils/app_app_bar_view.dart';
 
 class EventFeedbackManagementScreen extends StatefulWidget {
   final EventModel eventModel;
+  final FirebaseAuth? auth;
+  final Future<List<EventFeedbackModel>> Function()? loadFeedback;
+  final Future<EventFeedbackAnalytics?> Function()? loadAnalytics;
 
-  const EventFeedbackManagementScreen({super.key, required this.eventModel});
+  const EventFeedbackManagementScreen({
+    super.key,
+    required this.eventModel,
+    this.auth,
+    this.loadFeedback,
+    this.loadAnalytics,
+  });
 
   @override
   State<EventFeedbackManagementScreen> createState() =>
@@ -21,33 +32,74 @@ class _EventFeedbackManagementScreenState
   List<EventFeedbackModel> _feedbackList = [];
   EventFeedbackAnalytics? _feedbackAnalytics;
   bool _isLoading = true;
+  FirebaseAuth get _auth => widget.auth ?? FirebaseAuth.instance;
+  String? _ownerUid;
+  bool _accountChanged = false;
+  String? _error;
+  int _generation = 0;
+  StreamSubscription<User?>? _authSubscription;
+  bool get _currentAccount =>
+      mounted &&
+      !_accountChanged &&
+      _ownerUid != null &&
+      _auth.currentUser?.uid == _ownerUid;
 
   @override
   void initState() {
     super.initState();
+    _ownerUid = _auth.currentUser?.uid;
+    _authSubscription = _auth.authStateChanges().listen((user) {
+      if (mounted && user?.uid != _ownerUid) {
+        _generation++;
+        setState(() {
+          _accountChanged = true;
+          _feedbackList = [];
+          _feedbackAnalytics = null;
+        });
+      }
+    });
     _loadFeedbackData();
   }
 
+  @override
+  void dispose() {
+    _generation++;
+    _authSubscription?.cancel();
+    super.dispose();
+  }
+
   Future<void> _loadFeedbackData() async {
+    if (!_currentAccount) return;
+    final generation = ++_generation;
     setState(() {
       _isLoading = true;
+      _error = null;
     });
 
     try {
-      final feedbackList = await FirebaseFirestoreHelper().getEventFeedback(
-        eventId: widget.eventModel.id,
-      );
-      final analytics = await FirebaseFirestoreHelper()
-          .getEventFeedbackAnalytics(eventId: widget.eventModel.id);
+      final feedbackList =
+          await (widget.loadFeedback?.call() ??
+              FirebaseFirestoreHelper().getEventFeedback(
+                eventId: widget.eventModel.id,
+              ));
+      if (!_currentAccount || generation != _generation) return;
+      final analytics =
+          await (widget.loadAnalytics?.call() ??
+              FirebaseFirestoreHelper().getEventFeedbackAnalytics(
+                eventId: widget.eventModel.id,
+              ));
 
+      if (!_currentAccount || generation != _generation) return;
       setState(() {
         _feedbackList = feedbackList;
         _feedbackAnalytics = analytics;
         _isLoading = false;
       });
     } catch (e) {
+      if (!_currentAccount || generation != _generation) return;
       setState(() {
         _isLoading = false;
+        _error = 'Could not load feedback. Please retry.';
       });
       Logger.error('Error loading feedback data: $e');
     }
@@ -468,6 +520,14 @@ class _EventFeedbackManagementScreenState
 
   @override
   Widget build(BuildContext context) {
+    if (_accountChanged || _ownerUid == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Event Feedback')),
+        body: const Center(
+          child: Text('Your account changed. Reopen this screen to continue.'),
+        ),
+      );
+    }
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -484,6 +544,19 @@ class _EventFeedbackManagementScreenState
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(_error!),
+                          TextButton(
+                            onPressed: _loadFeedbackData,
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    )
                   : RefreshIndicator(
                       onRefresh: _loadFeedbackData,
                       child: SingleChildScrollView(
