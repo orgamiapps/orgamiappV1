@@ -570,3 +570,48 @@ patch. Linked subsystem reports do not assert individual-file review or executio
 The current 18-family web coverage matrix separately records hosted tests,
 unexecuted preparation and remaining staging/provider journeys. Native source
 inventory does not extend the current web-only acceptance scope.
+
+### October 4 waitlist and community follow-up
+
+These confirmed defects were corrected in candidate source; matching hosted
+CI and live acceptance remain open. They were found during the active-web review;
+they are not failed production mutations.
+
+| ID / severity / surface | Reproduction and expected versus actual behavior | Root cause | Status |
+| --- | --- | --- | --- |
+| WEBQA-12 / P2 / waitlist decisions | The roster offers Decline for a waitlisted attendee. The actual callable declines a pending row but rejects the waitlisted row with failed-precondition; the row remains waitlisted. | Every non-promote decision requires pending, despite the supported UI decline action for both states. | Fixed in candidate: decline accepts pending or waitlisted; approve/promote keep their prior restrictions. All 17 focused handler cases and 55 Firestore launch cases pass, including authorization, replay and one-winner transitions. Live staging remains open. |
+| WEBQA-13 / P2 / organizer feedback | Approve a pending registration at full capacity with waitlisting enabled. The server correctly returns and stores waitlisted, but the console says Registration approved. | The UI ignores the callable result and derives success text only from the requested action. | Fixed in candidate: feedback uses a supported acknowledged action/status pair. Full-capacity approval says waitlisted; inconsistent/malformed replies cannot show success. Included in 50 focused client cases and 515 full Flutter passes with clean analysis. The directly-used response helper is tested; packaged console acceptance remains open. |
+| WEBQA-14 / P2 / community member filter | Approve a community join request, then select the Members filter. The approved row uses role Member and disappears from the filtered list. | Display filtering compares only the lowercase member value, while the established approval path writes Member. | Fixed in candidate: role casing is normalized for filters, cards and menu presentation, retaining actor authorization and write payloads. Seven actual ManageMembers widget cases pass, included in the 515-test suite. Packaged community acceptance remains open. |
+| WEBQA-15 / P1 / admission integrity under contention | A tentative free-ticket approval is discarded when capacity changes; the retry correctly waitlists the registration but returns and stores the first attempt's ticket ID while no ticket exists. | Mutable ticket/result state survives outside the Firestore transaction callback across retries. | Fixed in candidate: return only the committed callback result with attempt-local state. Actual SDK retry verifies waitlisted with null ticket ID and zero committed tickets; replay and concurrent decisions preserve counts. All 17 focused and 55 launch cases pass. Production records are unchanged. |
+| WEBQA-16 / P2 / community join acknowledgement | Deny the JoinRequests write. The helper logs the failure and returns normally, so the screen reports Join request sent and switches to Requested. | The asynchronous helper swallows the write failure; the caller treats completion as acknowledgement. | Fixed in candidate: unauthenticated/failed writes propagate; success waits for acknowledgement, duplicate submissions are fenced and read failures disable joining. Actual SDK-double/widget regressions cover failure, delayed acknowledgement and disposal. Included in 50 focused and 515 full client passes. |
+| WEBQA-17 / P2 / community request status | Decline a join request and reopen the community. The retained declined document is displayed as Requested and Request pending. | The screen tests document existence instead of its status. | Fixed in candidate: pending, declined and unavailable requests have distinct truthful states. Declined or unknown requests remain disabled, preserving rules without an unsupported overwrite/reapply flow. Actual screen regressions pass in the full client suite. |
+| WEBQA-18 / P2 / community access display | Open a community with a pending member document or an approved legacy Admin role. The former is labelled Member; the latter loses the administrative presentation. | The profile and its administrative button infer approved membership from document existence and interpret only one role casing. | Fixed in candidate: non-creator membership must be approved; administrative controls accept only the four role spellings supported by rules. Profile, administrative button and active feed have malformed-role controls. The existing creator presentation shortcut is unchanged and does not establish server authorization without the required membership record. Independent review and 515 client tests pass. |
+| WEBQA-19 / P2 / public guest management | Open a valid management session for a pending, waitlisted or declined registration. Each page says Confirmed and each calendar endpoint returns a publishing invite. | Management rendering treats every non-cancelled record as confirmed and offers admission/calendar actions without checking registration eligibility. | Fixed in candidate: rendering and direct calendar/QR routes share current admission eligibility. Pending, waitlisted and declined states have no admission invite; unsupported calendar/QR requests return 409/404. Confirmed, supported legacy and cancellation controls are covered. All 31 public-web handler and 392 Functions cases pass. All 24 new rendered status cases pass across four browser projects, using a synthetic server session; browser cookie transport/token exchange remains a separate acceptance check. |
+| WEBQA-20 / P2 / public event capacity display | With capacity one, a ticketed event with confirmed count one and issued count zero, or an RSVP event with one reserved seat, still advertises acquisition while the authoritative capacity helper reports full. | Public rendering uses a different subset of counters from the registration handler. | Fixed in candidate: free-ticket/RSVP display uses V3 capacity and paid legacy display uses its V2 projection. Full states respect waitlisting; unresolved counters display Availability unavailable without an acquisition action or invented zero. Actual HTTP regressions and 392 Functions cases pass; production counter reconciliation remains a separate gate. |
+
+The registration transaction repairs pass all 17 focused unit cases and the
+complete 55-case Firestore launch suite under Node 22.23.2 and Java 21 against
+`demo-attendus-admin`. The successful launch log SHA256 is
+`b9a2c5d51b8d81626b72cc59bbd3d0027eda26f6e12f8ced02bed2ee5b062c9b`.
+Its new cases cover concurrent decline replay, the actual SDK discarding a
+tentative confirmed ticket before retrying into the waitlist, and a concurrent
+decline/promotion with exactly one valid winner.
+
+The first launch run is retained as 52 passes and three failures (SHA256
+`16a8701af30250d6775a8f6eedabc9fe09773b0f7a997a1504936b35bb6af714`).
+All three new cases reused a guest whose deletion tombstone had been created
+earlier in the suite. Only their fixture identities were isolated; the product
+deletion guard was not relaxed. The unchanged registration implementation then
+passed the complete rerun. Later capacity-display changes require matching
+final source CI; this emulator receipt does not claim staging acceptance.
+
+| ID / severity / surface | Reproduction and expected versus actual behavior | Root cause and correction | Verification and remaining acceptance |
+| --- | --- | --- | --- |
+| WEBQA-21 / P2 / enlarged guest ticket layout | At 320px and 200% text, a valid eight-character ticket code and its QR image extend past their inner panel even though the page stays within the viewport. | The grid's intrinsic minimum width and fixed QR dimensions exceed the panel's available width. Use a shrinkable grid column, wrapping code text and an aspect-preserving responsive QR image. | The pinned old stylesheet fails all four ticket-panel bound checks with a valid eight-character code. All four pass after correction; the full local rendered selection passes 36/36 across four projects, with visual review. All 23 asset/versioning contract cases pass. A new immutable stylesheet is published in the candidate source; prior assets remain intact. |
+
+The new `registration-email-v2.css` immutable asset SHA256 is
+`5b3c898270ee766874a8e7d4db561b791cccb5b0f26fbb4fd6e0bb3e6ed1f311`.
+The source manifest references this new path and retains the previous
+`49fc8739d038b38eb58ecd506d04369b32c872cef4cc66fbda6308f9fa569dee`
+file for existing cached pages. This stylesheet change does not alter the
+reviewed registration or roster transaction logic.

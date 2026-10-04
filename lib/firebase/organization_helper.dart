@@ -251,7 +251,7 @@ class OrganizationHelper {
 
   Future<void> requestToJoinOrganization(String organizationId) async {
     final user = _auth.currentUser;
-    if (user == null) return;
+    if (user == null) throw StateError('Sign in to request group membership.');
 
     try {
       final reqRef = _firestore
@@ -267,6 +267,7 @@ class OrganizationHelper {
       });
     } catch (e) {
       Logger.error('Failed to request join: $e');
+      rethrow;
     }
   }
 

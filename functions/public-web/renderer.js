@@ -123,11 +123,19 @@ function ticketState(data, now = new Date()) {
   const opens = asDate(policy.opensAt); const closes = asDate(policy.closesAt);
   if (opens && now < opens) return {state: "closed", label: "Registration opens soon"};
   if (closes && now > closes) return {state: "closed", label: "Registration closed"};
+  let full;
+  try {
+    const capacity = require("../events/capacity");
+    // Public free registration uses V3 and requires reconciled totals. Paid
+    // checkout retains its existing V2 ticket-only legacy capacity contract.
+    const paidCheckout = data.ticketsEnabled === true && Number(data.ticketPrice || 0) > 0;
+    full = (paidCheckout ? capacity.ticketCapacityState(data) : capacity.capacityState(data)).full;
+  } catch (error) {
+    if (error.code !== "failed-precondition") throw error;
+    return {state: "unavailable", label: "Availability unavailable"};
+  }
   if (data.ticketsEnabled === true) {
-    const maximum = Number(data.maxTickets || 0);
-    const committed = Number(data.issuedTickets || 0);
-    const reserved = Number(data.reservedTickets || 0);
-    if (maximum > 0 && committed + reserved >= maximum) {
+    if (full) {
       if (Number(data.ticketPrice || 0) <= 0 && policy.waitlistEnabled !== false) return {state: "waitlist", action: "ticket", label: "Join waitlist"};
       return {state: "sold_out", label: "Sold out"};
     }
@@ -139,8 +147,7 @@ function ticketState(data, now = new Date()) {
       price,
     } : {state: "free_ticket", action: "ticket", label: policy.approvalMode === "manual" ? "Request a place" : "Get free ticket", price: 0};
   }
-  const maximum = Number(policy.capacity || data.maxTickets || 0);
-  if (maximum > 0 && Number(data.confirmedRegistrationCount || 0) >= maximum) {
+  if (full) {
     return policy.waitlistEnabled !== false ? {state: "waitlist", action: "rsvp", label: "Join waitlist"} : {state: "full", label: "Event full"};
   }
   return {state: "rsvp", action: "rsvp", label: policy.approvalMode === "manual" ? "Request a place" : "RSVP"};
@@ -396,6 +403,31 @@ async function manageData(db, session) {
   return {registration, event, ticket: tickets.empty ? null : tickets.docs[0], guest};
 }
 
+function manageAdmission(data) {
+  const event = data.event.data(), registration = data.registration.data();
+  const ticket = data.ticket?.data();
+  const {activeEvent, confirmedRegistration, validTicket} = require("../attendance/arrival-core");
+  // Missing legacy status is supported by the admission contract. Other
+  // malformed values must not gain eligibility merely because they are falsy.
+  const status = registration.status === undefined || registration.status === null || registration.status === "" ? "confirmed" : registration.status;
+  const linkedTicket = Boolean(ticket && (!registration.ticketId || registration.ticketId === data.ticket.id) &&
+    (!ticket.registrationId || ticket.registrationId === data.registration.id));
+  const cancelled = registration.cancelled === true || registration.revoked === true ||
+    ["cancelled", "canceled", "revoked", "refunded"].includes(status) ||
+    event.cancelled === true || ["cancelled", "canceled"].includes(event.status) ||
+    (linkedTicket && (ticket.revoked === true || ticket.cancelled === true ||
+      ["cancelled", "canceled", "revoked", "refunded"].includes(ticket.status) || ticket.paymentStatus === "refunded"));
+  const confirmed = !cancelled && status === "confirmed" && confirmedRegistration(registration) && activeEvent(event) &&
+    (!(event.ticketsEnabled || registration.ticketId || ticket) || (linkedTicket && validTicket(ticket, event)));
+  const label = cancelled ? "Cancelled" : confirmed ? "Confirmed" :
+    status === "pending" ? "Pending approval" : status === "waitlisted" ? "Waitlisted" :
+      status === "declined" ? "Declined" : "Unavailable";
+  return {label, confirmed, cancelled, calendarMethod: cancelled ? "CANCEL" : confirmed ? "PUBLISH" : null,
+    showTicket: confirmed && linkedTicket && typeof ticket.ticketCode === "string" && ticket.ticketCode.length > 0,
+    canCancel: !cancelled && activeEvent(event) && ["pending", "waitlisted", "confirmed"].includes(status) &&
+      ticket?.isPaid !== true && eventStartForManage(event) > new Date()};
+}
+
 function managePage(res, nonce, data, session, notice = "") {
   pageHeaders(res, nonce);
   res.set("X-Robots-Tag", "noindex, nofollow");
@@ -403,13 +435,14 @@ function managePage(res, nonce, data, session, notice = "") {
   const registration = data.registration.data();
   const ticket = data.ticket?.data();
   const guest = data.guest.data() || {};
-  const cancelled = registration.status === "cancelled" || ticket?.revoked === true;
+  const admission = manageAdmission(data);
   const paid = ticket?.isPaid === true;
-  const cancel = !cancelled && !paid && eventStartForManage(event) > new Date() ?
+  const cancel = admission.canCancel ?
     `<form method="post" action="/manage/action"><input type="hidden" name="csrf" value="${escapeHtml(session.csrfToken)}"><input type="hidden" name="action" value="cancel"><button class="secondary-button danger" type="submit">Cancel registration</button></form>` : "";
-  const ticketMarkup = ticket ? `<section class="manage-ticket" aria-labelledby="ticket-heading"><h2 id="ticket-heading">Your ticket</h2><div class="ticket-code"><span>Ticket code</span><strong>${escapeHtml(ticket.ticketCode)}</strong><img src="/manage/ticket.svg" width="220" height="220" alt="QR ticket code ${escapeHtml(ticket.ticketCode)}"></div><button class="secondary-button print-ticket" type="button">Print ticket</button></section>` : "";
+  const ticketMarkup = admission.showTicket ? `<section class="manage-ticket" aria-labelledby="ticket-heading"><h2 id="ticket-heading">Your ticket</h2><div class="ticket-code"><span>Ticket code</span><strong>${escapeHtml(ticket.ticketCode)}</strong><img src="/manage/ticket.svg" width="220" height="220" alt="QR ticket code ${escapeHtml(ticket.ticketCode)}"></div><button class="secondary-button print-ticket" type="button">Print ticket</button></section>` : "";
+  const admissionActions = `${admission.confirmed ? `<a class="secondary-button" href="/manage/attendance">Check in or get my event pass</a>` : ""}${admission.calendarMethod ? `<a class="secondary-button" href="/manage/calendar.ics">Download calendar invite</a>` : ""}`;
   const emailForm = `<details class="contact-update"><summary>Update confirmation email</summary><form method="post" action="/manage/action"><input type="hidden" name="csrf" value="${escapeHtml(session.csrfToken)}"><input type="hidden" name="action" value="update_email"><label>Email address <input name="email" type="email" autocomplete="email" required maxlength="254"></label><button class="secondary-button" type="submit">Update and resend</button></form></details>`;
-  const body = `<main id="main" class="page manage-page"><article><div class="eyebrow">Guest registration</div><h1>${escapeHtml(event.title)}</h1>${notice ? `<p class="notice" role="status">${escapeHtml(notice)}</p>` : ""}<dl class="details"><div><dt>Status</dt><dd>${cancelled ? "Cancelled" : "Confirmed"}</dd></div><div><dt>Attendee</dt><dd>${escapeHtml(registration.realName || registration.userName)}</dd></div><div><dt>Email</dt><dd>${escapeHtml(guest.maskedEmail || "Protected")}</dd></div><div><dt>Date</dt><dd>${escapeHtml(formatDate(eventStartForManage(event), validTimeZone(event.eventTimeZone)))}</dd></div></dl>${ticketMarkup}<div class="manage-actions"><a class="secondary-button" href="/manage/attendance">Check in or get my event pass</a><a class="secondary-button" href="/manage/calendar.ics">Download calendar invite</a><a class="secondary-button" href="/event/${encodeURIComponent(data.event.id)}">View event</a>${cancel}</div>${emailForm}${paid ? `<p>Paid ticket refunds are handled by the organizer or <a href="mailto:support@attendus.app">support@attendus.app</a>.</p>` : ""}</article></main>`;
+  const body = `<main id="main" class="page manage-page"><article><div class="eyebrow">Guest registration</div><h1>${escapeHtml(event.title)}</h1>${notice ? `<p class="notice" role="status">${escapeHtml(notice)}</p>` : ""}<dl class="details"><div><dt>Status</dt><dd>${admission.label}</dd></div><div><dt>Attendee</dt><dd>${escapeHtml(registration.realName || registration.userName)}</dd></div><div><dt>Email</dt><dd>${escapeHtml(guest.maskedEmail || "Protected")}</dd></div><div><dt>Date</dt><dd>${escapeHtml(formatDate(eventStartForManage(event), validTimeZone(event.eventTimeZone)))}</dd></div></dl>${ticketMarkup}<div class="manage-actions">${admissionActions}<a class="secondary-button" href="/event/${encodeURIComponent(data.event.id)}">View event</a>${cancel}</div>${emailForm}${paid ? `<p>Paid ticket refunds are handled by the organizer or <a href="mailto:support@attendus.app">support@attendus.app</a>.</p>` : ""}</article></main>`;
   res.status(200).send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Manage registration | Attendus</title><link rel="stylesheet" href="${publicAssetUrl("public.css")}"><link rel="stylesheet" href="${publicAssetUrl("registration-email-v2.css")}"></head><body><a class="skip-link" href="#main">Skip to registration</a><header class="site-header"><a class="brand" href="/"><img src="/icons/Icon-192.png" alt="" width="36" height="36"><span>Attendus</span></a></header>${body}<script nonce="${nonce}">document.querySelector('.print-ticket')?.addEventListener('click',()=>window.print());</script></body></html>`);
 }
 
@@ -431,8 +464,12 @@ async function manageCalendar(db, req, res, nonce) {
   const data = await manageData(db, session);
   if (!data) return notFound(res, nonce);
   const event = data.event.data();
+  const {calendarMethod: method} = manageAdmission(data);
+  if (!method) {
+    res.set("Cache-Control", "no-store"); res.set("X-Robots-Tag", "noindex, nofollow");
+    return res.status(409).send("A confirmed registration is required for a calendar invite.");
+  }
   if (!eventEnd(event)) return res.status(409).send("The organizer needs to confirm the event end time.");
-  const method = data.registration.get("status") === "cancelled" || event.status === "cancelled" ? "CANCEL" : "PUBLISH";
   const content = require("../events/schedule").calendar(event, {
     uid: `${data.registration.id}@attendus.app`, method,
     url: `${publicOrigin()}/event/${data.event.id}`,
@@ -447,7 +484,7 @@ async function manageTicketQr(db, req, res, nonce) {
   if (!session) return notFound(res, nonce);
   const data = await manageData(db, session);
   const code = data?.ticket?.get("ticketCode");
-  if (!code) return notFound(res, nonce);
+  if (!data || !manageAdmission(data).showTicket) return notFound(res, nonce);
   const svg = await QRCode.toString(code, {type: "svg", margin: 1, width: 220,
     errorCorrectionLevel: "M"});
   res.set("Cache-Control", "private, no-store");

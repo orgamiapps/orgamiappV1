@@ -1,5 +1,9 @@
 Status: implementation in progress; web/backend qualification only. Native/store/Admin distribution is excluded.
 
+Latest checkpoint, October 4 at 20:47 UTC: the new registration, membership and guest-page repairs (WEBQA-12 through WEBQA-21) pass local verification: 515 Flutter tests with clean full analysis, 392 Functions tests with clean lint, 55 Firestore launch tests, 36 rendered public-page cases across four browser projects, and 23 asset/versioning checks. The launch receipt precedes the final display-only changes; matching complete hosted CI is still required for the new source freeze. These repairs have not been deployed. Candidate10 remains held after its failed browser run; seven retired fixture roster records await the new fenced backend and separately verified cleanup. Production is unchanged.
+
+The current journey matrix is [debugging-web-coverage-20261004.md](debugging-web-coverage-20261004.md), and defects are tracked in [debugging-ledger-20261003.md](debugging-ledger-20261003.md). The baseline and dated entries below are chronological evidence, not current readiness claims. A passing earlier CI run does not qualify later source changes or replace live browser, provider, data and observation gates.
+
 Preserved baseline: source content SHA256 `375d7e0847f864ac7f51387bd3770ca55974d54f83ba4747dd2eeaf9ed2571e1`; Git HEAD `8c40edcf77d7ae269c38294e5bbd8931da1fb3bb`; branch `codex/project-debugging-20261003`. Snapshot: sibling `attendus-web-qualification-baseline-20261004T025604Z`, 1,140 files, ZIP SHA256 `8ed07b0c46bbd21bd2fb479e7fbef2d2ea2fd45df2f68c34d5bb4c54bb185a7c`. No original work was discarded.
 
 Current cloud findings:
@@ -457,3 +461,34 @@ and checks sealed-byte verification on both production origins. All five tests
 in the affected file pass. The executable Node contracts remain responsible for
 behavioral drift and mismatch cases. No release safeguard was removed; the
 corrected source requires a new hosted run before merge or staging deployment.
+
+### Registration, community and guest-page verification
+
+The 50 new client cases bring the main suite to 515 passes. The full CI analysis
+paths are clean using Flutter 3.44.6/Dart 3.12.2. Client readiness SHA256:
+`6cee272b9255ccb1e8012f249f30f55e0cc45886cc49d1efb908ff374b53284e`.
+The backend batch has 392 passing cases and clean lint under Node22.23.2;
+readiness SHA256 `93d9543431d80a10a7c00201ee8856e35351cc081d27a9c24e80a4b1494eb01a`.
+Independent cross-reviews cover both batches. The 55-case real Firestore run
+passes after correcting a test-only identity collision; its original failure
+and both receipts remain in the defect ledger.
+
+The rendered selection contains 24 new management-status cases and 12 existing
+layout cases across Chromium, Firefox, WebKit and mobile Chromium, all passing
+without retries. These management cases supply a known synthetic session at
+the actual HTTP handler boundary and explicitly do not prove browser cookie
+transport or token exchange. Earlier intercepted-cookie fixture failures and
+short local timeouts remain retained, not recast as product passes. Complete
+CI must execute all 60 public-page cases plus the Flutter integration journeys.
+The valid eight-character ticket layout fails with the pinned old stylesheet
+and passes inside its panel with the new immutable stylesheet at 320px and
+200% text; visual review confirms the QR remains square and unclipped.
+
+The refreshed residual-seven cleanup and operational preparation have separate
+12-case and 48-case passing reviews. They remain null-bound and have performed
+no cleanup, seed, workflow or provider operation. Their renderer fence uses
+Git-normalized LF SHA256 `b4b4652f53896527488f2d726e88a17916c00831d7c2159119330995b073a325`,
+not the Windows working-file hash. Final independent preparation review SHA256:
+`2f851eda0f5c2dae5177a15cc08c274bf0fe161bf03ff4a19bb8f2538be82323`.
+Actual successful candidate, deployment, rollback/restore and complete runtime
+source receipts are still required before residual cleanup or another seed.

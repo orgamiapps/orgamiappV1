@@ -15,6 +15,24 @@ import 'package:attendus/models/event_model.dart';
 import 'package:attendus/screens/Events/Attendance/attendance_sheet_screen.dart';
 import 'package:attendus/screens/Events/ticket_scanner_screen.dart';
 
+String registrationDecisionMessage(
+  String decision,
+  Map<String, dynamic> result,
+) {
+  // Approving a pending registration can still put it on the waitlist when
+  // capacity fills. Only the acknowledged server status describes the outcome.
+  final resultLabel = switch ((decision, result['status'])) {
+    ('approve', 'confirmed') => 'approved',
+    ('promote', 'confirmed') => 'promoted',
+    ('approve', 'waitlisted') => 'waitlisted',
+    ('decline', 'declined') => 'declined',
+    _ => throw const FormatException(
+      'Registration result is unavailable. Refresh the roster before trying again.',
+    ),
+  };
+  return 'Registration $resultLabel.';
+}
+
 class CheckInConsoleScreen extends StatefulWidget {
   const CheckInConsoleScreen({super.key, required this.event});
 
@@ -82,22 +100,19 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
     String decision,
   ) async {
     await _run(() async {
-      await FirebaseFunctions.instanceFor(
-        region: 'us-central1',
-      ).httpsCallable('decideEventRegistrationV1').call<Map<String, dynamic>>({
-        'eventId': widget.event.id,
-        'registrationId': registrationId,
-        'decision': decision,
-      });
+      final response =
+          await FirebaseFunctions.instanceFor(region: 'us-central1')
+              .httpsCallable('decideEventRegistrationV1')
+              .call<Map<String, dynamic>>({
+                'eventId': widget.event.id,
+                'registrationId': registrationId,
+                'decision': decision,
+              });
       if (!mounted) return;
-      final resultLabel = switch (decision) {
-        'approve' => 'approved',
-        'decline' => 'declined',
-        _ => 'promoted',
-      };
+      final message = registrationDecisionMessage(decision, response.data);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Registration $resultLabel.')));
+      ).showSnackBar(SnackBar(content: Text(message)));
     });
   }
 

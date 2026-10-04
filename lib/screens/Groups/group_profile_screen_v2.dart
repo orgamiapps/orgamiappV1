@@ -22,6 +22,25 @@ import 'package:attendus/Services/discovery_marketplace_service.dart';
 import 'package:attendus/Services/product_funnel_service.dart';
 import 'package:attendus/Services/community_share_service.dart';
 
+enum _JoinStatus {
+  none,
+  pending,
+  declined,
+  membershipPending,
+  membershipDeclined,
+  requestUnavailable,
+  unavailable,
+}
+
+String? _approvedMembershipRole(Map<String, dynamic>? data) {
+  if (data?['status'] != 'approved') return null;
+  return switch (data?['role']) {
+    'Owner' || 'owner' => 'Owner',
+    'Admin' || 'admin' => 'Admin',
+    _ => 'Member',
+  };
+}
+
 class GroupProfileScreenV2 extends StatefulWidget {
   final String organizationId;
   const GroupProfileScreenV2({super.key, required this.organizationId});
@@ -35,13 +54,31 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final OrganizationHelper _helper = OrganizationHelper();
   bool _isMember = false;
-  bool _hasRequestedJoin = false;
+  _JoinStatus _joinStatus = _JoinStatus.none;
+  bool _requestingJoin = false;
   bool _checkingMembership = true;
   bool _isFollowing = false;
   String _memberRole = '';
   // Reference to the FAB widget key for direct animation control
   final GlobalKey<_AdminFabState> _fabKey = GlobalKey<_AdminFabState>();
   TabController? _tabController;
+
+  String get _joinLabel => switch (_joinStatus) {
+    _JoinStatus.none => _requestingJoin ? 'Sending...' : 'Join',
+    _JoinStatus.pending || _JoinStatus.membershipPending => 'Requested',
+    _JoinStatus.declined || _JoinStatus.membershipDeclined => 'Declined',
+    _ => 'Unavailable',
+  };
+
+  String get _accessDescription => switch (_joinStatus) {
+    _JoinStatus.none => 'Not joined',
+    _JoinStatus.pending => 'Request pending',
+    _JoinStatus.declined => 'Request declined',
+    _JoinStatus.membershipPending => 'Membership pending',
+    _JoinStatus.membershipDeclined => 'Membership declined',
+    _JoinStatus.requestUnavailable => 'Request status unavailable',
+    _JoinStatus.unavailable => 'Membership status unavailable',
+  };
 
   @override
   void initState() {
@@ -116,6 +153,7 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
           .doc(widget.organizationId)
           .get();
 
+      if (!mounted) return;
       final createdBy = orgDoc.data()?['createdBy'];
 
       if (createdBy == user.uid) {
@@ -135,17 +173,19 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
           .doc(user.uid)
           .get();
 
-      if (memberDoc.exists) {
-        final role = memberDoc.data()?['role'] ?? 'Member';
+      if (!mounted) return;
+      final role = _approvedMembershipRole(memberDoc.data());
+      if (role != null) {
         setState(() {
           _isMember = true;
-          _memberRole = role == 'admin' ? 'Admin' : 'Member';
+          _memberRole = role;
           _checkingMembership = false;
         });
         return;
       }
 
-      // Check if user has a pending join request
+      // An existing request cannot be overwritten by the requester. Keep
+      // declined/unknown records disabled rather than offering a denied reapply.
       final requestDoc = await _db
           .collection('Organizations')
           .doc(widget.organizationId)
@@ -153,17 +193,40 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
           .doc(user.uid)
           .get();
 
+      if (!mounted) return;
       setState(() {
         _isMember = false;
-        _hasRequestedJoin = requestDoc.exists;
+        _joinStatus = requestDoc.exists
+            ? switch (requestDoc.data()?['status']) {
+                'pending' => _JoinStatus.pending,
+                'declined' => _JoinStatus.declined,
+                _ => _JoinStatus.requestUnavailable,
+              }
+            : memberDoc.exists
+            ? switch (memberDoc.data()?['status']) {
+                'pending' => _JoinStatus.membershipPending,
+                'declined' => _JoinStatus.membershipDeclined,
+                _ => _JoinStatus.unavailable,
+              }
+            : _JoinStatus.none;
         _checkingMembership = false;
       });
     } catch (e) {
-      setState(() => _checkingMembership = false);
+      if (!mounted) return;
+      setState(() {
+        _checkingMembership = false;
+        _joinStatus = _JoinStatus.unavailable;
+      });
     }
   }
 
   Future<void> _requestToJoin() async {
+    if (_requestingJoin ||
+        _checkingMembership ||
+        _isMember ||
+        _joinStatus != _JoinStatus.none) {
+      return;
+    }
     if (AccountAccessService.isGuest) {
       await showAccountRequiredSheet(
         context: context,
@@ -180,10 +243,12 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
       return;
     }
 
+    setState(() => _requestingJoin = true);
     try {
       await _helper.requestToJoinOrganization(widget.organizationId);
+      if (!mounted) return;
       setState(() {
-        _hasRequestedJoin = true;
+        _joinStatus = _JoinStatus.pending;
       });
       if (mounted) {
         ScaffoldMessenger.of(
@@ -196,6 +261,8 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
+    } finally {
+      if (mounted) setState(() => _requestingJoin = false);
     }
   }
 
@@ -482,9 +549,9 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
                                     ),
                                   if (!_isMember &&
                                       !_checkingMembership &&
-                                      _hasRequestedJoin)
-                                    const AttendUsStatusBadge(
-                                      label: 'Requested',
+                                      _joinStatus != _JoinStatus.none)
+                                    AttendUsStatusBadge(
+                                      label: _joinLabel,
                                       tone: AttendUsStatusTone.warning,
                                     ),
                                 ],
@@ -494,11 +561,15 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
                         ),
                         if (!_isMember && !_checkingMembership)
                           AttendUsButton.primary(
-                            label: _hasRequestedJoin ? 'Requested' : 'Join',
-                            icon: _hasRequestedJoin
+                            label: _joinLabel,
+                            icon:
+                                _joinStatus == _JoinStatus.pending ||
+                                    _joinStatus == _JoinStatus.membershipPending
                                 ? Icons.hourglass_empty
                                 : Icons.person_add_alt_1,
-                            onPressed: _hasRequestedJoin
+                            onPressed:
+                                _joinStatus != _JoinStatus.none ||
+                                    _requestingJoin
                                 ? null
                                 : _requestToJoin,
                           ),
@@ -585,7 +656,7 @@ class _GroupProfileScreenV2State extends State<GroupProfileScreenV2>
                     ? 'Checking membership'
                     : _isMember
                     ? (_memberRole.isEmpty ? 'Member' : _memberRole)
-                    : (_hasRequestedJoin ? 'Request pending' : 'Not joined'),
+                    : _accessDescription,
                 dense: true,
               ),
               const SizedBox(height: 10),
@@ -3103,6 +3174,7 @@ class _AdminFabState extends State<_AdminFab> with TickerProviderStateMixin {
           .doc(widget.organizationId)
           .get();
 
+      if (!mounted) return;
       final createdBy = orgDoc.data()?['createdBy'];
 
       // Check if user is creator
@@ -3123,10 +3195,11 @@ class _AdminFabState extends State<_AdminFab> with TickerProviderStateMixin {
           .doc(user.uid)
           .get();
 
-      if (memberDoc.exists) {
-        final role = memberDoc.data()?['role'];
+      if (!mounted) return;
+      final role = _approvedMembershipRole(memberDoc.data());
+      if (role != null) {
         setState(() {
-          _isAdmin = role == 'admin' || role == 'owner';
+          _isAdmin = role == 'Admin' || role == 'Owner';
           _isMember = true;
           _isLoading = false;
         });
@@ -3134,7 +3207,7 @@ class _AdminFabState extends State<_AdminFab> with TickerProviderStateMixin {
         setState(() => _isLoading = false);
       }
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
