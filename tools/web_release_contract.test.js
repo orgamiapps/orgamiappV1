@@ -7,7 +7,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const c = require("./web_release_contract");
 const {verifyState, captureFunctionSources, pages} = require("./web_release_state");
-const {options, materializeBackend, materializeRules, runFunctionsCommand} = require("./web_release_pipeline");
+const {options, materializeBackend, materializeRules, runFunctionsCommand, verifyPublishedDeployment} = require("./web_release_pipeline");
 const {publishEvidence, retainReports, selectedGates} = require("./web_release_evidence");
 const hash = "a".repeat(64); const sourceSha = "a".repeat(40);
 function candidate(environment = "staging") {
@@ -383,4 +383,67 @@ test("wrong-source, stale, failed and incompletely guarded CLI receipts are reje
     const f = completionHarness();
     try {assert.throws(() => f.run(alter), /completed, matching/);} finally {f.cleanup();}
   }
+});
+
+function hostingStateHarness(t, {beforeChange = () => {}, afterChange = () => {}} = {}) {
+  const tempRoot = fs.realpathSync(os.tmpdir());
+  const directory = fs.realpathSync(fs.mkdtempSync(path.join(tempRoot, "attendus-hosting-state-")));
+  t.after(() => {
+    assert.equal(fs.realpathSync(os.tmpdir()), tempRoot); assert.equal(fs.realpathSync(directory), directory);
+    assert.ok(directory.startsWith(tempRoot + path.sep)); assert.equal(fs.lstatSync(directory).isSymbolicLink(), false);
+    fs.rmSync(directory, {recursive: true});
+  });
+  const value = candidate(), manifest = {indexes: [], fieldOverrides: []};
+  const hosting = {config: {rewrites: [{glob: "**", path: "/index.html"}]}, files: {"index.html": hash}};
+  hosting.configSha256 = c.digest(hosting.config); hosting.filesSha256 = c.digest(hosting.files);
+  const published = {projectId: value.projectId, hostingVersion: `sites/${value.projectId}/versions/new-final`,
+    hostingRelease: `sites/${value.projectId}/releases/new-final`, hosting};
+  const state = {...published, functions: value.deployment.functions.map((id) => ({id, state: "ACTIVE", region: "us-central1",
+    environmentVariablesSha256: hash, eventTrigger: {eventType: id === "triggerAIInsights" ? value.deployment.triggerTransition.legacy.eventType : value.deployment.triggerTransition.replacement.eventType,
+      eventFilters: {document: "event_analytics/{docId}"}}})),
+  rules: [{release: `projects/${value.projectId}/releases/cloud.firestore`, files: [{name: "firestore.rules", sha256: hash}]},
+    {release: `projects/${value.projectId}/releases/firebase.storage/default`, files: [{name: "storage.rules", sha256: hash}]}],
+  indexes: [], fields: [], functionSources: [{name: "triggerAIInsightsV2", source: {generation: "123"}, revision: "revision-1"}]};
+  const output = path.join(directory, "deployment.json"), calls = [];
+  const readPhase = (phase) => JSON.parse(fs.readFileSync(path.join(directory, `hosting-state-${phase}-verification.json`), "utf8"));
+  const adapters = {manifest, capture: async (project) => {
+    assert.equal(project, value.projectId); const snapshot = structuredClone(state);
+    if (calls.length === 0) {calls.push("capture-before"); beforeChange(snapshot);} else {calls.push("capture-after"); afterChange(snapshot);}
+    return {state: snapshot, stateSha256: c.digest(snapshot), capturedAt: new Date().toISOString()};
+  }, http: async (candidateValue, options) => {
+    calls.push("http"); assert.equal(candidateValue, value); assert.equal(options.expectedHostingIdentity, published);
+    assert.equal(readPhase("before").candidateSha256, c.digest(value));
+    assert.equal(fs.existsSync(path.join(directory, "hosting-state-after-verification.json")), false);
+    return {schemaVersion: 1, status: "verified", candidateSha256: c.digest(value)};
+  }};
+  return {run: () => verifyPublishedDeployment(value, published, {output, client: {}}, adapters), calls, readPhase, output, state, value, manifest};
+}
+test("final Hosting verification brackets canonical HTTP with retained identical full deployment state", async (t) => {
+  const f = hostingStateHarness(t), result = await f.run();
+  assert.deepEqual(f.calls, ["capture-before", "http", "capture-after"]);
+  assert.equal(result.before.stateSha256, result.after.stateSha256);
+  assert.equal(result.live.status, "verified"); assert.equal(f.readPhase("after").stateSha256, result.after.stateSha256);
+  assert.equal(f.readPhase("before").sourceSha, f.value.sourceSha); assert.equal(f.readPhase("after").candidateRunId, f.value.candidateRunId);
+});
+for (const kind of ["function-source", "function-environment"]) test(`${kind} drift after matching HTTP bytes cannot become a deployment receipt`, async (t) => {
+  const f = hostingStateHarness(t, {afterChange: (state) => {
+    if (kind === "function-source") state.functionSources[0].source.generation = "456";
+    else state.functions[0].environmentVariablesSha256 = "b".repeat(64);
+  }});
+  await assert.rejects(f.run(), /Full deployment state changed/);
+  assert.deepEqual(f.calls, ["capture-before", "http", "capture-after"]);
+  const retained = f.readPhase("after");
+  assert.doesNotThrow(() => verifyState(f.value, retained, f.manifest), "inventory/rules checks alone do not detect this drift");
+  assert.notEqual(retained.stateSha256, f.readPhase("before").stateSha256);
+  assert.equal(fs.existsSync(f.output), false);
+});
+test("full pre-HTTP capture must still be the pinned final Hosting release, never the bridge", async (t) => {
+  const f = hostingStateHarness(t, {beforeChange: (state) => {state.hostingVersion = `sites/${state.projectId}/versions/asset-bridge`;}});
+  await assert.rejects(f.run(), /Hosting release changed before/);
+  assert.deepEqual(f.calls, ["capture-before"]); assert.match(f.readPhase("before").state.hostingVersion, /asset-bridge$/);
+});
+test("after snapshot remains retained when candidate state verification itself fails", async (t) => {
+  const f = hostingStateHarness(t, {afterChange: (state) => {state.functions[0].state = "DEPLOYING";}});
+  await assert.rejects(f.run(), /inactive function/);
+  assert.equal(f.readPhase("after").state.functions[0].state, "DEPLOYING"); assert.equal(fs.existsSync(f.output), false);
 });
