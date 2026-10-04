@@ -19,6 +19,9 @@ const PINS = Object.freeze({
   "lib/command.js": "8694788bf242975de8e0b1e5e532ea1e51723d78286a62741f4034abb21119fa",
   "lib/logger.js": "72eb50a1733b9d225cb01a5efb873503f4a542bd680f19c605ab461fa6feb229",
   "lib/deploy/extensions/prepare.js": "b47d8b26f01457f52b747f6e9c6509cec147f29926d913a9ede13e8cc7322be8",
+  "lib/apiv2.js": "eada1f0c2f2bce92482647dcbf78fddff32eb6439d18f4a8cb26076fd2746db5", // gitleaks:allow Pinned CLI module SHA-256.
+  "lib/gcp/cloudfunctionsv2.js": "c9fd8ed8e6faf0cad70051cdec048a7a222760384a14b45f5f01d38418d22752",
+  "lib/api.js": "a13c173c36066ac62c711005534fc3bc071d49be8bb26df60303d88e818c5907", // gitleaks:allow Pinned CLI module SHA-256.
 });
 const PUBLIC_KEYS = ["id", "platform", "project", "region", "runtime", "entryPoint", "state", "codebase", "labels", "eventTrigger", "scheduleTrigger", "callableTrigger", "httpsTrigger", "serviceAccountEmail", "availableMemoryMb", "timeout", "minInstances", "maxInstances", "concurrency", "secretEnvironmentVariables"];
 const key = (endpoint) => `${endpoint.region}/${endpoint.id}`;
@@ -191,6 +194,93 @@ function installGuards({candidate, predecessor, outputPath, preflight = false}, 
     modules.deploy.uploadSourceV2 = original.uploadSourceV2; modules.release.release = original.release; installed = false;
   }};
 }
+function guardUnfinishedExecution(guards) {
+  // An awaited promise alone does not keep Node alive. The pinned CLI's queue
+  // can strand queued work after retry exhaustion, leaving command.runner()
+  // unresolved even though the event loop is empty. Never turn that into an
+  // exit-zero deployment. Do not resume/retry the queue or create a keepalive.
+  let stopped = false, rejectUnfinished;
+  const unfinished = new Promise((_, reject) => {rejectUnfinished = reject;});
+  function fail(code) {
+    if (stopped) return;
+    const error = Object.assign(Error("Pinned Firebase CLI exited with unfinished execution; inspect the curated CLI log and reconcile deployed state."), {code});
+    guards.receipt.status = "failure";
+    guards.receipt.failureCode = code;
+    guards.receipt.error = error.message;
+    guards.receipt.finishedAt = new Date().toISOString();
+    if (!process.exitCode) process.exitCode = 1;
+    // The exit callback can only do synchronous work. persist() uses the same
+    // atomic receipt replacement as the normal finalizer and retains all plans.
+    try {guards.persist();}
+    catch (_) {console.error("Could not persist the unfinished Functions failure receipt.");}
+    rejectUnfinished(error);
+  }
+  const beforeExit = () => fail("cli-unsettled-before-exit");
+  const exit = () => fail("cli-unsettled-exit");
+  process.once("beforeExit", beforeExit); process.once("exit", exit);
+  return {wait: (promise) => Promise.race([promise, unfinished]), stop() {
+    stopped = true; process.removeListener("beforeExit", beforeExit); process.removeListener("exit", exit);
+  }};
+}
+function installFunctionApiPacing({candidate, now = () => performance.now(), sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))}) {
+  const origin = "https://cloudfunctions.googleapis.com", region = "us-central1", interval = 1500;
+  if (PROJECTS[candidate?.environment] !== candidate?.projectId || !Array.isArray(candidate?.deployment?.functions) ||
+      !candidate.deployment.functions.length || candidate.deployment.functions.some((id) => !/^[A-Za-z][A-Za-z0-9_]*$/.test(id))) throw Error("Invalid Functions transport scope");
+  const names = new Set(candidate.deployment.functions), base = `/v2/projects/${candidate.projectId}/locations/${region}/functions`;
+  const original = globalThis.fetch;
+  if (typeof original !== "function") throw Error("Pinned Functions transport requires global fetch");
+  const receipt = {projectId: candidate.projectId, region, minimumStartSpacingMs: interval, startedRequests: 0, minimumObservedSpacingMs: null};
+  let lastDispatch = -Infinity, lastObservedStart = -Infinity, dispatch = Promise.resolve();
+  function selected(input, options) {
+    const request = typeof Request !== "undefined" && input instanceof Request;
+    const value = request ? input.url : typeof input === "string" || input instanceof URL ? input : null;
+    if (value === null) return false;
+    let url;
+    try {url = new URL(value);} catch (_) {return false;}
+    if (url.hostname !== "cloudfunctions.googleapis.com") return false;
+    const method = String(options?.method ?? (request ? input.method : "GET")).toUpperCase();
+    let pathname;
+    try {pathname = decodeURIComponent(url.pathname);} catch (_) {pathname = url.pathname;}
+    // Fabricator can attempt an internal delete/recreate after code 8 despite
+    // a safe top-level plan. This adapter forbids every Function deletion.
+    if (method === "DELETE" && /\/functions\//.test(pathname)) throw Error("Functions transport deletion is forbidden");
+    const create = method === "POST" && /\/functions\/?$/.test(pathname);
+    const update = method === "PATCH" && /\/functions(?:\/|$)/.test(pathname);
+    if (!create && !update) return false;
+    let id;
+    if (create && url.pathname === base && [...url.searchParams.keys()].every((name) => name === "functionId") && url.searchParams.getAll("functionId").length === 1) id = url.searchParams.get("functionId");
+    if (update && url.pathname.startsWith(base + "/") && [...url.searchParams.keys()].every((name) => name === "updateMask") && url.searchParams.getAll("updateMask").length <= 1) id = url.pathname.slice(base.length + 1);
+    if (url.origin !== origin || url.username || url.password || url.hash || !names.has(id)) throw Error("Functions transport mutation is outside the frozen candidate project/region/name");
+    return true;
+  }
+  function pacedFetch(...args) {
+    let pace;
+    try {pace = selected(args[0], args[1]);} catch (error) {return Promise.reject(error);}
+    if (!pace) return Reflect.apply(original, this, args);
+    const receiver = this;
+    const start = dispatch.then(async () => {
+      let current = now();
+      while (current - lastDispatch < interval) {await sleep(interval - (current - lastDispatch)); current = now();}
+      // Do not await the response here: only request starts are serialized. The
+      // pinned apiv2 calls free global fetch for every internal retry, so those
+      // attempts share this same start gate. Arguments and payload stay intact.
+      const startedAt = now();
+      try {return {response: Reflect.apply(original, receiver, args)};}
+      finally {
+        // Using the return from the synchronous fetch invocation as the next
+        // lower bound also excludes any synchronous dispatch overhead.
+        lastDispatch = now();
+        const spacing = startedAt - lastObservedStart; lastObservedStart = startedAt;
+        receipt.startedRequests++;
+        if (Number.isFinite(spacing)) receipt.minimumObservedSpacingMs = receipt.minimumObservedSpacingMs === null ? spacing : Math.min(receipt.minimumObservedSpacingMs, spacing);
+      }
+    });
+    dispatch = start.then(() => undefined, () => undefined);
+    return start.then(({response}) => response);
+  }
+  globalThis.fetch = pacedFetch;
+  return {receipt, restore() {globalThis.fetch = original;}};
+}
 async function run({candidate, configPath, predecessor, outputPath, preflight = false}) {
   const {only} = validateInputs(candidate, predecessor);
   const absoluteConfig = path.resolve(configPath);
@@ -198,7 +288,13 @@ async function run({candidate, configPath, predecessor, outputPath, preflight = 
   const configurations = Array.isArray(config.functions) ? config.functions : [config.functions];
   if (configurations.length !== 1 || !configurations[0]?.source || (configurations[0].codebase || "default") !== "default" || config.extensions) throw Error("Only one frozen Functions codebase is supported");
   const modules = loadPinned(); const guards = installGuards({candidate, predecessor, outputPath, preflight}, modules);
+  const execution = guardUnfinishedExecution(guards);
+  let apiPacing;
   try {
+    const api = require(path.join(modules.directory, "lib/api"));
+    if (api.functionsOrigin() !== "https://cloudfunctions.googleapis.com" || api.functionsV2Origin() !== "https://cloudfunctions.googleapis.com") throw Error("Functions transport origin overrides are forbidden");
+    apiPacing = installFunctionApiPacing({candidate}); guards.receipt.apiPacing = apiPacing.receipt;
+    guards.persist();
     // The programmatic runner defaults to a silent logger. Enable only its
     // ordinary info console transport, never a debug log or inherited DEBUG.
     const previousDebug = process.env.DEBUG; const previousCli = process.env.IS_FIREBASE_CLI;
@@ -210,16 +306,18 @@ async function run({candidate, configPath, predecessor, outputPath, preflight = 
     const command = require(path.join(modules.directory, "lib/commands/deploy")).command;
     // Firebase's supported dry run still performs predeploy/prepare, including
     // possible prerequisite API enablement. It must not upload/release Functions.
-    await command.runner()({project: candidate.projectId, config: absoluteConfig, only, nonInteractive: true, force: false, dryRun: preflight});
+    await execution.wait(Promise.resolve().then(() => command.runner()({project: candidate.projectId, config: absoluteConfig, only, nonInteractive: true, force: false, dryRun: preflight})));
     if (!guards.receipt.plans.some((plan) => plan.phase === "prepare-before-upload") ||
         (preflight ? guards.receipt.plans.some((plan) => plan.phase !== "prepare-before-upload") : !guards.receipt.plans.some((plan) => plan.phase === "release"))) throw Error("Pinned CLI did not execute required plan guards");
     guards.receipt.status = preflight ? "preflight-passed" : "success";
     return guards.receipt;
   } catch (error) {
     guards.receipt.status = "failure";
-    guards.receipt.error = "Functions deployment failed; inspect the curated CLI log.";
+    guards.receipt.error ||= "Functions deployment failed; inspect the curated CLI log.";
     throw error;
   } finally {
+    apiPacing?.restore();
+    execution.stop();
     guards.receipt.finishedAt = new Date().toISOString(); guards.restore();
     guards.persist();
   }
@@ -230,4 +328,4 @@ if (require.main === module) {
   else Promise.resolve().then(() => run({candidate: JSON.parse(fs.readFileSync(candidateFile, "utf8")), configPath,
     predecessor: JSON.parse(fs.readFileSync(predecessorFile, "utf8")), outputPath, preflight: mode === "--preflight"})).catch((error) => { console.error(error.message); process.exitCode = 1; });
 }
-module.exports = {VERSION, PINS, assertPins, loadPinned, descriptor, publicEndpoint, validateInputs, validateBackends, assertPlan, assertEmptyExtensions, installGuards, run};
+module.exports = {VERSION, PINS, assertPins, loadPinned, descriptor, publicEndpoint, validateInputs, validateBackends, assertPlan, assertEmptyExtensions, installGuards, installFunctionApiPacing, run};

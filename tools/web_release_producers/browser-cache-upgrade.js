@@ -4,6 +4,7 @@ const path = require('node:path');
 const http = require('node:http');
 const crypto = require('node:crypto');
 const {files, gitSourceFiles} = require('../web_release_contract');
+const {activateFlutterSemanticsPage} = require('./flutter-semantics');
 const sha = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
 function verifyTree(root, expected) {
@@ -108,9 +109,7 @@ async function produce({browser, context, candidate, outputDir, observeCreatedId
   }
   async function ready() {
     await page.waitForFunction(() => performance.getEntriesByName('attendus-first-frame').length > 0, undefined, {timeout: 120000});
-    const placeholder = page.locator('flt-semantics-placeholder');
-    if (await placeholder.count()) await placeholder.first().click({force: true});
-    await page.locator('flt-semantics').first().waitFor();
+    await activateFlutterSemanticsPage(page);
   }
   async function storageState() {
     return page.evaluate(async () => {

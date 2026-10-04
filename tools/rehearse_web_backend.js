@@ -22,9 +22,20 @@ function sourceIdentity(source) {
 }
 function stableConfig(fn) {
   const serviceConfig = {...fn.serviceConfig}; delete serviceConfig.revision;
+  const eventTrigger = fn.eventTrigger ? {...fn.eventTrigger} : null;
+  // The v2 API returns these conjunctive filters in varying array order even
+  // when updateTime is unchanged. Preserve every value/operator; reject
+  // ambiguous duplicate attributes instead of dropping a filter.
+  if (Array.isArray(eventTrigger?.eventFilters)) {
+    const attributes = new Set();
+    eventTrigger.eventFilters = eventTrigger.eventFilters.map((filter) => {
+      if (typeof filter?.attribute !== "string" || !filter.attribute || typeof filter.value !== "string" || attributes.has(filter.attribute)) throw Error("Ambiguous event filter configuration");
+      attributes.add(filter.attribute); return {...filter};
+    }).sort((a, b) => a.attribute.localeCompare(b.attribute));
+  }
   return {name: fn.name, environment: fn.environment, runtime: fn.buildConfig?.runtime, entryPoint: fn.buildConfig?.entryPoint,
     buildEnvironment: fn.buildConfig?.environmentVariables || {}, buildServiceAccount: fn.buildConfig?.serviceAccount || null,
-    dockerRepository: fn.buildConfig?.dockerRepository || null, serviceConfig, eventTrigger: fn.eventTrigger || null, labels: fn.labels || {}};
+    dockerRepository: fn.buildConfig?.dockerRepository || null, serviceConfig, eventTrigger, labels: fn.labels || {}};
 }
 function validateArchives(manifest, predecessor) {
   if (manifest.schemaVersion !== 1 || !Array.isArray(manifest.entries) || predecessor.projectId !== PROJECT) throw Error("Invalid staged predecessor archive manifest");
@@ -75,6 +86,15 @@ async function readFunction(client, name) {
   if (!/^projects\/attendus-staging\/locations\/us-central1\/functions\/[A-Za-z0-9_]+$/.test(name)) throw Error("Rehearsal cannot target production or another region");
   return (await client.request({url: `https://cloudfunctions.googleapis.com/v2/${name}`})).data;
 }
+async function resolvedArchive(client, name, fn, requested) {
+  if (fn?.name !== name || fn.environment !== "GEN_2") throw Error("Resolved archive belongs to another function");
+  const source = sourceIdentity(sourceOf(fn)), id = name.split("/").at(-1);
+  const identical = digest(source) === digest(sourceIdentity(requested));
+  if (!identical && (source.bucket !== "gcf-v2-sources-925344893088-us-central1" || source.object !== `${id}/function-source.zip`)) throw Error("Unexpected resolved source boundary");
+  const actual = await objectBytes(client, source);
+  if (actual.sha256 !== requested.sha256 || actual.size !== requested.size) throw Error("Resolved archive bytes differ from the submitted pinned archive");
+  return actual;
+}
 async function retainCandidateSource(client, source, runId, id) {
   if (!/^[1-9][0-9]*$/.test(String(runId)) || !Object.hasOwn(REPRESENTATIVES, id)) throw Error("Invalid private candidate archive identity");
   const original = await objectBytes(client, source);
@@ -86,7 +106,7 @@ async function retainCandidateSource(client, source, runId, id) {
   if (backup.sha256 !== original.sha256 || backup.size !== original.size) throw Error("Private candidate archive copy differs from the deployed candidate");
   return {original, backup};
 }
-async function patchSource(client, name, source, {timeoutMs = 15 * 60000, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))} = {}) {
+async function patchSource(client, name, source, {timeoutMs = 15 * 60000, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), onOperation = () => {}} = {}) {
   const readyDeadline = Date.now() + timeoutMs;
   let before = await readFunction(client, name); // Enforces the target boundary before any write.
   while (before.state === "DEPLOYING") {
@@ -94,20 +114,33 @@ async function patchSource(client, name, source, {timeoutMs = 15 * 60000, sleep 
     await sleep(10000); before = await readFunction(client, name);
   }
   if (!["ACTIVE", "FAILED"].includes(before.state)) throw Error("Function is not in a recoverable deployment state");
+  const requestedSource = await objectBytes(client, source);
+  if (source.sha256 && requestedSource.sha256 !== source.sha256 || source.size && requestedSource.size !== source.size) throw Error("Submitted archive differs from its retained proof");
   const operation = (await client.request({method: "PATCH", url: `https://cloudfunctions.googleapis.com/v2/${name}`,
     params: {updateMask: "buildConfig.source"}, data: {name, buildConfig: {source: {storageSource: sourceIdentity(source)}}}})).data;
   if (!OPERATION.test(operation.name || "")) throw Error("Unexpected function operation identity");
-  const deadline = Date.now() + timeoutMs; let current = operation;
-  while (!current.done) {
-    if (Date.now() >= deadline) throw Error(`Source deployment operation timed out: ${operation.name}`);
-    await sleep(10000);
-    current = (await client.request({url: `https://cloudfunctions.googleapis.com/v2/${operation.name}`})).data;
-  }
-  if (current.error || current.response?.name !== name || current.metadata?.target && current.metadata.target !== name) throw Error(`Source operation did not succeed for the exact function: ${operation.name}`);
-  const fresh = await readFunction(client, name);
-  if (fresh.state !== "ACTIVE" || digest(sourceIdentity(sourceOf(fresh))) !== digest(sourceIdentity(source))) throw Error(`Live function source differs after operation: ${operation.name}`);
-  return {operation: operation.name, startedAt: current.metadata?.createTime || null, completedAt: current.metadata?.endTime || null,
-    source: sourceIdentity(sourceOf(fresh)), configurationSha256: digest(stableConfig(fresh)), revision: fresh.serviceConfig?.revision || null};
+  const proof = {operation: operation.name, startedAt: operation.metadata?.createTime || null,
+    completedAt: operation.metadata?.endTime || null, requestedSource};
+  try {
+    // Persist the acknowledged operation before polling. A timeout or failed
+    // GET must retain the exact operation needed to reconcile this attempt.
+    await onOperation(proof);
+    const deadline = Date.now() + timeoutMs; let current = operation;
+    while (!current.done) {
+      if (Date.now() >= deadline) throw Error(`Source deployment operation timed out: ${operation.name}`);
+      await sleep(10000);
+      current = (await client.request({url: `https://cloudfunctions.googleapis.com/v2/${operation.name}`})).data;
+      if (current.name !== operation.name) throw Error("Polled function operation identity differs");
+    }
+    proof.startedAt = current.metadata?.createTime || null;
+    proof.completedAt = current.metadata?.endTime || null;
+    if (current.error || current.response?.name !== name || current.metadata?.target && current.metadata.target !== name) throw Error(`Source operation did not succeed for the exact function: ${operation.name}`);
+    proof.source = await resolvedArchive(client, name, current.response, requestedSource);
+    const fresh = await readFunction(client, name);
+    if (fresh.state !== "ACTIVE" || digest(sourceIdentity(sourceOf(fresh))) !== digest(sourceIdentity(proof.source)) ||
+        digest(stableConfig(fresh)) !== digest(stableConfig(current.response))) throw Error(`Live function source/configuration differs after operation: ${operation.name}`);
+    return {...proof, configurationSha256: digest(stableConfig(fresh)), revision: fresh.serviceConfig?.revision || null};
+  } catch (error) { error.operationReceipt = proof; throw error; }
 }
 async function rehearse({candidate, predecessor, manifest, output, client = null, patch = patchSource, checkEmpty = assertEmpty, retain = retainCandidateSource}) {
   if (candidate.environment !== "staging" || candidate.projectId !== PROJECT || candidate.candidateRunId !== process.env.GITHUB_RUN_ID || candidate.sourceSha !== process.env.GITHUB_SHA) throw Error("Rehearsal is restricted to the current staging candidate workflow");
@@ -140,17 +173,17 @@ async function rehearse({candidate, predecessor, manifest, output, client = null
     let attempted = false; let failure;
     try {
       await checkEmpty(client); attempted = true;
-      item.rollback = await patch(client, name, archive.backup); save();
+      item.rollback = await patch(client, name, archive.backup, {onOperation: (proof) => { item.rollbackAttempt = proof; save(); }}); save();
       if (item.rollback.configurationSha256 !== candidateHash) throw Error("Rollback changed service, trigger, runtime or entrypoint configuration");
       item.emptyDuring = await checkEmpty(client); save();
-    } catch (error) { failure = error; item.failure = String(error.message); save(); }
+    } catch (error) { failure = error; item.failure = String(error.message); if (error.operationReceipt) item.rollbackAttempt = error.operationReceipt; save(); }
     finally {
       if (attempted) {
         try {
-          item.restoration = await patch(client, name, forwardArchive.backup); save();
+          item.restoration = await patch(client, name, forwardArchive.backup, {onOperation: (proof) => { item.restorationAttempt = proof; save(); }}); save();
           if (item.restoration.configurationSha256 !== candidateHash) throw Error("Restoration changed non-source configuration");
           item.emptyAfter = await checkEmpty(client); save();
-        } catch (error) { item.restorationFailure = String(error.message); save(); throw Error(`Candidate restoration failed for ${id}; stop and recover using the retained operation/source receipt`, {cause: error}); }
+        } catch (error) { item.restorationFailure = String(error.message); if (error.operationReceipt) item.restorationAttempt = error.operationReceipt; save(); throw Error(`Candidate restoration failed for ${id}; stop and recover using the retained operation/source receipt`, {cause: error}); }
       }
     }
     if (failure) throw failure;
@@ -171,14 +204,21 @@ async function verifyRehearsal({candidate, receipt, manifest, client = null}) {
       const recorded = item[phase]; const expected = phase === "rollback" ? item.priorSource : item.candidateSource.backup;
       if (!OPERATION.test(recorded.operation || "")) throw Error("Unexpected rehearsal operation resource");
       const operation = (await client.request({url: `https://cloudfunctions.googleapis.com/v2/${recorded.operation}`})).data;
-      if (operation.done !== true || operation.error || operation.response?.name !== name || operation.metadata?.target && operation.metadata.target !== name || digest(sourceIdentity(sourceOf(operation.response))) !== digest(sourceIdentity(expected)) || digest(stableConfig(operation.response)) !== item.candidateConfigurationSha256) throw Error("Actual completed operation does not prove the recorded source-only transition");
+      if (operation.done !== true || operation.error || operation.response?.name !== name || operation.metadata?.target && operation.metadata.target !== name ||
+          digest(sourceIdentity(recorded.requestedSource)) !== digest(sourceIdentity(expected)) ||
+          digest(sourceIdentity(sourceOf(operation.response))) !== digest(sourceIdentity(recorded.source)) ||
+          digest(stableConfig(operation.response)) !== item.candidateConfigurationSha256 || recorded.configurationSha256 !== item.candidateConfigurationSha256) throw Error("Actual completed operation does not prove the recorded source-only transition");
+      const requested = await objectBytes(client, expected);
+      if (requested.sha256 !== expected.sha256 || digest(requested) !== digest(recorded.requestedSource)) throw Error("Recorded submitted archive bytes differ");
+      const resolved = await resolvedArchive(client, name, operation.response, requested);
+      if (digest(resolved) !== digest(recorded.source)) throw Error("Recorded resolved archive bytes differ");
       const start = Date.parse(operation.metadata?.createTime), end = Date.parse(operation.metadata?.endTime);
       if (!Number.isFinite(start) || !Number.isFinite(end) || end < start || start < Date.parse(receipt.startedAt) - 60000 || end > Date.parse(receipt.completedAt) + 60000 || phase === "restoration" && start < Date.parse(item.rollback.completedAt)) throw Error("Rehearsal operation time/phase order differs");
       if (operation.metadata.createTime !== recorded.startedAt || operation.metadata.endTime !== recorded.completedAt) throw Error("Recorded operation timing was modified");
-      evidence.push({function: id, type, phase, operation: recorded.operation, source: sourceIdentity(expected), startedAt: operation.metadata.createTime, completedAt: operation.metadata.endTime});
+      evidence.push({function: id, type, phase, operation: recorded.operation, requestedSource: requested, source: resolved, startedAt: operation.metadata.createTime, completedAt: operation.metadata.endTime});
     }
     const fresh = await readFunction(client, name);
-    if (fresh.state !== "ACTIVE" || digest(stableConfig(fresh)) !== item.candidateConfigurationSha256 || digest(sourceIdentity(sourceOf(fresh))) !== digest(sourceIdentity(item.candidateSource.backup))) throw Error("Representative no longer has the restored candidate source/configuration");
+    if (fresh.state !== "ACTIVE" || digest(stableConfig(fresh)) !== item.candidateConfigurationSha256 || digest(sourceIdentity(sourceOf(fresh))) !== digest(sourceIdentity(item.restoration.source))) throw Error("Representative no longer has the restored candidate source/configuration");
     const restored = await objectBytes(client, item.candidateSource.backup);
     if (restored.sha256 !== item.candidateSource.original.sha256) throw Error("Retained candidate restoration bytes differ");
     for (const check of [receipt.emptyBefore, item.emptyDuring, item.emptyAfter]) if (!check || !Number.isFinite(Date.parse(check.checkedAt)) || EMPTY_COLLECTIONS.some((collection) => check.collections?.[collection] !== 0) || !Number.isInteger(check.anonymousAuthCount) || check.anonymousAuthCount < 0 || check.anonymousAuthCount > 1) throw Error("Pre-fixture empty-project evidence is incomplete");

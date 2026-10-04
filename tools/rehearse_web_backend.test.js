@@ -8,8 +8,13 @@ const {digest, sha256} = require("./web_release_contract");
 const r = require("./rehearse_web_backend");
 const clone = (value) => JSON.parse(JSON.stringify(value));
 function fixture(t) {
-  const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), "attendus-rehearsal-"));
-  t.after(() => fs.rmSync(outputRoot, {recursive: true, force: true}));
+  const temporaryBase = fs.realpathSync(os.tmpdir());
+  const outputRoot = fs.mkdtempSync(path.join(temporaryBase, "attendus-rehearsal-"));
+  const owned = fs.realpathSync(outputRoot);
+  t.after(() => {
+    if (fs.realpathSync(os.tmpdir()) !== temporaryBase || fs.lstatSync(outputRoot).isSymbolicLink() || fs.realpathSync(outputRoot) !== owned || !owned.startsWith(`${temporaryBase}${path.sep}`)) throw Error("Unsafe owned test cleanup");
+    fs.rmSync(owned, {recursive: true});
+  });
   const oldRun = process.env.GITHUB_RUN_ID, oldSha = process.env.GITHUB_SHA;
   process.env.GITHUB_RUN_ID = "123"; process.env.GITHUB_SHA = "a".repeat(40);
   t.after(() => {
@@ -39,7 +44,7 @@ function fixture(t) {
       ...(type === "firestore-updated" ? {eventTrigger: {eventType: "google.cloud.firestore.document.v1.updated", eventFilters: [{attribute: "document", value: "event_analytics/{docId}"}]}} : {})});
   }
   const candidate = {environment: "staging", projectId: r.PROJECT, candidateRunId: "123", sourceSha: "a".repeat(40), predecessor: {staging: predecessor}};
-  const state = {patches: 0, failPatch: null, driftPatch: null, nonempty: false};
+  const state = {patches: 0, failPatch: null, driftPatch: null, nonempty: false, copyResolved: false, corruptPatch: null, foreignCopy: false};
   const client = {request: async (request) => {
     calls.push(clone(request)); const url = new URL(request.url);
     if (url.hostname === "firestore.googleapis.com") return {data: {documents: state.nonempty ? [{name: "live-record"}] : []}};
@@ -66,7 +71,13 @@ function fixture(t) {
     assert.equal(request.params.updateMask, "buildConfig.source");
     assert.deepEqual(Object.keys(request.data).sort(), ["buildConfig", "name"]);
     assert.deepEqual(Object.keys(request.data.buildConfig), ["source"]);
-    const fn = clone(functions.get(resource)); const source = clone(request.data.buildConfig.source.storageSource);
+    const fn = clone(functions.get(resource)); let source = clone(request.data.buildConfig.source.storageSource);
+    if (state.copyResolved) {
+      const resolved = {bucket: state.foreignCopy ? "unrelated-project-sources" : "gcf-v2-sources-925344893088-us-central1",
+        object: `${resource.split("/").at(-1)}/function-source.zip`, generation: String(100 + state.patches)};
+      objects.set(objectKey(resolved), state.corruptPatch === state.patches ? Buffer.from("wrong deployed bytes") : objects.get(objectKey(source)));
+      source = resolved;
+    }
     fn.buildConfig.source = {storageSource: source}; fn.buildConfig.sourceProvenance = {resolvedStorageSource: source};
     fn.serviceConfig.revision = `revision-${state.patches}`;
     if (state.driftPatch === state.patches) fn.serviceConfig.timeoutSeconds = 99;
@@ -135,4 +146,86 @@ test("receipt scope, archive paths, timing and empty-project counts cannot be fo
     const changed = clone(receipt); mutate(changed);
     await assert.rejects(() => r.verifyRehearsal({...f, receipt: changed}));
   }
+});
+test("actual GCF archive copying preserves byte/configuration proof across all eight transitions", async (t) => {
+  const f = fixture(t); f.state.copyResolved = true;
+  const receipt = await r.rehearse(f), verified = await r.verifyRehearsal({...f, receipt});
+  assert.equal(verified.operations.length, 8);
+  for (const item of Object.values(receipt.representatives)) for (const phase of ["rollback", "restoration"]) {
+    assert.equal(item[phase].requestedSource.bucket, "attendus-recovery-20261004-backups");
+    assert.equal(item[phase].source.bucket, "gcf-v2-sources-925344893088-us-central1");
+    assert.equal(item[phase].source.sha256, item[phase].requestedSource.sha256);
+    assert.equal(item[phase].source.size, item[phase].requestedSource.size);
+  }
+});
+test("copied source with different bytes fails and retains operation evidence while restoring candidate", async (t) => {
+  const f = fixture(t); f.state.copyResolved = true; f.state.corruptPatch = 1;
+  await assert.rejects(() => r.rehearse(f), /archive bytes differ/);
+  const item = JSON.parse(fs.readFileSync(f.output)).representatives.publicWeb;
+  assert.equal(f.state.patches, 2); assert.ok(item.restoration);
+  assert.match(item.rollbackAttempt.operation, /operation-1$/);
+  assert.ok(item.rollbackAttempt.completedAt);
+  assert.equal(item.restoration.source.sha256, item.candidateSource.backup.sha256);
+});
+test("matching bytes cannot authorize an unrelated resolved source bucket", async (t) => {
+  const f = fixture(t); f.state.copyResolved = true; f.state.foreignCopy = true;
+  await assert.rejects(() => r.rehearse(f), /Candidate restoration failed/);
+  const item = JSON.parse(fs.readFileSync(f.output)).representatives.publicWeb;
+  assert.match(item.failure, /resolved source boundary/);
+  assert.match(item.restorationFailure, /resolved source boundary/);
+});
+test("API event filter ordering is canonical while values, operators and duplicates remain guarded", () => {
+  const fn = {name: "trigger", eventTrigger: {eventType: "written", eventFilters: [
+    {attribute: "namespace", value: "(default)"},
+    {attribute: "document", value: "Events/{id}", operator: "match-path-pattern"},
+    {attribute: "database", value: "(default)"},
+  ]}, serviceConfig: {timeoutSeconds: 60}};
+  const original = clone(fn), reordered = clone(fn); reordered.eventTrigger.eventFilters.reverse();
+  assert.equal(digest(r.stableConfig(fn)), digest(r.stableConfig(reordered)));
+  assert.deepEqual(fn, original);
+  for (const change of [
+    (value) => {value.eventTrigger.eventFilters[1].value = "Other/{id}";},
+    (value) => {delete value.eventTrigger.eventFilters[1].operator;},
+    (value) => {value.serviceConfig.timeoutSeconds = 99;},
+  ]) {const changed = clone(fn); change(changed); assert.notEqual(digest(r.stableConfig(fn)), digest(r.stableConfig(changed)));}
+  const duplicate = clone(fn); duplicate.eventTrigger.eventFilters.push(clone(duplicate.eventTrigger.eventFilters[0]));
+  assert.throws(() => r.stableConfig(duplicate), /Ambiguous event filter/);
+});
+test("operation filter reordering does not hide source or configuration proof", async (t) => {
+  const f = fixture(t); f.state.copyResolved = true;
+  const name = `projects/${r.PROJECT}/locations/us-central1/functions/triggerAIInsights`;
+  f.functions.get(name).eventTrigger.eventFilters.push({attribute: "database", value: "(default)"});
+  const receipt = await r.rehearse(f);
+  for (const phase of ["rollback", "restoration"]) f.operations.get(receipt.representatives.triggerAIInsights[phase].operation).response.eventTrigger.eventFilters.reverse();
+  assert.equal((await r.verifyRehearsal({...f, receipt})).operations.length, 8);
+  const forged = clone(receipt); forged.representatives.publicWeb.restoration.requestedSource.sha256 = "0".repeat(64);
+  await assert.rejects(() => r.verifyRehearsal({...f, receipt: forged}), /submitted archive bytes differ/);
+});
+for (const failedPhase of ["rollback", "restoration"]) test(`acknowledged ${failedPhase} operation is saved before a polling failure`, async (t) => {
+  const f = fixture(t), request = f.client.request, failedPatch = failedPhase === "rollback" ? 1 : 2;
+  let persistedBeforeFailedRead = false;
+  f.client.request = async (input) => {
+    if (input.url.endsWith(`/operations/operation-${failedPatch}`)) {
+      const attempt = JSON.parse(fs.readFileSync(f.output)).representatives.publicWeb[`${failedPhase}Attempt`];
+      assert.equal(attempt.operation, `projects/${r.PROJECT}/locations/us-central1/operations/operation-${failedPatch}`);
+      assert.equal(attempt.completedAt, null);
+      assert.match(attempt.requestedSource.sha256, /^[a-f0-9]{64}$/);
+      persistedBeforeFailedRead = true;
+      throw Error("Injected operation read failure after PATCH acknowledgement");
+    }
+    const result = await request(input);
+    if (input.method === "PATCH" && f.state.patches === failedPatch) return {data: {name: result.data.name, done: false,
+      metadata: {target: result.data.metadata.target, createTime: result.data.metadata.createTime}}};
+    return result;
+  };
+  await assert.rejects(() => r.rehearse({...f, patch: (client, name, source, options) => r.patchSource(client, name, source, {...options, sleep: async () => {}})}),
+    failedPhase === "rollback" ? /Injected operation read failure/ : /Candidate restoration failed/);
+  const receipt = JSON.parse(fs.readFileSync(f.output)), item = receipt.representatives.publicWeb;
+  assert.equal(persistedBeforeFailedRead, true);
+  assert.equal(f.state.patches, 2);
+  assert.equal(Object.keys(receipt.representatives).length, 1);
+  assert.equal(receipt.completedAt, undefined);
+  assert.match(item[`${failedPhase}Attempt`].operation, new RegExp(`operation-${failedPatch}$`));
+  if (failedPhase === "rollback") assert.ok(item.restoration);
+  else assert.match(item.restorationFailure, /Injected operation read failure/);
 });

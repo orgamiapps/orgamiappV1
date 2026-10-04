@@ -11,6 +11,7 @@ const dependencies = createRequire(path.resolve(__dirname, "../../functions/pack
 const {sha256, digest} = require("../web_release_contract");
 const {validScope, bindingId} = require("../../functions/communications/qualification-isolation");
 const {schedule, calendarDate, calendarText} = require("../../functions/events/schedule");
+const {activateFlutterSemanticsDriver} = require("./flutter-semantics");
 const GATE = "safari-web-acceptance";
 const ORIGIN = "https://attendus-staging.web.app";
 const ELEMENT = "element-6066-11e4-a52e-4f735466cecf";
@@ -154,9 +155,7 @@ async function click(driver, selector) {
   await driver.execute((node) => node.scrollIntoView({block: "center"}), element); await driver.click(element);
 }
 async function semantics(driver) {
-  const placeholder = await until(async () => await driver.execute(visibleElement, {css: "flt-semantics-placeholder"}) || await driver.execute(visibleElement, {css: "flt-semantics"}), "safari-flutter-first-frame-missing", 90000);
-  if (await driver.execute((node) => node.tagName.toLowerCase() === "flt-semantics-placeholder", placeholder)) await driver.click(placeholder);
-  await find(driver, {css: "flt-semantics"}, 90000);
+  await activateFlutterSemanticsDriver(driver);
 }
 async function authIdentity(driver, apiKey, appName = "[DEFAULT]") {
   if (!["[DEFAULT]", "attendus-public-web"].includes(appName)) fail("safari-auth-app-invalid");

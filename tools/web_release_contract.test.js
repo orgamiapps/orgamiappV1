@@ -7,7 +7,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const c = require("./web_release_contract");
 const {verifyState, captureFunctionSources, pages} = require("./web_release_state");
-const {options, materializeBackend, materializeRules} = require("./web_release_pipeline");
+const {options, materializeBackend, materializeRules, runFunctionsCommand} = require("./web_release_pipeline");
 const {publishEvidence, retainReports, selectedGates} = require("./web_release_evidence");
 const hash = "a".repeat(64); const sourceSha = "a".repeat(40);
 function candidate(environment = "staging") {
@@ -326,4 +326,61 @@ test("production deployment never invokes the staging-only empty-project prerequ
     assert.deepEqual(harness.calls, ["validate-artifact", "capture-state", "plan-bridge", "materialize-resources"]);
     assert.equal(harness.requests.length, 0); assert.equal(fs.existsSync(path.join(path.dirname(harness.output), "staging-empty-prerequisite.json")), false);
   } finally { harness.cleanup(); }
+});
+
+function completionHarness(preflight = false) {
+  const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "attendus-cli-completion-")));
+  const value = candidate(), predecessor = {functions: [{id: "triggerAIInsights"}]};
+  const receiptPath = path.join(directory, "receipt.json"), adapter = require("./deploy_web_functions");
+  return {value, receiptPath, directory,
+    run(alter = () => {}, output = "ordinary CLI log") {
+      return runFunctionsCommand({candidate: value, predecessor, receiptPath, preflight,
+        configPath: "frozen-config.json", candidateFile: "candidate.json", predecessorFile: "predecessor.json"},
+      (_command, args, options) => {
+        assert.equal(args[0], "tools/deploy_web_functions.js"); assert.equal(args.includes("--preflight"), preflight);
+        assert.equal(options.stdio[0], "ignore");
+        const now = new Date().toISOString();
+        const receipt = {schemaVersion: 1, mode: preflight ? "preflight" : "deploy", status: preflight ? "preflight-passed" : "success",
+          projectId: value.projectId, sourceSha: value.sourceSha, candidateRunId: value.candidateRunId, candidateSha256: c.digest(value),
+          predecessorFunctionsSha256: c.digest(predecessor.functions), globalForce: false, firebaseToolsVersion: adapter.VERSION,
+          moduleHashes: adapter.PINS, startedAt: now, finishedAt: now,
+          plans: [{phase: "prepare-before-upload"}, ...(preflight ? [] : [{phase: "release"}])]};
+        alter(receipt); fs.writeFileSync(receiptPath, JSON.stringify(receipt)); return output;
+      });
+    },
+    cleanup() {
+      const target = fs.realpathSync(directory), parent = fs.realpathSync(os.tmpdir()), relative = path.relative(parent, target);
+      assert.equal(target, directory); assert.ok(relative && !relative.startsWith("..") && !path.isAbsolute(relative));
+      fs.rmSync(target, {recursive: true});
+    }};
+}
+test("exit-zero Functions child with unfinished receipt cannot continue deployment and retains its log", () => {
+  for (const preflight of [false, true]) {
+    const f = completionHarness(preflight);
+    try {
+      assert.throws(() => f.run((receipt) => {receipt.status = "preparing"; delete receipt.finishedAt;}, "partial quota failure log"),
+          (error) => /completed, matching/.test(error.message) && error.stdout === "partial quota failure log");
+      assert.equal(JSON.parse(fs.readFileSync(f.receiptPath)).status, "preparing", "failed evidence stays intact");
+    } finally {f.cleanup();}
+  }
+});
+test("only completed source-bound CLI receipts pass and existing receipts cannot be replayed", () => {
+  for (const preflight of [false, true]) {
+    const f = completionHarness(preflight);
+    try {
+      assert.equal(f.run(), "ordinary CLI log");
+      assert.throws(() => f.run(), /already exists/);
+    } finally {f.cleanup();}
+  }
+});
+test("wrong-source, stale, failed and incompletely guarded CLI receipts are rejected", () => {
+  for (const alter of [
+    (v) => {v.sourceSha = "b".repeat(40);}, (v) => {v.candidateRunId = "456";},
+    (v) => {v.status = "failure";}, (v) => {v.globalForce = true;}, (v) => {v.startedAt = "2020-01-01T00:00:00.000Z";},
+    (v) => {v.finishedAt = "2100-01-01T00:00:00.000Z";}, (v) => {v.plans = [{phase: "prepare-before-upload"}];},
+    (v) => {v.moduleHashes = {};}, (v) => {v.predecessorFunctionsSha256 = "c".repeat(64);},
+  ]) {
+    const f = completionHarness();
+    try {assert.throws(() => f.run(alter), /completed, matching/);} finally {f.cleanup();}
+  }
 });
