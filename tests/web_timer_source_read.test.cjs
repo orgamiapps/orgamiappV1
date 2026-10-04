@@ -33,6 +33,35 @@ test("absent early timer is recorded honestly and never qualifies delivery", asy
   const f = setup(), before = [...f.db.values]; const row = await readOriginalTimerSource(f);
   assert.equal(row.discoveryPhase, "absent"); assert.equal(row.originalTimersVerified, false); assert.equal(row.qualifiesCandidate, false);
   assert.equal(row.discoveryItem.path, f.itemPath); assert.equal(row.identity.discoveryRecipientUid, f.fixture.attendee.uid); assert.deepEqual([...f.db.values], before);
+  assert.equal(row.discoveryItem.createTime, null);
+  assert.equal(row.reminderQueues.every((item) => item.createTime === null), true);
+});
+
+test("server creation provenance retains nanoseconds independently of mutable fields and updates", async () => {
+  const f = setup(), serverCreated = {seconds: now / 1000, nanoseconds: 123456789};
+  let serverUpdated = {seconds: now / 1000 + 1, nanoseconds: 876543210};
+  // Add metadata to this test's snapshots only, without changing shared memoryAdmin.
+  const transact = f.db.runTransaction;
+  f.db.runTransaction = (fn, options) => transact((tx) => fn({get: async (ref) => {
+    const row = await tx.get(ref);
+    return Object.assign(Object.create(Object.getPrototypeOf(row)), row, {
+      createTime: row.exists ? serverCreated : undefined,
+      updateTime: row.exists ? serverUpdated : undefined,
+    });
+  }}), options);
+  f.db.values.get("Events/discovery").createTime = new Date(now - 3600000);
+  const first = await readOriginalTimerSource(f), event = first.events.find((row) => row.id === "discovery");
+  assert.deepEqual(event.createTime, serverCreated);
+  assert.deepEqual(event.createdAt, {seconds: now / 1000, nanoseconds: 0});
+  assert.deepEqual(event.updateTime, serverUpdated);
+  assert.notEqual(event.createTime, serverCreated, "Evidence must copy timestamp metadata");
+  serverUpdated = {seconds: now / 1000 + 2, nanoseconds: 111222333};
+  f.db.values.get("Events/discovery").createTime = new Date(now + 3600000);
+  const second = (await readOriginalTimerSource(f)).events.find((row) => row.id === "discovery");
+  assert.deepEqual(second.createTime, serverCreated);
+  assert.deepEqual(second.createdAt, event.createdAt);
+  assert.deepEqual(second.updateTime, serverUpdated);
+  assert.notDeepEqual(second.updateTime, event.updateTime);
 });
 test("pending source stores exact full timestamps and original candidate/recipient identity", async () => {
   const f = setup(); f.db.values.set(f.itemPath, {eventId: "discovery", status: "pending", queuedAt: new Date(now), readyAt: new Date(now + 45 * 60000)});

@@ -714,6 +714,66 @@ accounts, all 14 acknowledged browser-created anonymous accounts and the one
 pre-existing anonymous account. Communications and deletion were never entered;
 the attendee reminder was never created. This current-state reconciliation
 does not manufacture an acknowledgement for the timed-out request.
-The owner could not supply the missing
-historical usage or ambiguous admission relationship; investigation of existing
-backups, logs and linked records continues without invented counters or links.
+The owner could not supply the missing historical usage or ambiguous admission
+relationship and requested an investigation. The completed bounded read-only
+review recovered five deleted historical events, including one belonging to an
+account with no counter. No complete charged-publication ledger was found.
+Forty enabled accounts remain blocked under the current quota policy. Retained
+snapshots preserve the missing counters; PITR is disabled and no managed backups
+or backup schedules exist. No restore would recover values absent from these
+sources. Empty retained log queries do not prove zero historical usage.
+
+WISE's ticket, registration and separate manual attendance retain the same
+versions as September 2025. Legacy source permits one ticket flow to create a
+separate registration but also permits independent registrations; the surviving
+two generic notifications contain no shared operation identifier. Seven related
+payment/operation collections supply no linking record. The ticket/registration
+relationship remains unresolved. The manual attendance is preserved unidentified
+historical evidence, not an additional current migration blocker. The forensic
+summary SHA256 is `bebad42664fc51ca5abd7b710e36cd4c9922619414c2d2e144470f1ed1a62262`;
+its completeness/policy addendum is
+`a39216fa3541265bfa9c0c820d915cf924bb699f0a91760b6aaac80dd66b2dbf`.
+No counter, admission relationship, entitlement or production data was changed.
+
+## Candidate12 CI cancellation defect
+
+At source `f257e9c914bc313246b38acb65bdbc7250de030b`, PR run `37243299474`
+passed all six hosted groups. Artifact `11318446849`, SHA256
+`e344a494a16265f5de55aeb2f799f1263d8264ca8315fb060ab228bfd0d2e530`,
+contains 60 first-attempt public-browser passes, five successful Flutter journeys
+and complete fixture cleanup. The same-source push run `37243295645` failed its
+Functions contract step on a post-timeout polling assertion. Both results are
+retained; the successful run does not waive the observed defect.
+
+| ID / severity / surface | Reproduction and expected versus actual behavior | Root cause and correction | Verification and remaining acceptance |
+| --- | --- | --- | --- |
+| WEBQA-28 / P2 / browser qualification authentication reader | Fire the timeout at monotonic 9.5 ms for a 10 ms budget, then wake the pending poll at 9.75 ms. The caller has already received timeout, but the original adapter starts another page read. A late in-flight evaluation can also schedule another poll. Expected: no new reads or polling after timeout. | Promise.race rejects without cancelling the losing loop; the timer can fire before the fractional monotonic deadline. Add a synchronous cancellation fence before rejection, clear and settle pending poll sleep, and check cancellation after each evaluation. | Before: 14 controls pass and two deterministic regressions fail. After: all 16 focused cases pass, including the unchanged real-timer assertion. An already-started page evaluation may finish; its completion cannot schedule further work. Combined contracts and fresh exact-source hosted CI remain required. |
+| WEBQA-29 / P2 / release qualification chronology | Supply a complete passing fixture with deployment.verifiedAt set to not-a-date. Expected: reject the invalid deployment receipt. Actual: qualification succeeds because comparisons against NaN are false. | Require a string that parses to a finite deployment timestamp before comparing report chronology and observation deadlines. | New regression fails on the original qualifier. All 33 contract cases pass after correction and in independent review; valid ISO deployment receipts and all other gates remain required. Fresh combined and hosted validation remain required. |
+
+All 323 combined release-contract cases now pass using Node 22's default
+parallel test execution, with zero failures, cancellations or skips. This
+includes the reader, timer provenance and release chronology corrections.
+No Dart source changed since the retained 547-test client pass. Fresh hosted
+CI remains required for the combined revision; staging acceptance remains held.
+
+Original-timer evidence now also records the Firestore snapshot's immutable
+createTime, retaining nanoseconds and distinguishing it from mutable document
+fields and updateTime. The old reader omitted that provenance required by the
+corrected delay verification. Before: 11 controls pass and two assertions fail.
+After and independent review: all 13 reader cases pass. Historical baselines
+without createTime remain unchanged and cannot be silently upgraded into proof.
+
+The local Edge App Check diagnostic attempted one token request and one
+exchange. Its response capture closed the browser context before draining the
+body reader, and its SDK error allowlist omitted the SDK's initial-throttle
+classification. It therefore retains no usable exchange response; it is
+inconclusive evidence, not proof of a particular provider rejection or successful
+attestation. Preparation of a corrected diagnostic preserves that attempt and
+does not authorize an automatic retry or any App Check configuration change.
+One deliberate capture-repair diagnostic then retained HTTP 403,
+PERMISSION_DENIED and App attestation failed, with the matching SDK
+initial-throttle classification. It also identified a blocked official
+Enterprise webworker resource, so that local experiment is still confounded by
+the diagnostic's network restriction. It establishes the observed rejection,
+not normal-browser acceptance or its complete cause. Both attempts remain
+preserved, and production enforcement is unchanged.

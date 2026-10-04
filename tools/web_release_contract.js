@@ -150,7 +150,8 @@ function validateEvidence(report, candidate, rawRoot) {
 function qualify(candidate, productionCandidate, deployment, reports, now = Date.now()) {
   validateCandidate(candidate, "staging"); validateCandidate(productionCandidate, "production");
   if (candidate.sourceSha !== productionCandidate.sourceSha || candidate.candidateRunId !== productionCandidate.candidateRunId || candidate.sourceManifestSha256 !== productionCandidate.sourceManifestSha256 || candidate.deploymentSha256 !== productionCandidate.deploymentSha256 || digest(candidate.predecessor) !== digest(productionCandidate.predecessor)) fail("Environment candidates are not one frozen source");
-  if (deployment.candidateSha256 !== digest(candidate) || deployment.environment !== "staging" || !deployment.verifiedAt || !deployment.stateSha256) fail("Missing verified staging deployment");
+  if (deployment.candidateSha256 !== digest(candidate) || deployment.environment !== "staging" ||
+      typeof deployment.verifiedAt !== "string" || !Number.isFinite(Date.parse(deployment.verifiedAt)) || !deployment.stateSha256) fail("Missing verified staging deployment");
   const deploymentTime = Date.parse(deployment.verifiedAt);
   for (const report of reports) { validateEvidence(report, candidate); if (Date.parse(report.startedAt) < deploymentTime) fail("Evidence predates staging deployment"); }
   for (const gate of GATES) if (!reports.some((report) => report.gate === gate)) fail(`Required gate missing: ${gate}`);

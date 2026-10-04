@@ -31,7 +31,8 @@ function sourceIdentity(candidate, fixture) {
     reminderRecipientUids: [fixture.owner.uid, fixture.attendee.uid]};
 }
 function rowEvidence(row, times, fields) {
-  return {id: row.id, path: row.ref.path, exists: row.exists, updateTime: fullTimestamp(row.updateTime), readTime: fullTimestamp(row.readTime),
+  return {id: row.id, path: row.ref.path, exists: row.exists, createTime: fullTimestamp(row.createTime),
+    updateTime: fullTimestamp(row.updateTime), readTime: fullTimestamp(row.readTime),
     ...Object.fromEntries(fields.map((name) => [name, row.get(name) ?? null])),
     ...Object.fromEntries(times.map((name) => [name, fullTimestamp(row.get(name))]))};
 }

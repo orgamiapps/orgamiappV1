@@ -66,26 +66,43 @@ async function readFirebaseAuthStatePage(page, options) {
   if (!options || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 30000) throw safeReadError("invalid_expected_identity");
   const deadline = performance.now() + timeoutMs;
   const input = {apiKey: options.apiKey, projectId: options.projectId, appName: options.appName, expectedUid: options.expectedUid};
-  let timer;
+  let timer, pollTimer, wakePoll, cancelled = false;
+  const cancelPolling = () => {
+    cancelled = true;
+    clearTimeout(pollTimer);
+    // Settle the pending sleep so cancellation does not strand the poll loop.
+    wakePoll?.();
+    wakePoll = undefined;
+  };
   try {
     return await Promise.race([
       (async () => {
-        while (performance.now() < deadline) {
+        while (!cancelled && performance.now() < deadline) {
           let state;
           try {state = await page.evaluate(readFirebaseAuthStateInBrowser, input);} catch {throw safeReadError("browser_read_failed");}
-          if (performance.now() >= deadline) throw safeReadError("local_state_timeout");
+          if (cancelled || performance.now() >= deadline) throw safeReadError("local_state_timeout");
           if (state?.state === "ready" && state.uid === input.expectedUid && state.isAnonymous === false && typeof state.token === "string") {
             return {uid: state.uid, isAnonymous: false, token: state.token};
           }
           if (state?.state === "rejected") throw safeReadError(state.code);
           if (state?.state !== "missing") throw safeReadError("browser_read_failed");
-          await new Promise((resolve) => setTimeout(resolve, Math.min(100, Math.max(0, deadline - performance.now()))));
+          await new Promise((resolve) => {
+            wakePoll = resolve;
+            pollTimer = setTimeout(resolve, Math.min(100, Math.max(0, deadline - performance.now())));
+          });
+          wakePoll = undefined;
+          pollTimer = undefined;
         }
         throw safeReadError("local_state_timeout");
       })(),
-      new Promise((_, reject) => {timer = setTimeout(() => reject(safeReadError("local_state_timeout")), timeoutMs);}),
+      new Promise((_, reject) => {timer = setTimeout(() => {
+        // A timer may fire before the fractional monotonic deadline. Fence the
+        // loop synchronously rather than relying only on another clock read.
+        cancelPolling();
+        reject(safeReadError("local_state_timeout"));
+      }, timeoutMs);}),
     ]);
-  } finally {clearTimeout(timer);}
+  } finally {cancelPolling(); clearTimeout(timer);}
 }
 
 module.exports = {readFirebaseAuthStateInBrowser, readFirebaseAuthStatePage};

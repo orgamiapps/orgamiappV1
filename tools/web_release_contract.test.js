@@ -44,6 +44,13 @@ test("one frozen candidate qualifies only with every gate and continuous post-cl
   const f = fixture(); const receipt = c.qualify(f.value, f.production, f.deployment, f.reports, f.now);
   assert.equal(receipt.sourceSha, sourceSha); assert.equal(receipt.requiredGates.length, 13);
 });
+test("invalid deployment verification time cannot bypass observation chronology", () => {
+  for (const verifiedAt of ["not-a-date", "2026-99-99T00:00:00Z", {}, [], 2026, null, undefined, ""]) {
+    const f = fixture(); f.deployment.verifiedAt = verifiedAt;
+    assert.throws(() => c.qualify(f.value, f.production, f.deployment, f.reports, f.now), /verified staging deployment/);
+  }
+});
+
 test("candidate must retain its explicitly reviewed retry acknowledgement manifest", () => {
   const value = candidate();
   delete value.deployment.retryAcknowledgements;
