@@ -28,8 +28,10 @@ class PushNotificationIntent {
       'org_update' => (PushDestination.community, data['organizationId']),
       'event_reminder' ||
       'event_changes' ||
+      'event_update' ||
       'geofence_checkin' ||
       'new_event' ||
+      'group_event' ||
       'discovery_new_events' ||
       'ticket_update' ||
       'organizer_feedback' ||
@@ -41,8 +43,10 @@ class PushNotificationIntent {
         value.isEmpty ||
         value.length > 300 ||
         value.trim() != value ||
+        value == '.' ||
+        value == '..' ||
         value.contains('/') ||
-        value.contains(RegExp(r'[\x00-\x1f]'))) {
+        value.contains(RegExp(r'[\x00-\x1f\x7f]'))) {
       return null;
     }
     return PushNotificationIntent(destination, value);

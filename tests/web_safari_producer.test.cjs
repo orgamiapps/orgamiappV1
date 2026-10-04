@@ -2,7 +2,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const vm = require("node:vm");
-const {validateContext, safariIdentity, targetUrl, createDriver, expectedCalendar, calendarProof, publicTitle, authIdentity} = require("../tools/web_release_producers/safari");
+const {validateContext, safariIdentity, targetUrl, createDriver, expectedCalendar, calendarProof, publicTitle, authIdentity, htmlResponsiveProbe} = require("../tools/web_release_producers/safari");
 function fixture() {
   const candidate = {environment: "staging", projectId: "attendus-staging", sourceSha: "a".repeat(40), candidateRunId: "123"};
   const runId = "safari-qa-20261004", context = {...candidate, baseUrl: "https://attendus-staging.web.app", fixture: {
@@ -101,4 +101,48 @@ test("correct history URL cannot substitute for visible expected event content",
     await assert.rejects(() => publicTitle(driver, "Second owned event", 100), /content-missing/);
     assert.ok(reads > before);
   }
+});
+
+test("200-percent probe scales inserted form from original computed baselines without 400-percent inheritance", () => {
+  const nodes = []; let dialog = null;
+  function node(tag, parent = null, base = null) {
+    const properties = new Map();
+    const result = {tagName: tag.toUpperCase(), parent, base, isConnected: true,
+      box: {left: 12, right: 378, width: 366, height: 40}, clientWidth: 360, scrollWidth: 360,
+      style: {getPropertyValue: (name) => properties.get(name)?.value || "", getPropertyPriority: (name) => properties.get(name)?.priority || "",
+        setProperty: (name, value, priority = "") => properties.set(name, {value, priority}), removeProperty: (name) => properties.delete(name)},
+      getBoundingClientRect() {return this.box;}};
+    nodes.push(result); return result;
+  }
+  const body = node("body", null, 16);
+  const heading = node("h1", body, 20); node("button", body, 16);
+  const eyebrow = node("div", body, 13.12), footer = node("footer", body), footerText = node("span", footer);
+  body.querySelectorAll = (selector) => {
+    // A selector-aware mock must not silently return omitted div/span nodes.
+    assert.equal(selector, "*"); return nodes.filter((value) => value !== body);
+  };
+  const computed = (value) => value.style.getPropertyValue("font-size") || `${value.base || (value.parent ? parseFloat(computed(value.parent)) : 16)}px`;
+  const context = vm.createContext({document: {body, documentElement: {scrollWidth: 390}, querySelector: () => dialog}, innerWidth: 390,
+    getComputedStyle: (value) => ({fontSize: computed(value), display: "block", visibility: "visible"})});
+  const probe = () => vm.runInContext(`(${htmlResponsiveProbe.toString()})()`, context);
+  assert.equal(probe().textIs200Percent, true); assert.equal(computed(heading), "40px");
+  assert.equal(computed(eyebrow), "26.24px"); assert.equal(computed(footerText), "32px");
+  dialog = node("dialog", null, 16);
+  const label = node("label", dialog); const input = node("input", label); const textarea = node("textarea", dialog); const button = node("button", dialog);
+  dialog.querySelectorAll = () => [input, textarea, button];
+  for (let pass = 0; pass < 2; pass++) {
+    const result = probe();
+    assert.equal(result.textIs200Percent, true); assert.equal(result.controlsFit, true); assert.equal(result.dialogFits, true);
+    assert.equal(result.controlCount, 3); assert.equal(computed(input), "32px"); assert.equal(computed(label), "32px");
+    assert.equal(computed(heading), "40px");
+    assert.equal(computed(eyebrow), "26.24px"); assert.equal(computed(footerText), "32px");
+    assert.equal(result.samples.find((sample) => sample.tag === "input").before, 16);
+  }
+  // A fitting outer dialog/viewport cannot hide a clipped or oversized field.
+  input.box = {...input.box, right: 600, width: 588};
+  let result = probe(); assert.equal(result.pageFits, true); assert.equal(result.dialogFits, true); assert.equal(result.controlsFit, false);
+  input.box = {...input.box, right: 378, width: 366}; button.scrollWidth = 700;
+  result = probe(); assert.equal(result.dialogFits, true); assert.equal(result.controlsFit, false);
+  button.scrollWidth = 360; dialog.scrollWidth = 700;
+  assert.equal(probe().dialogFits, false);
 });

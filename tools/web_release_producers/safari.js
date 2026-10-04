@@ -17,6 +17,44 @@ const ELEMENT = "element-6066-11e4-a52e-4f735466cecf";
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const fail = (code) => { throw Object.assign(new Error(code), {code}); };
 
+// Serializable in both WebDriver and Playwright. Restore every previously
+// touched inline size before measuring, so newly inserted dialog descendants
+// inherit the original baseline and a second probe never compounds to 400%.
+function htmlResponsiveProbe() {
+  const saved = globalThis.__attendusHtmlTextBaselines ||= new Map();
+  for (const [node, previous] of saved) {
+    if (!node.isConnected) { saved.delete(node); continue; }
+    if (previous.value) node.style.setProperty("font-size", previous.value, previous.priority);
+    else node.style.removeProperty("font-size");
+  }
+  const visible = (node) => {
+    const box = node.getBoundingClientRect(), style = getComputedStyle(node);
+    return box.width > 0 && box.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+  };
+  // Include all rendered containers, not only familiar text tags: the public
+  // eyebrow is a div and footer text can live directly in a span. Snapshot all
+  // computed sizes before changing any ancestor so inherited text remains 2x.
+  const nodes = [document.body, ...document.body.querySelectorAll("*")].filter(visible);
+  const sizes = nodes.map((node) => {
+    if (!saved.has(node)) saved.set(node, {value: node.style.getPropertyValue("font-size"), priority: node.style.getPropertyPriority("font-size")});
+    return {node, before: parseFloat(getComputedStyle(node).fontSize)};
+  });
+  for (const {node, before} of sizes) node.style.setProperty("font-size", `${before * 2}px`, "important");
+  const samples = sizes.map(({node, before}) => ({tag: node.tagName.toLowerCase(), before, after: parseFloat(getComputedStyle(node).fontSize)}));
+  const textIs200Percent = samples.length > 0 && samples.every((sample) => Number.isFinite(sample.before) && sample.before > 0 && Math.abs(sample.after - sample.before * 2) < 0.1);
+  const dialog = document.querySelector("dialog[open]");
+  const dialogBounds = dialog?.getBoundingClientRect();
+  const controls = dialog ? [...dialog.querySelectorAll("input,textarea,select,button")].filter(visible).map((node) => {
+    const box = node.getBoundingClientRect();
+    return {tag: node.tagName.toLowerCase(), left: box.left, right: box.right, scrollWidth: node.scrollWidth, clientWidth: node.clientWidth};
+  }) : [];
+  return {width: innerWidth, scrollWidth: document.documentElement.scrollWidth, textIs200Percent, samples,
+    pageFits: document.documentElement.scrollWidth <= innerWidth + 1,
+    dialogOpen: !!dialog, dialogFits: !!dialogBounds && dialogBounds.left >= -1 && dialogBounds.right <= innerWidth + 1 && dialog.scrollWidth <= dialog.clientWidth + 1,
+    controlCount: controls.length, controls,
+    controlsFit: controls.length > 0 && controls.every((box) => box.left >= Math.max(0, dialogBounds.left) - 1 && box.right <= Math.min(innerWidth, dialogBounds.right) + 1 && box.scrollWidth <= box.clientWidth + 1)};
+}
+
 function validateContext(candidate, context) {
   const fixture = context.fixture;
   if (candidate.environment !== "staging" || candidate.projectId !== "attendus-staging" || context.projectId !== candidate.projectId || context.baseUrl !== ORIGIN || context.sourceSha !== candidate.sourceSha || context.candidateRunId !== candidate.candidateRunId || process.env.FIRESTORE_EMULATOR_HOST || process.env.FIREBASE_AUTH_EMULATOR_HOST) fail("safari-requires-frozen-staging");
@@ -251,13 +289,16 @@ async function produce({candidate, context, outputDir}) {
     record("dialog-restores-trigger-focus", true, await driver.execute(() => document.activeElement?.hasAttribute("data-public-action") === true));
     await shot("guest-form.png");
     stage = "responsive"; await driver.resize(500, 900);
-    const responsive = await driver.execute(() => { const nodes = [...document.querySelectorAll("h1,h2,p,a,dt,dd,button,label,input")], sizes = nodes.map((node) => parseFloat(getComputedStyle(node).fontSize)); nodes.forEach((node, i) => { node.style.fontSize = `${sizes[i] * 2}px`; }); return {width: innerWidth, scrollWidth: document.documentElement.scrollWidth, titleSize: parseFloat(getComputedStyle(document.querySelector("h1")).fontSize)}; });
+    const responsive = await driver.execute(htmlResponsiveProbe);
     record("narrow-safari-viewport", true, responsive.width >= 280 && responsive.width <= 600);
-    record("200-percent-text-no-horizontal-overflow", true, responsive.scrollWidth <= responsive.width);
+    record("actual-200-percent-public-text", true, responsive.textIs200Percent);
+    record("200-percent-text-no-horizontal-overflow", true, responsive.pageFits);
     await click(driver, {css: "[data-public-action]"}); await find(driver, {css: "dialog input[name=fullName]"});
-    const formFits = await driver.execute(() => { const dialog = document.querySelector("dialog"), nodes = [...dialog.querySelectorAll("h2,p,a,button,label,input")], sizes = nodes.map((node) => parseFloat(getComputedStyle(node).fontSize)); nodes.forEach((node, i) => { node.style.fontSize = `${sizes[i] * 2}px`; }); return dialog.getBoundingClientRect().width <= innerWidth && document.documentElement.scrollWidth <= innerWidth; });
-    record("200-percent-guest-dialog-fits", true, formFits);
-    write("responsive.json", {...identity, requestedWindowWidth: 500, textScale: 2, ...responsive}); await shot("narrow-200-percent.png"); await driver.key("\uE00C");
+    const form = await driver.execute(htmlResponsiveProbe);
+    record("actual-200-percent-inserted-dialog-text", true, form.textIs200Percent && form.dialogOpen);
+    record("200-percent-guest-dialog-fits", true, form.pageFits && form.dialogFits);
+    record("200-percent-guest-fields-buttons-fit", true, form.controlCount >= 3 && form.controlsFit);
+    write("responsive.json", {...identity, requestedWindowWidth: 500, textScale: 2, page: responsive, dialog: form}); await shot("narrow-200-percent.png"); await driver.key("\uE00C");
     await driver.resize(1280, 1000);
     stage = "public-history"; await driver.navigate(fixture.event.publicPath); await driver.navigate(`/event/${fixture.secondEventId}`);
     await driver.history("back"); record("public-back-content", owned.eventTitles[fixture.event.id], await publicTitle(driver, owned.eventTitles[fixture.event.id]));
@@ -318,4 +359,4 @@ async function produce({candidate, context, outputDir}) {
   }
   return {gates: {[GATE]: evidence}};
 }
-module.exports = {produce, validateContext, safariIdentity, targetUrl, createDriver, expectedCalendar, calendarProof, publicTitle, authIdentity, GATE};
+module.exports = {produce, validateContext, safariIdentity, targetUrl, createDriver, expectedCalendar, calendarProof, publicTitle, authIdentity, htmlResponsiveProbe, GATE};
