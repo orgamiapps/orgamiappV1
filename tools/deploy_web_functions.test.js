@@ -15,9 +15,19 @@ function fixture() {
   const predecessor = {projectId: have.project, functions: [adapter.publicEndpoint(have)]};
   const candidate = {sourceSha: "a".repeat(40), candidateRunId: "123", environment: "staging", projectId: have.project,
     predecessor: {staging: clone(predecessor)}, deployment: {functions: [want.id], deleteFunctions: [], retryAcknowledgements: [adapter.descriptor(want)]}};
-  return {have, want, predecessor, candidate, options: {project: have.project, projectId: have.project, force: false, nonInteractive: true, only: "functions:reviewed"}};
+  return {have, want, predecessor, candidate, options: {project: have.project, projectId: have.project, force: false, nonInteractive: true, dryRun: false, only: "functions:reviewed"}};
 }
 function plan(fn) { return {regionalChangesets: {region: {endpointsToCreate: [], endpointsToUpdate: [{endpoint: fn, unsafe: false}], endpointsToDelete: [], endpointsToSkip: []}}}; }
+function ownedDirectory(t) {
+  const temporaryBase = fs.realpathSync(os.tmpdir());
+  const directory = fs.mkdtempSync(path.join(temporaryBase, "attendus-functions-plan-"));
+  const owned = fs.realpathSync(directory);
+  t.after(() => {
+    if (fs.realpathSync(os.tmpdir()) !== temporaryBase || fs.lstatSync(directory).isSymbolicLink() || fs.realpathSync(directory) !== owned || !owned.startsWith(`${temporaryBase}${path.sep}`)) throw Error("Unsafe owned test cleanup");
+    fs.rmSync(owned, {recursive: true});
+  });
+  return directory;
+}
 
 test("pins the actual installed CLI version and every adapted call boundary", () => {
   const modules = adapter.loadPinned();
@@ -148,7 +158,7 @@ test("all eleven reviewed production/staging descriptors pass the actual prompt 
     const predecessor = {projectId: project, functions: existing.map(adapter.publicEndpoint)};
     const candidate = {sourceSha: "b".repeat(40), environment, projectId: project, predecessor: {[environment]: clone(predecessor)}, deployment: {functions: desired.map((item) => item.id).sort(), deleteFunctions: [], retryAcknowledgements: approvals}};
     const modules = adapter.loadPinned(); const guards = adapter.installGuards({candidate, predecessor}, modules);
-    const options = {project, force: false, nonInteractive: true, only: candidate.deployment.functions.map((name) => `functions:${name}`).join(",")};
+    const options = {project, force: false, nonInteractive: true, dryRun: false, only: candidate.deployment.functions.map((name) => `functions:${name}`).join(",")};
     try {
       await modules.prompts.promptForFailurePolicies(options, backend(desired), backend(existing));
       assert.equal(guards.receipt.transitions.length, 11); assert.equal(options.force, false);
@@ -157,13 +167,7 @@ test("all eleven reviewed production/staging descriptors pass the actual prompt 
 });
 
 test("persisted pre-upload plan survives a deployment failure and publishes no error bearer", async (t) => {
-  const temporaryBase = fs.realpathSync(os.tmpdir());
-  const directory = fs.mkdtempSync(path.join(temporaryBase, "attendus-functions-plan-"));
-  const owned = fs.realpathSync(directory);
-  t.after(() => {
-    if (fs.realpathSync(os.tmpdir()) !== temporaryBase || fs.lstatSync(directory).isSymbolicLink() || fs.realpathSync(directory) !== owned || !owned.startsWith(`${temporaryBase}${path.sep}`)) throw Error("Unsafe owned test cleanup");
-    fs.rmSync(owned, {recursive: true});
-  });
+  const directory = ownedDirectory(t);
   const f = fixture(); const configPath = path.join(directory, "firebase.json"); const outputPath = path.join(directory, "receipt.json");
   fs.writeFileSync(configPath, JSON.stringify({functions: {source: "source", codebase: "default"}}));
   const modules = adapter.loadPinned(); const command = require(path.join(modules.directory, "lib/commands/deploy")).command;
@@ -192,4 +196,69 @@ test("persisted pre-upload plan survives a deployment failure and publishes no e
   assert.equal(saved.status, "failure");
   assert.doesNotMatch(JSON.stringify(saved), /DO_NOT_PUBLISH|access_token|example.test/);
   assert.ok(saved.finishedAt);
+});
+
+test("actual pinned empty dynamic-extension preparation is accepted; real plans and malformed records fail", async (t) => {
+  const f = fixture(); const modules = adapter.loadPinned();
+  const load = (name) => require(path.join(modules.directory, name));
+  const extensionPrepare = load("lib/deploy/extensions/prepare");
+  t.mock.method(load("lib/extensions/extensionsHelper"), "ensureExtensionsApiEnabled", async () => {});
+  t.mock.method(load("lib/requirePermissions"), "requirePermissions", async () => {});
+  t.mock.method(load("lib/deploy/extensions/planner"), "haveDynamic", async () => []);
+  const extensionPayload = {};
+  await extensionPrepare.prepareDynamicExtensions({}, {...f.options, projectNumber: "123456789", config: {src: {functions: {source: "source", codebase: "default"}}}}, extensionPayload, {default: {extensions: {}}});
+  assert.deepEqual(extensionPayload, {});
+  adapter.assertEmptyExtensions({});
+  adapter.assertEmptyExtensions({extensions: extensionPayload});
+  for (const value of [null, undefined, [], false, "", {instancesToCreate: []}, {instancesToDelete: [{instanceId: "real"}]}]) assert.throws(() => adapter.assertEmptyExtensions({extensions: value}), /extension deployment/);
+  t.mock.method(modules.prepare, "prepare", async (_context, options, payload) => {
+    payload.extensions = extensionPayload;
+    await modules.prompts.promptForFailurePolicies(options, payload.functions.default.wantBackend, payload.functions.default.haveBackend);
+  });
+  const guards = adapter.installGuards(f, modules);
+  try {
+    await modules.prepare.prepare({projectId: f.candidate.projectId}, f.options, {functions: {default: {wantBackend: backend([f.want]), haveBackend: backend([f.have])}}});
+    assert.ok(guards.receipt.plans.some((item) => item.phase === "prepare-before-upload"));
+  } finally { guards.restore(); }
+});
+
+test("diagnostic preflight mode rejects any upload/deploy/release and dry-run mismatch", async () => {
+  const f = fixture(); const modules = adapter.loadPinned();
+  const guards = adapter.installGuards({...f, preflight: true}, modules);
+  try {
+    await assert.rejects(modules.prepare.prepare({}, {...f.options, dryRun: false}, {}), /options changed/);
+    await assert.rejects(modules.deploy.deploy({}, {...f.options, dryRun: true}, {}), /Preflight cannot deploy/);
+    await assert.rejects(modules.deploy.uploadSourceV2(), /Preflight cannot upload/);
+    await assert.rejects(modules.release.release({}, {...f.options, dryRun: true}, {}), /Preflight cannot release/);
+    assert.equal(guards.receipt.mode, "preflight");
+  } finally { guards.restore(); }
+  const ordinary = adapter.installGuards(f, modules);
+  try { await assert.rejects(modules.prepare.prepare({}, {...f.options, dryRun: true}, {}), /options changed/); }
+  finally { ordinary.restore(); }
+});
+
+test("supported CLI dryRun preparation records preflight-passed, never deployment success", async (t) => {
+  const f = fixture(); const directory = ownedDirectory(t); const configPath = path.join(directory, "firebase.json"); const outputPath = path.join(directory, "preflight.json");
+  fs.writeFileSync(configPath, JSON.stringify({functions: {source: "source", codebase: "default"}}));
+  const modules = adapter.loadPinned(); const command = require(path.join(modules.directory, "lib/commands/deploy")).command;
+  const actualDeploy = require(path.join(modules.directory, "lib/deploy")).deploy;
+  t.mock.method(require(path.join(modules.directory, "lib/track")), "trackGA4", async () => {});
+  t.mock.method(modules.prepare, "prepare", async (_context, options, payload) => {
+    assert.equal(options.dryRun, true); assert.equal(options.force, false);
+    payload.extensions = {};
+    payload.functions = {default: {wantBackend: backend([f.want]), haveBackend: backend([f.have])}};
+    await modules.prompts.promptForFailurePolicies(options, payload.functions.default.wantBackend, payload.functions.default.haveBackend);
+  });
+  // Replace authentication/project resolution only. The pinned CLI's actual
+  // lifecycle selects prepare and must skip its guarded upload/release targets.
+  t.mock.method(command, "runner", () => async (options) => {
+    assert.equal(options.dryRun, true);
+    await actualDeploy(["functions"], {...options, projectId: f.candidate.projectId,
+      config: {projectDir: directory, get: (target) => target === "functions" ? {source: "source"} : undefined}});
+  });
+  const result = await adapter.run({...f, configPath, outputPath, preflight: true});
+  const saved = JSON.parse(fs.readFileSync(outputPath));
+  assert.equal(result.status, "preflight-passed"); assert.equal(saved.status, "preflight-passed");
+  assert.equal(saved.mode, "preflight"); assert.equal(saved.globalForce, false);
+  assert.ok(saved.plans.length); assert.ok(saved.plans.every((item) => item.phase === "prepare-before-upload"));
 });

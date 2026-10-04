@@ -46,6 +46,8 @@ jobs:
 
           build/web-promotion/function-deployment-plan.json
 
+          build/web-promotion/function-preflight-plan.json
+
           build/web-promotion/*.txt'
         include-hidden-files: true
         retention-days: 90

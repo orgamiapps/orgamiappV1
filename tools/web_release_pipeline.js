@@ -126,6 +126,9 @@ async function deploy(candidate, bundle, expectedState, output) {
   configuration.firestore.rules = path.join(rulesRoot, "firestore.rules"); configuration.firestore.indexes = path.join(rulesRoot, "firestore.indexes.json");
   configuration.storage.rules = path.join(rulesRoot, "storage.rules");
   const configPath = path.join(root, "build", `frozen-firebase-${candidate.environment}.json`); write(configPath, configuration);
+  const functionCandidate = path.join(root, "build", `frozen-function-candidate-${candidate.environment}.json`);
+  const functionPredecessor = path.join(root, "build", `frozen-function-predecessor-${candidate.environment}.json`);
+  write(functionCandidate, candidate); write(functionPredecessor, before.state);
   function deployStep(name, selectors, execute = null) {
     let result;
     try { result = execute ? execute() : firebase(["deploy", "--config", configPath, "--project", candidate.projectId, "--only", selectors, "--non-interactive"]); }
@@ -135,6 +138,16 @@ async function deploy(candidate, bundle, expectedState, output) {
       fs.mkdirSync(path.dirname(output), {recursive: true}); fs.writeFileSync(path.join(path.dirname(output), `${name}.txt`), safeOutput);
     }
   }
+  function deployFunctionsStep(preflight) {
+    return deployStep(preflight ? "functions-preflight" : "functions", null, () => execFileSync(process.execPath,
+        ["tools/deploy_web_functions.js", functionCandidate, configPath, functionPredecessor,
+          path.join(path.dirname(output), preflight ? "function-preflight-plan.json" : "function-deployment-plan.json"),
+          ...(preflight ? ["--preflight"] : [])],
+        {cwd: root, encoding: "utf8", maxBuffer: 20 * 1024 * 1024, stdio: ["ignore", "pipe", "inherit"]}));
+  }
+  // Real CLI preparation precedes Hosting/rule changes. Dry-run can enable
+  // prerequisite APIs, but the adapter forbids Function upload and release.
+  deployFunctionsStep(true);
   // Existing HTML/Flutter/rewrites stay byte-for-byte intact while physical
   // content-addressed assets become available to the new Functions renderer.
   const bridge = await assets.publishBridge({candidate, webRoot: path.join(bundle, "web"), predecessor: before.state,
@@ -147,13 +160,7 @@ async function deploy(candidate, bundle, expectedState, output) {
   execFileSync(process.execPath, ["tools/verify_firestore_indexes.js", candidate.projectId, "1800"], {cwd: root, stdio: "inherit"});
   execFileSync(process.execPath, ["tools/check_function_secrets.js", candidate.projectId], {cwd: root, stdio: "inherit"});
   assets.assertBridgeState(await assets.currentHosting(candidate.projectId, await require("./web_release_state").googleClient()), bridge);
-  const functionCandidate = path.join(root, "build", `frozen-function-candidate-${candidate.environment}.json`);
-  const functionPredecessor = path.join(root, "build", `frozen-function-predecessor-${candidate.environment}.json`);
-  write(functionCandidate, candidate); write(functionPredecessor, before.state);
-  deployStep("functions", null, () => execFileSync(process.execPath,
-      ["tools/deploy_web_functions.js", functionCandidate, configPath, functionPredecessor,
-        path.join(path.dirname(output), "function-deployment-plan.json")],
-      {cwd: root, encoding: "utf8", maxBuffer: 20 * 1024 * 1024, stdio: ["ignore", "pipe", "inherit"]}));
+  deployFunctionsStep(false);
   const backendState = verifyState(candidate, await captureState(candidate.projectId), read(path.join(root, "firestore.indexes.json")));
   assets.assertBridgeState(backendState.state, bridge);
   if (candidate.environment === "staging") {

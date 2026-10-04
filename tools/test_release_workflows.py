@@ -150,8 +150,9 @@ def validate(workflows):
         raise ValueError("Production requires protected environment, provenance and predecessor")
     if not any(step.get("uses", "").startswith("actions/upload-artifact@") and step.get("if") == "always()" and "hosting-asset-bridge.json" in step.get("with", {}).get("path", "") for step in promotion.get("steps", [])):
         raise ValueError("Failed or successful Hosting bridge receipts must be retained")
-    if not any(step.get("uses", "").startswith("actions/upload-artifact@") and step.get("if") == "always()" and "function-deployment-plan.json" in step.get("with", {}).get("path", "") for step in promotion.get("steps", [])):
-        raise ValueError("Scoped Functions deployment plan receipts must be retained")
+    for plan_receipt in ["function-deployment-plan.json", "function-preflight-plan.json"]:
+        if not any(step.get("uses", "").startswith("actions/upload-artifact@") and step.get("if") == "always()" and plan_receipt in step.get("with", {}).get("path", "") for step in promotion.get("steps", [])):
+            raise ValueError("Scoped Functions deployment plan receipts must be retained")
     collector = workflows["web-release-observe.yml"]
     collect = collector["jobs"]["collect"]
     if "post-close-replay" not in collector["on"]["workflow_dispatch"]["inputs"]["gates"]["options"]:
@@ -275,11 +276,12 @@ class ReleaseWorkflowTests(unittest.TestCase):
                         step["run"] = step["run"].replace("../tools/deploy_web_functions.test.js", "")
             self.mutate(remove, "Scoped Functions deployment guard")
 
-        def remove_receipt(w):
-            for step in w["web-release-promote.yml"]["jobs"]["promote"]["steps"]:
-                if step.get("uses", "").startswith("actions/upload-artifact@"):
-                    step["with"]["path"] = step["with"]["path"].replace("build/web-promotion/function-deployment-plan.json", "")
-        self.mutate(remove_receipt, "Scoped Functions deployment plan receipts")
+        for receipt in ["function-deployment-plan.json", "function-preflight-plan.json"]:
+            def remove_receipt(w):
+                for step in w["web-release-promote.yml"]["jobs"]["promote"]["steps"]:
+                    if step.get("uses", "").startswith("actions/upload-artifact@"):
+                        step["with"]["path"] = step["with"]["path"].replace("build/web-promotion/" + receipt, "")
+            self.mutate(remove_receipt, "Scoped Functions deployment plan receipts")
 
     def test_browser_producer_dependencies_precede_contract_tests(self):
         for filename in ["quality.yml", "web-quality.yml"]:
