@@ -6,7 +6,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
 const {files} = require('../../tools/web_release_contract');
-const {validateFixture, allowStagingRequest, scrubBrowserError, pageErrorDiagnostic, createPageErrorRecorder, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, readOwnedHistoryTitles, visibleHistoryTitle} = require('../../tools/web_release_producers/browser')._test;
+const {validateFixture, allowStagingRequest, scrubBrowserError, pageErrorDiagnostic, createPageErrorRecorder, projectAppCheckError, readAppCheckFailure, createAppCheckErrorRecorder, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, readOwnedHistoryTitles, visibleHistoryTitle} = require('../../tools/web_release_producers/browser')._test;
 const {bindingId} = require('../../functions/communications/qualification-isolation');
 test('browser and Safari use the same insertion-aware computed text scaling and control-boundary probe', () => {
   assert.equal(require('../../tools/web_release_producers/browser')._test.htmlResponsiveProbe,
@@ -21,6 +21,63 @@ function context() {
   for (const role of ['owner', 'attendee', 'unauthorized']) fixture[role] = {uid: role, email: `${runId}-${role}@example.test`, password: 'fixture-password'};
   return {projectId: 'attendus-staging', baseUrl: 'https://attendus-staging.web.app', fixture};
 }
+
+function appCheckResponse(ctx, {status = 403, body, length, url, method = 'POST', pending = false} = {}) {
+  const bytes = Buffer.from(body ?? JSON.stringify({error: {code: 403, status: 'PERMISSION_DENIED'}}));
+  let bodyReads = 0;
+  return {status: () => status, url: () => url ?? `https://content-firebaseappcheck.googleapis.com/v1/projects/${ctx.fixture.firebase.projectId}/apps/${ctx.fixture.firebase.appId}:exchangeRecaptchaEnterpriseToken?key=${ctx.fixture.firebase.apiKey}`,
+    request: () => ({method: () => method}), headerValue: async () => length === undefined ? String(bytes.length) : length,
+    body: async () => {bodyReads++; return pending ? new Promise(() => {}) : bytes;}, reads: () => bodyReads};
+}
+
+test('App Check diagnostics project only fixed Google codes and allowlisted ErrorInfo reasons', () => {
+  const body = JSON.stringify({token: 'PRIVATE_RESPONSE_TOKEN', error: {code: 403, status: 'PERMISSION_DENIED',
+    message: 'PRIVATE_MESSAGE?session=PRIVATE_SESSION', details: [
+      {'@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'SERVICE_DISABLED', domain: 'googleapis.com', metadata: {consumer: 'PRIVATE_CONSUMER'}},
+      {'@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'PRIVATE_UNKNOWN_REASON'},
+      {'@type': 'other-type', reason: 'API_KEY_INVALID'},
+    ]}});
+  const result = projectAppCheckError(403, Buffer.from(body));
+  assert.deepEqual(result, {httpStatus: 403, bodyStatus: 'projected', googleCode: 403, googleStatus: 'PERMISSION_DENIED', errorInfoReasons: ['SERVICE_DISABLED'], unrecognizedErrorInfo: true});
+  assert.equal(JSON.stringify(result).includes('PRIVATE'), false);
+  assert.equal(projectAppCheckError(403, Buffer.from('{bad')).bodyStatus, 'invalid-json');
+  assert.equal(projectAppCheckError(403, Buffer.alloc(16385)).bodyStatus, 'too-large');
+  assert.equal(projectAppCheckError(403, Buffer.from(JSON.stringify({error: {code: 'PRIVATE', status: 'PRIVATE'}}))).googleStatus, null);
+});
+
+test('App Check response reader binds exact endpoint and bounds body length and wait time', async () => {
+  const ctx = context();
+  for (const patch of [{method: 'GET'}, {status: 200}, {url: 'https://evil.test/anything'},
+    {url: `https://firebaseappcheck.googleapis.com/v1/projects/orgami-66nxok/apps/${ctx.fixture.firebase.appId}:exchangeRecaptchaEnterpriseToken?key=${ctx.fixture.firebase.apiKey}`},
+    {url: `https://firebaseappcheck.googleapis.com/v1/projects/attendus-staging/apps/${ctx.fixture.firebase.appId}:exchangeDebugToken?key=${ctx.fixture.firebase.apiKey}`}]) {
+    const response = appCheckResponse(ctx, patch); assert.equal(await readAppCheckFailure(response, ctx), null); assert.equal(response.reads(), 0);
+  }
+  for (const [length, expected] of [[null, 'not-read-missing-length'], ['invalid', 'not-read-invalid-length'], ['16385', 'not-read-too-large']]) {
+    const response = appCheckResponse(ctx, {length}); assert.equal((await readAppCheckFailure(response, ctx)).bodyStatus, expected); assert.equal(response.reads(), 0);
+  }
+  assert.equal((await readAppCheckFailure(appCheckResponse(ctx, {pending: true}), ctx, {timeoutMs: 5})).bodyStatus, 'read-timeout');
+  const stalledHeaders = appCheckResponse(ctx);
+  stalledHeaders.headerValue = () => new Promise(() => {});
+  assert.equal((await readAppCheckFailure(stalledHeaders, ctx, {timeoutMs: 5})).bodyStatus, 'read-timeout');
+  assert.equal(stalledHeaders.reads(), 0);
+  const unavailable = appCheckResponse(ctx);
+  unavailable.body = async () => {throw Error('PRIVATE_REQUEST_TOKEN');};
+  assert.deepEqual(await readAppCheckFailure(unavailable, ctx), {httpStatus: 403, bodyStatus: 'read-unavailable'});
+  const decodedOverflow = appCheckResponse(ctx, {length: '1', body: 'x'.repeat(16385)});
+  assert.equal((await readAppCheckFailure(decodedOverflow, ctx)).bodyStatus, 'too-large');
+  assert.equal((await readAppCheckFailure(appCheckResponse(ctx), ctx)).googleStatus, 'PERMISSION_DENIED');
+});
+
+test('App Check recorder drains pending responses and retains omitted counts without extra requests', async () => {
+  const ctx = context(), recorder = createAppCheckErrorRecorder(ctx);
+  for (let i = 0; i < 53; i++) recorder.observe(appCheckResponse(ctx));
+  await recorder.drain();
+  const snapshot = recorder.snapshot();
+  assert.equal(snapshot.totalCount, 53); assert.equal(snapshot.omittedCount, 3); assert.equal(snapshot.records.length, 50);
+  assert.ok(snapshot.records.every(row => row.httpStatus === 403 && row.googleStatus === 'PERMISSION_DENIED' && Number.isFinite(Date.parse(row.at))));
+  assert.equal(JSON.stringify(snapshot).includes(ctx.fixture.firebase.apiKey), false);
+  assert.equal(JSON.stringify(snapshot).includes('exchangeRecaptchaEnterpriseToken?'), false);
+});
 
 test('page errors retain exact sealed artifact frames and observation context without raw URLs or payloads', () => {
   const c = context(), artifact = 'releases/fixture/main.dart.js', digest = 'a'.repeat(64);

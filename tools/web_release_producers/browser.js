@@ -141,6 +141,84 @@ function allowStagingRequest(value, method, context, headers = {}) {
   return false;
 }
 
+function projectAppCheckError(httpStatus, bytes) {
+  const base = {httpStatus, bodyStatus: 'projected', googleCode: null, googleStatus: null,
+    errorInfoReasons: [], unrecognizedErrorInfo: false};
+  if (!Buffer.isBuffer(bytes) || bytes.length > 16384) return {...base, bodyStatus: 'too-large'};
+  let payload;
+  try {payload = JSON.parse(bytes.toString('utf8'));} catch {return {...base, bodyStatus: 'invalid-json'};}
+  const error = payload?.error;
+  if (!error || typeof error !== 'object' || Array.isArray(error)) return {...base, bodyStatus: 'not-google-error'};
+  const statuses = new Set(['CANCELLED', 'UNKNOWN', 'INVALID_ARGUMENT', 'DEADLINE_EXCEEDED', 'NOT_FOUND',
+    'ALREADY_EXISTS', 'PERMISSION_DENIED', 'UNAUTHENTICATED', 'RESOURCE_EXHAUSTED', 'FAILED_PRECONDITION',
+    'ABORTED', 'OUT_OF_RANGE', 'UNIMPLEMENTED', 'INTERNAL', 'UNAVAILABLE', 'DATA_LOSS']);
+  const reasons = new Set(['SERVICE_DISABLED', 'BILLING_DISABLED', 'CONSUMER_INVALID', 'API_KEY_INVALID',
+    'API_KEY_EXPIRED', 'API_KEY_NOT_FOUND', 'API_KEY_SERVICE_BLOCKED', 'API_KEY_HTTP_REFERRER_BLOCKED',
+    'API_KEY_IP_ADDRESS_BLOCKED', 'API_KEY_ANDROID_APP_BLOCKED', 'API_KEY_IOS_APP_BLOCKED',
+    'ACCESS_TOKEN_SCOPE_INSUFFICIENT', 'ACCESS_TOKEN_EXPIRED', 'CREDENTIALS_MISSING',
+    'IAM_PERMISSION_DENIED', 'SECURITY_POLICY_VIOLATED', 'RATE_LIMIT_EXCEEDED',
+    'RESOURCE_QUOTA_EXCEEDED', 'USER_PROJECT_DENIED']);
+  if (Number.isInteger(error.code) && error.code >= 100 && error.code <= 599) base.googleCode = error.code;
+  if (statuses.has(error.status)) base.googleStatus = error.status;
+  for (const detail of (Array.isArray(error.details) ? error.details : []).slice(0, 20)) {
+    if (detail?.['@type'] !== 'type.googleapis.com/google.rpc.ErrorInfo') continue;
+    if (reasons.has(detail.reason)) {
+      if (!base.errorInfoReasons.includes(detail.reason)) base.errorInfoReasons.push(detail.reason);
+    } else base.unrecognizedErrorInfo = true;
+  }
+  // Never retain message, metadata, domain, token, raw body or unknown codes.
+  return base;
+}
+
+function isBoundAppCheckFailure(response, context) {
+  try {
+    const status = response.status(), url = new URL(response.url());
+    return Number.isInteger(status) && status >= 300 && status <= 599 &&
+      ['https://content-firebaseappcheck.googleapis.com', 'https://firebaseappcheck.googleapis.com'].includes(url.origin) &&
+      allowStagingRequest(response.url(), response.request().method(), context);
+  } catch {return false;}
+}
+
+async function readAppCheckFailure(response, context, {timeoutMs = 3000} = {}) {
+  if (!isBoundAppCheckFailure(response, context)) return null;
+  const httpStatus = response.status();
+  let timer;
+  try {
+    return await Promise.race([
+      (async () => {
+        const length = await response.headerValue('content-length');
+        if (length === null) return {httpStatus, bodyStatus: 'not-read-missing-length'};
+        if (!/^\d{1,6}$/.test(length || '')) return {httpStatus, bodyStatus: 'not-read-invalid-length'};
+        if (Number(length) > 16384) return {httpStatus, bodyStatus: 'not-read-too-large'};
+        // Playwright buffers the response: gate the declared length first,
+        // then cap decoded bytes before parsing. Missing length is not a pass.
+        return projectAppCheckError(httpStatus, await response.body());
+      })().catch(() => ({httpStatus, bodyStatus: 'read-unavailable'})),
+      new Promise((resolve) => {timer = setTimeout(() => resolve({httpStatus, bodyStatus: 'read-timeout'}), Math.min(3000, Math.max(1, timeoutMs)));}),
+    ]);
+  } finally {clearTimeout(timer);}
+}
+
+function createAppCheckErrorRecorder(context) {
+  const records = [], pending = new Set();
+  let totalCount = 0;
+  return {
+    observe(response) {
+      if (!isBoundAppCheckFailure(response, context)) return;
+      const sequence = ++totalCount;
+      if (sequence > 50) return;
+      const at = new Date().toISOString();
+      const observation = readAppCheckFailure(response, context).then((result) => {
+        if (result) records.push({sequence, at, ...result});
+      });
+      pending.add(observation);
+      void observation.finally(() => pending.delete(observation));
+    },
+    async drain() {await Promise.allSettled([...pending]);},
+    snapshot() {return {totalCount, omittedCount: Math.max(0, totalCount - 50), records: structuredClone(records)};},
+  };
+}
+
 function scrubBrowserError(error, fixture) {
   let result = String(error?.message || error).replace(/\bBearer\s+[^\s'"<>]+/gi, 'Bearer [redacted]');
   // Chromium can emit /host/path?session=... without a scheme. Include that
@@ -334,7 +412,7 @@ async function produce({candidate, context, outputDir}) {
   fs.mkdirSync(outputDir, {recursive: true});
   const gates = Object.fromEntries(activeGates.map((id) => [id, {assertions: [], rawPaths: [], blockers: []}]));
   const blocked = [], browserErrors = [], identityObservations = new Set(), anonymousUids = new Set();
-  const pageErrors = createPageErrorRecorder({candidate, context}), contextMetadata = new WeakMap();
+  const pageErrors = createPageErrorRecorder({candidate, context}), appCheckErrors = createAppCheckErrorRecorder(context), contextMetadata = new WeakMap();
   let contextSequence = 0, pageSequence = 0, stepSequence = 0, observedDuringStep = null;
   let appCheckToken;
   const write = (gate, name, value) => { fs.writeFileSync(path.join(outputDir, name), JSON.stringify(value, null, 2)); gates[gate].rawPaths.push(name); };
@@ -365,6 +443,7 @@ async function produce({candidate, context, outputDir}) {
       const errorIndex = browserErrors.push(scrub(error)) - 1;
       pageErrors.record(error, {...metadata, errorIndex, pageUrl: page.url(), observedDuringStep});
     });
+    page.on('response', (response) => appCheckErrors.observe(response));
     observeCreatedIdentities(page);
     return page;
   }
@@ -919,9 +998,16 @@ async function produce({candidate, context, outputDir}) {
       JSON.stringify({phase, ...pageErrors.snapshot()}, null, 2));
     savePageErrors('before-close');
     for (const gate of activeGates) gates[gate].rawPaths.push('page-error-diagnostics.json');
+    const saveAppCheckErrors = (phase) => fs.writeFileSync(path.join(outputDir, 'appcheck-error-diagnostics.json'),
+      JSON.stringify({phase, ...appCheckErrors.snapshot()}, null, 2));
+    await appCheckErrors.drain();
+    saveAppCheckErrors('before-close');
+    for (const gate of activeGates) gates[gate].rawPaths.push('appcheck-error-diagnostics.json');
     await browser.close();
     await Promise.allSettled([...identityObservations]);
+    await appCheckErrors.drain();
     savePageErrors('after-close');
+    saveAppCheckErrors('after-close');
     // Keep the cleanup manifest even when candidate identity or a browser
     // operation fails before a gate report can be produced.
     fs.writeFileSync(path.join(outputDir, 'fixture-created-identities.json'), JSON.stringify({runId: fixture.runId,
@@ -931,4 +1017,4 @@ async function produce({candidate, context, outputDir}) {
 
 module.exports = produce;
 module.exports.produce = produce;
-module.exports._test = {validateFixture, allowStagingRequest, scrubBrowserError, pageErrorDiagnostic, createPageErrorRecorder, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, htmlResponsiveProbe, readOwnedHistoryTitles, visibleHistoryTitle, openCheckInConsole};
+module.exports._test = {validateFixture, allowStagingRequest, scrubBrowserError, pageErrorDiagnostic, createPageErrorRecorder, projectAppCheckError, readAppCheckFailure, createAppCheckErrorRecorder, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, htmlResponsiveProbe, readOwnedHistoryTitles, visibleHistoryTitle, openCheckInConsole};
