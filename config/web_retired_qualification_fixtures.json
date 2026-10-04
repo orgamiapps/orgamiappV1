@@ -1,5 +1,142 @@
 {
   "schemaVersion": 1,
   "projectId": "attendus-staging",
-  "runs": []
+  "runs": [
+    {
+      "runId": "webqa-20261004-671be56c38",
+      "sourceSha": "2d275ac0c23008bf8b68d2fdf0ff83e331869f73",
+      "candidateRunId": "37210826673",
+      "cleanupEvidenceSha256": "b7f220c20a7862f889cd0cf677e155758fa16f20ae7ce8b400b7f8b2a844f2aa",
+      "documents": [
+        {
+          "path": "QualificationBindings/account_1f965a235ae4a0179c788e9116d45e5a423a716da98d6ce5f99964fd886a3547",
+          "sha256": "86e3bc1fab81b28327484bc97c8640bcce150d924a71428adab1e52ff2ae79f4"
+        },
+        {
+          "path": "QualificationBindings/account_26f09c8a29ed23bf18ee753e6561cf16e238e16a8cf98f623f5cba0cbe632ba7",
+          "sha256": "b76ca25a2327c6b07d9ad168a19ed0f53a1e7cafc3694c40b480199bb4d9a42f"
+        },
+        {
+          "path": "QualificationBindings/account_35a2426f15879186e395027138741ef06de7f9c65656093d36e754cdb704c8da",
+          "sha256": "77999b0607a8b4a5ba3c3efe8f9b349cb43ebc751a3d918c57060a9e44451cd9"
+        },
+        {
+          "path": "QualificationBindings/account_3648acbb0e08cf65fe19917e9c00c7dac2772750a9d55214fb98651962f0562a",
+          "sha256": "11c5b83dbceb6f8558b2ca022a80f686cecc514ed2720a709fd90f583bde5d44"
+        },
+        {
+          "path": "QualificationBindings/account_3aead6bb30287f0fdd3f84262d88e7ccac73e8119febfaca3dda6c7881857d6b",
+          "sha256": "370040aebc842a57db3e8c3452ca51cc61aa4ac9b74e08ae068d5872e597ede5"
+        },
+        {
+          "path": "QualificationBindings/account_475dfe571087eed81bd672031d8519b613880bb7724871eb1bb6233364809766",
+          "sha256": "c4502c9b60f4a48e3baf73d8d80dc002f891973a5060ae7cdc4551d3cd78b722"
+        },
+        {
+          "path": "QualificationBindings/account_4a0e92ed338422f6412553fc8356ab49f8320456d7ee278abd62fb9a20f230ac",
+          "sha256": "4b7d940f4275fadaf2eebd370fdb25947885d6a407abc502e0287555c8b81d7c"
+        },
+        {
+          "path": "QualificationBindings/account_667b9eb75d3c9543c6746ba1c24494d151967298b32d3cfbce63bf8df7376399",
+          "sha256": "d363518d88a811f6897b5ad3fc9d9c80e3bc4771d6b91d0af38cb12197323801"
+        },
+        {
+          "path": "QualificationBindings/account_7534b9d554719fba750ad2bc0c25e691fce3aa17056dc7c6b7e7452f1d5cdc5d",
+          "sha256": "2da219aa075e9ea21fc0e5e6c2b19a228204fbc74dd46d1d5d9379e9e811d9a3"
+        },
+        {
+          "path": "QualificationBindings/account_7c308b50db1fbad1287e8c8e066a3724d66d785c49d326d56d56bc8d4b8d814a",
+          "sha256": "67c8ad4f0e608107f778a3bba58df14f7a0567e1bc3aedd2831e9d9ea7b0210b"
+        },
+        {
+          "path": "QualificationBindings/account_8ef62116273c39e9838fde0b3372f79d28cfa4d0cae83f1e147597273c872af8",
+          "sha256": "8178978de48e12491686e63a7fe73b349e0ebc8222848ccaad351fe4366bfc3c"
+        },
+        {
+          "path": "QualificationBindings/account_8f2f2a555050c38e8bfd85fbd9fab29ae6e9f0c8a4ae2d0a8e4c393bff4af431",
+          "sha256": "33f870b77225ac18bf2fedfb5800313642dedebae51a7709148396fcf7c3fb84"
+        },
+        {
+          "path": "QualificationBindings/account_928d30e5cc9c6630e7ffda3b79a863601ee59f3b4bd0dd5ad53d76017f881ebc",
+          "sha256": "eb602ab082d0b30fec5c03edc674cd2f7d2037d7fbd60190e7a3261c25877775"
+        },
+        {
+          "path": "QualificationBindings/account_9581024fca66b978d466403d70438c7326aa89b42bdc049e451e6e08478d1cf3",
+          "sha256": "302b3575898736e9f2cb8a7710c8fe1484a5bd16a10c457c55afae432da8105a"
+        },
+        {
+          "path": "QualificationBindings/account_9735071d6ea54bb59049e00b1f0c85a13eac0353494b616eedfb8bd5006ff464",
+          "sha256": "c528db7456020c5a67409e48b03f39fa4db1a2b8103bc029101c04d05e9b59e5"
+        },
+        {
+          "path": "QualificationBindings/account_9bb6a999958e65eb9952bf8713e783eeb9bc8a1fcbafef15846cf378f2e08b0e",
+          "sha256": "3646d572181508d6ff0177a2b540809ece59768e84630af910c14f0299f0804c"
+        },
+        {
+          "path": "QualificationBindings/account_9c4daa773e31b284c07fc1d0c35d31d4362980c8ccaeafd89068086a9dd964e7",
+          "sha256": "3063de567b0e191dbc83122f9606388d8bfc685efb147f44fd3d447440ec3030"
+        },
+        {
+          "path": "QualificationBindings/account_9c9382040e3af50b148f9849512b06fe194a0d81f149c20b3962d4c43d5efc01",
+          "sha256": "80b7076a71336b1366867f3a89d23bae5051092007fe2d7a9704abe261711bf9"
+        },
+        {
+          "path": "QualificationBindings/account_b35bf99d9a5782a2f1906521a80a9a9e1373fc7b79b60541ca7553facb6b81a6",
+          "sha256": "6bfd93f67f2afdbe4ad1cc9312fdbc959bc1abfa07c17152f18cf5c897175245"
+        },
+        {
+          "path": "QualificationBindings/account_dd0cd574188a2f1cddb8ca3e176411079dff8826305e39e087758f0330a97eac",
+          "sha256": "62d3ccaf23d4a80d981b5ec7af732fc4c4245632fa9d3698e2c061a9478871c0"
+        },
+        {
+          "path": "QualificationBindings/account_e99195062a549a55187e5de29c4497d133a6555f3ae28023cc0ac581d6329741",
+          "sha256": "10802dd6c7f8572138e1eba478cf4d998f658c9ca9710175378f732825babfcc"
+        },
+        {
+          "path": "QualificationBindings/conversation_2cd897d14ea187bf3adb8c23db12d7a8786a226e217ea522162a555e2f0c95aa",
+          "sha256": "d1082005f1a26c1e815fbde44301aa177404aea30a4a9fe59cfe916768f4676c"
+        },
+        {
+          "path": "QualificationBindings/event_13add757240a46541eca3b30814b97f559dc8d75d257406fb19f1ae103b159dc",
+          "sha256": "635d976db8e0f7ae9b28b686a7d652cab5350285a9f6a3af08b0cce65dad60b6"
+        },
+        {
+          "path": "QualificationBindings/event_6af657879bc1af17713739416b873e8253a76a9868d6fe38140bf5ae8647ca23",
+          "sha256": "6837c2ee7e791b17ec993f0b9939f2715cfd2dd49b671c8ceb1ad39477047b2a"
+        },
+        {
+          "path": "QualificationBindings/event_710d5b7ae27f8dc295cb9661a8075a32b6944acc9b46650c7a2a03737f1fe467",
+          "sha256": "75414cd25aff22c499b4f3de7f099f08fb2003f88846d4610a7bc07c8afa7ee7"
+        },
+        {
+          "path": "QualificationBindings/event_b8097ea938bec04bc4432788d545d48fb5773be4f5548c97bb2852fb5a85d189",
+          "sha256": "7c00a553c5d446ca624279d28fe2ebf0856004db63818f1b8919f2518fca38d6"
+        },
+        {
+          "path": "QualificationBindings/event_bed2b95217b5e46982758d392122cbe17143d65e088da74b43455cc9e6b1f2b6",
+          "sha256": "d9f7e273bd967cad485573d2267548276dbfef8e5397a4c6912aa137f3719692"
+        },
+        {
+          "path": "QualificationBindings/event_c3bfc3f597da4f2447dc81af08dd0b99592759b90f2b4d2b92b7042855fbade4",
+          "sha256": "c64763c0f07179df04b35e07894caf4df278cb77a7153be87017f2bc3847a502"
+        },
+        {
+          "path": "QualificationBindings/event_d844b2d6246fb7f4236811087c108d68802df4b8b972cf0f1341665246442aab",
+          "sha256": "153008bee50459c5f20af8fa49cfc9215e59544806df5b1679f607e17a940836"
+        },
+        {
+          "path": "QualificationBindings/organization_f9e3b98c60cd552610f594cb4081f1ec2884e7e3a51e4d7e99d7321277ce1c2f",
+          "sha256": "95c259a5f17848bd63c93efe44e397a782784925bf7b0b0db16e88e1ac580c3f"
+        },
+        {
+          "path": "QualificationScopes/webqa-20261004-671be56c38",
+          "sha256": "cccea059cc81dc1f349bff276058f54ea780db333df7c041b78764c1627c0b33"
+        },
+        {
+          "path": "QualificationSetup/webqa-20261004-671be56c38",
+          "sha256": "203ea7d7e05620104304d1e2b7b773dd704dedbbd8ab1e0f12b5e0a489105a8a"
+        }
+      ]
+    }
+  ]
 }

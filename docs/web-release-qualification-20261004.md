@@ -352,3 +352,95 @@ restoration remain open. A new complete read-only inventory precedes those
 phases. Public mirror reappearance is a separate issue, not part of the roster
 exception. All captured failed evidence, retirement tombstones and unrelated
 records remain preserved. Production has not changed.
+
+### October 4, 19:03 UTC checkpoint
+
+Source `7b92211dd04b596c569f675bb938f577306342cf` passed all six hosted web
+quality jobs in PR run `37223057506` and push run `37223054558`. Retained browser
+artifact `11310613823` has verified ZIP SHA256
+`26df938516c485689adebe65d2089bee7edec02d0f4a5c877899f41d4266ce39`:
+36 public cases across four browser projects, no unexpected failures, flakes or
+skips, and a passing actual Flutter browser driver result. These are hosted test
+results, not new staging acceptance. The subsequent inventory-tool correction
+is checked separately against all 26 declared Flutter image files.
+
+Cleanup now has 1,241 explicit document deletions with actual acknowledgements
+and verified absence. A further 22 derived absences were observed after their
+source deletions; they are recorded separately and are not our own delete
+acknowledgements. All 32 retired isolation records, 19 captures, five unrelated
+historical insights and the unrelated Auth account remain preserved. The latest
+complete read at `2026-10-04T19:03:30.758Z` contains 195 Firestore documents,
+21 Auth identities and zero Storage objects. Seven roster residuals still await
+the corrected backend and a separate verified cleanup before any new seed.
+
+The first owned Auth deletion produced no accepted acknowledgement. Its original
+failure remains unchanged. Exact-UID lookup and a subsequent complete inventory
+confirm that account's absence and unchanged metadata for all remaining accounts.
+This is one manually reviewed reconciled absence, **zero acknowledged Auth
+deletions**, and 20 owned accounts still to clean up. Reconciliation proof SHA256:
+`838cd60bc011c4a0b3e52f2c7aa8a5f78001f76911ff896a758492973ab89e95`.
+The attempted UID must never be retried. The private cleanup parser incorrectly
+requires an empty success body although Google's documented `DeleteAccountResponse`
+permits a deprecated `kind` string. That contract defect is confirmed; the lost
+original body means it remains an inferred explanation for this particular
+failure. A corrected, independently reviewed batch is required before continuing
+with the other 20 accounts. The three configuration restorations remain pending.
+
+Supplemental browser helpers have 143 passing offline checks and independent
+review. Concrete signup preparation has 47 passing offline checks and independent
+review; genuine multiple-admission preparation is undergoing review. All remain
+unbound and unexecuted against a fresh candidate. Candidate10 stays held after its
+failed browser run. App Check, provider access, production data decisions, broad
+web acceptance and the original timed observation requirements remain open.
+Production has not changed.
+
+### October 4, 19:28 UTC cleanup checkpoint
+
+The remaining 20 owned Auth accounts were deleted sequentially with actual
+acknowledgements and exact-UID absence checks. The batch completed at
+`2026-10-04T19:17:37.225Z`; receipt SHA256:
+`93892c43d298ce6a20def55acaecf4f3dee543955d9982d12f4f755e3ca11898`.
+The first account remains a separately recorded manually reconciled absence;
+its original acknowledgement is unknown and it must never be retried. The
+corrected private response parser has 45 passing checks; the actual 20-account
+responses used Google's documented legacy `kind` field.
+
+All three staging configuration restorations were acknowledged and their typed
+effects verified at `2026-10-04T19:27:27.090Z`. Receipt SHA256:
+`53fb199e6f48122199f22cb0171dc9152ca83b15eca568172f78ed1110f4061a`.
+The complete read at `2026-10-04T19:28:11.743Z` contains 193 Firestore documents,
+one preserved unrelated Auth account and zero Storage objects. It preserves all
+32 retirement tombstones, 19 captures and unrelated history. Firestore snapshot
+SHA256: `bf4bb46bbeed410c5a5b397e9fb06c67cded25d99ed0b4a74126803cc0ab6ae5`.
+
+The combined outcome is 1,241 acknowledged document deletions, 22 separately
+observed derived absences, 20 acknowledged Auth deletions plus one reconciled
+absence, and three verified configuration restorations. Seven roster records
+remain explicitly unresolved. A newly verified backend containing the roster
+fences must be deployed and rehearsed before their separately guarded removal,
+followed by a complete fresh absence proof before another fixture is seeded.
+The private predeployment receipt SHA256 is
+`b7f220c20a7862f889cd0cf677e155758fa16f20ae7ce8b400b7f8b2a844f2aa`;
+it explicitly says cleanup is incomplete. Its exact 32 typed retirement pins
+are integrated into `config/web_retired_qualification_fixtures.json`, SHA256
+`9c1917ede4743ff362f8e0f9106fa6ee693fd83d1a5418573503df3c4db059b7`.
+
+The 143-check supplemental, 47-check signup and 119-check multiple-admission
+helpers now have independent review. They remain unbound and unexecuted against
+a new staging candidate. Five legacy shell entrypoints were separately found
+to bypass qualified release controls and now fail before any command; their
+eleven regression checks pass. The corrected inventory enumerates 992 surfaces,
+including previously omitted assets, localization, configuration and tooling. These
+pending changes require fresh source CI. Candidate10 remains held, the provider,
+data and complete web acceptance gates remain open, and production is unchanged.
+
+The final local release/browser selection passes **316/316**, with zero failures
+or skips, when run serially with Node22.23.2. Log SHA256:
+`5aeb20d5ed6c35c39c252ac67653ba2ae75c57384183ae0bffdc9f921aac8d0d`.
+The first parallel run remains preserved as 313 passes and three 20-second
+subprocess timeouts (SHA256
+`d415a367374527335e04810ec33636c70b4db92478d24d73b1aeb4c0a5bc4f0d`).
+All 48 affected deployment-adapter tests also pass in an isolated, credential-free,
+network-blocked run. No timeout was increased, assertion removed or product code
+changed for this diagnostic. The earlier delay's cause is not established;
+fresh hosted CI still must pass on the committed candidate.

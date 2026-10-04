@@ -528,3 +528,45 @@ Fixture data/Auth cleanup and configuration restoration are still open at this
 checkpoint. All production data is unchanged. See the release qualification
 record for immutable evidence hashes and the remaining provider, data and timed
 acceptance gates.
+
+### October 4 inventory correction
+
+The refreshed inventory omitted the Flutter `images/` directory and three root
+logos declared in `pubspec.yaml`. The scanner now recognizes image and font
+assets outside `web/` and hashes their bytes without parsing them as source.
+An actual declaration-to-file comparison verifies all 26 declared image files;
+the total inventory increases from 862 to 927 surfaces, including 65 previously
+omitted image/font files. Independent review confirms that no previous surface
+was removed. Corrected inventory SHA256:
+`f604825be41d4b5b45b43a45b902d4b22b9c9cfff45693d75ed6ad665dd821e4`.
+This local inventory includes the pending scanner correction on source
+`7b92211dd04b596c569f675bb938f577306342cf`; it is not runtime acceptance.
+Its 153 lexical export matches include the commented `helloWorld` example;
+effective runtime exports remain subject to the separate deployment inventory.
+
+### October 4 deployment-entrypoint correction
+
+| ID / severity / surface | Reproduction and expected versus actual behavior | Root cause and correction | Verification and remaining acceptance |
+| --- | --- | --- | --- |
+| WEBQA-11 / P1 / release controls | Run any of the five historical deployment/provider shell scripts. They could invoke Firebase without the qualified release workflow or an explicit project; the default project is production. | Old standalone scripts bypassed source, artifact and acceptance gates. All five now print the supported workflow paths and exit with failure before invoking any command. Historical implementations remain in Git. | The isolated copied-script regression failed ten behavioral cases before correction and passes all eleven cases afterward, including force-argument/environment attempts and recurring CI registration. Independent review clear. No cloud or provider operation was executed. Fresh CI is required for this source delta. |
+
+The affected entrypoints are `deploy_web.sh`, `deploy_firestore_rules.sh`,
+`deploy_guest_mode_fix.sh`, `DEPLOY_JOIN_APPROVAL_NOTIFICATIONS.sh` and
+`setup_google_wallet.sh`. Their shared corrected SHA256 is
+`ef7bf72e9be959278814860c01fe4f6de7efaa9a6eda750313ad55f9e83c7426`.
+The new regression file is `tests/browser/legacy-deploy-entrypoints.test.cjs`;
+its SHA256 is `bd696966760849a0101f3121a6c861cfb4235f6dfd5328407855d2adbec06b63`.
+
+The inventory also now includes the three `config/` manifests, root Firebase,
+Git, Flutter and analyzer configuration, root tooling and `router_fixed.dart`.
+Independent reconciliation also restored localization inputs, the Admin
+integration test, Firebase Storage CORS, legacy public HTML and native/installer
+source formats. The working inventory contains 992 file surfaces, with all 992
+file hashes verified. Inventory SHA256:
+`de71a94c9bc01c81fb72044a3c0513f8f1bc9b29f26ea241096ab2969f5b7099`.
+The 259 excluded tracked/nonignored paths are 243 Markdown documents, ten retained
+JSON evidence files, four backups, one generated Firebase cache and one unapplied
+patch. Linked subsystem reports do not assert individual-file review or execution.
+The current 18-family web coverage matrix separately records hosted tests,
+unexecuted preparation and remaining staging/provider journeys. Native source
+inventory does not extend the current web-only acceptance scope.
