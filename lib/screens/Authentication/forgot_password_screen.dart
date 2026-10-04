@@ -9,7 +9,10 @@ import 'package:flutter/material.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
-  const ForgotPasswordScreen({super.key});
+  const ForgotPasswordScreen({super.key, this.auth});
+
+  @visibleForTesting
+  final FirebaseAuth? auth;
 
   @override
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
@@ -19,6 +22,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _btnCtlr = RoundedLoadingButtonController();
   final _emailEdtController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  bool _resettingPassword = false;
 
   @override
   void dispose() {
@@ -61,7 +65,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             SizedBox(
               height: 52,
               child: RoundedLoadingButton(
-                animateOnTap: true,
+                animateOnTap: false,
                 borderRadius: 12,
                 controller: _btnCtlr,
                 elevation: 0,
@@ -89,19 +93,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   void _submit() {
+    if (_resettingPassword || !_formKey.currentState!.validate()) return;
+    _resettingPassword = true;
     _btnCtlr.start();
-    if (_formKey.currentState!.validate()) {
-      _resetPassword();
-    } else {
-      _btnCtlr.reset();
-    }
+    _resetPassword();
   }
 
   Future<void> _resetPassword() async {
+    var succeeded = false;
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(
+      await (widget.auth ?? FirebaseAuth.instance).sendPasswordResetEmail(
         email: _emailEdtController.text.trim(),
       );
+      succeeded = true;
+      if (!mounted) return;
       ShowToast().showNormalToast(
         msg: 'Password reset link sent to your email.',
       );
@@ -139,6 +144,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       ShowToast().showNormalToast(
         msg: 'Unable to send reset instructions. Please try again.',
       );
+    } finally {
+      if (!succeeded) _resettingPassword = false;
     }
   }
 }

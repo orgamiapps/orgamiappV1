@@ -33,6 +33,79 @@ test.before(async () => {
   await db.collection("Events").doc(eventId).collection("EventQuestions").doc("diet").set({id: "diet", timing: "registration", prompt: "Diet", type: "short_text", required: true});
 });
 test.after(async () => { await db.terminate(); });
+test("actual roster handlers invalidate current parents and ignore delayed deleted-parent deliveries", async () => {
+  const deletedId = `roster-deleted-${suffix}`, liveId = `roster-current-${suffix}`;
+  const sourceId = `roster-source-${suffix}`, uid = `roster-person-${suffix}`;
+  const event = db.doc(`Events/${deletedId}`), state = db.doc(`EventRosters/${deletedId}`);
+  const liveEvent = db.doc(`Events/${liveId}`), liveState = db.doc(`EventRosters/${liveId}`);
+  const registration = db.doc(`RegisterAttendance/${sourceId}`), ticket = db.doc(`Tickets/${sourceId}`);
+  const historical = db.doc(`HistoricalAttendance/${sourceId}`);
+  const refs = [event, state, liveEvent, liveState, registration, ticket, historical];
+  try {
+    await event.set({customerUid: uid, status: "active"});
+    await state.set({revision: 3, ready: true, generation: "retained", count: 2});
+    await operations.refreshRosterEvent.run({params: {id: deletedId}});
+    assert.deepEqual((await state.get()).data(), {revision: 4, ready: false, generation: "retained", count: 2});
+    await registration.set({eventId: deletedId, customerUid: uid, guestId: uid});
+    await ticket.set({eventId: deletedId, customerUid: uid, guestId: uid});
+    await historical.set({eventId: deletedId});
+    const before = await registration.get();
+    await Promise.all([event.delete(), state.delete()]);
+    await operations.refreshRosterEvent.run({params: {id: deletedId}});
+    for (const name of ["RegisterAttendance", "Attendance", "Tickets", "HistoricalAttendance"]) {
+      await operations[`refreshRoster${name}`].run({params: {id: sourceId}, data: {before, after: before}});
+    }
+    await operations.refreshRosterCorrection.run({params: {id: sourceId, correction: "late"}});
+    await operations.refreshRosterCustomers.run({params: {id: uid}});
+    await operations.refreshRosterGuestAttendees.run({params: {id: uid}});
+    assert.equal((await state.get()).exists, false);
+    // A moved source must still invalidate its surviving parent.
+    await liveEvent.set({customerUid: uid, status: "cancelled"});
+    await registration.update({eventId: liveId});
+    const after = await registration.get();
+    await operations.refreshRosterRegisterAttendance.run({params: {id: sourceId}, data: {before, after}});
+    assert.equal((await state.get()).exists, false);
+    assert.deepEqual((await liveState.get()).data(), {revision: 1, ready: false});
+  } finally {
+    await Promise.all(refs.map((ref) => ref.delete()));
+  }
+});
+for (const replacement of [false, true]) test(`roster publication fences concurrent parent ${replacement ? "replacement" : "deletion"}`, async () => {
+  const id = `roster-publish-${replacement ? "replace" : "delete"}-${suffix}`;
+  const event = db.doc(`Events/${id}`), state = db.doc(`EventRosters/${id}`);
+  let intercepted = false;
+  try {
+    await event.set({customerUid: owner, status: "active", eventRevision: 1});
+    const proxy = new Proxy(db, {get(target, property) {
+      if (property === "runTransaction") return async (...args) => {
+        if (!intercepted) {
+          intercepted = true;
+          assert.equal((await state.collection("generations").get()).size, 1,
+              "The race must occur after materialization and before final publication");
+          await event.delete();
+          if (replacement) await event.set({customerUid: `replacement-${owner}`, status: "active", eventRevision: 1});
+        }
+        return target.runTransaction(...args);
+      };
+      const value = target[property];
+      return typeof value === "function" ? value.bind(target) : value;
+    }});
+    const firestore = () => proxy;
+    firestore.FieldValue = admin.firestore.FieldValue;
+    await assert.rejects(createLaunchOperations({firestore}).listEventRosterV2.run(request(owner, {eventId: id})),
+        {code: "unavailable"});
+    assert.equal(intercepted, true);
+    assert.equal((await state.get()).exists, false);
+    assert.equal((await state.collection("generations").get()).empty, true);
+    const current = await event.get();
+    assert.equal(current.exists, replacement);
+    if (replacement) assert.equal(current.get("customerUid"), `replacement-${owner}`);
+  } finally {
+    await db.recursiveDelete(state);
+    await event.delete();
+  }
+});
+
 test("concurrent free publications consume the current final allowance only once", async () => {
   const {consumePublicationAllowance} = require("../events/wizard");
   const uid = `quota-${suffix}`;
@@ -208,6 +281,97 @@ test("approval preserves capacity and retries do not issue duplicate tickets", a
   assert.deepEqual(first, retry);
   assert.equal((await db.collection("Tickets").where("eventId", "==", id).get()).size, 1);
   await assert.rejects(wizard.decideEventRegistrationV1.run(request(owner, {...input, decision: "decline"})), {code: "already-exists"});
+});
+
+test("waitlisted guest decline commits once without issuing tickets or changing capacity", async () => {
+  const wizard = require("../events/wizard").createEventWizardFunctions(admin);
+  const id = `decline-${suffix}`, reg = `decline-reg-${suffix}`, guestId = `decline-guest-${suffix}`;
+  const eventRef = db.doc(`Events/${id}`), registrationRef = db.doc(`RegisterAttendance/${reg}`);
+  const guestRef = db.doc(`GuestAttendees/${guestId}`);
+  await eventRef.set({customerUid: owner, status: "active", selectedDateTime: new Date(Date.now() + 86400000),
+    eventDurationMinutes: 90, confirmedRegistrationCount: 1, issuedTickets: 1, reservedTickets: 0,
+    registrationPolicy: {mode: "free_ticket", capacity: 1, waitlistEnabled: true}});
+  await registrationRef.set({eventId: id, customerUid: `decline-person-${suffix}`, guestId, status: "waitlisted"});
+  await guestRef.set({encryptedEmail: "fixture-ciphertext", maskedEmail: "f***@example.test"});
+  const input = {eventId: id, registrationId: reg, decision: "decline"};
+  const before = (await eventRef.get()).data();
+  await assert.rejects(wizard.decideEventRegistrationV1.run(request(`foreign-${suffix}`, input)), {code: "permission-denied"});
+  const [first, retry] = await Promise.all([1, 2].map(() => wizard.decideEventRegistrationV1.run(request(owner, input))));
+  assert.deepEqual(first, {status: "declined", ticketId: null});
+  assert.deepEqual(retry, first);
+  assert.deepEqual((await eventRef.get()).data(), before);
+  assert.equal((await registrationRef.get()).get("status"), "declined");
+  const decisions = await db.collection("RegistrationDecisions").where("eventId", "==", id).get();
+  const messages = await db.collection("OutboundMessages").where("eventId", "==", id).get();
+  assert.equal(decisions.size, 1);
+  assert.equal(messages.size, 1);
+  assert.equal(messages.docs[0].get("templateId"), "guest_registration_declined");
+  assert.equal((await db.collection("GuestManageTokens").where("registrationId", "==", reg).get()).size, 1);
+  assert.equal((await db.collection("Tickets").where("eventId", "==", id).get()).size, 0);
+  await assert.rejects(wizard.decideEventRegistrationV1.run(request(owner, {...input, idempotencyKey: "fresh-decline"})), {code: "failed-precondition"});
+});
+
+test("actual SDK retry discards a tentative free ticket before committing a full-capacity waitlist", async () => {
+  const id = `retry-decision-${suffix}`, reg = `retry-decision-reg-${suffix}`;
+  const eventRef = db.doc(`Events/${id}`), registrationRef = db.doc(`RegisterAttendance/${reg}`);
+  await eventRef.set({customerUid: owner, status: "active", selectedDateTime: new Date(Date.now() + 86400000),
+    eventDurationMinutes: 90, confirmedRegistrationCount: 0, issuedTickets: 0,
+    registrationPolicy: {mode: "free_ticket", capacity: 1, waitlistEnabled: true}});
+  await registrationRef.set({eventId: id, customerUid: `retry-decision-person-${suffix}`, status: "pending"});
+  let attempts = 0;
+  const proxy = new Proxy(db, {get(target, property) {
+    if (property === "runTransaction") return (callback) => target.runTransaction(async (transaction) => {
+      attempts++;
+      // The first attempt has already rolled back before this update, so no
+      // external write is awaited while the first transaction holds its locks.
+      if (attempts === 2) await eventRef.update({confirmedRegistrationCount: 1, issuedTickets: 1});
+      const result = await callback(transaction);
+      if (attempts === 1) {
+        assert.equal(result.status, "confirmed");
+        assert.ok(result.ticketId);
+        throw Object.assign(new Error("Fixture forces one SDK transaction retry"), {code: 10});
+      }
+      return result;
+    }, {maxAttempts: 3});
+    const value = target[property];
+    return typeof value === "function" ? value.bind(target) : value;
+  }});
+  const firestore = () => proxy;
+  firestore.FieldValue = admin.firestore.FieldValue;
+  firestore.Timestamp = admin.firestore.Timestamp;
+  const wizard = require("../events/wizard").createEventWizardFunctions({firestore});
+  const input = {eventId: id, registrationId: reg, decision: "approve", idempotencyKey: "retried-approval"};
+  assert.deepEqual(await wizard.decideEventRegistrationV1.run(request(owner, input)), {status: "waitlisted", ticketId: null});
+  assert.equal(attempts, 2);
+  assert.deepEqual(await wizard.decideEventRegistrationV1.run(request(owner, input)), {status: "waitlisted", ticketId: null});
+  assert.equal((await registrationRef.get()).get("ticketId"), null);
+  const decisions = await db.collection("RegistrationDecisions").where("eventId", "==", id).get();
+  assert.equal(decisions.size, 1);
+  assert.equal(decisions.docs[0].get("ticketId"), null);
+  assert.equal((await db.collection("Tickets").where("eventId", "==", id).get()).size, 0);
+  assert.equal((await eventRef.get()).get("confirmedRegistrationCount"), 1);
+  assert.equal((await eventRef.get()).get("issuedTickets"), 1);
+});
+
+test("concurrent waitlist decline and promotion commit exactly one valid state transition", async () => {
+  const wizard = require("../events/wizard").createEventWizardFunctions(admin);
+  const id = `decision-race-${suffix}`, reg = `decision-race-reg-${suffix}`;
+  const eventRef = db.doc(`Events/${id}`), registrationRef = db.doc(`RegisterAttendance/${reg}`);
+  await eventRef.set({customerUid: owner, status: "active", selectedDateTime: new Date(Date.now() + 86400000),
+    eventDurationMinutes: 90, confirmedRegistrationCount: 0, issuedTickets: 0,
+    registrationPolicy: {mode: "free_ticket", capacity: 1, waitlistEnabled: true}});
+  await registrationRef.set({eventId: id, customerUid: `decision-race-person-${suffix}`, status: "waitlisted"});
+  const results = await Promise.allSettled(["decline", "promote"].map((decision) =>
+    wizard.decideEventRegistrationV1.run(request(owner, {eventId: id, registrationId: reg, decision}))));
+  assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+  assert.equal(results.find((result) => result.status === "rejected").reason.code, "failed-precondition");
+  const final = (await registrationRef.get()).data();
+  assert.ok(["declined", "confirmed"].includes(final.status));
+  const count = final.status === "confirmed" ? 1 : 0;
+  assert.equal((await eventRef.get()).get("confirmedRegistrationCount"), count);
+  assert.equal((await eventRef.get()).get("issuedTickets"), count);
+  assert.equal((await db.collection("Tickets").where("eventId", "==", id).get()).size, count);
+  assert.equal((await db.collection("RegistrationDecisions").where("eventId", "==", id).get()).size, 1);
 });
 
 test("removed organization role invalidates a previously reviewed cancellation", async () => {

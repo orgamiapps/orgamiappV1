@@ -724,10 +724,10 @@ function createDecideEventRegistration(admin) {
     if (!/^[A-Za-z0-9._:-]{1,180}$/.test(requestKey)) throw new HttpsError("invalid-argument", "Invalid decision request key.");
     const fingerprint = crypto.createHash("sha256").update(JSON.stringify([eventId, registrationId, decision])).digest("hex");
     const decisionRef = db.collection("RegistrationDecisions").doc(crypto.createHash("sha256").update(`${uid}:${eventId}:${requestKey}`).digest("hex"));
-    let resultStatus;
-    let ticketId = null;
     const rawManageToken = crypto.randomBytes(32).toString("base64url");
-    await db.runTransaction(async (transaction) => {
+    return db.runTransaction(async (transaction) => {
+      let resultStatus;
+      let ticketId = null;
       const [eventSnapshot, registrationSnapshot] = await Promise.all([
         transaction.get(eventRef), transaction.get(registrationRef),
       ]);
@@ -737,12 +737,13 @@ function createDecideEventRegistration(admin) {
       const prior = await transaction.get(decisionRef);
       if (prior.exists) {
         if (prior.get("fingerprint") !== fingerprint) throw new HttpsError("already-exists", "A request key cannot be reused with a different decision.");
-        resultStatus = prior.get("status"); ticketId = prior.get("ticketId"); return;
+        return {status: prior.get("status"), ticketId: prior.get("ticketId")};
       }
       require("./capacity").assertDecidable(eventSnapshot.data());
-      const expectedStatus = decision === "promote" ? "waitlisted" : "pending";
+      const expectedStatuses = decision === "decline" ? ["pending", "waitlisted"] :
+        [decision === "promote" ? "waitlisted" : "pending"];
       if (!registrationSnapshot.exists || registrationSnapshot.get("eventId") !== eventId ||
-          registrationSnapshot.get("status") !== expectedStatus) {
+          !expectedStatuses.includes(registrationSnapshot.get("status"))) {
         throw new HttpsError("failed-precondition", "Registration status changed before this decision.");
       }
       const registration = registrationSnapshot.data();
@@ -817,8 +818,8 @@ function createDecideEventRegistration(admin) {
           }, createdAt: admin.firestore.FieldValue.serverTimestamp(), nextAttemptAt: new Date(),
         });
       }
+      return {status: resultStatus, ticketId};
     });
-    return {status: resultStatus, ticketId};
   });
 }
 

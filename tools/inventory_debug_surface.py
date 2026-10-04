@@ -36,13 +36,25 @@ def inventory():
     flags = {}
     for name in sorted(set(tracked)):
         path = ROOT / name
-        asset = name.startswith(("assets/", "web/icons/", "web/splash/")) or (
-            name.startswith("web/") and path.suffix.lower() in {".svg", ".png", ".jpg", ".webp", ".ico"})
-        if not path.is_file() or (not asset and path.suffix not in {".dart", ".js", ".cjs", ".yml", ".rules",
+        configuration = name.startswith(("config/", "firebase/", ".cursor/", ".vscode/")) or name in {
+            ".firebaserc", ".gitattributes", ".gitignore", ".gitleaks.toml", ".metadata",
+            "firebase.json", "firebase.test.json", "firestore.indexes.json", "studio.vmoptions",
+        } or path.name in {"pubspec.yaml", "pubspec.lock", "analysis_options.yaml", ".gitignore", ".metadata"}
+        # Include the Flutter images/ directory and root logos, as well as
+        # native/web images and fonts. Their paths are not restricted to web/.
+        # Read these as bytes: asset contents are not source-code references.
+        asset = name.startswith(("assets/", "images/", "web/icons/", "web/splash/")) or (
+            path.suffix.lower() in {".svg", ".png", ".jpg", ".jpeg", ".gif", ".webp",
+                                   ".ico", ".bmp", ".avif", ".ttf", ".otf", ".woff", ".woff2"})
+        native_source = path.name in {"Podfile", "gradlew"} or name.endswith(".xcconfig.example")
+        binary = asset or path.suffix.lower() == ".jar"
+        if not path.is_file() or (not asset and not configuration and not native_source and path.suffix not in {".dart", ".js", ".cjs", ".yml", ".rules",
                 ".py", ".ps1", ".xml", ".gradle", ".plist", ".entitlements", ".xcconfig",
                 ".pbxproj", ".json", ".yaml", ".html", ".css", ".swift", ".kt", ".kts",
                 ".java", ".m", ".mm", ".h", ".cpp", ".cc", ".c", ".cmake", ".rc",
-                ".sh", ".bat", ".cmd", ".config", ".props", ".vcxproj", ".sln", ".lock", ".txt"}):
+                ".sh", ".bat", ".cmd", ".config", ".props", ".vcxproj", ".sln", ".lock", ".txt",
+                ".arb", ".properties", ".jar", ".storyboard", ".xib", ".xcprivacy", ".xcscheme",
+                ".xcworkspacedata", ".xcsettings", ".manifest", ".iss"}):
             continue
         if asset:
             kind = "asset"
@@ -52,27 +64,32 @@ def inventory():
             kind = "client"
         elif name.startswith(("apps/attendus_admin/lib/", "attendus_admin/lib/")):
             kind = "admin"
-        elif name.startswith(("functions/test/", "test/", "integration_test/", "test_driver/", "tests/")) or "/test/" in name:
+        elif name.startswith(("functions/test/", "test/", "integration_test/", "test_driver/", "tests/")) or any(
+                segment in name for segment in ("/test/", "/tests/", "/integration_test/", "/test_driver/")):
             kind = "test"
         elif name.startswith("functions/"):
             kind = "backend"
-        elif name.startswith("web/"):
+        elif name.startswith(("web/", "public/")):
             kind = "web-delivery"
         elif name.startswith((".github/workflows/", "tools/", "scripts/")):
             kind = "tooling"
-        elif name.startswith(("android/", "ios/", "windows/", "macos/", "linux/",
+        elif "/" not in name and path.suffix in {".sh", ".bat", ".cmd", ".py", ".js", ".cjs", ".ps1"}:
+            kind = "tooling"
+        elif "/" not in name and path.suffix == ".dart":
+            kind = "client"
+        elif name.startswith(("android/", "ios/", "windows/", "macos/", "linux/", "installer/",
                               "apps/attendus_admin/windows/", "apps/attendus_admin/android/",
                               "apps/attendus_admin/ios/", "apps/attendus_admin/macos/",
                               "apps/attendus_admin/linux/")):
             kind = "platform"
         elif name.endswith(".rules"):
             kind = "rules"
-        elif name in {"firebase.json", "firebase.test.json", "firestore.indexes.json"} or path.name in {"pubspec.yaml", "pubspec.lock"}:
+        elif configuration:
             kind = "configuration"
         else:
             continue
         content = path.read_bytes()
-        text = "" if asset else content.decode("utf-8", errors="replace")
+        text = "" if binary else content.decode("utf-8", errors="replace")
         entries.append({"path": name, "kind": kind, "sha256": hashlib.sha256(content).hexdigest(),
                         "reviewStatus": "subsystem-report-linked; individual-file-coverage-not-asserted",
                         "reviewEvidence": REVIEW_REPORTS[kind],

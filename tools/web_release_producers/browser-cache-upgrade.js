@@ -5,6 +5,7 @@ const http = require('node:http');
 const crypto = require('node:crypto');
 const {files, gitSourceFiles} = require('../web_release_contract');
 const {activateFlutterSemanticsPage} = require('./flutter-semantics');
+const {readFirebaseAuthStatePage} = require('./firebase-auth-state');
 const sha = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
 function verifyTree(root, expected) {
@@ -54,6 +55,50 @@ function verifyMessagingWorker(source, expected) {
     throw Error('Predecessor messaging worker imports are not verified Firebase SDK assets.');
   }
   return {sha256: sha(source), projectId: options.projectId, appId: options.appId, imports};
+}
+
+function initializedAuthIdentity({firebase, expectedUid}) {
+  // Read an existing provider only. getAuth()/initializeAuth() could create one
+  // and would invalidate a restoration test. The predecessor may have selected
+  // either LOCAL or IndexedDB; the SDK's restored currentUser is authoritative.
+  if (firebase?.projectId !== 'attendus-staging' || typeof firebase.apiKey !== 'string' ||
+      !/^[A-Za-z0-9_-]{8,200}$/.test(firebase.apiKey) || typeof expectedUid !== 'string' || !expectedUid ||
+      expectedUid.length > 128 || expectedUid.trim() !== expectedUid || /[\x00-\x1f\x7f/]/.test(expectedUid)) throw Error('Cache auth binding invalid.');
+  const apps = globalThis.firebase_core?.getApps?.() || globalThis.firebase?.apps;
+  if (!Array.isArray(apps)) return false;
+  const matches = apps.filter(app => app?.name === '[DEFAULT]');
+  if (!matches.length) return false;
+  if (matches.length !== 1) throw Error('Cache auth default app ambiguous.');
+  const app = matches[0]._delegate || matches[0];
+  if (['projectId', 'apiKey', 'appId', 'storageBucket'].some(key => !firebase[key] || app.options?.[key] !== firebase[key])) throw Error('Cache auth app mismatch.');
+  const providers = app.container?.getProviders?.();
+  if (!Array.isArray(providers)) throw Error('Cache auth provider unavailable.');
+  const authProviders = providers.filter(provider => provider?.name === 'auth');
+  if (!authProviders.length) return false;
+  if (authProviders.length !== 1) throw Error('Cache auth provider ambiguous.');
+  const provider = authProviders[0];
+  if (provider.isInitialized?.() !== true) return false;
+  const auth = provider.getImmediate({optional: true});
+  if (!auth || auth._isInitialized !== true) return false;
+  if (auth.app?.name !== '[DEFAULT]' || auth.app.options?.projectId !== firebase.projectId ||
+      auth.app.options?.apiKey !== firebase.apiKey) throw Error('Cache active auth app mismatch.');
+  const user = auth.currentUser;
+  if (!user) return false;
+  if (user.uid !== expectedUid || user.isAnonymous !== false) throw Error('Cache restored auth actor mismatch.');
+  return {uid: user.uid, isAnonymous: false};
+}
+
+async function readCacheAuthIdentity(page, firebase, expectedUid, requireLocal) {
+  let handle;
+  try {
+    // First frame alone does not establish that the predecessor restored Auth.
+    handle = await page.waitForFunction(initializedAuthIdentity, {firebase, expectedUid}, {timeout: 10000, polling: 100});
+    const user = await handle.jsonValue();
+    if (requireLocal) await readFirebaseAuthStatePage(page, {apiKey: firebase.apiKey, projectId: firebase.projectId,
+      appName: '[DEFAULT]', expectedUid, timeoutMs: 10000});
+    return user;
+  } catch {throw Error('Cache restored authentication identity could not be verified.');}
+  finally {await handle?.dispose();}
 }
 
 async function produce({browser, context, candidate, outputDir, observeCreatedIdentities}) {
@@ -112,24 +157,10 @@ async function produce({browser, context, candidate, outputDir, observeCreatedId
     await activateFlutterSemanticsPage(page);
   }
   async function storageState() {
-    return page.evaluate(async () => {
-      const databases = await indexedDB.databases();
-      let uid = null;
-      if (databases.some((db) => db.name === 'firebaseLocalStorageDb')) {
-        uid = await new Promise((resolve, reject) => {
-          const open = indexedDB.open('firebaseLocalStorageDb');
-          open.onerror = () => reject(Error('Cannot inspect browser auth identity.'));
-          open.onsuccess = () => {
-            const db = open.result;
-            if (!db.objectStoreNames.contains('firebaseLocalStorage')) {db.close(); resolve(null); return;}
-            const request = db.transaction('firebaseLocalStorage').objectStore('firebaseLocalStorage').getAll();
-            request.onsuccess = () => {const user = request.result.find((row) => row.fbase_key?.startsWith('firebase:authUser:')); db.close(); resolve(user?.value?.uid || null);};
-            request.onerror = () => {db.close(); reject(Error('Cannot read browser auth identity.'));};
-          };
-        });
-      }
-      return {uid, cacheNames: await caches.keys(), workers: (await navigator.serviceWorker.getRegistrations()).map((entry) => (entry.active || entry.waiting || entry.installing)?.scriptURL || null)};
-    });
+    const user = await readCacheAuthIdentity(page, context.fixture.firebase, context.fixture.owner.uid, phase === 'candidate');
+    const state = await page.evaluate(async () => ({cacheNames: await caches.keys(),
+      workers: (await navigator.serviceWorker.getRegistrations()).map((entry) => (entry.active || entry.waiting || entry.installing)?.scriptURL || null)}));
+    return {uid: user.uid, authObservation: phase === 'candidate' ? 'initialized-default-auth-and-exact-local' : 'initialized-default-auth', ...state};
   }
   async function login() {
     await page.getByText('Log in', {exact: true}).last().click();
@@ -184,4 +215,4 @@ async function produce({browser, context, candidate, outputDir, observeCreatedId
   } finally {await browserContext?.close(); await new Promise((resolve) => server.close(resolve));}
   return {assertions, rawPaths, blockers};
 }
-module.exports = {produce, _test: {artifactPath, verifyTree, verifyFirebaseApps, verifyMessagingWorker}};
+module.exports = {produce, _test: {artifactPath, verifyTree, verifyFirebaseApps, verifyMessagingWorker, initializedAuthIdentity, readCacheAuthIdentity}};

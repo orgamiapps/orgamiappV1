@@ -1,5 +1,9 @@
 Status: implementation in progress; web/backend qualification only. Native/store/Admin distribution is excluded.
 
+Latest checkpoint, October 4 at 21:35 UTC: source `c179a34` passed all six hosted web jobs, 60 first-attempt public cases and five actual Flutter journeys, closing the two retained `4ba7e20` CI failures. The subsequent community integrity corrections (WEBQA-24/25) make approval and organization/name/creator creation atomic and preserve roles on replay. They pass 53 focused client cases, all 542 main Flutter tests, clean full CI-path analysis, all 49 real Firestore/Storage rules cases and Functions lint. Independent helper/rules review is clear. A new exact-source hosted run is required before staging. None of these repairs has been deployed. Candidate10 remains held after its failed browser run; seven retired fixture roster records await the new fenced backend and separately verified cleanup. Production is unchanged.
+
+The current journey matrix is [debugging-web-coverage-20261004.md](debugging-web-coverage-20261004.md), and defects are tracked in [debugging-ledger-20261003.md](debugging-ledger-20261003.md). The baseline and dated entries below are chronological evidence, not current readiness claims. A passing earlier CI run does not qualify later source changes or replace live browser, provider, data and observation gates.
+
 Preserved baseline: source content SHA256 `375d7e0847f864ac7f51387bd3770ca55974d54f83ba4747dd2eeaf9ed2571e1`; Git HEAD `8c40edcf77d7ae269c38294e5bbd8931da1fb3bb`; branch `codex/project-debugging-20261003`. Snapshot: sibling `attendus-web-qualification-baseline-20261004T025604Z`, 1,140 files, ZIP SHA256 `8ed07b0c46bbd21bd2fb479e7fbef2d2ea2fd45df2f68c34d5bb4c54bb185a7c`. No original work was discarded.
 
 Current cloud findings:
@@ -258,3 +262,244 @@ Additional current checks:
 - Startup diagnostics for this successful run show Firebase core initialized and all observed startup assets settled. They do not establish the cause of the earlier failed run, which remains retained separately. No network allowance or product timeout was relaxed. The integrated Node 22 release/browser contract selection passes **243/243 assertions**, with no failures or skips, in `tenth-candidate-integrated-node22.log`.
 - Final review identified a remaining master-notification indicator mismatch: its displayed state aggregates four controls while the action changes eleven. A focused actual-widget reproduction and correction are being completed before the next source freeze. The passing rendered run above precedes that final display correction.
 - The actual master-switch reproduction failed before correction when messages remained enabled but the four original channels were off. The corrected control considers all eleven controlled types, explicitly labels partial selections, and offers a single-action opt-out whenever any type is enabled. Seven focused widget cases now pass with clean analysis and formatting (`notification-master-before.log`, `notification-master-after.log`, `notification-master-analyze.log`). All product source is frozen for a fresh CI run; the earlier 443-test and rendered results predate this final correction. The 31 Python release/configuration checks also pass on the refreshed archive configuration.
+
+## Tenth candidate: retained failed browser acceptance
+
+Candidate `37210826673`, source `2d275ac0c23008bf8b68d2fdf0ff83e331869f73`, completed staging deployment at `2026-10-04T15:25:11.238Z`. All 148 canonical asset URLs matched and all eight operations in four representative backend rollback/restoration pairs were independently verified. This was not a full-fleet rollback. Hosting version: `886b8d680e8c9b4c`. Candidate digest: `bdb3ac33968500db7dea118b12b7f92026a701a6f0a4cd8909d8b576c5d02313`.
+
+The controlled six-account fixture was seeded once at 15:30:19Z. Initial observation `37213274566` passed. Browser collector `37213445908` then failed all five gates; its original artifact, logs, 28 extracted files and independent hash review remain preserved. Artifact SHA256: `393129fb9d00e0a45bd7e88583a5b660e95e858baba9592583e28ce9a63b02e0`. Candidate10 is held and cannot be promoted or treated as a successful pilot. Its original event, close and reminder clocks have not been reset.
+
+The browser network policy incorrectly rejected 79 exact staging App Check exchanges, ten Maps CSP telemetry reads and three legacy Auth configuration reads. Those failures blocked registration and login. Later privacy/cache/export timeouts do not independently establish product defects. The recorded null-check exception remains unclassified. The packaged narrow screenshot shows a session-checking spinner, so it does not verify loaded application layout.
+
+The actual public-page screenshot also exposed a confirmed long-title overflow at 320px with 200% text. Independently, actual route review found that the active Discover shell hides the legacy header containing the only Maps entry, leaving Maps unreachable in the default and marketplace branches.
+
+## Corrections prepared for the next candidate
+
+| Defect | Reproduction and root cause | Correction and fresh evidence |
+| --- | --- | --- |
+| Staging browser policy blocks required SDK calls | The exact App Check app ID contains colons; the old matcher stopped at the first colon. Exact observed Auth/Maps SDK endpoints were absent. | Bind allowed method, origin, path, app, API key and query shape to staging. Focused fail-before/pass-after regressions and combined Node checks pass. No broad origin allowance was added. |
+| Browser diagnostic query strings leak through scheme-less URLs | Actual failed error strings contain URL-shaped text without a scheme, bypassing the existing scrubber. | Scrub both URL forms; all seven retained query-bearing examples are redacted. Original private failed evidence is preserved. |
+| Discover has no reachable Maps control | Actual HomeHub branches suppress the old child header and provide no replacement entry. | Add an accessible Maps control to the active shared shell. Nine new entry tests, including narrow 200% and keyboard cases, pass; related focused total15 passes. Actual staged provider markers remain unverified. |
+| Public headings overflow at enlarged text | Actual event title and unbroken event/community names exceed a 320px viewport at 200%. | Apply `overflow-wrap:anywhere` to the heading and publish a new immutable CSS asset, preserving all prior assets. Twelve real rendered cases across four projects pass with visual review. |
+| Delayed roster invalidation recreates deleted-parent markers | Invoke actual event/admission/profile handlers after the parent event has been deleted. | Read the current event in the same transaction as the invalidation. Normal, cancelled and recreated current events still invalidate. Focused and emulator results are recorded separately after completion. |
+| Roster generation can publish after parent deletion/replacement | Delete or replace the event while generation materialization is in progress, including a discarded first transaction callback. | Final publication rechecks exact event updateTime and uses the committed transaction return value. Abandoned generations are removed. Focused and emulator results are recorded separately after completion. |
+
+Fresh local client analysis passes and all **454 Flutter tests** pass with no skips. Formatting reports 445 unchanged files. Combined release/browser contracts pass **261 assertions** with no failures, skips or cancellations; all **31 Python release/configuration checks** pass. An earlier overly broad analyzer invocation incorrectly included the nested Admin package without its dependencies; that failed command is retained and is not classified as a product regression. These checks precede the final backend/fixture manifest freeze and do not qualify a new candidate.
+
+The first two owner-login diagnostics stopped before browser creation or authentication. A local subprocess reproduction identified the diagnostic-only cause: importing the corrected policy loaded the FIX Playwright package, and subsequently importing the root package threw the duplicate-runtime guard. Both failed attempts remain unchanged. The third reviewed helper uses the same FIX runtime and actually reached authentication. Its single allowed owner password request received HTTP200; another password request was blocked by the diagnostic's attempt budget. The App Check exchange passed the network guard but returned403. No uncaught page error was observed. The overall diagnostic remained blocked and cannot satisfy browser acceptance; the login submission path and App Check response are under separate investigation.
+
+Private read-only staging snapshots preserve all 1,441 typed Firestore documents and zero Storage objects. The final snapshot after the actual browser diagnostic contains22 Auth metadata records:21 controlled/acknowledged test identities and the older unrelated anonymous account. The one additional anonymous account has an exact acknowledged creation ledger, not inferred ownership. No cleanup has occurred at this checkpoint. Cleanup must use exact ownership and current preconditions, preserve captures and unrelated historical data, retain durable retired scope/binding/setup tombstones, restore only the three actually changed configuration records, and reconcile late derived writes.
+
+The corrected backend passes362 unit tests, lint, and48 real-Firestore launch cases with no failures or skips. The source checkpoint is `65fd39f2995f2039049d33660cccf49288411871` in the isolated worktree. Seventy-eight local failure/regression evidence files are preserved under `candidate11-local-evidence/`; manifest SHA256 `5b7e6169cb758e0a5b7e28b079fc034235a270849c9d6c3767a2a0b6b60a2d16`. Source secret scanning covered1,243 tracked/proposed files with no findings. These checks precede subsequent login/diagnostic corrections and the final candidate freeze.
+
+All152 actual candidate10 Function source generations were copied to create-only private recovery objects. A separate GET-only verifier reread and hashed every backup and checked unchanged source/configuration/update timestamps. All135 production predecessor entries remain unchanged. Proposed manifest SHA256: `5e5cbfc77e57aef75f1af2650fe8878625c0f502457fcbb0d908194816331db9`; independent verification SHA256: `a8916044d17c2fa0820e3bbd7ab6d81b3de54fd65d081bf3fe578f2b12b6d898`. The next source freeze must incorporate this verified predecessor manifest.
+
+The next candidate adds a source-bound retired-fixture inventory to the rehearsal isolation check. Only exact, fully typed reviewed retired documents are accepted; extra, missing, malformed or active isolation records fail. Both CI workflows include this suite. The configuration remains empty until actual retirement and cleanup are verified; no retired data or completion evidence is fabricated.
+
+Production application resources and data remain unchanged. Native/store distribution stays outside the agreed web-only scope. Real provider account/inbox acceptance, historical usage/admission decisions, complete staged browser journeys and the timed observation/replay window remain open; successful CI alone cannot close them.
+
+## Follow-up authentication findings
+
+Pressing Enter once in the actual login form reproduced two password requests: the form started the loading controller and sent the request immediately, then `rounded_loading_button_plus` invoked the callback again after its animation. The actual password-reset form had the same defect and could send two reset requests. Both forms now own their loading animation, prevent overlapping submissions and allow an explicit retry after failure. A successful submission remains guarded through navigation. Eleven new tests and four related onboarding tests pass; no test email was sent. The subsequent complete main Flutter analysis is clean and all **465 tests pass** (`candidate11-auth-flutter-analyze.log`, `candidate11-auth-flutter-test.log`).
+
+The packaged application explicitly selects Firebase `Persistence.LOCAL`; the installed FlutterFire adapter maps that setting to localStorage. The browser acceptance producer instead read the first matching IndexedDB record. This could miss the authenticated user or select a stale account from another app. The shared replacement reads the exact configured app/API-key record, validates the expected staging project and actor, and keeps the token in memory. It does not change application persistence. Its 14 focused tests and the combined 61 browser/diagnostic assertions pass. The remaining Safari and cache-upgrade readers are being corrected separately; their acceptance remains open.
+
+The structured browser diagnostics now retain bounded UTC/context/step/route-family evidence and stack coordinates only for exact sealed same-origin candidate assets. Raw stacks, function names, query strings and dynamic route identifiers are not retained. This improves attribution for the next attempt; it does not establish the root cause or repair of the historical null-check exception.
+
+Fresh read-only App Check metadata matches the staging key and both allowed staging domains, with the existing score threshold unchanged. Available daily metrics end before the failing exchange. The actual HTTP403 remains unclassified because the provider error body and per-request assessment were not retained. Official fixed-score nonproduction reCAPTCHA keys and private App Check debug tokens were researched but neither was activated; sandbox checks cannot certify production risk scoring.
+
+The reviewed retirement package contains exactly 32 isolation writes and no data/Auth/configuration deletions. A root read-only transport preflight failed with `Unexpected API status` before any retirement intent or mutation. That failure is retained and the transport is under investigation; preparation and offline safety tests are not cleanup evidence.
+
+The transport diagnosis subsequently confirmed an Auth403 `SERVICE_DISABLED` against the ADC OAuth client's consumer project. Explicitly binding the same read-only request to `attendus-staging` returned200 for the exact controlled owner; Firestore reads succeeded in both probes. The corrected private transport pins the staging quota project and retains one-request/no-retry behavior. Independent review and47 injected executor/wrapper tests pass. No permissions or service configuration were changed.
+
+The concrete32-write retirement committed at **2026-10-04T17:23:14.601013Z**. All32 full typed effects were freshly read and matched the reviewed payload. Receipt SHA256: `2d3a40640995194b8e81bc8c7a10f3ec4895ba20e8ae4acb14e63e27f09143ac`. Scope, setup and30 bindings are retired; captured lineage and evidence remain. This is acknowledged retirement only: data cleanup, Auth deletion, the three configuration restorations and final residue verification have not yet occurred. A new complete inventory is required before those separate phases.
+
+The authentication/diagnostic source checkpoint is `05d1239a0380ea8544d8efebfdaa94991cdad671`. Thirteen additional local before/after/review files are copied under `candidate11-auth-local-evidence/`; immutable manifest SHA256 `0e7a44131bb860eb77672226b1b1142a8a12918fdbd0c92b709a5e9e352faee3`. The staged source delta passed secret scanning with no findings. The Safari/cache and App Check diagnostic follow-ups remain separate, uncommitted work at this checkpoint.
+
+The Safari/cache follow-up is now committed as `ded8f2d76f865f419e258a1f36a5e929cc82fd1f`. The Safari observer reads the exact packaged LOCAL app, preserving the public HTML app's separate namespace. Cache upgrade checks inspect the exact already-initialized SDK actor and additionally require the candidate's correct LOCAL record. Unknown predecessor SDK shapes fail closed. Three actual Safari regressions failed before repair; the extracted old cache reader selected a foreign IndexedDB user despite the correct LOCAL owner. The corrected focused selection passes55 tests. These are local regressions, not live Safari/cache acceptance.
+
+Bounded App Check diagnostics are committed as `805c161eaac1459b23ec2b28e26d8505d3ae82f5`, with no provider configuration or gate changes. Only exact bound exchange failures are observed. Fixed status/code/reason fields are retained; raw messages, bodies, tokens and metadata are excluded. Missing lengths, oversize bodies, read failures and timeouts remain explicitly unavailable. Three new cases failed before correction;27 producer tests pass afterward. Final combined Node22 web-quality contracts and all browser unit tests pass **290/290**, zero skipped/failures, in `web-quality-node22-final.log` (SHA256 `a690e5fc810cd57c03168196f5d3083098cd754dc37853a2a763f82a5a23be9e`). The isolated source branch `codex/web-candidate11-repairs` is clean. Both later source deltas passed secret scanning.
+
+The first post-retirement complete read at17:29:05.427Z verifies all32 unchanged retired documents,1,458 total typed documents,22 Auth identities and zero Storage objects. One actual discovery delivery completed in capture-only mode at17:08, with six exact owned event references; its associated claimed rows and new capture require explicit cleanup review. No fixture data deletion has occurred. This historical timer activity does not qualify the held pilot.
+
+Historical private candidate10 supplemental, organizer and200%-text helpers still contain the old IndexedDB observer. Preserve their source/hashes and replace that logic only in newly reviewed future-candidate copies. Blind rebinding would repeat the same harness defect.
+### October 4, 18:04 UTC repair and cleanup checkpoint
+
+Source `0fce5c3775940683aac3be3b08c4bba525e20961` adds current-source
+transactional public event/community mirrors and positive Maps marker acceptance.
+All370 Functions unit tests, lint,52 serial Firestore launch cases and305 combined
+release/browser contract tests pass locally with Node22.23.2 and Java21. The
+launch log SHA256 is
+`b2ce821ad4aeabab6fbf4b927b30249e4db81f1f3661d2e4d41e53c6bababb70`;
+the combined contract log is
+`12e86e30858e5ffd7e6d51c50956e7ac72017eb4a6ba51ab59829748023c762a`.
+Changed source passed a39,618-byte staged-diff secret scan. These are local
+results, not new staged browser acceptance.
+
+Hosted web CI for the preceding source
+`0d9dd89e973240c3ccf7135dc8328eca46ba4e00` passed all six jobs in runs
+`37221132094` and `37221104316`. Browser artifact `11310580749` was downloaded
+and independently checked against ZIP SHA256
+`539e71911cabbdc042f811aa2a8270ab46a3d84a89c0bad1aa3852e5f2294ba9`.
+It contains36 passing public cases across four browser projects and a passing
+actual Flutter browser driver result. Rendered320px/200% public headings and the
+390px/200% login form were visually reviewed. Later changes require their own CI.
+
+The failed candidate10 fixture remains retired. All nine individually reviewed
+source-cleanup batches now have actual commit acknowledgments and verified
+absence: one admin role,1,201 synthetic registration rows and six source children.
+The final batch completed at `2026-10-04T18:03:23.433Z`. Seven roster markers are
+explicitly deferred until the corrected backend is deployed and a further
+cleanup verifies absence; they are not counted as removed. Event/community
+roots, profiles, Auth identities, remaining derived rows and configuration
+restoration remain open. A new complete read-only inventory precedes those
+phases. Public mirror reappearance is a separate issue, not part of the roster
+exception. All captured failed evidence, retirement tombstones and unrelated
+records remain preserved. Production has not changed.
+
+### October 4, 19:03 UTC checkpoint
+
+Source `7b92211dd04b596c569f675bb938f577306342cf` passed all six hosted web
+quality jobs in PR run `37223057506` and push run `37223054558`. Retained browser
+artifact `11310613823` has verified ZIP SHA256
+`26df938516c485689adebe65d2089bee7edec02d0f4a5c877899f41d4266ce39`:
+36 public cases across four browser projects, no unexpected failures, flakes or
+skips, and a passing actual Flutter browser driver result. These are hosted test
+results, not new staging acceptance. The subsequent inventory-tool correction
+is checked separately against all 26 declared Flutter image files.
+
+Cleanup now has 1,241 explicit document deletions with actual acknowledgements
+and verified absence. A further 22 derived absences were observed after their
+source deletions; they are recorded separately and are not our own delete
+acknowledgements. All 32 retired isolation records, 19 captures, five unrelated
+historical insights and the unrelated Auth account remain preserved. The latest
+complete read at `2026-10-04T19:03:30.758Z` contains 195 Firestore documents,
+21 Auth identities and zero Storage objects. Seven roster residuals still await
+the corrected backend and a separate verified cleanup before any new seed.
+
+The first owned Auth deletion produced no accepted acknowledgement. Its original
+failure remains unchanged. Exact-UID lookup and a subsequent complete inventory
+confirm that account's absence and unchanged metadata for all remaining accounts.
+This is one manually reviewed reconciled absence, **zero acknowledged Auth
+deletions**, and 20 owned accounts still to clean up. Reconciliation proof SHA256:
+`838cd60bc011c4a0b3e52f2c7aa8a5f78001f76911ff896a758492973ab89e95`.
+The attempted UID must never be retried. The private cleanup parser incorrectly
+requires an empty success body although Google's documented `DeleteAccountResponse`
+permits a deprecated `kind` string. That contract defect is confirmed; the lost
+original body means it remains an inferred explanation for this particular
+failure. A corrected, independently reviewed batch is required before continuing
+with the other 20 accounts. The three configuration restorations remain pending.
+
+Supplemental browser helpers have 143 passing offline checks and independent
+review. Concrete signup preparation has 47 passing offline checks and independent
+review; genuine multiple-admission preparation is undergoing review. All remain
+unbound and unexecuted against a fresh candidate. Candidate10 stays held after its
+failed browser run. App Check, provider access, production data decisions, broad
+web acceptance and the original timed observation requirements remain open.
+Production has not changed.
+
+### October 4, 19:28 UTC cleanup checkpoint
+
+The remaining 20 owned Auth accounts were deleted sequentially with actual
+acknowledgements and exact-UID absence checks. The batch completed at
+`2026-10-04T19:17:37.225Z`; receipt SHA256:
+`93892c43d298ce6a20def55acaecf4f3dee543955d9982d12f4f755e3ca11898`.
+The first account remains a separately recorded manually reconciled absence;
+its original acknowledgement is unknown and it must never be retried. The
+corrected private response parser has 45 passing checks; the actual 20-account
+responses used Google's documented legacy `kind` field.
+
+All three staging configuration restorations were acknowledged and their typed
+effects verified at `2026-10-04T19:27:27.090Z`. Receipt SHA256:
+`53fb199e6f48122199f22cb0171dc9152ca83b15eca568172f78ed1110f4061a`.
+The complete read at `2026-10-04T19:28:11.743Z` contains 193 Firestore documents,
+one preserved unrelated Auth account and zero Storage objects. It preserves all
+32 retirement tombstones, 19 captures and unrelated history. Firestore snapshot
+SHA256: `bf4bb46bbeed410c5a5b397e9fb06c67cded25d99ed0b4a74126803cc0ab6ae5`.
+
+The combined outcome is 1,241 acknowledged document deletions, 22 separately
+observed derived absences, 20 acknowledged Auth deletions plus one reconciled
+absence, and three verified configuration restorations. Seven roster records
+remain explicitly unresolved. A newly verified backend containing the roster
+fences must be deployed and rehearsed before their separately guarded removal,
+followed by a complete fresh absence proof before another fixture is seeded.
+The private predeployment receipt SHA256 is
+`b7f220c20a7862f889cd0cf677e155758fa16f20ae7ce8b400b7f8b2a844f2aa`;
+it explicitly says cleanup is incomplete. Its exact 32 typed retirement pins
+are integrated into `config/web_retired_qualification_fixtures.json`, SHA256
+`9c1917ede4743ff362f8e0f9106fa6ee693fd83d1a5418573503df3c4db059b7`.
+
+The 143-check supplemental, 47-check signup and 119-check multiple-admission
+helpers now have independent review. They remain unbound and unexecuted against
+a new staging candidate. Five legacy shell entrypoints were separately found
+to bypass qualified release controls and now fail before any command; their
+eleven regression checks pass. The corrected inventory enumerates 992 surfaces,
+including previously omitted assets, localization, configuration and tooling. These
+pending changes require fresh source CI. Candidate10 remains held, the provider,
+data and complete web acceptance gates remain open, and production is unchanged.
+
+The final local release/browser selection passes **316/316**, with zero failures
+or skips, when run serially with Node22.23.2. Log SHA256:
+`5aeb20d5ed6c35c39c252ac67653ba2ae75c57384183ae0bffdc9f921aac8d0d`.
+The first parallel run remains preserved as 313 passes and three 20-second
+subprocess timeouts (SHA256
+`d415a367374527335e04810ec33636c70b4db92478d24d73b1aeb4c0a5bc4f0d`).
+All 48 affected deployment-adapter tests also pass in an isolated, credential-free,
+network-blocked run. No timeout was increased, assertion removed or product code
+changed for this diagnostic. The earlier delay's cause is not established;
+fresh hosted CI still must pass on the committed candidate.
+
+Hosted source `c872150c50146c995ff3304e354c4883c88f838d` exposed one stale
+Flutter release-wiring assertion: it expected deployment commands inside the
+now-disabled `deploy_web.sh`. The job reports 464 passing tests and this one
+failure; its retained log SHA256 is
+`757beb67e74be7525d702e8b8fb73a5af1dbd2e8a5efc58bb9cd5a68d62e426a`.
+The failure reproduces locally. The corrected test follows the active candidate
+and promotion workflows, checks retention/packaging/deferred verification before
+sealing, preserves artifact and predecessor checks, rejects promotion rebuilds,
+and checks sealed-byte verification on both production origins. All five tests
+in the affected file pass. The executable Node contracts remain responsible for
+behavioral drift and mismatch cases. No release safeguard was removed; the
+corrected source requires a new hosted run before merge or staging deployment.
+
+### Registration, community and guest-page verification
+
+The 50 new client cases bring the main suite to 515 passes. The full CI analysis
+paths are clean using Flutter 3.44.6/Dart 3.12.2. Client readiness SHA256:
+`6cee272b9255ccb1e8012f249f30f55e0cc45886cc49d1efb908ff374b53284e`.
+The backend batch has 392 passing cases and clean lint under Node22.23.2;
+readiness SHA256 `93d9543431d80a10a7c00201ee8856e35351cc081d27a9c24e80a4b1494eb01a`.
+Independent cross-reviews cover both batches. The 55-case real Firestore run
+passes after correcting a test-only identity collision; its original failure
+and both receipts remain in the defect ledger.
+
+The rendered selection contains 24 new management-status cases and 12 existing
+layout cases across Chromium, Firefox, WebKit and mobile Chromium, all passing
+without retries. These management cases supply a known synthetic session at
+the actual HTTP handler boundary and explicitly do not prove browser cookie
+transport or token exchange. Earlier intercepted-cookie fixture failures and
+short local timeouts remain retained, not recast as product passes. Complete
+CI must execute all 60 public-page cases plus the Flutter integration journeys.
+The valid eight-character ticket layout fails with the pinned old stylesheet
+and passes inside its panel with the new immutable stylesheet at 320px and
+200% text; visual review confirms the QR remains square and unclipped.
+
+The refreshed residual-seven cleanup and operational preparation have separate
+12-case and 48-case passing reviews. They remain null-bound and have performed
+no cleanup, seed, workflow or provider operation. Their renderer fence uses
+Git-normalized LF SHA256 `b4b4652f53896527488f2d726e88a17916c00831d7c2159119330995b073a325`,
+not the Windows working-file hash. Final independent preparation review SHA256:
+`2f851eda0f5c2dae5177a15cc08c274bf0fe161bf03ff4a19bb8f2538be82323`.
+Actual successful candidate, deployment, rollback/restore and complete runtime
+source receipts are still required before residual cleanup or another seed.
+
+Hosted run `37233539046` on source `4ba7e2030520929563cddac6dcb5a80a9adce69d`
+passes all 392 Functions cases but fails one release-contract test with a
+stdin-pipe EPIPE race against an intentionally immediate-exit shell guard.
+Its full failed log SHA256 is
+`afafd094bef28cc1c7f9d93f9b1a97a9838f469ea5a09e8ca9d4e96af1d035d8`.
+The test now provides the identical input through a read-only owned fixture
+file; every exit/error/guard-text/no-command assertion is preserved. All five
+guard scripts are unchanged. The focused 11-case suite and unchanged complete
+316-case selection pass locally, and independent review is clear. This run
+remains unqualified; a new exact-source hosted run must pass before merge.

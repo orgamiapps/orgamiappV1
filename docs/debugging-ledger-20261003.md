@@ -481,3 +481,197 @@ keep the master on whenever any type remains enabled so one tap can opt out.
 The actual before case failed; seven focused widget cases and analysis pass
 afterward. The next immutable candidate must pass fresh complete CI and staged
 acceptance; those gates remain unverified at this source freeze.
+
+## Candidate 10 failure and subsequent web repairs (October 4)
+
+Candidate `37210826673` is held after browser collector `37213445908` failed
+all five gates. The original artifacts and failed diagnostics remain preserved.
+The following rows distinguish confirmed defects from later blocked journeys.
+
+| ID / severity / surface | Reproduction and expected versus actual behavior | Root cause and correction | Verification and remaining acceptance |
+| --- | --- | --- | --- |
+| WEBQA-01 / P1 / browser tooling | Required staging App Check, Maps telemetry and legacy Auth configuration requests should reach their exact endpoints; the policy denied 92 requests. | The App Check app-ID matcher stopped at a colon and two exact SDK paths were missing. Bind the allowed method, endpoint, app, project, key and query shape. | Actual failed request evidence and focused fail-before/pass-after cases retained. Included in 290 passing combined Node assertions. Fresh staged journeys required. |
+| WEBQA-02 / P2 / evidence privacy | A scheme-less URL in a browser error should lose its query; seven actual errors retained query strings. | Redactor covered only scheme-prefixed URLs. Scrub both forms and retain structured coordinates only for sealed candidate assets. | Actual seven examples and regressions pass. Original private failed evidence retained. |
+| WEBQA-03 / P2 / Discover | Open the actual shared Discover shell and navigate to Maps. The only entry was hidden with the child header. | Add a reachable, keyboard-accessible Maps action to the shared shell for default and marketplace branches. | Nine new cases cover route entry, narrow 200% text and shared header behavior. Actual provider markers remain unverified. |
+| WEBQA-04 / P2 / public event and community pages | At 320px and 200% text, long headings should fit the viewport; the actual event title overflowed. | Allow heading wrapping and publish new immutable CSS while preserving prior assets. | Twelve rendered cases across four browser projects pass with visual review. |
+| WEBQA-05 / P1 / backend roster integrity | Replay an invalidator after event deletion. No derived record should reappear; the old handler recreated the roster marker. | Read current event state and write invalidation in one transaction across all eight handlers. | Actual-handler before failure, focused cases and 48-case real Firestore launch suite pass. Current/cancelled/recreated events still invalidate correctly. |
+| WEBQA-06 / P1 / backend roster integrity | Delete or replace an event during roster construction. The obsolete generation should not publish; the old finalization could publish it. | Compare exact current event updateTime at publication, use the committed transaction result and remove abandoned generations. | Focused concurrency and real Firestore regressions pass; backend total362 unit tests plus lint pass. |
+| WEBQA-07 / P2 / web login and reset | Press Enter once. Exactly one password/reset request is expected; both actual widgets sent two. | Manual controller start plus automatic animation callback duplicated submission. Disable automatic callback animation and fence in-flight/successful submissions, retaining explicit failure retry. | Both before reproductions fail, then11 new and4 related focused tests pass. Complete main Flutter suite465 passes with clean analysis. No real reset email sent; staged acceptance remains open. |
+| WEBQA-08 / P1 / browser acceptance identity | Sign in under packaged LOCAL persistence. The observer should identify the exact actor; old readers missed LOCAL or selected a foreign IndexedDB actor. | Read the exact packaged LOCAL record and validate app/project/actor claims. Safari keeps the public HTML namespace separate. Cache predecessor observes its already-initialized exact SDK actor and candidate additionally checks LOCAL. | Shared14-case and Safari/cache55-case focused selections pass, included in290 combined Node assertions. Unknown predecessor SDK shape fails closed. Live Safari/cache remains unverified. |
+| WEBQA-09 / P2 / failure attribution | A failed App Check exchange should preserve safe provider error classification; only403 was retained. | Add bounded status/code/allowlisted-reason projection for exact staging exchanges; omit raw body, token, message and metadata. | Three cases fail before implementation;27 producer tests pass afterward. Missing/oversize/timed-out bodies remain unavailable. The original403 cause is still unknown. |
+
+The null-check exception recorded by the failed browser run remains an
+unclassified hypothesis. Downstream export/privacy/cache timeouts from that run
+are blocked checks, not independent confirmed product defects. The narrow
+packaged screenshot shows a session spinner and cannot close layout acceptance.
+
+| ID / severity / surface | Reproduction and expected versus actual behavior | Root cause and correction | Verification and remaining acceptance |
+| --- | --- | --- | --- |
+| WEBQA-10 / P1 / public event and community privacy | Deliver an old public update after the current source becomes private or is deleted; then deliver an old deletion after a public source is recreated. The mirror must follow the current source, but both old handlers could republish private/deleted labels or delete the replacement projection. | Both handlers trusted the delivered snapshot and wrote unconditionally. Read the current source and set/delete its allowlisted projection in one Firestore transaction, so concurrent source changes cause a retry. | Eight new actual-handler unit cases fail before and pass after. All370 Functions tests and lint pass; all52 Firestore launch cases pass, including four real-SDK lifecycle/retry cases. Independent review clear. New cases are registered in the recurring launch suite. The correction has not yet been deployed. |
+
+Maps qualification now seeds two existing owned events with distinct synthetic
+locations and requires actual named marker controls, marker selection, the exact
+venue sheet and navigation to the matching event details. Thirteen producer
+regressions and three fixture tests pass. This adds a positive acceptance check;
+actual provider marker accessibility remains unverified and must fail the run if
+the Maps SDK does not expose usable controls.
+
+Local repairs are preserved through source checkpoint
+`805c161eaac1459b23ec2b28e26d8505d3ae82f5`; the isolated branch incorporates the
+protected main history afterward. The combined Node suite passes290 assertions
+without skips. Local counts overlap and are not an exhaustive coverage percentage.
+
+Staging retirement of the failed fixture's32 isolation records was acknowledged
+at `2026-10-04T17:23:14.601013Z` and all effects verified. The fresh inventory at
+17:29:05Z contains1,458 documents,22 Auth identities and zero Storage objects.
+Fixture data/Auth cleanup and configuration restoration are still open at this
+checkpoint. All production data is unchanged. See the release qualification
+record for immutable evidence hashes and the remaining provider, data and timed
+acceptance gates.
+
+### October 4 inventory correction
+
+The refreshed inventory omitted the Flutter `images/` directory and three root
+logos declared in `pubspec.yaml`. The scanner now recognizes image and font
+assets outside `web/` and hashes their bytes without parsing them as source.
+An actual declaration-to-file comparison verifies all 26 declared image files;
+the total inventory increases from 862 to 927 surfaces, including 65 previously
+omitted image/font files. Independent review confirms that no previous surface
+was removed. Corrected inventory SHA256:
+`f604825be41d4b5b45b43a45b902d4b22b9c9cfff45693d75ed6ad665dd821e4`.
+This local inventory includes the pending scanner correction on source
+`7b92211dd04b596c569f675bb938f577306342cf`; it is not runtime acceptance.
+Its 153 lexical export matches include the commented `helloWorld` example;
+effective runtime exports remain subject to the separate deployment inventory.
+
+### October 4 deployment-entrypoint correction
+
+| ID / severity / surface | Reproduction and expected versus actual behavior | Root cause and correction | Verification and remaining acceptance |
+| --- | --- | --- | --- |
+| WEBQA-11 / P1 / release controls | Run any of the five historical deployment/provider shell scripts. They could invoke Firebase without the qualified release workflow or an explicit project; the default project is production. | Old standalone scripts bypassed source, artifact and acceptance gates. All five now print the supported workflow paths and exit with failure before invoking any command. Historical implementations remain in Git. | The isolated copied-script regression failed ten behavioral cases before correction and passes all eleven cases afterward, including force-argument/environment attempts and recurring CI registration. Independent review clear. No cloud or provider operation was executed. Fresh CI is required for this source delta. |
+
+The affected entrypoints are `deploy_web.sh`, `deploy_firestore_rules.sh`,
+`deploy_guest_mode_fix.sh`, `DEPLOY_JOIN_APPROVAL_NOTIFICATIONS.sh` and
+`setup_google_wallet.sh`. Their shared corrected SHA256 is
+`ef7bf72e9be959278814860c01fe4f6de7efaa9a6eda750313ad55f9e83c7426`.
+The new regression file is `tests/browser/legacy-deploy-entrypoints.test.cjs`;
+its SHA256 is `bd696966760849a0101f3121a6c861cfb4235f6dfd5328407855d2adbec06b63`.
+
+The inventory also now includes the three `config/` manifests, root Firebase,
+Git, Flutter and analyzer configuration, root tooling and `router_fixed.dart`.
+Independent reconciliation also restored localization inputs, the Admin
+integration test, Firebase Storage CORS, legacy public HTML and native/installer
+source formats. The working inventory contains 992 file surfaces, with all 992
+file hashes verified. Inventory SHA256:
+`de71a94c9bc01c81fb72044a3c0513f8f1bc9b29f26ea241096ab2969f5b7099`.
+The 259 excluded tracked/nonignored paths are 243 Markdown documents, ten retained
+JSON evidence files, four backups, one generated Firebase cache and one unapplied
+patch. Linked subsystem reports do not assert individual-file review or execution.
+The current 18-family web coverage matrix separately records hosted tests,
+unexecuted preparation and remaining staging/provider journeys. Native source
+inventory does not extend the current web-only acceptance scope.
+
+### October 4 waitlist and community follow-up
+
+These confirmed defects were corrected in candidate source; matching hosted
+CI and live acceptance remain open. They were found during the active-web review;
+they are not failed production mutations.
+
+| ID / severity / surface | Reproduction and expected versus actual behavior | Root cause | Status |
+| --- | --- | --- | --- |
+| WEBQA-12 / P2 / waitlist decisions | The roster offers Decline for a waitlisted attendee. The actual callable declines a pending row but rejects the waitlisted row with failed-precondition; the row remains waitlisted. | Every non-promote decision requires pending, despite the supported UI decline action for both states. | Fixed in candidate: decline accepts pending or waitlisted; approve/promote keep their prior restrictions. All 17 focused handler cases and 55 Firestore launch cases pass, including authorization, replay and one-winner transitions. Live staging remains open. |
+| WEBQA-13 / P2 / organizer feedback | Approve a pending registration at full capacity with waitlisting enabled. The server correctly returns and stores waitlisted, but the console says Registration approved. | The UI ignores the callable result and derives success text only from the requested action. | Fixed in candidate: feedback uses a supported acknowledged action/status pair. Full-capacity approval says waitlisted; inconsistent/malformed replies cannot show success. Included in 50 focused client cases and 515 full Flutter passes with clean analysis. The directly-used response helper is tested; packaged console acceptance remains open. |
+| WEBQA-14 / P2 / community member filter | Approve a community join request, then select the Members filter. The approved row uses role Member and disappears from the filtered list. | Display filtering compares only the lowercase member value, while the established approval path writes Member. | Fixed in candidate: role casing is normalized for filters, cards and menu presentation, retaining actor authorization and write payloads. Seven actual ManageMembers widget cases pass, included in the 515-test suite. Packaged community acceptance remains open. |
+| WEBQA-15 / P1 / admission integrity under contention | A tentative free-ticket approval is discarded when capacity changes; the retry correctly waitlists the registration but returns and stores the first attempt's ticket ID while no ticket exists. | Mutable ticket/result state survives outside the Firestore transaction callback across retries. | Fixed in candidate: return only the committed callback result with attempt-local state. Actual SDK retry verifies waitlisted with null ticket ID and zero committed tickets; replay and concurrent decisions preserve counts. All 17 focused and 55 launch cases pass. Production records are unchanged. |
+| WEBQA-16 / P2 / community join acknowledgement | Deny the JoinRequests write. The helper logs the failure and returns normally, so the screen reports Join request sent and switches to Requested. | The asynchronous helper swallows the write failure; the caller treats completion as acknowledgement. | Fixed in candidate: unauthenticated/failed writes propagate; success waits for acknowledgement, duplicate submissions are fenced and read failures disable joining. Actual SDK-double/widget regressions cover failure, delayed acknowledgement and disposal. Included in 50 focused and 515 full client passes. |
+| WEBQA-17 / P2 / community request status | Decline a join request and reopen the community. The retained declined document is displayed as Requested and Request pending. | The screen tests document existence instead of its status. | Fixed in candidate: pending, declined and unavailable requests have distinct truthful states. Declined or unknown requests remain disabled, preserving rules without an unsupported overwrite/reapply flow. Actual screen regressions pass in the full client suite. |
+| WEBQA-18 / P2 / community access display | Open a community with a pending member document or an approved legacy Admin role. The former is labelled Member; the latter loses the administrative presentation. | The profile and its administrative button infer approved membership from document existence and interpret only one role casing. | Fixed in candidate: non-creator membership must be approved; administrative controls accept only the four role spellings supported by rules. Profile, administrative button and active feed have malformed-role controls. The existing creator presentation shortcut is unchanged and does not establish server authorization without the required membership record. Independent review and 515 client tests pass. |
+| WEBQA-19 / P2 / public guest management | Open a valid management session for a pending, waitlisted or declined registration. Each page says Confirmed and each calendar endpoint returns a publishing invite. | Management rendering treats every non-cancelled record as confirmed and offers admission/calendar actions without checking registration eligibility. | Fixed in candidate: rendering and direct calendar/QR routes share current admission eligibility. Pending, waitlisted and declined states have no admission invite; unsupported calendar/QR requests return 409/404. Confirmed, supported legacy and cancellation controls are covered. All 31 public-web handler and 392 Functions cases pass. All 24 new rendered status cases pass across four browser projects, using a synthetic server session; browser cookie transport/token exchange remains a separate acceptance check. |
+| WEBQA-20 / P2 / public event capacity display | With capacity one, a ticketed event with confirmed count one and issued count zero, or an RSVP event with one reserved seat, still advertises acquisition while the authoritative capacity helper reports full. | Public rendering uses a different subset of counters from the registration handler. | Fixed in candidate: free-ticket/RSVP display uses V3 capacity and paid legacy display uses its V2 projection. Full states respect waitlisting; unresolved counters display Availability unavailable without an acquisition action or invented zero. Actual HTTP regressions and 392 Functions cases pass; production counter reconciliation remains a separate gate. |
+
+The registration transaction repairs pass all 17 focused unit cases and the
+complete 55-case Firestore launch suite under Node 22.23.2 and Java 21 against
+`demo-attendus-admin`. The successful launch log SHA256 is
+`b9a2c5d51b8d81626b72cc59bbd3d0027eda26f6e12f8ced02bed2ee5b062c9b`.
+Its new cases cover concurrent decline replay, the actual SDK discarding a
+tentative confirmed ticket before retrying into the waitlist, and a concurrent
+decline/promotion with exactly one valid winner.
+
+The first launch run is retained as 52 passes and three failures (SHA256
+`16a8701af30250d6775a8f6eedabc9fe09773b0f7a997a1504936b35bb6af714`).
+All three new cases reused a guest whose deletion tombstone had been created
+earlier in the suite. Only their fixture identities were isolated; the product
+deletion guard was not relaxed. The unchanged registration implementation then
+passed the complete rerun. Later capacity-display changes require matching
+final source CI; this emulator receipt does not claim staging acceptance.
+
+| ID / severity / surface | Reproduction and expected versus actual behavior | Root cause and correction | Verification and remaining acceptance |
+| --- | --- | --- | --- |
+| WEBQA-21 / P2 / enlarged guest ticket layout | At 320px and 200% text, a valid eight-character ticket code and its QR image extend past their inner panel even though the page stays within the viewport. | The grid's intrinsic minimum width and fixed QR dimensions exceed the panel's available width. Use a shrinkable grid column, wrapping code text and an aspect-preserving responsive QR image. | The pinned old stylesheet fails all four ticket-panel bound checks with a valid eight-character code. All four pass after correction; the full local rendered selection passes 36/36 across four projects, with visual review. All 23 asset/versioning contract cases pass. A new immutable stylesheet is published in the candidate source; prior assets remain intact. |
+
+The new `registration-email-v2.css` immutable asset SHA256 is
+`5b3c898270ee766874a8e7d4db561b791cccb5b0f26fbb4fd6e0bb3e6ed1f311`.
+The source manifest references this new path and retains the previous
+`49fc8739d038b38eb58ecd506d04369b32c872cef4cc66fbda6308f9fa569dee`
+file for existing cached pages. This stylesheet change does not alter the
+reviewed registration or roster transaction logic.
+
+| ID / severity / surface | Reproduction and expected versus actual behavior | Root cause and correction | Verification and remaining acceptance |
+| --- | --- | --- | --- |
+| WEBQA-22 / P2 / deployment-safety test harness | Hosted source `4ba7e20` passes 392 Functions cases but fails one of 316 release-contract cases when `/bin/bash` exits before Node finishes supplying synthetic stdin, returning EPIPE. | The intentionally immediate-exit guard script races the test's input pipe. Supply exactly the same input through a read-only owned file descriptor and close it in finally. | All five scripts are byte-identical to the prior source. Exit 1, no spawn error, guard text and zero external commands remain required. Focused 11/11 and the unchanged complete serialized selection 316/316 pass; independent review is clear. A replacement exact-source CI run is required. |
+
+Failed CI run `37233539046`, Functions job `111528047406`, is retained with log
+SHA256 `afafd094bef28cc1c7f9d93f9b1a97a9838f469ea5a09e8ca9d4e96af1d035d8`.
+The corrected test SHA256 is
+`c1cdd0773ac996785959bb4a3282fb3158486b52b141e1ff4b6ea5275cb73843`;
+the complete 316-pass local log SHA256 is
+`22a1c231e4c72a32c6d50c3a9d675f99c4a308fad2da09863f1f4330f88c8356`.
+No failing result was accepted, timeout increased or deployment guard weakened.
+
+| ID / severity / surface | Reproduction and expected versus actual behavior | Root cause and correction | Verification and remaining acceptance |
+| --- | --- | --- | --- |
+| WEBQA-23 / P2 / guest management at enlarged text | Hosted Linux Firefox and WebKit overflow the 320px viewport in all six manage states at actual 200% text. The retained Firefox screenshot shows the masked email beyond the viewport; opening the contact disclosure also exposes an input wider than the panel locally. | Details cells have an unbreakable email and automatic grid minimum; the contact form lacks the registration form's width/font rules. Allow details text to wrap with zero minimum width and apply the existing responsive input/label/form styles to the contact form. | New assertions check text rectangles inside details, then actually open the form and check control bounds and 200% text. The expanded pre-fix cases fail in all four projects (three layout failures and one mobile click timeout, retained separately). After correction, 36/36 local rendered cases and 23/23 asset checks pass. Exact-source hosted Linux verification is still required. |
+
+Source `4ba7e20`, browser job `111528047351`, had 48/60 passing public
+cases and 12 failures; its Flutter browser step did not execute. The failed
+artifact `11315330210` is retained with ZIP SHA256
+`14f1bb01d46914aebfdd6dbf0086a2a7a7f65f5968a00e1c67e3b95544780e73`.
+The actual hosted screenshot is 340px wide for a 320px viewport. Per-email
+hosted DOM bounds were not retained; the screenshot and whole-page measurement
+establish overflow without inventing an element measurement.
+
+The corrected immutable registration stylesheet is
+`443a6f84d04a8f0465d4917b63932fdac32250c9250384ac18c95e8dc2e9b879`.
+Both earlier immutable copies remain available. Renderer, transaction and
+deployment-guard script contents are unchanged by this follow-up.
+
+Hosted follow-up `c179a3498c12eaaa002aaaa8cafa5cb8daea3186` passed all six
+jobs in PR run `37235032195` and push run `37235028562`. Independently retained
+PR artifact `11315630611` has SHA256
+`fa86a1465be86ffef584c6cfa32d7d5b34dc8f0c341a4dc4e9813c8de68c122d`;
+all 60 public cases pass on their first attempt, with no failures, skips or
+flakes, and all five actual Flutter journeys pass with complete fixture cleanup.
+The hosted Firefox enlarged management page was visually checked. This closes
+the two CI failures on that source; staging remains unqualified.
+
+| ID / severity / surface | Reproduction and expected versus actual behavior | Root cause and correction | Verification and remaining acceptance |
+| --- | --- | --- | --- |
+| WEBQA-24 / P1 / community approval integrity | Reject removal of a pending join request after the member write succeeds. The real helper returns false although membership is already approved. Replaying approval can also overwrite an existing Owner's role, permissions and join date. Expected: one committed decision and preserved existing privileges. | Approval performs two separate writes without reading fresh request/member state. Replace with a guarded transaction, preserve exact approved-member replay and reject missing/declined/malformed requests before granting new membership. | 53 focused cases and 542 full main Flutter tests pass. Coverage includes revoked actor, account-switch retry, declined request, concurrent Owner promotion, absent legacy organizationId, invalid identities, pending ACK and lost ACK with consistent records and safe replay. Independent source review is clear; new hosted and staging acceptance remain required. |
+| WEBQA-25 / P2 / community creation integrity | Reject the creator-member write after the organization/name transaction. The helper returns null with the organization and name reservation persisted; retry fails on the reserved name. Expected: either all three records exist or none do. | Move creator membership into the same organization/name transaction. Creator-bootstrap rules use getAfter for the same parent while retaining full-user, ownership, identity, role and approved-state conditions; legacy two-step creation stays supported. | Before correction, the actual atomic Firestore bootstrap fails and the rules suite is 48/49. With the narrow rule change, all 49 Firestore/Storage rules tests pass, including rollback, anonymous, takeover, absent-parent and existing two-step cases. Client tests verify one three-write commit, denied member/name writes and concurrent name reservation. Full 542 client tests pass; hosted/staging verification remains required. |
+
+The creation/approval wrapper reproduction has two controls passing and twelve
+behavioral failures on the old helper. These are separate from the real rules
+emulator evidence. The complete rules before/after log SHA256 values are
+`6010a13e393a6939e18904b4ab662eaa16e31217358d7e250719f2bb818f55ef`
+and `bad25d0b44d4285f2757f4c4270d105e212c5784a2999112ada8cfb6d92f65f8`.
+Independent review found no authorization expansion beyond the creator's same
+atomic bootstrap. A new complete hosted run is required after the client fixes.
+
+The final 53-case focused client log has SHA256
+`1093bef6a6f71ad1a2135b6a38efcf8c31108a11ac20718f709a21350b8f8d1b`.
+The before-fix client log has SHA256
+`c5e96dc588de7d4ce2eb8fe69964a5c3bd2b7dbb844f1b67733d00186c10df11`.
+Platform transport doubles establish helper behavior, while the separately
+executed emulator suite establishes actual rules acceptance; neither is a live
+staging community journey. Explicitly malformed identity fields remain rejected;
+only the already-supported absent organizationId uses the membership parent path.

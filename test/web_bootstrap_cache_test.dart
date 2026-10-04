@@ -59,28 +59,95 @@ void main() {
   });
 
   test(
-    'production deploy validates deferred chunks before and after release',
+    'qualified release checks deferred chunks before sealing and live bytes after publication',
     () {
-      final deployScript = File('deploy_web.sh').readAsStringSync();
+      final candidateWorkflow = File(
+        '.github/workflows/firebase-release.yml',
+      ).readAsStringSync();
+      final promotionWorkflow = File(
+        '.github/workflows/web-release-promote.yml',
+      ).readAsStringSync();
+      final pipeline = File('tools/web_release_pipeline.js').readAsStringSync();
+      final verifier = File('tools/verify_web_hosting.js').readAsStringSync();
+      final contract = File('tools/web_release_contract.js').readAsStringSync();
+      final promotion = pipeline.substring(
+        pipeline.indexOf('async function promote('),
+        pipeline.indexOf('async function main('),
+      );
+      final deployment = pipeline.substring(
+        pipeline.indexOf('async function deploy('),
+        pipeline.indexOf('async function qualify('),
+      );
 
-      expect(deployScript, contains('dart run tools/retain_web_releases.dart'));
-      expect(deployScript, contains('dart run tools/package_web_release.dart'));
+      // This guards the active workflow wiring. The Node contract/Hosting
+      // suites exercise artifact drift, live hash mismatches and state changes.
       expect(
-        deployScript,
-        contains('dart run tools/check_deferred_web_chunks.dart'),
+        candidateWorkflow,
+        stringContainsInOrder([
+          'origin=https://attendus.app/',
+          r'dart run tools/retain_web_releases.dart "$origin"',
+          r'dart run tools/package_web_release.dart --release-id "$RELEASE_ID"',
+          'dart run tools/check_deferred_web_chunks.dart',
+          'node tools/web_release_pipeline.js seal',
+          r'name: web-candidate-${{ matrix.environment }}',
+        ]),
       );
       expect(
-        deployScript,
+        promotionWorkflow,
         contains(
-          'dart run tools/check_deferred_web_chunks.dart https://attendus.app/',
+          'node tools/web_release_pipeline.js promote --qualification-run',
         ),
       );
+      expect(promotionWorkflow, contains('--expected-prior-release'));
       expect(
-        deployScript,
-        contains(
-          'dart run tools/check_deferred_web_chunks.dart '
-          'https://orgami-66nxok.web.app/',
-        ),
+        promotion,
+        stringContainsInOrder([
+          '"web-candidate-production"',
+          'provenance.artifactSha256 !== receipt.provenance.production.artifactSha256',
+          'c.digest(candidate) !== receipt.productionCandidateSha256',
+          'args["expected-prior-release"] !== candidate.predecessor.production.hostingVersion',
+          'await deploy(candidate,',
+        ]),
+      );
+      for (final buildCommand in [
+        'flutter build',
+        'tools/retain_web_releases.dart',
+        'tools/package_web_release.dart',
+      ]) {
+        expect(promotionWorkflow, isNot(contains(buildCommand)));
+        expect(promotion, isNot(contains(buildCommand)));
+      }
+      expect(
+        deployment,
+        stringContainsInOrder([
+          'c.validateArtifact(candidate, root, path.join(bundle, "web"))',
+          'deployStep("hosting", "hosting")',
+          'await verifyPublishedDeployment(candidate, publishedHosting,',
+          'write(output,',
+        ]),
+      );
+      expect(
+        contract,
+        contains('digest(files(webRoot)) !== candidate.webSha256'),
+      );
+      expect(pipeline, contains('await http(candidate,'));
+      expect(
+        pipeline,
+        contains('require("./verify_web_hosting").verifyHosting('),
+      );
+      expect(
+        verifier,
+        contains('["https://attendus.app", "https://orgami-66nxok.web.app"]'),
+      );
+      expect(
+        verifier,
+        contains(r'name.startsWith(`releases/${candidate.releaseId}/`)'),
+      );
+      expect(verifier, contains('expectedSha256: candidate.webFiles[name]'));
+      expect(verifier, contains('record.sha256 !== target.expectedSha256'));
+      expect(
+        verifier,
+        contains('receipt.matchedUrls.length !== targets.length'),
       );
     },
   );

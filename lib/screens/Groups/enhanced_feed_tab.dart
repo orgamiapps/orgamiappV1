@@ -53,6 +53,7 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
   bool _isRefreshing = false;
   String? _error;
   bool _isAdmin = false;
+  bool _isMember = false;
 
   // Refresh controller for pull-to-refresh
   final RefreshController _refreshController = RefreshController(
@@ -88,7 +89,10 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
       final createdBy = orgDoc.data()?['createdBy'];
       if (createdBy == _currentUser!.uid) {
         if (!mounted) return;
-        setState(() => _isAdmin = true);
+        setState(() {
+          _isAdmin = true;
+          _isMember = true;
+        });
         return;
       }
 
@@ -99,10 +103,13 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
           .doc(_currentUser!.uid)
           .get();
 
-      if (memberDoc.exists) {
-        final role = memberDoc.data()?['role']?.toString().toLowerCase();
+      if (memberDoc.data()?['status'] == 'approved') {
+        final role = memberDoc.data()?['role'];
         if (!mounted) return;
-        setState(() => _isAdmin = role == 'admin' || role == 'owner');
+        setState(() {
+          _isMember = true;
+          _isAdmin = const {'Admin', 'admin', 'Owner', 'owner'}.contains(role);
+        });
       }
     } catch (e) {
       debugPrint('Error checking admin status: $e');
@@ -609,7 +616,7 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
               style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
             ),
             const SizedBox(height: 32),
-            if (_currentUser != null)
+            if (_isMember)
               Center(
                 child: FilledButton.icon(
                   onPressed: () => _showCreateOptions(context),

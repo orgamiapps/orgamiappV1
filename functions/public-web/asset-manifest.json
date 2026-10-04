@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "algorithm": "sha256-lf",
   "assets": {
-    "public.css": "847197eebae525f121e9ef8e8b7aaafe77f99a83767ade549e04abb71eaf9783",
-    "registration-email-v2.css": "49fc8739d038b38eb58ecd506d04369b32c872cef4cc66fbda6308f9fa569dee",
+    "public.css": "4b135c20b4843253e824c0ebe35465f48b87573becfc112695d25aa2b2a7fe5c",
+    "registration-email-v2.css": "443a6f84d04a8f0465d4917b63932fdac32250c9250384ac18c95e8dc2e9b879",
     "actions-email-v2.js": "a56cadbc7e57cf165c082b38d96f152959e31666f43aaa1e8090519546b16ed2"
   }
 }

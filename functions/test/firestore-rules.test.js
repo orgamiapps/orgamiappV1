@@ -123,6 +123,58 @@ test("organization names are reserved atomically and can be renamed by an approv
   await assertFails(dbFor("outsider").doc("Organizations/duplicate").set({createdBy: "outsider", name_lowercase: "renamed"}));
 });
 
+test("creator can commit organization, reserved name and own approved membership atomically", async () => {
+  const owner = dbFor("atomic-creator");
+  await assertSucceeds(owner.runTransaction(async (tx) => {
+    const name = owner.doc("OrganizationNames/atomic-group");
+    assert.equal((await tx.get(name)).exists, false);
+    tx.set(owner.doc("Organizations/atomic-group"), {createdBy: "atomic-creator", name: "Atomic group", name_lowercase: "atomic-group"});
+    tx.set(name, {organizationId: "atomic-group"});
+    tx.set(owner.doc("Organizations/atomic-group/Members/atomic-creator"), {
+      organizationId: "atomic-group", userId: "atomic-creator", role: "Admin", status: "approved",
+      permissions: ["CreateEditEvents", "ApproveJoinRequests", "ManageMembersRoles", "ViewAnalytics"],
+    });
+  }));
+  assert.equal((await owner.doc("Organizations/atomic-group/Members/atomic-creator").get()).data().role, "Admin");
+  await assertSucceeds(owner.doc("Organizations/atomic-group").update({description: "Immediately manageable"}));
+});
+
+test("invalid atomic creator membership rolls back the organization and reserved name", async () => {
+  const owner = dbFor("atomic-creator");
+  const batch = owner.batch();
+  batch.set(owner.doc("Organizations/invalid-creator"), {createdBy: "atomic-creator", name_lowercase: "invalid-creator"});
+  batch.set(owner.doc("OrganizationNames/invalid-creator"), {organizationId: "invalid-creator"});
+  batch.set(owner.doc("Organizations/invalid-creator/Members/atomic-creator"), {userId: "another-user", role: "Admin", status: "approved"});
+  await assertFails(batch.commit());
+  await seed(async (db) => {
+    for (const key of ["Organizations/invalid-creator", "OrganizationNames/invalid-creator", "Organizations/invalid-creator/Members/atomic-creator"]) {
+      assert.equal((await db.doc(key).get()).exists, false, key);
+    }
+  });
+});
+
+test("anonymous or unrelated users cannot bootstrap an approved creator membership", async () => {
+  const anonymous = env.authenticatedContext("anonymous", {firebase: {sign_in_provider: "anonymous"}}).firestore();
+  const batch = anonymous.batch();
+  batch.set(anonymous.doc("Organizations/anonymous-group"), {createdBy: "anonymous", name_lowercase: "anonymous-group"});
+  batch.set(anonymous.doc("OrganizationNames/anonymous-group"), {organizationId: "anonymous-group"});
+  batch.set(anonymous.doc("Organizations/anonymous-group/Members/anonymous"), {userId: "anonymous", role: "Admin", status: "approved"});
+  await assertFails(batch.commit());
+  await seed((db) => db.doc("Organizations/existing-group").set({createdBy: "original-owner", name_lowercase: "existing-group"}));
+  const outsider = dbFor("outsider");
+  const takeover = outsider.batch();
+  takeover.update(outsider.doc("Organizations/existing-group"), {createdBy: "outsider"});
+  takeover.set(outsider.doc("Organizations/existing-group/Members/outsider"), {userId: "outsider", role: "Admin", status: "approved"});
+  await assertFails(takeover.commit());
+  await assertFails(outsider.doc("Organizations/absent/Members/outsider").set({userId: "outsider", role: "Admin", status: "approved"}));
+  await seed(async (db) => {
+    assert.equal((await db.doc("Organizations/existing-group").get()).data().createdBy, "original-owner");
+    for (const key of ["Organizations/anonymous-group", "OrganizationNames/anonymous-group", "Organizations/anonymous-group/Members/anonymous", "Organizations/existing-group/Members/outsider", "Organizations/absent/Members/outsider"]) {
+      assert.equal((await db.doc(key).get()).exists, false, key);
+    }
+  });
+});
+
 test("legacy event comments do not disclose private events to another signed-in account", async () => {
   await seed(async (db) => {
     await db.doc("Events/private-comment-event").set({customerUid: "owner", private: true, accessList: ["invited"]});

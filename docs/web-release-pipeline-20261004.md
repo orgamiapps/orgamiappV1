@@ -99,7 +99,7 @@ The only supported real restore target is `attendus-recovery-20261004`, never pr
 
 ## Representative backend rollback
 
-`config/web_backend_predecessor_archives.json` retains the original and private backup bucket/object/generation plus actual archive SHA-256 for every captured predecessor function. These immutable backups must exist before candidate Functions deployment. The current manifest records 113 staging and 135 production archives; production archives are retained for recovery and are never deployed by the staging rehearsal.
+`config/web_backend_predecessor_archives.json` retains the original and private backup bucket/object/generation plus actual archive SHA-256 for every captured predecessor function. These immutable backups must exist before candidate Functions deployment. The current manifest records 152 staging and 135 production archives; production archives are retained for recovery and are never deployed by the staging rehearsal.
 
 `tools/rehearse_web_backend.js` is restricted to the current staging candidate workflow and refuses production. Before and between changes it verifies the specified business, notification and qualification collections are empty and Auth has no identified account (at most the single existing anonymous account). It selects exactly `publicWeb` (HTTP), `getOrganizerEventRegistrationsV1` (callable), `aggregateAdminMetricsDaily` (scheduled), and `triggerAIInsights` (Firestore updated). Missing or incompatible predecessors stop the operation.
 

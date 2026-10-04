@@ -9,6 +9,7 @@ const serverDependencies = createRequire(path.resolve(__dirname, '../../function
 const {gitSourceFiles} = require('../web_release_contract');
 const {collectRosterPages} = require('./roster-read');
 const {activateFlutterSemanticsPage} = require('./flutter-semantics');
+const {readFirebaseAuthStatePage} = require('./firebase-auth-state');
 const {htmlResponsiveProbe} = require('./safari');
 const {validScope, bindingId} = require('../../functions/communications/qualification-isolation');
 const {chromium, firefox, webkit} = dependencies('@playwright/test');
@@ -47,7 +48,9 @@ function validateFixture(context) {
 }
 
 function allowStagingRequest(value, method, context, headers = {}) {
-  const url = new URL(value), fixture = context.fixture;
+  let url;
+  try {url = new URL(value);} catch {return false;}
+  const fixture = context.fixture;
   if (['data:', 'blob:', 'about:'].includes(url.protocol)) return true;
   if (url.origin === context.baseUrl) return true;
   if (url.protocol !== 'https:') return false;
@@ -82,6 +85,17 @@ function allowStagingRequest(value, method, context, headers = {}) {
       [...url.searchParams.keys()].length === 1 && url.searchParams.get('le') === 'scs';
   }
   if (url.hostname === 'us-central1-attendus-staging.cloudfunctions.net') return true;
+  // The Firebase-hosted Auth iframe still uses this legacy read-only endpoint.
+  // Its optional cb is Date.now(), not a JSONP callback or a delegated project.
+  if (url.origin === 'https://www.googleapis.com') {
+    const params = url.searchParams;
+    return method === 'GET' && !url.username && !url.password && !url.hash &&
+      fixture.firebase.projectId === 'attendus-staging' &&
+      url.pathname === '/identitytoolkit/v3/relyingparty/getProjectConfig' &&
+      [...params.keys()].every((key) => ['key', 'cb'].includes(key) && params.getAll(key).length === 1) &&
+      params.get('key') === fixture.firebase.apiKey &&
+      (!params.has('cb') || /^\d{1,16}$/.test(params.get('cb')));
+  }
   if (['identitytoolkit.googleapis.com', 'securetoken.googleapis.com'].includes(url.hostname)) return url.searchParams.getAll('key').length === 1 && url.searchParams.get('key') === fixture.firebase.apiKey;
   if (url.hostname === 'firestore.googleapis.com') {
     const target = 'projects/attendus-staging/databases/(default)';
@@ -96,6 +110,13 @@ function allowStagingRequest(value, method, context, headers = {}) {
   if (url.hostname === 'recaptchaenterprise.googleapis.com') return true;
   if (method === 'GET' && url.hostname === 'maps.gstatic.com') return /^\/(maps|mapfiles)\//.test(url.pathname);
   if (url.hostname === 'maps.googleapis.com') {
+    if (url.pathname === '/maps/api/mapsjs/gen_204') {
+      // The Maps SDK's CSP reachability probe has no API key or user payload.
+      return url.origin === 'https://maps.googleapis.com' && method === 'GET' &&
+        !url.username && !url.password && !url.hash && !!fixture.mapsApiKey &&
+        fixture.firebase.projectId === 'attendus-staging' &&
+        (!url.search || (url.searchParams.size === 1 && url.searchParams.get('csp_test') === 'true'));
+    }
     if (method === 'GET' && /^\/maps-api-v3\/api\/js\//.test(url.pathname)) return true;
     const key = fixture.mapsApiKey;
     if (!key) return false;
@@ -104,13 +125,178 @@ function allowStagingRequest(value, method, context, headers = {}) {
     return method === 'POST' && /^\/\$rpc\/google\.maps\./.test(url.pathname) &&
       (keyed || headers['x-goog-api-key'] === key);
   }
-  if (url.hostname === 'firebaseappcheck.googleapis.com') {
-    const project = url.pathname.match(/^\/v1\/projects\/([^/]+)\/apps\/([^/:]+)/);
-    return !!project && [fixture.firebase.projectId, fixture.firebase.projectNumber].filter(Boolean).includes(project[1]) &&
-      decodeURIComponent(project[2]) === fixture.firebase.appId;
+  if (['https://content-firebaseappcheck.googleapis.com', 'https://firebaseappcheck.googleapis.com'].includes(url.origin)) {
+    // Firebase's installed SDK emits raw colons in appId; the REST method is
+    // the final suffix. Neither other apps nor debug/V3 exchanges are allowed.
+    const project = url.pathname.match(/^\/v1\/projects\/([^/]+)\/apps\/([^/]+):exchangeRecaptchaEnterpriseToken$/);
+    let appId;
+    try {appId = project && decodeURIComponent(project[2]);} catch {return false;}
+    return method === 'POST' && !url.username && !url.password && !url.hash &&
+      fixture.firebase.projectId === 'attendus-staging' && !!project &&
+      [fixture.firebase.projectId, fixture.firebase.projectNumber].filter(Boolean).includes(project[1]) &&
+      typeof fixture.firebase.appId === 'string' && appId === fixture.firebase.appId &&
+      url.searchParams.size === 1 && url.searchParams.get('key') === fixture.firebase.apiKey;
   }
   if (method === 'GET' && url.hostname === 'storage.googleapis.com') return url.pathname.startsWith(`/${fixture.firebase.storageBucket}/private-event-exports/`);
   return false;
+}
+
+function projectAppCheckError(httpStatus, bytes) {
+  const base = {httpStatus, bodyStatus: 'projected', googleCode: null, googleStatus: null,
+    errorInfoReasons: [], unrecognizedErrorInfo: false};
+  if (!Buffer.isBuffer(bytes) || bytes.length > 16384) return {...base, bodyStatus: 'too-large'};
+  let payload;
+  try {payload = JSON.parse(bytes.toString('utf8'));} catch {return {...base, bodyStatus: 'invalid-json'};}
+  const error = payload?.error;
+  if (!error || typeof error !== 'object' || Array.isArray(error)) return {...base, bodyStatus: 'not-google-error'};
+  const statuses = new Set(['CANCELLED', 'UNKNOWN', 'INVALID_ARGUMENT', 'DEADLINE_EXCEEDED', 'NOT_FOUND',
+    'ALREADY_EXISTS', 'PERMISSION_DENIED', 'UNAUTHENTICATED', 'RESOURCE_EXHAUSTED', 'FAILED_PRECONDITION',
+    'ABORTED', 'OUT_OF_RANGE', 'UNIMPLEMENTED', 'INTERNAL', 'UNAVAILABLE', 'DATA_LOSS']);
+  const reasons = new Set(['SERVICE_DISABLED', 'BILLING_DISABLED', 'CONSUMER_INVALID', 'API_KEY_INVALID',
+    'API_KEY_EXPIRED', 'API_KEY_NOT_FOUND', 'API_KEY_SERVICE_BLOCKED', 'API_KEY_HTTP_REFERRER_BLOCKED',
+    'API_KEY_IP_ADDRESS_BLOCKED', 'API_KEY_ANDROID_APP_BLOCKED', 'API_KEY_IOS_APP_BLOCKED',
+    'ACCESS_TOKEN_SCOPE_INSUFFICIENT', 'ACCESS_TOKEN_EXPIRED', 'CREDENTIALS_MISSING',
+    'IAM_PERMISSION_DENIED', 'SECURITY_POLICY_VIOLATED', 'RATE_LIMIT_EXCEEDED',
+    'RESOURCE_QUOTA_EXCEEDED', 'USER_PROJECT_DENIED']);
+  if (Number.isInteger(error.code) && error.code >= 100 && error.code <= 599) base.googleCode = error.code;
+  if (statuses.has(error.status)) base.googleStatus = error.status;
+  for (const detail of (Array.isArray(error.details) ? error.details : []).slice(0, 20)) {
+    if (detail?.['@type'] !== 'type.googleapis.com/google.rpc.ErrorInfo') continue;
+    if (reasons.has(detail.reason)) {
+      if (!base.errorInfoReasons.includes(detail.reason)) base.errorInfoReasons.push(detail.reason);
+    } else base.unrecognizedErrorInfo = true;
+  }
+  // Never retain message, metadata, domain, token, raw body or unknown codes.
+  return base;
+}
+
+function isBoundAppCheckFailure(response, context) {
+  try {
+    const status = response.status(), url = new URL(response.url());
+    return Number.isInteger(status) && status >= 300 && status <= 599 &&
+      ['https://content-firebaseappcheck.googleapis.com', 'https://firebaseappcheck.googleapis.com'].includes(url.origin) &&
+      allowStagingRequest(response.url(), response.request().method(), context);
+  } catch {return false;}
+}
+
+async function readAppCheckFailure(response, context, {timeoutMs = 3000} = {}) {
+  if (!isBoundAppCheckFailure(response, context)) return null;
+  const httpStatus = response.status();
+  let timer;
+  try {
+    return await Promise.race([
+      (async () => {
+        const length = await response.headerValue('content-length');
+        if (length === null) return {httpStatus, bodyStatus: 'not-read-missing-length'};
+        if (!/^\d{1,6}$/.test(length || '')) return {httpStatus, bodyStatus: 'not-read-invalid-length'};
+        if (Number(length) > 16384) return {httpStatus, bodyStatus: 'not-read-too-large'};
+        // Playwright buffers the response: gate the declared length first,
+        // then cap decoded bytes before parsing. Missing length is not a pass.
+        return projectAppCheckError(httpStatus, await response.body());
+      })().catch(() => ({httpStatus, bodyStatus: 'read-unavailable'})),
+      new Promise((resolve) => {timer = setTimeout(() => resolve({httpStatus, bodyStatus: 'read-timeout'}), Math.min(3000, Math.max(1, timeoutMs)));}),
+    ]);
+  } finally {clearTimeout(timer);}
+}
+
+function createAppCheckErrorRecorder(context) {
+  const records = [], pending = new Set();
+  let totalCount = 0;
+  return {
+    observe(response) {
+      if (!isBoundAppCheckFailure(response, context)) return;
+      const sequence = ++totalCount;
+      if (sequence > 50) return;
+      const at = new Date().toISOString();
+      const observation = readAppCheckFailure(response, context).then((result) => {
+        if (result) records.push({sequence, at, ...result});
+      });
+      pending.add(observation);
+      void observation.finally(() => pending.delete(observation));
+    },
+    async drain() {await Promise.allSettled([...pending]);},
+    snapshot() {return {totalCount, omittedCount: Math.max(0, totalCount - 50), records: structuredClone(records)};},
+  };
+}
+
+function scrubBrowserError(error, fixture) {
+  let result = String(error?.message || error).replace(/\bBearer\s+[^\s'"<>]+/gi, 'Bearer [redacted]');
+  // Chromium can emit /host/path?session=... without a scheme. Include that
+  // form, protocol-relative URLs and relative proof paths, preserving reasons.
+  result = result.replace(/https?:\/\/[^\s'"<>]+|\/{0,2}(?:[^\s/@]+@)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d+)?\/[^\s'"<>]*|\/[^\s'"<>]+/gi, (value) => {
+    try {
+      const absolute = /^https?:\/\//i.test(value);
+      const hosted = !absolute && /^\/{0,2}(?:[^\s/@]+@)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d+)?\//i.test(value);
+      const parsed = new URL(absolute ? value : hosted ? 'https://' + value.replace(/^\/+/, '') : value, 'https://attendus-staging.web.app');
+      const pathname = /^\/manage\//.test(parsed.pathname) ? '/manage/[redacted]' : parsed.pathname;
+      return (absolute || hosted ? parsed.origin : '') + pathname;
+    } catch {return '[url]';}
+  });
+  for (const account of Object.values(fixture)) {
+    if (typeof account?.password === 'string' && account.password) result = result.split(account.password).join('[redacted]');
+  }
+  return result.replace(/eyJ[A-Za-z0-9_.-]+/g, '[token]');
+}
+
+function pageErrorDiagnostic(error, {candidate, context, pageUrl, errorIndex, contextId, pageId,
+  pageRole, engine, observedDuringStep, now = Date.now()}) {
+  const positive = (value) => Number.isSafeInteger(value) && value > 0 && value <= 100000000;
+  const origin = new URL(context.baseUrl).origin;
+  let routeFamily = 'outside-staging';
+  try {
+    const url = new URL(pageUrl);
+    if (url.origin === origin && !url.username && !url.password) {
+      routeFamily = 'other-staging';
+      for (const [pattern, family] of [
+        [/^\/$/, '/'], [/^\/app\/discover\/?$/, '/app/discover'],
+        [/^\/app\/event\/[^/]+\/?$/, '/app/event/:id'], [/^\/event\/[^/]+\/?$/, '/event/:id'],
+        [/^\/community\/[^/]+\/?$/, '/community/:id'], [/^\/manage\/?$/, '/manage'],
+        [/^\/manage\/[^/]+\/?$/, '/manage/:proof'], [/^\/app(?:\/|$)/, '/app/other'],
+      ]) if (pattern.test(url.pathname)) {routeFamily = family; break;}
+    }
+  } catch {/* Blank/closed/external pages retain only the fixed family. */}
+  const stack = typeof error?.stack === 'string' ? error.stack : '';
+  const lines = stack.slice(0, 65536).split(/\r?\n/), frames = [];
+  let stackTruncated = stack.length > 65536 || lines.length > 80;
+  for (const line of lines.slice(0, 80)) {
+    // Recognize Chromium and Firefox/WebKit frame shapes. Never persist raw
+    // stack text, function names, arbitrary message payloads or foreign URLs.
+    if (!/^\s*at\s+/.test(line) && !/^[^@\r\n]{0,300}@https:\/\//.test(line) && !/^https:\/\//.test(line)) continue;
+    const match = /(https:\/\/[^\s()]+):(\d+):(\d+)\)?$/.exec(line.trim());
+    if (!match || !positive(Number(match[2])) || !positive(Number(match[3]))) continue;
+    try {
+      const url = new URL(match[1]), artifact = url.pathname.slice(1);
+      const digest = Object.hasOwn(candidate.webFiles || {}, artifact) ? candidate.webFiles[artifact] : null;
+      if (url.origin !== origin || url.username || url.password || !/^[a-f0-9]{64}$/.test(digest || '')) continue;
+      if (frames.length === 12) {stackTruncated = true; continue;}
+      frames.push({artifact, sha256: digest, line: Number(match[2]), column: Number(match[3])});
+    } catch {/* Invalid frame locations are omitted, never echoed. */}
+  }
+  const roles = ['public', 'owner', 'attendee', 'staff', 'unauthorized', 'administrator', 'deletion',
+    'responsive', 'export', 'engine-public'];
+  return {schemaVersion: 1, at: new Date(now).toISOString(),
+    errorIndex: Number.isSafeInteger(errorIndex) && errorIndex >= 0 ? errorIndex : null,
+    contextId: positive(contextId) ? contextId : null, pageId: positive(pageId) ? pageId : null,
+    pageRole: roles.includes(pageRole) ? pageRole : 'unassigned',
+    engine: ['chromium', 'firefox', 'webkit', 'edge', 'chrome'].includes(engine) ? engine : 'unknown',
+    // This is observation context, not a claim about which step caused an
+    // asynchronous exception from an earlier operation.
+    observedDuringStep: [...GATES, 'post-close-replay'].includes(observedDuringStep?.gate) && positive(observedDuringStep?.sequence) ?
+      {gate: observedDuringStep.gate, sequence: observedDuringStep.sequence} : null,
+    routeFamily, errorName: ['Error', 'TypeError', 'RangeError', 'StateError', 'AssertionError', 'FirebaseError'].includes(error?.name) ? error.name : 'Error',
+    nullCheckMessage: error?.message === 'Null check operator used on a null value',
+    frames, stackPresent: Boolean(stack), stackTruncated};
+}
+
+function createPageErrorRecorder({candidate, context}) {
+  const entries = []; let totalCount = 0;
+  return {
+    record(error, options) {
+      totalCount++;
+      if (entries.length < 200) entries.push(pageErrorDiagnostic(error, {...options, candidate, context}));
+    },
+    snapshot() {return {entries: [...entries], totalCount, omittedCount: totalCount - entries.length};},
+  };
 }
 
 function parseCsv(input) {
@@ -218,6 +404,86 @@ async function visibleHistoryTitle(page, title, flutter = false) {
   return true;
 }
 
+async function readOwnedMapEvents(context, db, now = Date.now()) {
+  const fixture = validateFixture(context), ids = [fixture.secondEventId, fixture.canaryEventId];
+  if (db.projectId !== 'attendus-staging' || process.env.FIRESTORE_EMULATOR_HOST || process.env.FIREBASE_AUTH_EMULATOR_HOST ||
+      !/^[a-f0-9]{40}$/.test(context.sourceSha || '') || !context.candidateRunId || !Number.isFinite(now) ||
+      fixture.sourceSha !== context.sourceSha || fixture.candidateRunId !== context.candidateRunId ||
+      new Set(ids).size !== 2 || ids.some((id) => !/^[A-Za-z0-9_-]{1,128}$/.test(id || '') || !fixture.ownedFixtureIds.includes(id)) ||
+      !/^[A-Za-z0-9_-]{1,128}$/.test(fixture.owner.uid)) throw Error('Maps requires two exact owned staging event fixtures.');
+  return db.runTransaction(async (tx) => {
+    const refs = [db.doc(`QualificationScopes/${fixture.runId}`), db.doc(`QualificationSetup/${fixture.runId}`),
+      db.doc(`QualificationBindings/${bindingId('account', fixture.owner.uid)}`), db.doc(`account_deletion_jobs/${fixture.owner.uid}`),
+      ...ids.flatMap((id) => [db.doc(`Events/${id}`), db.doc(`QualificationBindings/${bindingId('event', id)}`)])];
+    const [scope, setup, owner, deleting, first, firstBinding, second, secondBinding] = await Promise.all(refs.map((ref) => tx.get(ref)));
+    const bound = (row) => row.get('schemaVersion') === 1 && row.get('state') === 'bound' && row.get('projectId') === context.projectId && row.get('runId') === fixture.runId;
+    if (!validScope(scope.data(), fixture.runId, context.projectId, now) || !scope.get('actorUids').includes(fixture.owner.uid) ||
+        setup.get('state') !== 'seeded' || setup.get('projectId') !== context.projectId || setup.get('sourceSha') !== context.sourceSha ||
+        setup.get('candidateRunId') !== context.candidateRunId || ![owner, firstBinding, secondBinding].every(bound) || deleting.exists) {
+      throw Error('Maps fixture ownership, scope or candidate changed.');
+    }
+    const events = [first, second].map((event, index) => {
+      const title = event.get('title'), latitude = event.get('latitude'), longitude = event.get('longitude');
+      const locationName = event.get('locationName'), location = event.get('location');
+      const start = event.get('selectedDateTime')?.toMillis?.(), duration = event.get('eventDurationMinutes');
+      const expected = index === 0 ? [40.7829, -73.9654, 'Synthetic qualification venue A'] : [40.7851, -73.9683, 'Synthetic qualification venue B'];
+      if (!event.exists || !scope.get('eventIds').includes(event.id) || event.get('customerUid') !== fixture.owner.uid ||
+          event.get('private') !== false || event.get('deleted') === true || event.get('isHidden') === true ||
+          !['active', 'scheduled'].includes(event.get('status')) || event.get('locationType') !== 'in_person' ||
+          typeof title !== 'string' || !title.trim() || title.length > 500 ||
+          latitude !== expected[0] || longitude !== expected[1] || locationName !== expected[2] ||
+          typeof location !== 'string' || !location.includes('synthetic test location') || location.length > 1000 ||
+          !Number.isFinite(start) || !Number.isInteger(duration) || duration <= 0 || now >= start + (duration + 120) * 60000) {
+        throw Error('Maps event is unowned, ineligible or missing the seeded synthetic geometry.');
+      }
+      return {id: event.id, title, latitude, longitude, locationName, location};
+    });
+    if (events[0].title === events[1].title) throw Error('Maps fixture marker titles must be distinct.');
+    return {projectId: context.projectId, runId: fixture.runId, sourceSha: context.sourceSha,
+      candidateRunId: context.candidateRunId, checkedAt: new Date(now).toISOString(), events};
+  }, {readOnly: true});
+}
+
+async function openOwnedMapMarker(page, events, {screenshot = async () => {}} = {}) {
+  if (!Array.isArray(events) || events.length !== 2 || new Set(events.map((event) => event.id)).size !== 2 ||
+      new Set(events.map((event) => event.title)).size !== 2 || events.some((event) =>
+        typeof event.title !== 'string' || !event.title.trim() || typeof event.locationName !== 'string' ||
+        !event.locationName || typeof event.location !== 'string' || !event.location)) throw Error('Missing verified Maps fixture landmarks.');
+  await page.getByRole('button', {name: 'View events map', exact: true}).click();
+  const map = page.locator('.gm-style').first();
+  await map.waitFor({state: 'visible', timeout: 30000});
+  try {
+    if (await page.getByText('Map unavailable', {exact: true}).count()) throw Error('The Maps screen reports unavailable.');
+    // The pinned Flutter web plugin passes InfoWindow.title to the real Maps
+    // marker title and installs a click listener. Require the SDK's named
+    // control; never invoke its callback, inject a button, or select a search
+    // result as a substitute. Optimized SDK markers may lack this control;
+    // that is an explicit accessibility/acceptance failure, not a pass.
+    for (const event of events) await map.getByRole('button', {name: event.title, exact: true}).waitFor({state: 'visible', timeout: 30000});
+    await screenshot('discover-maps-markers.png');
+    const selected = events[0];
+    await map.getByRole('button', {name: selected.title, exact: true}).click();
+    const details = page.getByRole('button', {name: 'View event details', exact: true});
+    await details.waitFor({state: 'visible'});
+    await page.getByText(selected.title, {exact: true}).last().waitFor({state: 'visible'});
+    await page.getByText(`${selected.locationName}\n${selected.location}`, {exact: true}).waitFor({state: 'visible'});
+    await screenshot('discover-maps-selected-event.png');
+    await details.click();
+    await details.waitFor({state: 'hidden'});
+    await page.getByText(selected.title, {exact: true}).last().waitFor({state: 'visible'});
+    await page.getByText('Manage event', {exact: true}).waitFor({state: 'visible'});
+    await screenshot('discover-maps-event-details.png');
+    // This product path pushes an unnamed Flutter Navigator route. Its actual
+    // details screen/content, not an invented browser URL, proves navigation.
+    return {mapVisible: true, mapUnavailable: false, markerEventIds: events.map((event) => event.id), markerTitles: events.map((event) => event.title),
+      selectedEventId: selected.id, selectedTitle: selected.title, selectedLocation: `${selected.locationName}\n${selected.location}`,
+      detailsTitle: selected.title, detailsManagementVisible: true};
+  } catch (error) {
+    await screenshot('discover-maps-failure.png');
+    throw error;
+  }
+}
+
 async function produce({candidate, context, outputDir}) {
   const fixture = validateFixture(context);
   const replayOnly = context.requestedGates?.length === 1 && context.requestedGates[0] === 'post-close-replay';
@@ -226,19 +492,16 @@ async function produce({candidate, context, outputDir}) {
   fs.mkdirSync(outputDir, {recursive: true});
   const gates = Object.fromEntries(activeGates.map((id) => [id, {assertions: [], rawPaths: [], blockers: []}]));
   const blocked = [], browserErrors = [], identityObservations = new Set(), anonymousUids = new Set();
+  const pageErrors = createPageErrorRecorder({candidate, context}), appCheckErrors = createAppCheckErrorRecorder(context), contextMetadata = new WeakMap();
+  let contextSequence = 0, pageSequence = 0, stepSequence = 0, observedDuringStep = null;
   let appCheckToken;
   const write = (gate, name, value) => { fs.writeFileSync(path.join(outputDir, name), JSON.stringify(value, null, 2)); gates[gate].rawPaths.push(name); };
   const record = (gate, id, expected, actual) => gates[gate].assertions.push({id, expected, actual});
-  const scrub = (error) => {
-    let result = String(error?.message || error).replace(/https?:\/\/[^\s)]+/g, (url) => {try {const parsed = new URL(url); return parsed.origin + (/^\/manage\/[A-Za-z0-9_-]{20,}/.test(parsed.pathname) ? '/manage/[redacted]' : parsed.pathname);} catch {return '[url]';}});
-    for (const account of Object.values(fixture)) {
-      if (typeof account?.password === 'string' && account.password) result = result.split(account.password).join('[redacted]');
-    }
-    return result.replace(/eyJ[A-Za-z0-9_.-]+/g, '[token]');
-  };
+  const scrub = (error) => scrubBrowserError(error, fixture);
   const browser = await chromium.launch({headless: true});
-  async function newContext(viewport = {width: 1440, height: 1000}, engine = browser) {
+  async function newContext(viewport = {width: 1440, height: 1000}, engine = browser, engineName = 'chromium') {
     const browserContext = await engine.newContext({viewport, serviceWorkers: replayOnly ? 'block' : 'allow'});
+    contextMetadata.set(browserContext, {contextId: ++contextSequence, engine: engineName});
     await browserContext.route('**/*', async (route) => {
       const request = route.request(), url = new URL(request.url());
       const headers = await request.allHeaders();
@@ -252,10 +515,15 @@ async function produce({candidate, context, outputDir}) {
     await browserContext.routeWebSocket('**/*', (socket) => { blocked.push({method: 'WEBSOCKET', origin: new URL(socket.url()).origin}); socket.close(); });
     return browserContext;
   }
-  async function pageFor(browserContext) {
+  async function pageFor(browserContext, pageRole) {
     const page = await browserContext.newPage();
+    const metadata = {...contextMetadata.get(browserContext), pageId: ++pageSequence, pageRole};
     page.setDefaultTimeout(30000);
-    page.on('pageerror', (error) => browserErrors.push(scrub(error)));
+    page.on('pageerror', (error) => {
+      const errorIndex = browserErrors.push(scrub(error)) - 1;
+      pageErrors.record(error, {...metadata, errorIndex, pageUrl: page.url(), observedDuringStep});
+    });
+    page.on('response', (response) => appCheckErrors.observe(response));
     observeCreatedIdentities(page);
     return page;
   }
@@ -297,26 +565,17 @@ async function produce({candidate, context, outputDir}) {
     gates[gate].rawPaths.push(name);
   }
   async function step(gate, operation) {
+    observedDuringStep = {gate, sequence: ++stepSequence};
     try {await operation();} catch (error) {gates[gate].blockers.push(scrub(error));}
+    finally {observedDuringStep = null;}
   }
   async function browserToken(page, account) {
     // Read only the currently authenticated browser identity in memory. The
     // token never enters evidence, traces, screenshots, or error messages.
-    const user = await page.evaluate(async () => new Promise((resolve, reject) => {
-      const open = indexedDB.open('firebaseLocalStorageDb');
-      open.onerror = () => reject(Error('Browser authentication storage unavailable.'));
-      open.onsuccess = () => {
-        const db = open.result;
-        if (!db.objectStoreNames.contains('firebaseLocalStorage')) {db.close(); resolve(null); return;}
-        const request = db.transaction('firebaseLocalStorage').objectStore('firebaseLocalStorage').getAll();
-        request.onsuccess = () => {
-          const value = request.result.find((row) => row.fbase_key?.startsWith('firebase:authUser:'))?.value;
-          db.close(); resolve(value ? {uid: value.uid, token: value.stsTokenManager?.accessToken} : null);
-        };
-        request.onerror = () => {db.close(); reject(Error('Browser authentication state unavailable.'));};
-      };
-    }));
-    if (user?.uid !== account.uid || !user.token) throw Error('Browser session does not match the owned fixture actor.');
+    const user = await readFirebaseAuthStatePage(page, {
+      apiKey: fixture.firebase.apiKey, projectId: fixture.firebase.projectId,
+      appName: '[DEFAULT]', expectedUid: account.uid, timeoutMs: 10000,
+    });
     return user.token;
   }
   async function callable(name, data, token) {
@@ -332,7 +591,7 @@ async function produce({candidate, context, outputDir}) {
     if (!['owner', 'attendee', 'staff', 'unauthorized', 'administrator', 'deletion'].includes(role) || !fixture[role] ||
         !fixture.ownedFixtureIds.includes(fixture[role].uid)) throw Error('Pilot actor is outside the owned fixture manifest.');
     if (!actors.has(role)) {
-      const actorContext = await newContext(), page = await pageFor(actorContext);
+      const actorContext = await newContext(), page = await pageFor(actorContext, role);
       await login(page, fixture[role]); actors.set(role, page);
     }
     if (!appCheckToken) throw Error('The packaged browser has not obtained an App Check token.');
@@ -413,7 +672,7 @@ async function produce({candidate, context, outputDir}) {
       record(gate, 'uncaught-browser-errors', [], browserErrors);
       record(gate, 'unexpected-blocked-network-requests', [], blocked);
       write(gate, 'fixture-created-identities.json', {runId: fixture.runId, projectId: context.projectId, anonymousUids: [...anonymousUids].sort()});
-      write(gate, 'browser-replay-network.json', {identity, blocked, browserErrors});
+      write(gate, 'browser-replay-network.json', {identity, blocked, browserErrors, pageErrors: pageErrors.snapshot()});
       return {gates, observedDeploymentIdentity: identity};
     }
     // Observe the original source timers before long UI journeys can cross an
@@ -451,7 +710,7 @@ async function produce({candidate, context, outputDir}) {
       }
       return {gates, observedDeploymentIdentity: identity};
     }
-    let history;
+    let history, mapEvents;
     await step(GATES[2], async () => {
       const {initializeApp, applicationDefault, deleteApp} = serverDependencies('firebase-admin/app');
       const {getFirestore} = serverDependencies('firebase-admin/firestore');
@@ -464,8 +723,20 @@ async function produce({candidate, context, outputDir}) {
       for (const gate of GATES) gates[gate].blockers.push('Owned history event preflight failed; no browser fixture mutations started.');
       return {gates, observedDeploymentIdentity: identity};
     }
-    const publicContext = await newContext(), publicPage = await pageFor(publicContext);
-    const ownerContext = await newContext(), ownerPage = await pageFor(ownerContext);
+    await step(GATES[0], async () => {
+      const {initializeApp, applicationDefault, deleteApp} = serverDependencies('firebase-admin/app');
+      const {getFirestore} = serverDependencies('firebase-admin/firestore');
+      const observer = initializeApp({projectId: 'attendus-staging', credential: applicationDefault()}, `browser-maps-${fixture.runId}`);
+      const db = getFirestore(observer);
+      try {mapEvents = await readOwnedMapEvents(context, db); write(GATES[0], 'maps-owned-events.json', mapEvents);}
+      finally {await db.terminate(); await deleteApp(observer);}
+    });
+    if (!mapEvents) {
+      for (const gate of GATES) gates[gate].blockers.push('Owned Maps event preflight failed; no browser fixture mutations started.');
+      return {gates, observedDeploymentIdentity: identity};
+    }
+    const publicContext = await newContext(), publicPage = await pageFor(publicContext, 'public');
+    const ownerContext = await newContext(), ownerPage = await pageFor(ownerContext, 'owner');
     await step(GATES[0], async () => {
       const response = await publicPage.goto(context.baseUrl + fixture.event.publicPath);
       record(GATES[0], 'public-event-http', 200, response.status());
@@ -494,16 +765,23 @@ async function produce({candidate, context, outputDir}) {
         registrationId: proof.registrationId, captureId: proof.captureId, fingerprint: proof.fingerprint, status: proof.status});
       await screenshot(GATES[0], publicPage, 'guest-confirmation.png');
       await login(ownerPage, fixture.owner);
+      await browserToken(ownerPage, fixture.owner);
       if (!fixture.mapsApiKey) throw Error('A verified staging Maps browser key is required for Discover/Maps acceptance.');
       await ownerPage.waitForFunction(() => typeof globalThis.google?.maps?.Map === 'function', undefined, {timeout: 30000});
       const mapsLoader = await ownerPage.locator('script[data-attendus-google-maps]').getAttribute('src');
       record(GATES[0], 'discover-maps-loader-bound-to-staging-key', fixture.mapsApiKey, new URL(mapsLoader).searchParams.get('key'));
-      await ownerPage.getByRole('button', {name: 'View events map', exact: true}).click();
-      await ownerPage.locator('.gm-style').first().waitFor({timeout: 30000});
-      record(GATES[0], 'discover-renders-live-map', true, await ownerPage.locator('.gm-style').first().isVisible());
-      record(GATES[0], 'discover-map-not-unavailable', 0, await ownerPage.getByText('Map unavailable', {exact: true}).count());
+      const mapJourney = await openOwnedMapMarker(ownerPage, mapEvents.events, {
+        screenshot: (name) => screenshot(GATES[0], ownerPage, name),
+      });
+      write(GATES[0], 'maps-ui-journey.json', {...mapJourney, projectId: context.projectId, runId: fixture.runId,
+        sourceSha: context.sourceSha, candidateRunId: context.candidateRunId});
+      record(GATES[0], 'discover-renders-two-owned-marker-controls', mapEvents.events.map((event) => event.id), mapJourney.markerEventIds);
+      record(GATES[0], 'discover-marker-opens-exact-venue', `${mapEvents.events[0].locationName}\n${mapEvents.events[0].location}`, mapJourney.selectedLocation);
+      record(GATES[0], 'discover-marker-details-navigation', {title: mapEvents.events[0].title, management: true},
+        {title: mapJourney.detailsTitle, management: mapJourney.detailsManagementVisible});
+      record(GATES[0], 'discover-renders-live-map', true, mapJourney.mapVisible);
+      record(GATES[0], 'discover-map-not-unavailable', false, mapJourney.mapUnavailable);
       record(GATES[0], 'discover-maps-requests-not-blocked', [], blocked.filter((entry) => /^https:\/\/maps\./.test(entry.origin)));
-      await screenshot(GATES[0], ownerPage, 'discover-maps.png');
       await app(ownerPage, `/app/event/${encodeURIComponent(fixture.event.id)}`);
       await ownerPage.getByText('Manage event', {exact: true}).waitFor();
       record(GATES[0], 'owner-management-visible', true, await ownerPage.getByText('Manage event', {exact: true}).isVisible());
@@ -618,7 +896,7 @@ async function produce({candidate, context, outputDir}) {
       }
       // Flutter 200-percent layout is covered by the rendered emulator test;
       // this exact-artifact gate still requires an enabled semantics tree.
-      const appContext = await newContext({width: 390, height: 844}), appPage = await pageFor(appContext);
+      const appContext = await newContext({width: 390, height: 844}), appPage = await pageFor(appContext, 'responsive');
       await app(appPage);
       record(GATES[3], 'packaged-flutter-semantics-present', true, (await appPage.locator('flt-semantics').count()) > 0);
       await screenshot(GATES[3], appPage, 'packaged-flutter-390.png');
@@ -627,7 +905,7 @@ async function produce({candidate, context, outputDir}) {
       const large = fixture.largeRoster;
       if (!large || !fixture.ownedFixtureIds.includes(large.eventId) || !Number.isInteger(large.expectedRows) || large.expectedRows < 1000 || !Array.isArray(large.expectedCsvHeaders) ||
           !Array.isArray(large.expectedCsvSpecialNames) || large.expectedCsvSpecialNames.length < 2) throw Error('Owned large-roster fixture (at least 1000 rows), CSV headers and escaping examples are required.');
-      const exportContext = await newContext(), exportPage = await pageFor(exportContext);
+      const exportContext = await newContext(), exportPage = await pageFor(exportContext, 'export');
       await login(exportPage, fixture.owner);
       const token = await browserToken(exportPage, fixture.owner);
       const {seen, pages} = await collectRosterPages((name, data) => callable(name, data, token), {eventId: large.eventId});
@@ -725,7 +1003,7 @@ async function produce({candidate, context, outputDir}) {
         const version = engine.version();
         scope.executed.push({name: entry.name, channel: entry.channel ?? null, version});
         record(GATES[0], `${entry.name}-runtime-version-reported`, true, typeof version === 'string' && version.trim().length > 0);
-        const engineContext = await newContext({width: 1280, height: 900}, engine), page = await pageFor(engineContext);
+        const engineContext = await newContext({width: 1280, height: 900}, engine, entry.name), page = await pageFor(engineContext, 'engine-public');
         await page.goto(context.baseUrl + fixture.event.publicPath);
         record(GATES[0], `${entry.name}-public-event-title`, fixture.event.title, await page.getByRole('heading', {level: 1}).innerText());
         await page.locator('[data-public-action]:visible').first().click();
@@ -809,12 +1087,26 @@ async function produce({candidate, context, outputDir}) {
     for (const gate of GATES) record(gate, 'uncaught-browser-errors', [], browserErrors);
     for (const gate of GATES) record(gate, 'unexpected-blocked-network-requests', [], blocked);
     for (const gate of GATES) write(gate, `${gate}.json`, {identity, ...gates[gate]});
-    fs.writeFileSync(path.join(outputDir, 'browser-network.json'), JSON.stringify({blocked, browserErrors}, null, 2));
+    fs.writeFileSync(path.join(outputDir, 'browser-network.json'), JSON.stringify({blocked, browserErrors, pageErrors: pageErrors.snapshot()}, null, 2));
     for (const gate of GATES) gates[gate].rawPaths.push('browser-network.json');
     return {gates, observedDeploymentIdentity: identity};
   } finally {
+    // Retain setup failures before teardown; replace with the completed
+    // snapshot only after the browser and identity observations have settled.
+    const savePageErrors = (phase) => fs.writeFileSync(path.join(outputDir, 'page-error-diagnostics.json'),
+      JSON.stringify({phase, ...pageErrors.snapshot()}, null, 2));
+    savePageErrors('before-close');
+    for (const gate of activeGates) gates[gate].rawPaths.push('page-error-diagnostics.json');
+    const saveAppCheckErrors = (phase) => fs.writeFileSync(path.join(outputDir, 'appcheck-error-diagnostics.json'),
+      JSON.stringify({phase, ...appCheckErrors.snapshot()}, null, 2));
+    await appCheckErrors.drain();
+    saveAppCheckErrors('before-close');
+    for (const gate of activeGates) gates[gate].rawPaths.push('appcheck-error-diagnostics.json');
     await browser.close();
     await Promise.allSettled([...identityObservations]);
+    await appCheckErrors.drain();
+    savePageErrors('after-close');
+    saveAppCheckErrors('after-close');
     // Keep the cleanup manifest even when candidate identity or a browser
     // operation fails before a gate report can be produced.
     fs.writeFileSync(path.join(outputDir, 'fixture-created-identities.json'), JSON.stringify({runId: fixture.runId,
@@ -824,4 +1116,4 @@ async function produce({candidate, context, outputDir}) {
 
 module.exports = produce;
 module.exports.produce = produce;
-module.exports._test = {validateFixture, allowStagingRequest, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, htmlResponsiveProbe, readOwnedHistoryTitles, visibleHistoryTitle, openCheckInConsole};
+module.exports._test = {validateFixture, allowStagingRequest, scrubBrowserError, pageErrorDiagnostic, createPageErrorRecorder, projectAppCheckError, readAppCheckFailure, createAppCheckErrorRecorder, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, htmlResponsiveProbe, readOwnedHistoryTitles, visibleHistoryTitle, openCheckInConsole, readOwnedMapEvents, openOwnedMapMarker};

@@ -61,14 +61,16 @@ function createLaunchOperations(admin) {
     }
     const summary = metrics(rows, event.data());
     await root.set({createdAt: stamp(), count: rows.length, summary});
-    let published = false;
-    await db.runTransaction(async (tx) => {
-      const current = await tx.get(stateRef);
+    const published = await db.runTransaction(async (tx) => {
+      const [current, currentEvent] = await Promise.all([tx.get(stateRef), tx.get(event.ref)]);
       const guards = await Promise.all(subjectUids.map((uid) => tx.get(db.collection("account_deletion_jobs").doc(uid))));
-      if (guards.some((guard, index) => guard.exists !== deleting.has(subjectUids[index]))) return;
-      if ((current.get("revision") || 0) !== revision) return;
+      // A build can outlive deletion or replacement of its parent. Comparing
+      // the current snapshot also fences a replacement with the same revision.
+      if (!currentEvent.exists || !currentEvent.updateTime?.isEqual(event.updateTime)) return false;
+      if (guards.some((guard, index) => guard.exists !== deleting.has(subjectUids[index]))) return false;
+      if ((current.get("revision") || 0) !== revision) return false;
       tx.set(stateRef, {generation, revision, ready: true, count: rows.length, summary, updatedAt: stamp()}, {merge: true});
-      published = true;
+      return true;
     });
     if (!published) await db.recursiveDelete(root);
     return published ? {generation, summary, count: rows.length} : null;
@@ -551,20 +553,28 @@ function createLaunchOperations(admin) {
 
   const result = {setEventStaffV1, getEventCapabilitiesV1, listMyAdmissionsV1, listEventRosterV2, previewEventAnnouncementV1, sendEventAnnouncementV1,
     getEventAnnouncementV1, previewEventCancellationV1, cancelEventV1, deleteEmptyEventV1, createEventExportV2, getEventExportV2};
+  async function invalidateRoster(eventId) {
+    // A queued event/admission delivery can outlive the parent and its cleanup.
+    // Read the current parent in the same transaction as the marker write, so
+    // deletion between read and commit retries without recreating an orphan.
+    await db.runTransaction(async (tx) => {
+      const event = await tx.get(db.collection("Events").doc(eventId));
+      if (!event.exists) return;
+      tx.set(db.collection("EventRosters").doc(eventId), {ready: false,
+        revision: admin.firestore.FieldValue.increment(1)}, {merge: true});
+    });
+  }
   result.refreshRosterEvent = onDocumentWritten({document: "Events/{id}", region: "us-central1"}, async (change) => {
-    await db.collection("EventRosters").doc(change.params.id).set({ready: false,
-      revision: admin.firestore.FieldValue.increment(1)}, {merge: true});
+    await invalidateRoster(change.params.id);
   });
   result.refreshRosterCorrection = onDocumentCreated({document: "HistoricalAttendance/{id}/corrections/{correction}", region: "us-central1"}, async (change) => {
     const record = await db.collection("HistoricalAttendance").doc(change.params.id).get();
-    if (record.exists) await db.collection("EventRosters").doc(record.get("eventId")).set({ready: false,
-      revision: admin.firestore.FieldValue.increment(1)}, {merge: true});
+    if (record.exists) await invalidateRoster(record.get("eventId"));
   });
   for (const name of ["RegisterAttendance", "Attendance", "Tickets", "HistoricalAttendance"]) {
     result[`refreshRoster${name}`] = onDocumentWritten({document: `${name}/{id}`, region: "us-central1"}, async (change) => {
       const ids = new Set([change.data?.before.get("eventId"), change.data?.after.get("eventId")].filter(Boolean));
-      for (const id of ids) await db.collection("EventRosters").doc(id).set({ready: false,
-        revision: admin.firestore.FieldValue.increment(1)}, {merge: true});
+      for (const id of ids) await invalidateRoster(id);
     });
   }
   for (const name of ["Customers", "GuestAttendees"]) {
@@ -573,7 +583,7 @@ function createLaunchOperations(admin) {
       for (const source of ["RegisterAttendance", "Tickets"]) {
         for (const doc of await allDocuments(db.collection(source).where(name === "Customers" ? "customerUid" : "guestId", "==", change.params.id))) if (doc.get("eventId")) events.add(doc.get("eventId"));
       }
-      for (const id of events) await db.collection("EventRosters").doc(id).set({ready: false, revision: admin.firestore.FieldValue.increment(1)}, {merge: true});
+      for (const id of events) await invalidateRoster(id);
     });
   }
   result.deliverEventAnnouncement = onDocumentCreated({document: "EventAnnouncements/{id}", region: "us-central1",

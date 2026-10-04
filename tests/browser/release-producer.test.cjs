@@ -6,7 +6,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
 const {files} = require('../../tools/web_release_contract');
-const {validateFixture, allowStagingRequest, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, readOwnedHistoryTitles, visibleHistoryTitle} = require('../../tools/web_release_producers/browser')._test;
+const {validateFixture, allowStagingRequest, scrubBrowserError, pageErrorDiagnostic, createPageErrorRecorder, projectAppCheckError, readAppCheckFailure, createAppCheckErrorRecorder, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, readOwnedHistoryTitles, visibleHistoryTitle} = require('../../tools/web_release_producers/browser')._test;
 const {bindingId} = require('../../functions/communications/qualification-isolation');
 test('browser and Safari use the same insertion-aware computed text scaling and control-boundary probe', () => {
   assert.equal(require('../../tools/web_release_producers/browser')._test.htmlResponsiveProbe,
@@ -21,6 +21,114 @@ function context() {
   for (const role of ['owner', 'attendee', 'unauthorized']) fixture[role] = {uid: role, email: `${runId}-${role}@example.test`, password: 'fixture-password'};
   return {projectId: 'attendus-staging', baseUrl: 'https://attendus-staging.web.app', fixture};
 }
+
+function appCheckResponse(ctx, {status = 403, body, length, url, method = 'POST', pending = false} = {}) {
+  const bytes = Buffer.from(body ?? JSON.stringify({error: {code: 403, status: 'PERMISSION_DENIED'}}));
+  let bodyReads = 0;
+  return {status: () => status, url: () => url ?? `https://content-firebaseappcheck.googleapis.com/v1/projects/${ctx.fixture.firebase.projectId}/apps/${ctx.fixture.firebase.appId}:exchangeRecaptchaEnterpriseToken?key=${ctx.fixture.firebase.apiKey}`,
+    request: () => ({method: () => method}), headerValue: async () => length === undefined ? String(bytes.length) : length,
+    body: async () => {bodyReads++; return pending ? new Promise(() => {}) : bytes;}, reads: () => bodyReads};
+}
+
+test('App Check diagnostics project only fixed Google codes and allowlisted ErrorInfo reasons', () => {
+  const body = JSON.stringify({token: 'PRIVATE_RESPONSE_TOKEN', error: {code: 403, status: 'PERMISSION_DENIED',
+    message: 'PRIVATE_MESSAGE?session=PRIVATE_SESSION', details: [
+      {'@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'SERVICE_DISABLED', domain: 'googleapis.com', metadata: {consumer: 'PRIVATE_CONSUMER'}},
+      {'@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'PRIVATE_UNKNOWN_REASON'},
+      {'@type': 'other-type', reason: 'API_KEY_INVALID'},
+    ]}});
+  const result = projectAppCheckError(403, Buffer.from(body));
+  assert.deepEqual(result, {httpStatus: 403, bodyStatus: 'projected', googleCode: 403, googleStatus: 'PERMISSION_DENIED', errorInfoReasons: ['SERVICE_DISABLED'], unrecognizedErrorInfo: true});
+  assert.equal(JSON.stringify(result).includes('PRIVATE'), false);
+  assert.equal(projectAppCheckError(403, Buffer.from('{bad')).bodyStatus, 'invalid-json');
+  assert.equal(projectAppCheckError(403, Buffer.alloc(16385)).bodyStatus, 'too-large');
+  assert.equal(projectAppCheckError(403, Buffer.from(JSON.stringify({error: {code: 'PRIVATE', status: 'PRIVATE'}}))).googleStatus, null);
+});
+
+test('App Check response reader binds exact endpoint and bounds body length and wait time', async () => {
+  const ctx = context();
+  for (const patch of [{method: 'GET'}, {status: 200}, {url: 'https://evil.test/anything'},
+    {url: `https://firebaseappcheck.googleapis.com/v1/projects/orgami-66nxok/apps/${ctx.fixture.firebase.appId}:exchangeRecaptchaEnterpriseToken?key=${ctx.fixture.firebase.apiKey}`},
+    {url: `https://firebaseappcheck.googleapis.com/v1/projects/attendus-staging/apps/${ctx.fixture.firebase.appId}:exchangeDebugToken?key=${ctx.fixture.firebase.apiKey}`}]) {
+    const response = appCheckResponse(ctx, patch); assert.equal(await readAppCheckFailure(response, ctx), null); assert.equal(response.reads(), 0);
+  }
+  for (const [length, expected] of [[null, 'not-read-missing-length'], ['invalid', 'not-read-invalid-length'], ['16385', 'not-read-too-large']]) {
+    const response = appCheckResponse(ctx, {length}); assert.equal((await readAppCheckFailure(response, ctx)).bodyStatus, expected); assert.equal(response.reads(), 0);
+  }
+  assert.equal((await readAppCheckFailure(appCheckResponse(ctx, {pending: true}), ctx, {timeoutMs: 5})).bodyStatus, 'read-timeout');
+  const stalledHeaders = appCheckResponse(ctx);
+  stalledHeaders.headerValue = () => new Promise(() => {});
+  assert.equal((await readAppCheckFailure(stalledHeaders, ctx, {timeoutMs: 5})).bodyStatus, 'read-timeout');
+  assert.equal(stalledHeaders.reads(), 0);
+  const unavailable = appCheckResponse(ctx);
+  unavailable.body = async () => {throw Error('PRIVATE_REQUEST_TOKEN');};
+  assert.deepEqual(await readAppCheckFailure(unavailable, ctx), {httpStatus: 403, bodyStatus: 'read-unavailable'});
+  const decodedOverflow = appCheckResponse(ctx, {length: '1', body: 'x'.repeat(16385)});
+  assert.equal((await readAppCheckFailure(decodedOverflow, ctx)).bodyStatus, 'too-large');
+  assert.equal((await readAppCheckFailure(appCheckResponse(ctx), ctx)).googleStatus, 'PERMISSION_DENIED');
+});
+
+test('App Check recorder drains pending responses and retains omitted counts without extra requests', async () => {
+  const ctx = context(), recorder = createAppCheckErrorRecorder(ctx);
+  for (let i = 0; i < 53; i++) recorder.observe(appCheckResponse(ctx));
+  await recorder.drain();
+  const snapshot = recorder.snapshot();
+  assert.equal(snapshot.totalCount, 53); assert.equal(snapshot.omittedCount, 3); assert.equal(snapshot.records.length, 50);
+  assert.ok(snapshot.records.every(row => row.httpStatus === 403 && row.googleStatus === 'PERMISSION_DENIED' && Number.isFinite(Date.parse(row.at))));
+  assert.equal(JSON.stringify(snapshot).includes(ctx.fixture.firebase.apiKey), false);
+  assert.equal(JSON.stringify(snapshot).includes('exchangeRecaptchaEnterpriseToken?'), false);
+});
+
+test('page errors retain exact sealed artifact frames and observation context without raw URLs or payloads', () => {
+  const c = context(), artifact = 'releases/fixture/main.dart.js', digest = 'a'.repeat(64);
+  const candidate = {webFiles: {[artifact]: digest}};
+  const error = Object.assign(Error('Null check operator used on a null value'), {stack:
+    'Error: bearer/private payload\n' +
+    `    at secretFunction (https://attendus-staging.web.app/${artifact}?session=secret#token:123:45)\n` +
+    `otherSecret@https://attendus-staging.web.app/${artifact}:124:7\n` +
+    '    at privateAccount (https://foreign.example/secret-path?token=secret:1:2)\n' +
+    '    at unsafe (https://username:password@attendus-staging.web.app/releases/fixture/main.dart.js:3:4)\n' +
+    '    at notSealed (https://attendus-staging.web.app/manage/private-proof:5:6)'});
+  const record = pageErrorDiagnostic(error, {candidate, context: c, errorIndex: 5, contextId: 2, pageId: 3,
+    pageRole: 'owner', engine: 'webkit', observedDuringStep: {gate: 'browser-auth-guest-organizer', sequence: 6},
+    pageUrl: 'https://attendus-staging.web.app/app/event/private-id?session=secret#private', now: 1791129600000});
+  assert.deepEqual(record.frames, [{artifact, sha256: digest, line: 123, column: 45}, {artifact, sha256: digest, line: 124, column: 7}]);
+  assert.equal(record.nullCheckMessage, true); assert.equal(record.errorIndex, 5);
+  assert.equal(record.pageRole, 'owner'); assert.equal(record.contextId, 2); assert.equal(record.pageId, 3);
+  assert.equal(record.engine, 'webkit'); assert.equal(record.routeFamily, '/app/event/:id');
+  assert.deepEqual(record.observedDuringStep, {gate: 'browser-auth-guest-organizer', sequence: 6});
+  assert.equal(record.at, new Date(1791129600000).toISOString());
+  for (const privateText of ['secret', 'username', 'password', 'private-id', 'private-proof', 'foreign.example', 'secretFunction']) {
+    assert.equal(JSON.stringify(record).includes(privateText), false, privateText);
+  }
+});
+
+test('page errors bound stacks and reject unsealed scripts, invalid coordinates and arbitrary context strings', () => {
+  const c = context(), artifact = 'main.dart.js', candidate = {webFiles: {[artifact]: 'b'.repeat(64)}};
+  const error = {name: 'private-error-name', message: 'private-body', stack:
+    `f@https://attendus-staging.web.app/${artifact}:0:1\n` +
+    `f@https://attendus-staging.web.app/${artifact}:99999999999999999999:1\n` +
+    Array.from({length: 100}, (_, i) => `f@https://attendus-staging.web.app/${artifact}:${i + 1}:2`).join('\n')};
+  const options = {candidate, context: c, pageUrl: 'https://attendus-staging.web.app/manage/private-proof?token=secret',
+    pageRole: 'private-role', engine: 'private-engine', observedDuringStep: {gate: 'private-step', sequence: 1}, now: 0};
+  const record = pageErrorDiagnostic(error, options);
+  assert.equal(record.frames.length, 12); assert.equal(record.stackTruncated, true);
+  assert.equal(record.routeFamily, '/manage/:proof'); assert.equal(record.errorName, 'Error');
+  assert.equal(record.pageRole, 'unassigned'); assert.equal(record.engine, 'unknown'); assert.equal(record.observedDuringStep, null);
+  assert.equal(JSON.stringify(record).includes('private'), false);
+  assert.equal(pageErrorDiagnostic(error, {...options, pageUrl: 'https://foreign.example/secret'}).routeFamily, 'outside-staging');
+  assert.deepEqual(pageErrorDiagnostic({message: 'Null check operator used on a null value'}, options).frames, []);
+  assert.equal(pageErrorDiagnostic({stack: 'x'.repeat(70000)}, options).stackTruncated, true);
+});
+
+test('page error recorder retains a sticky count past its bounded evidence capacity', () => {
+  const recorder = createPageErrorRecorder({candidate: {webFiles: {}}, context: context()});
+  for (let i = 0; i < 203; i++) recorder.record(Error('private payload'), {errorIndex: i, now: 0});
+  const result = recorder.snapshot();
+  assert.equal(result.totalCount, 203); assert.equal(result.entries.length, 200); assert.equal(result.omittedCount, 3);
+  assert.equal(result.entries[199].errorIndex, 199);
+  assert.equal(JSON.stringify(result).includes('private payload'), false);
+});
 test('staging evidence rejects real recipients, unowned records and production configuration', () => {
   assert.doesNotThrow(() => validateFixture(context()));
   for (const mutate of [c => c.fixture.owner.email = 'real@example.com', c => c.fixture.owner.uid = 'real-user',
@@ -90,7 +198,7 @@ test('network boundary permits required App Check but blocks cross-project data 
     'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fixture-key',
     'https://firestore.googleapis.com/v1/projects/attendus-staging/databases/(default)/documents',
     'https://firestore.googleapis.com/google.firestore.v1.Firestore/Listen/channel?database=projects%2Fattendus-staging%2Fdatabases%2F(default)',
-    'https://firebaseappcheck.googleapis.com/v1/projects/123/apps/1%3A123%3Aweb%3Afixture:exchangeRecaptchaEnterpriseToken',
+    'https://firebaseappcheck.googleapis.com/v1/projects/123/apps/1%3A123%3Aweb%3Afixture:exchangeRecaptchaEnterpriseToken?key=fixture-key',
     'https://www.google.com/recaptcha/enterprise/anchor?k=public', 'https://recaptchaenterprise.googleapis.com/v1/projects/staging/assessments']) {
     assert.equal(allowStagingRequest(url, 'POST', c), true, url);
   }
@@ -109,6 +217,70 @@ test('CSV evidence counts embedded newlines as one row and preserves escaped quo
   assert.deepEqual(parseCsv('name,answer\r\n"One, Two","line1\nline2"\r\nThree,"He said ""hello"""\r\n'),
     [['name', 'answer'], ['One, Two', 'line1\nline2'], ['Three', 'He said "hello"']]);
   assert.throws(() => parseCsv('name\n"truncated'));
+});
+
+test('actual App Check SDK exchange is bound to the exact staging app, method and key', () => {
+  const c = context();
+  for (const host of ['content-firebaseappcheck.googleapis.com', 'firebaseappcheck.googleapis.com']) {
+    for (const project of ['attendus-staging', '123']) {
+      for (const app of [c.fixture.firebase.appId, encodeURIComponent(c.fixture.firebase.appId)]) {
+        const url = `https://${host}/v1/projects/${project}/apps/${app}:exchangeRecaptchaEnterpriseToken?key=fixture-key`;
+        assert.equal(allowStagingRequest(url, 'POST', c), true);
+        for (const method of ['GET', 'PUT', 'DELETE', 'OPTIONS']) assert.equal(allowStagingRequest(url, method, c), false);
+        for (const bad of [url.replace('fixture-key', 'foreign'), url + '&key=fixture-key', url + '&unexpected=1',
+          url.replace('?key=fixture-key', ''), url.replace(app, '1:999:web:foreign'),
+          url.replace(`/projects/${project}/`, '/projects/foreign/'), url.replace('EnterpriseToken', 'Token'),
+          url.replace(':exchangeRecaptchaEnterpriseToken', ':exchangeDebugToken'), url.replace(':exchangeRecaptchaEnterpriseToken', ':exchangeRecaptchaEnterpriseToken/extra'),
+          url + '#secret', url.replace(host, `user:secret@${host}`), url.replace(host, `${host}:444`),
+          url.replace(host, `${host}.example.test`), url.replace('https:', 'http:')]) {
+          assert.equal(allowStagingRequest(bad, 'POST', c), false);
+        }
+      }
+    }
+  }
+});
+
+test('legacy Auth iframe configuration GET permits only the bound key and SDK cache timestamp', () => {
+  const c = context();
+  const url = 'https://www.googleapis.com/identitytoolkit/v3/relyingparty/getProjectConfig?key=fixture-key';
+  for (const good of [url, url + '&cb=1791100000000']) assert.equal(allowStagingRequest(good, 'GET', c), true);
+  for (const method of ['POST', 'PUT', 'DELETE', 'OPTIONS']) assert.equal(allowStagingRequest(url, method, c), false);
+  for (const bad of [url.replace('fixture-key', 'foreign'), url + '&key=fixture-key', url + '&cb=1&cb=2',
+    url + '&cb=callback', url + '&projectNumber=999', url + '&delegatedProjectNumber=999',
+    url.replace('getProjectConfig', 'getAccountInfo'), url.replace('getProjectConfig', 'getProjectConfig/extra'),
+    url.replace('www.googleapis.com', 'user:secret@www.googleapis.com'), url.replace('.com/', '.com:444/'),
+    url.replace('https:', 'http:'), url + '#secret', url.replace('?key=fixture-key', '')]) {
+    assert.equal(allowStagingRequest(bad, 'GET', c), false);
+  }
+});
+
+test('Maps SDK CSP probe permits only its exact empty GET and csp_test marker', () => {
+  const c = context(); c.fixture.mapsApiKey = 'staging-maps-key';
+  const url = 'https://maps.googleapis.com/maps/api/mapsjs/gen_204';
+  for (const good of [url, url + '?csp_test=true']) assert.equal(allowStagingRequest(good, 'GET', c), true);
+  for (const method of ['POST', 'PUT', 'DELETE', 'OPTIONS']) assert.equal(allowStagingRequest(url, method, c), false);
+  for (const bad of [url + '?csp_test=false', url + '?csp_test=true&csp_test=true', url + '?unexpected=1',
+    url + '?key=staging-maps-key', url + '/extra', url + '#secret', url.replace('https:', 'http:'),
+    url.replace('.com/', '.com:444/'), url.replace('maps.googleapis.com', 'user:secret@maps.googleapis.com'),
+    url.replace('gen_204', 'other')]) assert.equal(allowStagingRequest(bad, 'GET', c), false);
+  delete c.fixture.mapsApiKey;
+  assert.equal(allowStagingRequest(url, 'GET', c), false);
+});
+
+test('browser evidence redacts absolute and scheme-less URL queries, fragments and credentials', () => {
+  const fixture = context().fixture;
+  const secrets = ['userinfo-secret', 'query-secret', 'session-secret', 'fragment-secret', 'opaque-proof-secret-123456789', 'opaque-bearer-secret'];
+  for (const prefix of ['https://', '//', '/']) {
+    const input = `Request failed: ${prefix}user:userinfo-secret@firestore.googleapis.com/v1/projects/staging/databases/(default)/documents?key=query-secret&SID=session-secret#fragment-secret net::ERR_FAILED`;
+    const result = scrubBrowserError(Error(input), fixture);
+    assert.match(result, /Request failed:/); assert.match(result, /net::ERR_FAILED/);
+    assert.match(result, /firestore\.googleapis\.com/);
+    assert.ok(!result.includes('?') && !result.includes('#'));
+    for (const secret of secrets) assert.ok(!result.includes(secret));
+  }
+  const result = scrubBrowserError(Error('/manage/opaque-proof-secret-123456789?key=query-secret#fragment-secret fixture-password Authorization: Bearer opaque-bearer-secret eyJhbGci.fixture.signature'), fixture);
+  for (const secret of [...secrets, fixture.owner.password, 'eyJhbGci.fixture.signature']) assert.ok(!result.includes(secret));
+  assert.equal(scrubBrowserError(Error('Null check operator used on a null value'), fixture), 'Null check operator used on a null value');
 });
 
 test('Safari Auth iframe is read-only and bound to the staging project key and default app', () => {

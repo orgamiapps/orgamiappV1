@@ -9,15 +9,26 @@ import 'package:attendus/widgets/attendus_design_system.dart';
 
 class ManageMembersScreen extends StatefulWidget {
   final String organizationId;
+  final FirebaseFirestore? firestore;
+  final FirebaseAuth? auth;
+  final Future<List<CustomerModel>> Function(List<String> userIds)?
+  loadProfiles;
 
-  const ManageMembersScreen({super.key, required this.organizationId});
+  const ManageMembersScreen({
+    super.key,
+    required this.organizationId,
+    this.firestore,
+    this.auth,
+    this.loadProfiles,
+  });
 
   @override
   State<ManageMembersScreen> createState() => _ManageMembersScreenState();
 }
 
 class _ManageMembersScreenState extends State<ManageMembersScreen> {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  late final FirebaseFirestore _db =
+      widget.firestore ?? FirebaseFirestore.instance;
   final TextEditingController _searchController = TextEditingController();
   String _selectedFilter = 'all';
   String _searchQuery = '';
@@ -46,7 +57,7 @@ class _ManageMembersScreenState extends State<ManageMembersScreen> {
   }
 
   Future<void> _checkCurrentUserRole() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = (widget.auth ?? FirebaseAuth.instance).currentUser;
     if (user == null) return;
 
     _currentUserId = user.uid;
@@ -144,9 +155,15 @@ class _ManageMembersScreenState extends State<ManageMembersScreen> {
 
                       final members = snapshot.data!.docs;
                       return FutureBuilder<List<CustomerModel>>(
-                        future: FirebaseFirestoreHelper().getUsersByIds(
-                          userIds: members.map((member) => member.id).toList(),
-                        ),
+                        future:
+                            widget.loadProfiles?.call(
+                              members.map((member) => member.id).toList(),
+                            ) ??
+                            FirebaseFirestoreHelper().getUsersByIds(
+                              userIds: members
+                                  .map((member) => member.id)
+                                  .toList(),
+                            ),
                         builder: (context, profilesSnapshot) {
                           if (profilesSnapshot.connectionState ==
                               ConnectionState.waiting) {
@@ -288,7 +305,7 @@ class _ManageMembersScreenState extends State<ManageMembersScreen> {
       final data = member.value;
       final name = (data['name']?.toString() ?? '').toLowerCase();
       final username = (data['username']?.toString() ?? '').toLowerCase();
-      final role = data['role']?.toString() ?? 'member';
+      final role = (data['role']?.toString() ?? 'member').toLowerCase();
       final status = data['status']?.toString() ?? 'approved';
 
       // Filter by search query
@@ -324,7 +341,7 @@ class _ManageMembersScreenState extends State<ManageMembersScreen> {
 
   Widget _buildMemberCard(String memberId, Map<String, dynamic> data) {
     final name = data['name']?.toString() ?? 'Unknown';
-    final role = data['role']?.toString() ?? 'member';
+    final role = (data['role']?.toString() ?? 'member').toLowerCase();
     final status = data['status']?.toString() ?? 'approved';
     final joinedAt = (data['joinedAt'] as Timestamp?)?.toDate();
     final profilePictureUrl = data['profilePictureUrl']?.toString();
@@ -402,7 +419,7 @@ class _ManageMembersScreenState extends State<ManageMembersScreen> {
   // ignore: unused_element
   Widget _buildLegacyMemberCard(String memberId, Map<String, dynamic> data) {
     final name = data['name']?.toString() ?? 'Unknown';
-    final role = data['role']?.toString() ?? 'member';
+    final role = (data['role']?.toString() ?? 'member').toLowerCase();
     final status = data['status']?.toString() ?? 'approved';
     final joinedAt = (data['joinedAt'] as Timestamp?)?.toDate();
     final profilePictureUrl = data['profilePictureUrl']?.toString();
@@ -566,7 +583,7 @@ class _ManageMembersScreenState extends State<ManageMembersScreen> {
   }
 
   List<PopupMenuEntry<String>> _buildMemberActions(Map<String, dynamic> data) {
-    final role = data['role']?.toString() ?? 'member';
+    final role = (data['role']?.toString() ?? 'member').toLowerCase();
     final status = data['status']?.toString() ?? 'approved';
     final isAdmin = role == 'admin' || role == 'owner';
     final isOwner = role == 'owner';
