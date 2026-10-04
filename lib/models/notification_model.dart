@@ -158,7 +158,8 @@ class UserNotificationSettings {
       generalNotifications: map['generalNotifications'] ?? true,
       eventChanges: map['eventChanges'] ?? true,
       geofenceCheckIn: map['geofenceCheckIn'] ?? true,
-      messagesAll: map['messagesAll'] ?? true,
+      messagesAll:
+          (map['messagesAll'] ?? true) && map['messageNotifications'] != false,
       messageMentions: map['messageMentions'] ?? true,
       organizationUpdates: map['organizationUpdates'] ?? true,
       organizerFeedback: map['organizerFeedback'] ?? true,

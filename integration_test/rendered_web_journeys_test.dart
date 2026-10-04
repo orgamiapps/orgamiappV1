@@ -7,16 +7,20 @@ import 'package:attendus/Services/guest_mode_service.dart';
 import 'package:attendus/Services/subscription_service.dart';
 import 'package:attendus/Utils/theme_provider.dart';
 import 'package:attendus/firebase_options.dart';
+import 'package:attendus/firebase/firebase_messaging_helper.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:attendus/models/event_wizard_model.dart';
 import 'package:attendus/screens/Authentication/login_screen.dart';
 import 'package:attendus/screens/Events/Attendance/check_in_console_screen.dart';
 import 'package:attendus/screens/Events/event_creation_wizard_screen.dart';
 import 'package:attendus/screens/Home/account_details_screen.dart';
+import 'package:attendus/screens/Home/account_details_screen_v2.dart';
+import 'package:attendus/screens/Home/notification_settings_screen.dart';
 import 'package:attendus/widgets/auth_gate.dart';
 import 'package:attendus/widgets/public_registration_card.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -171,6 +175,25 @@ void main() {
       expect(find.text('Enter a valid email address.'), findsOneWidget);
       expect(FirebaseAuth.instance.currentUser?.uid, guestUid);
       await loginThroughForm(tester, owner);
+      final profileRef = FirebaseFirestore.instance
+          .collection('Customers')
+          .doc(owner['uid'] as String);
+      final preferencesRef = FirebaseFirestore.instance.doc(
+        'users/${owner['uid']}/settings/notifications',
+      );
+      final createdAt = Timestamp(1700000000, 123456000);
+      await profileRef.update({
+        'favorites': ['loaded-legacy-event'],
+        'isDiscoverable': true,
+        'bio': 'Loaded profile text',
+        'createdAt': createdAt,
+      });
+      await preferencesRef.set({
+        'messagesAll': true,
+        'eventReminders': true,
+        'generalNotifications': true,
+        'futurePreference': 'preserve',
+      });
       unawaited(
         application.appNavigatorKey.currentState!.push(
           MaterialPageRoute<void>(builder: (_) => const AccountDetailsScreen()),
@@ -188,6 +211,18 @@ void main() {
             .isNotEmpty,
         'Owner account editor',
       );
+      // Mutate the server after the actual editor has loaded. Its cached
+      // untouched fields must not replace another session's newer values.
+      await profileRef.update({
+        'favorites': ['newer-legacy-event'],
+        'isDiscoverable': false,
+        'bio': 'Newer profile text',
+      });
+      await preferencesRef.update({
+        'messagesAll': false,
+        'eventReminders': false,
+        'generalNotifications': false,
+      });
       await tester.enterText(
         find.byWidgetPredicate(
           (widget) =>
@@ -211,7 +246,116 @@ void main() {
           .get(const GetOptions(source: Source.server));
       expect(profile.get('name'), 'UI Updated Organizer');
       expect(profile.get('eventsCreated'), 0);
+      expect(profile.get('favorites'), ['newer-legacy-event']);
+      expect(profile.get('isDiscoverable'), false);
+      expect(profile.get('bio'), 'Newer profile text');
+      expect(profile.get('createdAt'), createdAt);
+      final preferences = await preferencesRef.get(
+        const GetOptions(source: Source.server),
+      );
+      expect(preferences.get('messagesAll'), false);
+      expect(preferences.get('eventReminders'), false);
+      expect(preferences.get('generalNotifications'), false);
+      expect(preferences.get('futurePreference'), 'preserve');
       await binding.takeScreenshot('owner-profile-saved');
+      expect(tester.takeException(), isNull);
+      await until(
+        tester,
+        () => find
+            .byType(AccountDetailsScreen, skipOffstage: false)
+            .evaluate()
+            .isEmpty,
+        'Legacy editor completed navigation',
+      );
+      unawaited(
+        application.appNavigatorKey.currentState!.push(
+          MaterialPageRoute<void>(
+            builder: (_) => const AccountDetailsScreenV2(),
+          ),
+        ),
+      );
+      final v2Name = find.widgetWithText(TextFormField, 'Full Name');
+      await until(
+        tester,
+        () => v2Name.evaluate().length == 1,
+        'Current account editor loaded',
+      );
+      expect(
+        tester.widget<TextFormField>(v2Name).controller!.text,
+        'UI Updated Organizer',
+        reason: 'Reopening preserves the saved name over Auth displayName',
+      );
+      await profileRef.update({
+        'favorites': ['newest-legacy-event'],
+        'bio': 'Newest profile text',
+      });
+      await tester.enterText(v2Name, 'UI Current Editor Organizer');
+      await tapText(tester, 'Save Changes');
+      await until(
+        tester,
+        () => find.text('Save Changes').evaluate().isNotEmpty,
+        'Current editor save and server refresh completed',
+      );
+      final current = await profileRef.get(
+        const GetOptions(source: Source.server),
+      );
+      expect(current.get('name'), 'UI Current Editor Organizer');
+      expect(current.get('favorites'), ['newest-legacy-event']);
+      expect(current.get('bio'), 'Newest profile text');
+      expect(current.get('isDiscoverable'), false);
+      expect(current.get('createdAt'), createdAt);
+      await binding.takeScreenshot('current-profile-preserved');
+      expect(tester.takeException(), isNull);
+      final permissionBefore = await FirebaseMessaging.instance
+          .getNotificationSettings();
+      expect(
+        permissionBefore.authorizationStatus,
+        isNot(
+          anyOf(
+            AuthorizationStatus.authorized,
+            AuthorizationStatus.provisional,
+          ),
+        ),
+        reason: 'Fresh fixture browser has not granted push permission',
+      );
+      unawaited(
+        application.appNavigatorKey.currentState!.push(
+          MaterialPageRoute<void>(
+            builder: (_) => const NotificationSettingsScreen(),
+          ),
+        ),
+      );
+      final sound = find.widgetWithText(SwitchListTile, 'Sound');
+      await until(
+        tester,
+        () => sound.evaluate().length == 1,
+        'Account notification preferences loaded',
+      );
+      expect(tester.widget<SwitchListTile>(sound).onChanged, isNotNull);
+      expect(tester.widget<SwitchListTile>(sound).value, true);
+      await tapText(tester, 'Sound');
+      await until(
+        tester,
+        () => FirebaseMessagingHelper().settings?.soundEnabled == false,
+        'Sound preference acknowledged without push permission',
+      );
+      final savedPreferences = await preferencesRef.get(
+        const GetOptions(source: Source.server),
+      );
+      expect(savedPreferences.data(), {
+        'messagesAll': false,
+        'eventReminders': false,
+        'generalNotifications': false,
+        'futurePreference': 'preserve',
+        'soundEnabled': false,
+      });
+      final permissionAfter = await FirebaseMessaging.instance
+          .getNotificationSettings();
+      expect(
+        permissionAfter.authorizationStatus,
+        permissionBefore.authorizationStatus,
+      );
+      await binding.takeScreenshot('preferences-without-push-permission');
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();

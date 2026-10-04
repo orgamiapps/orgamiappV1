@@ -22,6 +22,7 @@ class AuthService extends ChangeNotifier {
   factory AuthService() => _instance;
   AuthService._internal()
     : _authOverride = null,
+      _firestoreOverride = null,
       _storageOverride = null,
       _loadCustomerOverride = null,
       _initializeFirebaseOverride = null,
@@ -33,10 +34,12 @@ class AuthService extends ChangeNotifier {
     required FirebaseAuth auth,
     required FlutterSecureStorage storage,
     required Future<CustomerModel?> Function(String) loadCustomer,
+    FirebaseFirestore? firestore,
     Future<void> Function()? initializeFirebase,
     Future<void> Function()? onAuthenticatedSession,
     Future<void> Function()? onLogout,
   }) : _authOverride = auth,
+       _firestoreOverride = firestore,
        _storageOverride = storage,
        _loadCustomerOverride = loadCustomer,
        _initializeFirebaseOverride = initializeFirebase,
@@ -44,12 +47,15 @@ class AuthService extends ChangeNotifier {
        _onLogoutOverride = onLogout;
 
   final FirebaseAuth? _authOverride;
+  final FirebaseFirestore? _firestoreOverride;
   final FlutterSecureStorage? _storageOverride;
   final Future<CustomerModel?> Function(String)? _loadCustomerOverride;
   final Future<void> Function()? _initializeFirebaseOverride;
   final Future<void> Function()? _onAuthenticatedSessionOverride;
   final Future<void> Function()? _onLogoutOverride;
   FirebaseAuth get _auth => _authOverride ?? FirebaseAuth.instance;
+  FirebaseFirestore get _profileFirestore =>
+      _firestoreOverride ?? FirebaseFirestore.instance;
   FlutterSecureStorage get _storage => _storageOverride ?? _secureStorage;
   StreamSubscription<User?>? _authSubscription;
   int _authRevision = 0;
@@ -668,8 +674,11 @@ class AuthService extends ChangeNotifier {
         // Defer profile updates to background (non-blocking)
         Future.microtask(() async {
           try {
-            await _updateExistingUserProfile(userData, profileData);
-            Logger.info('Background profile update completed');
+            final refreshed = await _updateExistingUserProfile(
+              userData,
+              profileData,
+            );
+            if (refreshed) Logger.info('Background profile update completed');
           } catch (e) {
             Logger.warning('Background profile update failed: $e');
             // Non-critical, don't block login
@@ -747,12 +756,7 @@ class AuthService extends ChangeNotifier {
       Logger.info('Profile data to use for update: ${profileData.keys}');
 
       // Update the existing user profile
-      await _updateExistingUserProfile(currentCustomer, profileData);
-
-      Logger.info(
-        'Successfully completed manual profile update from Firebase Auth',
-      );
-      return true;
+      return await _updateExistingUserProfile(currentCustomer, profileData);
     } catch (e) {
       Logger.error('Error updating current user profile from auth', e);
       return false;
@@ -997,100 +1001,57 @@ class AuthService extends ChangeNotifier {
 
   /// Update existing user profile with any new information from social login
   /// Optimized to avoid blocking reload operations
-  Future<void> _updateExistingUserProfile(
+  Future<bool> _updateExistingUserProfile(
     CustomerModel existingUser,
     Map<String, dynamic> profileData,
   ) async {
     try {
-      Map<String, dynamic> updates = {};
       final user = profileData['user'] as User;
       final revision = _authRevision;
-      if (!_isCurrent(user, revision) || existingUser.uid != user.uid) return;
-
-      Logger.info('=== PROFILE UPDATE (Background) ===');
-      Logger.info('Current customer name: "${existingUser.name}"');
-      Logger.info('Profile data fullName: "${profileData['fullName']}"');
-      Logger.info('Profile data keys: ${profileData.keys}');
-
-      // Always try to get the best name available
-      String? bestName;
-
-      // Priority 1: fullName from profile data (from Google/Apple)
-      if (profileData.containsKey('fullName') &&
-          profileData['fullName'] != null &&
-          profileData['fullName'].toString().trim().isNotEmpty) {
-        bestName = profileData['fullName'].toString().trim();
-        Logger.info('Using fullName from profile data: "$bestName"');
+      if (!_isCurrent(user, revision) || existingUser.uid != user.uid) {
+        return false;
       }
-      // Priority 2: Current Firebase Auth displayName (no reload needed)
-      else if (user.displayName != null &&
-          user.displayName!.trim().isNotEmpty) {
-        bestName = user.displayName!.trim();
-        Logger.info('Using Firebase displayName: "$bestName"');
-      }
-
-      // Update name if we found a better one or current one needs improvement
-      bool needsNameUpdate =
-          _shouldUpdateName(existingUser) ||
-          (bestName != null &&
-              bestName != existingUser.name &&
-              bestName.length > existingUser.name.length &&
-              !bestName.contains('@'));
-
-      if (needsNameUpdate && bestName != null) {
-        final oldName = existingUser.name;
-        updates['name'] = bestName;
-        existingUser.name = bestName;
-        Logger.info('✅ Updating name from "$oldName" to "$bestName"');
-      } else {
-        Logger.info('Name update not needed or no better name found');
-      }
-
-      // Update phone number if it's empty and available from profile
-      if (existingUser.phoneNumber == null &&
-          profileData.containsKey('phoneNumber') &&
-          profileData['phoneNumber'] != null &&
-          profileData['phoneNumber'].toString().trim().isNotEmpty) {
-        updates['phoneNumber'] = profileData['phoneNumber'].toString().trim();
-        existingUser.phoneNumber = profileData['phoneNumber'].toString().trim();
-      }
-
-      // Ensure profile picture URL is preserved from Firebase Auth if missing
-      if ((existingUser.profilePictureUrl == null ||
-              existingUser.profilePictureUrl!.isEmpty) &&
-          user.photoURL != null &&
-          user.photoURL!.isNotEmpty) {
-        updates['profilePictureUrl'] = user.photoURL;
-        existingUser.profilePictureUrl = user.photoURL;
-      }
-
-      // Apply updates to Firestore if any (with timeout)
-      if (updates.isNotEmpty) {
-        await FirebaseFirestore.instance
-            .collection(CustomerModel.firebaseKey)
-            .doc(existingUser.uid)
-            .update(updates)
-            .timeout(
-              const Duration(seconds: 5),
-              onTimeout: () {
-                Logger.warning('Profile update to Firestore timed out');
-              },
+      final suppliedName = profileData['fullName']?.toString().trim();
+      final name = suppliedName?.isNotEmpty == true
+          ? suppliedName
+          : user.displayName;
+      final reference = _profileFirestore
+          .collection(CustomerModel.firebaseKey)
+          .doc(user.uid);
+      // Auth may fill absent data, but never replace a saved profile or use a
+      // stale cached absence as permission to overwrite another session.
+      await _profileFirestore
+          .runTransaction((transaction) async {
+            final document = await transaction.get(reference);
+            if (!_isCurrent(user, revision)) {
+              throw StateError('Account changed');
+            }
+            if (!document.exists) throw StateError('Profile is unavailable');
+            final updates = CustomerModel.missingAuthProfileFields(
+              CustomerModel.fromFirestore(document),
+              name: name,
+              phoneNumber: profileData['phoneNumber']?.toString(),
+              profilePictureUrl: user.photoURL,
             );
-
-        Logger.info(
-          'Updated existing user profile with: ${updates.keys.join(', ')}',
-        );
-      } else {
-        Logger.info('No profile updates needed for existing user');
-      }
-
-      // Update the controller with the latest data
-      if (!_isCurrent(user, revision)) return;
-      CustomerController.logeInCustomer = existingUser;
+            if (updates.isNotEmpty) transaction.update(reference, updates);
+          })
+          .timeout(const Duration(seconds: 5));
+      if (!_isCurrent(user, revision)) return false;
+      // A timeout is an unknown outcome, not an acknowledgement. Only a fresh
+      // post-commit read can replace this account's shared cached model.
+      final refreshed = await reference
+          .get(const GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 5));
+      if (!_isCurrent(user, revision) || !refreshed.exists) return false;
+      CustomerController.logeInCustomer = CustomerModel.fromFirestore(
+        refreshed,
+      );
       notifyListeners();
+      return true;
     } catch (e) {
       Logger.error('Error updating existing user profile', e);
       // Don't rethrow as this is not critical for login success
+      return false;
     }
   }
 
@@ -1140,8 +1101,7 @@ class AuthService extends ChangeNotifier {
         }
 
         // Force update the profile
-        await _updateExistingUserProfile(currentCustomer, profileData);
-        return true;
+        return await _updateExistingUserProfile(currentCustomer, profileData);
       }
 
       return false;
