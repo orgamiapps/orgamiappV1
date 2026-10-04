@@ -13,7 +13,7 @@ function candidate(environment = "staging") {
   const value = {schemaVersion: 1, sourceSha, candidateRunId: "123", environment, projectId: c.PROJECTS[environment], releaseId: hash,
     sourceFiles: {"tools/web_release_producers/backend.js": hash, "tools/web_release_producers/browser.js": hash, "tools/web_release_producers/operations.js": hash, "tools/web_release_producers/safari.js": hash},
     webFiles: {"index.html": hash, [`releases/${hash}/main.dart.js`]: hash, "firebase-messaging-sw.js": hash},
-    deployment: {functions: ["triggerAIInsights", "triggerAIInsightsV2"], deleteFunctions: [], firebaseConfigSha256: hash, firestoreRulesSha256: hash, storageRulesSha256: hash,
+    deployment: {functions: ["triggerAIInsights", "triggerAIInsightsV2"], deleteFunctions: [], retryAcknowledgements: [], firebaseConfigSha256: hash, firestoreRulesSha256: hash, storageRulesSha256: hash,
       triggerTransition: {legacy: {name: "triggerAIInsights", eventType: "google.cloud.firestore.document.v1.updated"}, replacement: {name: "triggerAIInsightsV2", eventType: "google.cloud.firestore.document.v1.written"}}},
     predecessor: {production: {hostingVersion: "sites/orgami-66nxok/versions/prior"}, staging: {hostingVersion: "sites/attendus-staging/versions/prior"}}};
   value.sourceManifestSha256 = c.digest(value.sourceFiles); value.webSha256 = c.digest(value.webFiles); value.deploymentSha256 = c.digest(value.deployment);
@@ -42,6 +42,12 @@ function fixture() {
 test("one frozen candidate qualifies only with every gate and continuous post-close observations", () => {
   const f = fixture(); const receipt = c.qualify(f.value, f.production, f.deployment, f.reports, f.now);
   assert.equal(receipt.sourceSha, sourceSha); assert.equal(receipt.requiredGates.length, 13);
+});
+test("candidate must retain its explicitly reviewed retry acknowledgement manifest", () => {
+  const value = candidate();
+  delete value.deployment.retryAcknowledgements;
+  value.deploymentSha256 = c.digest(value.deployment);
+  assert.throws(() => c.validateCandidate(value, "staging"), /retry acknowledgements/);
 });
 test("elapsed time alone, missing gate and unresolved journey blockers cannot qualify", () => {
   for (const modify of [

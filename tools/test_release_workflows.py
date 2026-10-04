@@ -79,6 +79,8 @@ def validate(workflows):
             raise ValueError("Producer contracts require locked browser dependencies before execution")
         if "../tools/bridge_web_assets.test.js" not in runs(jobs["functions"]):
             raise ValueError("Immutable Hosting bridge contracts must run before qualification")
+        if "../tools/deploy_web_functions.test.js" not in runs(jobs["functions"]):
+            raise ValueError("Scoped Functions deployment guard tests must run before qualification")
     for filename, workflow in workflows.items():
         jobs = workflow["jobs"]
         for name, job in jobs.items():
@@ -148,6 +150,8 @@ def validate(workflows):
         raise ValueError("Production requires protected environment, provenance and predecessor")
     if not any(step.get("uses", "").startswith("actions/upload-artifact@") and step.get("if") == "always()" and "hosting-asset-bridge.json" in step.get("with", {}).get("path", "") for step in promotion.get("steps", [])):
         raise ValueError("Failed or successful Hosting bridge receipts must be retained")
+    if not any(step.get("uses", "").startswith("actions/upload-artifact@") and step.get("if") == "always()" and "function-deployment-plan.json" in step.get("with", {}).get("path", "") for step in promotion.get("steps", [])):
+        raise ValueError("Scoped Functions deployment plan receipts must be retained")
     collector = workflows["web-release-observe.yml"]
     collect = collector["jobs"]["collect"]
     if "post-close-replay" not in collector["on"]["workflow_dispatch"]["inputs"]["gates"]["options"]:
@@ -262,6 +266,20 @@ class ReleaseWorkflowTests(unittest.TestCase):
                 if step.get("uses", "").startswith("actions/upload-artifact@"):
                     step["with"]["path"] = step["with"]["path"].replace("build/web-promotion/hosting-asset-bridge.json", "")
         self.mutate(remove_receipt, "bridge receipts")
+
+    def test_scoped_function_deployment_checks_and_receipts_are_required(self):
+        for filename in ["quality.yml", "web-quality.yml"]:
+            def remove(w):
+                for step in w[filename]["jobs"]["functions"]["steps"]:
+                    if "run" in step:
+                        step["run"] = step["run"].replace("../tools/deploy_web_functions.test.js", "")
+            self.mutate(remove, "Scoped Functions deployment guard")
+
+        def remove_receipt(w):
+            for step in w["web-release-promote.yml"]["jobs"]["promote"]["steps"]:
+                if step.get("uses", "").startswith("actions/upload-artifact@"):
+                    step["with"]["path"] = step["with"]["path"].replace("build/web-promotion/function-deployment-plan.json", "")
+        self.mutate(remove_receipt, "Scoped Functions deployment plan receipts")
 
     def test_browser_producer_dependencies_precede_contract_tests(self):
         for filename in ["quality.yml", "web-quality.yml"]:

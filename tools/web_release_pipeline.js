@@ -109,6 +109,8 @@ async function deploy(candidate, bundle, expectedState, output) {
   c.validateArtifact(candidate, root, path.join(bundle, "web"));
   const before = await captureState(candidate.projectId);
   if (c.digest(before.state) !== c.digest(expectedState)) throw Error("Prior deployment changed; prepare and qualify a new candidate");
+  if (candidate.environment === "staging") require("./rehearse_web_backend").validateArchives(
+      read(path.join(root, "config/web_backend_predecessor_archives.json")), before.state);
   assets.planBridge(candidate, path.join(bundle, "web"), expectedState);
   const rulesRoot = materializeRules(candidate);
   const configuration = read(path.join(rulesRoot, "firebase.json"));
@@ -124,9 +126,9 @@ async function deploy(candidate, bundle, expectedState, output) {
   configuration.firestore.rules = path.join(rulesRoot, "firestore.rules"); configuration.firestore.indexes = path.join(rulesRoot, "firestore.indexes.json");
   configuration.storage.rules = path.join(rulesRoot, "storage.rules");
   const configPath = path.join(root, "build", `frozen-firebase-${candidate.environment}.json`); write(configPath, configuration);
-  function deployStep(name, selectors) {
+  function deployStep(name, selectors, execute = null) {
     let result;
-    try { result = firebase(["deploy", "--config", configPath, "--project", candidate.projectId, "--only", selectors, "--non-interactive"]); }
+    try { result = execute ? execute() : firebase(["deploy", "--config", configPath, "--project", candidate.projectId, "--only", selectors, "--non-interactive"]); }
     catch (error) { result = String(error.stdout || "Deployment failed; consult the workflow's standard error output."); throw error; }
     finally {
       const safeOutput = String(result || "").replace(/(authorization\s*[:=]\s*|Bearer\s+)[^\s]+/gi, "$1[REDACTED]").replace(/([?&](?:token|access_token|key)=)[^\s&]+/gi, "$1[REDACTED]");
@@ -145,7 +147,13 @@ async function deploy(candidate, bundle, expectedState, output) {
   execFileSync(process.execPath, ["tools/verify_firestore_indexes.js", candidate.projectId, "1800"], {cwd: root, stdio: "inherit"});
   execFileSync(process.execPath, ["tools/check_function_secrets.js", candidate.projectId], {cwd: root, stdio: "inherit"});
   assets.assertBridgeState(await assets.currentHosting(candidate.projectId, await require("./web_release_state").googleClient()), bridge);
-  deployStep("functions", candidate.deployment.functions.map((name) => `functions:${name}`).join(","));
+  const functionCandidate = path.join(root, "build", `frozen-function-candidate-${candidate.environment}.json`);
+  const functionPredecessor = path.join(root, "build", `frozen-function-predecessor-${candidate.environment}.json`);
+  write(functionCandidate, candidate); write(functionPredecessor, before.state);
+  deployStep("functions", null, () => execFileSync(process.execPath,
+      ["tools/deploy_web_functions.js", functionCandidate, configPath, functionPredecessor,
+        path.join(path.dirname(output), "function-deployment-plan.json")],
+      {cwd: root, encoding: "utf8", maxBuffer: 20 * 1024 * 1024, stdio: ["ignore", "pipe", "inherit"]}));
   const backendState = verifyState(candidate, await captureState(candidate.projectId), read(path.join(root, "firestore.indexes.json")));
   assets.assertBridgeState(backendState.state, bridge);
   if (candidate.environment === "staging") {
