@@ -65,3 +65,11 @@ The final local harness source receipt is `build/web-browser-qualification-20261
 ## Remaining acceptance gates
 
 Exact staged artifact cold/warm bootstrap, real App Check configuration, actual previous staging cache migration, signed cloud CSV download/expiry, the protected fixture pilot, release observation and rollback require their executable staging reports. The local rendered suite deliberately cannot prove them. Browser engines on Windows do not prove physical iPhone Safari, installed PWA, native notifications, native camera, or device permission behavior. Those remain explicit limitations outside this web-only scope.
+
+## Production packaging isolation follow-up
+
+Candidate run `37186986949` failed before deployment because production `main.dart.js` retained three staging public-link origins from the runtime `PublicLinkConfiguration.forEnvironment` factory. The isolated local production build reproduced those exact constants; it contained no staging sender ID or Firebase API key. The strict configuration CLI correctly rejected it. `AppConstants.publicLinks` now selects shared production/staging constants directly using the compile-time environment; the injected factory and validated emulator path retain their behavior. The guard in `tools/configure_web_environment.dart` is unchanged.
+
+Full production and staging release outputs built with synthetic public keys pass the unchanged CLI on fresh copies; the preserved pre-fix output fails. Evidence is `build/web-browser-qualification-20261004/web-environment-isolation-proof.json` and the matching `*-isolation-*.log` files. These synthetic-key outputs are configuration verification artifacts only and must never be deployed or substituted for a candidate. The prior local 316-test/five-journey verdict predates this narrow packaging repair; the next immutable candidate requires fresh CI.
+
+Follow-up validation: 30 executable CLI isolation regressions and nine production public-link tests passed together (39/39); the same nine link tests passed separately under staging and emulator compile-time defines. Whole main analysis is clean, and the three affected Dart files are formatted unchanged. Logs: `web-environment-tests-production.log`, `web-environment-tests-staging.log`, `web-environment-tests-emulator.log` and `web-environment-analyze.log` in the same evidence directory.

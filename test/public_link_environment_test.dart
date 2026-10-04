@@ -59,6 +59,19 @@ void main() {
       AppConstants.publicWebDomain,
       environments[DefaultFirebaseOptions.environment],
     );
+    final selected = PublicLinkConfiguration.forEnvironment(
+      DefaultFirebaseOptions.environment,
+      debug: true,
+    );
+    expect(AppConstants.publicLinks.acceptedOrigins, selected.acceptedOrigins);
+    for (final entry in environments.entries) {
+      final uri = Uri.parse('${entry.value}/event/shared-id');
+      expect(
+        EventShareService.eventIdFromUri(uri),
+        entry.key == DefaultFirebaseOptions.environment ? 'shared-id' : isNull,
+        reason: 'Default parser must remain bound to the compiled environment',
+      );
+    }
   });
   test(
     'staging accepts its secondary Hosting hostname without changing canonical links',

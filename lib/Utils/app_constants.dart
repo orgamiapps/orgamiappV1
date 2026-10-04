@@ -9,6 +9,15 @@ class PublicLinkConfiguration {
   final String canonicalOrigin;
   final Set<String> acceptedOrigins;
 
+  static const _production = PublicLinkConfiguration._('https://attendus.app', {
+    'https://attendus.app',
+  });
+  static const _staging =
+      PublicLinkConfiguration._('https://attendus-staging.web.app', {
+        'https://attendus-staging.web.app',
+        'https://attendus-staging.firebaseapp.com',
+      });
+
   factory PublicLinkConfiguration.forEnvironment(
     String environment, {
     String emulatorPublicOrigin = 'http://127.0.0.1:4173',
@@ -16,17 +25,9 @@ class PublicLinkConfiguration {
   }) {
     switch (environment) {
       case 'production':
-        return const PublicLinkConfiguration._('https://attendus.app', {
-          'https://attendus.app',
-        });
+        return _production;
       case 'staging':
-        return const PublicLinkConfiguration._(
-          'https://attendus-staging.web.app',
-          {
-            'https://attendus-staging.web.app',
-            'https://attendus-staging.firebaseapp.com',
-          },
-        );
+        return _staging;
       case 'emulator':
         final uri = Uri.tryParse(emulatorPublicOrigin);
         if (!debug ||
@@ -86,16 +87,22 @@ class AppConstants {
     defaultValue: '',
   );
 
-  // Public web/deep-link configuration.
+  // Select release constants here so dart2js can discard the other environment's
+  // origins. The runtime factory remains available for injected configurations
+  // and the validated debug-only emulator origin.
   static final PublicLinkConfiguration publicLinks =
-      PublicLinkConfiguration.forEnvironment(
-        DefaultFirebaseOptions.environment,
-        emulatorPublicOrigin: const String.fromEnvironment(
-          'ATTENDUS_EMULATOR_PUBLIC_ORIGIN',
-          defaultValue: 'http://127.0.0.1:4173',
-        ),
-        debug: kDebugMode,
-      );
+      DefaultFirebaseOptions.environment == 'production'
+      ? PublicLinkConfiguration._production
+      : DefaultFirebaseOptions.environment == 'staging'
+      ? PublicLinkConfiguration._staging
+      : PublicLinkConfiguration.forEnvironment(
+          DefaultFirebaseOptions.environment,
+          emulatorPublicOrigin: const String.fromEnvironment(
+            'ATTENDUS_EMULATOR_PUBLIC_ORIGIN',
+            defaultValue: 'http://127.0.0.1:4173',
+          ),
+          debug: kDebugMode,
+        );
   static String get publicWebDomain => publicLinks.canonicalOrigin;
   static const String stripeReturnUrl = 'attendus://callback';
   static const String stripeMerchantDisplayName = 'Attendus';
