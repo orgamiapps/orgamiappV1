@@ -162,7 +162,9 @@ async function deploy(candidate, bundle, expectedState, output) {
     // The same strict pre-fixture check also runs immediately before and during
     // rollback. Check here before materialization, CLI preparation (which may
     // enable APIs), or any Hosting/rules/Functions deployment can change state.
-    const checks = await rehearsal.assertEmpty(await require("./web_release_state").googleClient());
+    const checks = await rehearsal.assertEmpty(await require("./web_release_state").googleClient(), {
+      retiredManifest: require("./retired_web_qualification").loadManifest(candidate),
+    });
     write(path.join(path.dirname(output), "staging-empty-prerequisite.json"), {
       schemaVersion: 1, kind: "staging-empty-prerequisite", environment: "staging", projectId: candidate.projectId,
       sourceSha: candidate.sourceSha, candidateRunId: candidate.candidateRunId, candidateSha256: c.digest(candidate),

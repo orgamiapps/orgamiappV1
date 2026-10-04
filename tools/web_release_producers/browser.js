@@ -47,7 +47,9 @@ function validateFixture(context) {
 }
 
 function allowStagingRequest(value, method, context, headers = {}) {
-  const url = new URL(value), fixture = context.fixture;
+  let url;
+  try {url = new URL(value);} catch {return false;}
+  const fixture = context.fixture;
   if (['data:', 'blob:', 'about:'].includes(url.protocol)) return true;
   if (url.origin === context.baseUrl) return true;
   if (url.protocol !== 'https:') return false;
@@ -82,6 +84,17 @@ function allowStagingRequest(value, method, context, headers = {}) {
       [...url.searchParams.keys()].length === 1 && url.searchParams.get('le') === 'scs';
   }
   if (url.hostname === 'us-central1-attendus-staging.cloudfunctions.net') return true;
+  // The Firebase-hosted Auth iframe still uses this legacy read-only endpoint.
+  // Its optional cb is Date.now(), not a JSONP callback or a delegated project.
+  if (url.origin === 'https://www.googleapis.com') {
+    const params = url.searchParams;
+    return method === 'GET' && !url.username && !url.password && !url.hash &&
+      fixture.firebase.projectId === 'attendus-staging' &&
+      url.pathname === '/identitytoolkit/v3/relyingparty/getProjectConfig' &&
+      [...params.keys()].every((key) => ['key', 'cb'].includes(key) && params.getAll(key).length === 1) &&
+      params.get('key') === fixture.firebase.apiKey &&
+      (!params.has('cb') || /^\d{1,16}$/.test(params.get('cb')));
+  }
   if (['identitytoolkit.googleapis.com', 'securetoken.googleapis.com'].includes(url.hostname)) return url.searchParams.getAll('key').length === 1 && url.searchParams.get('key') === fixture.firebase.apiKey;
   if (url.hostname === 'firestore.googleapis.com') {
     const target = 'projects/attendus-staging/databases/(default)';
@@ -96,6 +109,13 @@ function allowStagingRequest(value, method, context, headers = {}) {
   if (url.hostname === 'recaptchaenterprise.googleapis.com') return true;
   if (method === 'GET' && url.hostname === 'maps.gstatic.com') return /^\/(maps|mapfiles)\//.test(url.pathname);
   if (url.hostname === 'maps.googleapis.com') {
+    if (url.pathname === '/maps/api/mapsjs/gen_204') {
+      // The Maps SDK's CSP reachability probe has no API key or user payload.
+      return url.origin === 'https://maps.googleapis.com' && method === 'GET' &&
+        !url.username && !url.password && !url.hash && !!fixture.mapsApiKey &&
+        fixture.firebase.projectId === 'attendus-staging' &&
+        (!url.search || (url.searchParams.size === 1 && url.searchParams.get('csp_test') === 'true'));
+    }
     if (method === 'GET' && /^\/maps-api-v3\/api\/js\//.test(url.pathname)) return true;
     const key = fixture.mapsApiKey;
     if (!key) return false;
@@ -104,13 +124,39 @@ function allowStagingRequest(value, method, context, headers = {}) {
     return method === 'POST' && /^\/\$rpc\/google\.maps\./.test(url.pathname) &&
       (keyed || headers['x-goog-api-key'] === key);
   }
-  if (url.hostname === 'firebaseappcheck.googleapis.com') {
-    const project = url.pathname.match(/^\/v1\/projects\/([^/]+)\/apps\/([^/:]+)/);
-    return !!project && [fixture.firebase.projectId, fixture.firebase.projectNumber].filter(Boolean).includes(project[1]) &&
-      decodeURIComponent(project[2]) === fixture.firebase.appId;
+  if (['https://content-firebaseappcheck.googleapis.com', 'https://firebaseappcheck.googleapis.com'].includes(url.origin)) {
+    // Firebase's installed SDK emits raw colons in appId; the REST method is
+    // the final suffix. Neither other apps nor debug/V3 exchanges are allowed.
+    const project = url.pathname.match(/^\/v1\/projects\/([^/]+)\/apps\/([^/]+):exchangeRecaptchaEnterpriseToken$/);
+    let appId;
+    try {appId = project && decodeURIComponent(project[2]);} catch {return false;}
+    return method === 'POST' && !url.username && !url.password && !url.hash &&
+      fixture.firebase.projectId === 'attendus-staging' && !!project &&
+      [fixture.firebase.projectId, fixture.firebase.projectNumber].filter(Boolean).includes(project[1]) &&
+      typeof fixture.firebase.appId === 'string' && appId === fixture.firebase.appId &&
+      url.searchParams.size === 1 && url.searchParams.get('key') === fixture.firebase.apiKey;
   }
   if (method === 'GET' && url.hostname === 'storage.googleapis.com') return url.pathname.startsWith(`/${fixture.firebase.storageBucket}/private-event-exports/`);
   return false;
+}
+
+function scrubBrowserError(error, fixture) {
+  let result = String(error?.message || error).replace(/\bBearer\s+[^\s'"<>]+/gi, 'Bearer [redacted]');
+  // Chromium can emit /host/path?session=... without a scheme. Include that
+  // form, protocol-relative URLs and relative proof paths, preserving reasons.
+  result = result.replace(/https?:\/\/[^\s'"<>]+|\/{0,2}(?:[^\s/@]+@)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d+)?\/[^\s'"<>]*|\/[^\s'"<>]+/gi, (value) => {
+    try {
+      const absolute = /^https?:\/\//i.test(value);
+      const hosted = !absolute && /^\/{0,2}(?:[^\s/@]+@)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?::\d+)?\//i.test(value);
+      const parsed = new URL(absolute ? value : hosted ? 'https://' + value.replace(/^\/+/, '') : value, 'https://attendus-staging.web.app');
+      const pathname = /^\/manage\//.test(parsed.pathname) ? '/manage/[redacted]' : parsed.pathname;
+      return (absolute || hosted ? parsed.origin : '') + pathname;
+    } catch {return '[url]';}
+  });
+  for (const account of Object.values(fixture)) {
+    if (typeof account?.password === 'string' && account.password) result = result.split(account.password).join('[redacted]');
+  }
+  return result.replace(/eyJ[A-Za-z0-9_.-]+/g, '[token]');
 }
 
 function parseCsv(input) {
@@ -229,13 +275,7 @@ async function produce({candidate, context, outputDir}) {
   let appCheckToken;
   const write = (gate, name, value) => { fs.writeFileSync(path.join(outputDir, name), JSON.stringify(value, null, 2)); gates[gate].rawPaths.push(name); };
   const record = (gate, id, expected, actual) => gates[gate].assertions.push({id, expected, actual});
-  const scrub = (error) => {
-    let result = String(error?.message || error).replace(/https?:\/\/[^\s)]+/g, (url) => {try {const parsed = new URL(url); return parsed.origin + (/^\/manage\/[A-Za-z0-9_-]{20,}/.test(parsed.pathname) ? '/manage/[redacted]' : parsed.pathname);} catch {return '[url]';}});
-    for (const account of Object.values(fixture)) {
-      if (typeof account?.password === 'string' && account.password) result = result.split(account.password).join('[redacted]');
-    }
-    return result.replace(/eyJ[A-Za-z0-9_.-]+/g, '[token]');
-  };
+  const scrub = (error) => scrubBrowserError(error, fixture);
   const browser = await chromium.launch({headless: true});
   async function newContext(viewport = {width: 1440, height: 1000}, engine = browser) {
     const browserContext = await engine.newContext({viewport, serviceWorkers: replayOnly ? 'block' : 'allow'});
@@ -824,4 +864,4 @@ async function produce({candidate, context, outputDir}) {
 
 module.exports = produce;
 module.exports.produce = produce;
-module.exports._test = {validateFixture, allowStagingRequest, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, htmlResponsiveProbe, readOwnedHistoryTitles, visibleHistoryTitle, openCheckInConsole};
+module.exports._test = {validateFixture, allowStagingRequest, scrubBrowserError, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, htmlResponsiveProbe, readOwnedHistoryTitles, visibleHistoryTitle, openCheckInConsole};

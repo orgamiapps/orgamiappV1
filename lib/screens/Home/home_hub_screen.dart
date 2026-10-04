@@ -287,6 +287,28 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
             child: Column(
               children: [
                 if (!isGuestMode) _buildSegmentedTabs(),
+                if (_tabIndex == 0 || isGuestMode)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: Semantics(
+                        label: 'View events map',
+                        button: true,
+                        child: Tooltip(
+                          message: 'View events map',
+                          excludeFromSemantics: true,
+                          child: IconButton(
+                            onPressed: () => RouterClass.nextScreenNormal(
+                              context,
+                              const GlobalEventsMapScreen(),
+                            ),
+                            icon: const Icon(Icons.map_outlined),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 if ((_tabIndex == 0 || isGuestMode) &&
                     widget._publicContentOverride == null)
                   const SmartArrivalCard(),

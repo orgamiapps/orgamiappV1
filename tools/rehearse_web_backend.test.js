@@ -98,6 +98,16 @@ test("all four actual source-only transitions are restored and independently ver
   assert.equal(f.calls.filter((call) => call.method === "DELETE").length, 0);
   for (const fn of f.functions.values()) assert.match(fn.buildConfig.source.storageSource.object, /^backend-source\/attendus-staging\/candidates\/123\//);
 });
+test("new candidates cannot substitute historical empty counters for retained-isolation proofs", async (t) => {
+  const f = fixture(t), retired = require("./retired_web_qualification");
+  const receipt = await r.rehearse(f);
+  f.candidate.sourceFiles = {[retired.FILE]: sha256(fs.readFileSync(path.join(__dirname, "..", retired.FILE)))};
+  receipt.candidateSha256 = digest(f.candidate);
+  for (const check of [receipt.emptyBefore, ...Object.values(receipt.representatives).flatMap((item) => [item.emptyDuring, item.emptyAfter])]) {
+    delete check.retiredIsolation; check.collections.QualificationScopes = 0; check.collections.QualificationBindings = 0;
+  }
+  await assert.rejects(() => r.verifyRehearsal({...f, receipt}), /proof differs/);
+});
 test("a failed rollback still restores the retained candidate and leaves failed evidence", async (t) => {
   const f = fixture(t); f.state.failPatch = 1;
   await assert.rejects(() => r.rehearse(f), /did not succeed/);

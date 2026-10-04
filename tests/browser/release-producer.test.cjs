@@ -6,7 +6,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
 const {files} = require('../../tools/web_release_contract');
-const {validateFixture, allowStagingRequest, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, readOwnedHistoryTitles, visibleHistoryTitle} = require('../../tools/web_release_producers/browser')._test;
+const {validateFixture, allowStagingRequest, scrubBrowserError, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, readOwnedHistoryTitles, visibleHistoryTitle} = require('../../tools/web_release_producers/browser')._test;
 const {bindingId} = require('../../functions/communications/qualification-isolation');
 test('browser and Safari use the same insertion-aware computed text scaling and control-boundary probe', () => {
   assert.equal(require('../../tools/web_release_producers/browser')._test.htmlResponsiveProbe,
@@ -90,7 +90,7 @@ test('network boundary permits required App Check but blocks cross-project data 
     'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fixture-key',
     'https://firestore.googleapis.com/v1/projects/attendus-staging/databases/(default)/documents',
     'https://firestore.googleapis.com/google.firestore.v1.Firestore/Listen/channel?database=projects%2Fattendus-staging%2Fdatabases%2F(default)',
-    'https://firebaseappcheck.googleapis.com/v1/projects/123/apps/1%3A123%3Aweb%3Afixture:exchangeRecaptchaEnterpriseToken',
+    'https://firebaseappcheck.googleapis.com/v1/projects/123/apps/1%3A123%3Aweb%3Afixture:exchangeRecaptchaEnterpriseToken?key=fixture-key',
     'https://www.google.com/recaptcha/enterprise/anchor?k=public', 'https://recaptchaenterprise.googleapis.com/v1/projects/staging/assessments']) {
     assert.equal(allowStagingRequest(url, 'POST', c), true, url);
   }
@@ -109,6 +109,70 @@ test('CSV evidence counts embedded newlines as one row and preserves escaped quo
   assert.deepEqual(parseCsv('name,answer\r\n"One, Two","line1\nline2"\r\nThree,"He said ""hello"""\r\n'),
     [['name', 'answer'], ['One, Two', 'line1\nline2'], ['Three', 'He said "hello"']]);
   assert.throws(() => parseCsv('name\n"truncated'));
+});
+
+test('actual App Check SDK exchange is bound to the exact staging app, method and key', () => {
+  const c = context();
+  for (const host of ['content-firebaseappcheck.googleapis.com', 'firebaseappcheck.googleapis.com']) {
+    for (const project of ['attendus-staging', '123']) {
+      for (const app of [c.fixture.firebase.appId, encodeURIComponent(c.fixture.firebase.appId)]) {
+        const url = `https://${host}/v1/projects/${project}/apps/${app}:exchangeRecaptchaEnterpriseToken?key=fixture-key`;
+        assert.equal(allowStagingRequest(url, 'POST', c), true);
+        for (const method of ['GET', 'PUT', 'DELETE', 'OPTIONS']) assert.equal(allowStagingRequest(url, method, c), false);
+        for (const bad of [url.replace('fixture-key', 'foreign'), url + '&key=fixture-key', url + '&unexpected=1',
+          url.replace('?key=fixture-key', ''), url.replace(app, '1:999:web:foreign'),
+          url.replace(`/projects/${project}/`, '/projects/foreign/'), url.replace('EnterpriseToken', 'Token'),
+          url.replace(':exchangeRecaptchaEnterpriseToken', ':exchangeDebugToken'), url.replace(':exchangeRecaptchaEnterpriseToken', ':exchangeRecaptchaEnterpriseToken/extra'),
+          url + '#secret', url.replace(host, `user:secret@${host}`), url.replace(host, `${host}:444`),
+          url.replace(host, `${host}.example.test`), url.replace('https:', 'http:')]) {
+          assert.equal(allowStagingRequest(bad, 'POST', c), false);
+        }
+      }
+    }
+  }
+});
+
+test('legacy Auth iframe configuration GET permits only the bound key and SDK cache timestamp', () => {
+  const c = context();
+  const url = 'https://www.googleapis.com/identitytoolkit/v3/relyingparty/getProjectConfig?key=fixture-key';
+  for (const good of [url, url + '&cb=1791100000000']) assert.equal(allowStagingRequest(good, 'GET', c), true);
+  for (const method of ['POST', 'PUT', 'DELETE', 'OPTIONS']) assert.equal(allowStagingRequest(url, method, c), false);
+  for (const bad of [url.replace('fixture-key', 'foreign'), url + '&key=fixture-key', url + '&cb=1&cb=2',
+    url + '&cb=callback', url + '&projectNumber=999', url + '&delegatedProjectNumber=999',
+    url.replace('getProjectConfig', 'getAccountInfo'), url.replace('getProjectConfig', 'getProjectConfig/extra'),
+    url.replace('www.googleapis.com', 'user:secret@www.googleapis.com'), url.replace('.com/', '.com:444/'),
+    url.replace('https:', 'http:'), url + '#secret', url.replace('?key=fixture-key', '')]) {
+    assert.equal(allowStagingRequest(bad, 'GET', c), false);
+  }
+});
+
+test('Maps SDK CSP probe permits only its exact empty GET and csp_test marker', () => {
+  const c = context(); c.fixture.mapsApiKey = 'staging-maps-key';
+  const url = 'https://maps.googleapis.com/maps/api/mapsjs/gen_204';
+  for (const good of [url, url + '?csp_test=true']) assert.equal(allowStagingRequest(good, 'GET', c), true);
+  for (const method of ['POST', 'PUT', 'DELETE', 'OPTIONS']) assert.equal(allowStagingRequest(url, method, c), false);
+  for (const bad of [url + '?csp_test=false', url + '?csp_test=true&csp_test=true', url + '?unexpected=1',
+    url + '?key=staging-maps-key', url + '/extra', url + '#secret', url.replace('https:', 'http:'),
+    url.replace('.com/', '.com:444/'), url.replace('maps.googleapis.com', 'user:secret@maps.googleapis.com'),
+    url.replace('gen_204', 'other')]) assert.equal(allowStagingRequest(bad, 'GET', c), false);
+  delete c.fixture.mapsApiKey;
+  assert.equal(allowStagingRequest(url, 'GET', c), false);
+});
+
+test('browser evidence redacts absolute and scheme-less URL queries, fragments and credentials', () => {
+  const fixture = context().fixture;
+  const secrets = ['userinfo-secret', 'query-secret', 'session-secret', 'fragment-secret', 'opaque-proof-secret-123456789', 'opaque-bearer-secret'];
+  for (const prefix of ['https://', '//', '/']) {
+    const input = `Request failed: ${prefix}user:userinfo-secret@firestore.googleapis.com/v1/projects/staging/databases/(default)/documents?key=query-secret&SID=session-secret#fragment-secret net::ERR_FAILED`;
+    const result = scrubBrowserError(Error(input), fixture);
+    assert.match(result, /Request failed:/); assert.match(result, /net::ERR_FAILED/);
+    assert.match(result, /firestore\.googleapis\.com/);
+    assert.ok(!result.includes('?') && !result.includes('#'));
+    for (const secret of secrets) assert.ok(!result.includes(secret));
+  }
+  const result = scrubBrowserError(Error('/manage/opaque-proof-secret-123456789?key=query-secret#fragment-secret fixture-password Authorization: Bearer opaque-bearer-secret eyJhbGci.fixture.signature'), fixture);
+  for (const secret of [...secrets, fixture.owner.password, 'eyJhbGci.fixture.signature']) assert.ok(!result.includes(secret));
+  assert.equal(scrubBrowserError(Error('Null check operator used on a null value'), fixture), 'Null check operator used on a null value');
 });
 
 test('Safari Auth iframe is read-only and bound to the staging project key and default app', () => {

@@ -253,7 +253,7 @@ test("unsafe raw paths and producer execution failures retain only safe blocked 
 // Execute the real deploy orchestration with the real strict empty-project
 // reader. Only remote transport, artifact validation and later mutations are
 // mocked, so moving this prerequisite after deployment makes these tests fail.
-function stagingPrerequisiteHarness({environment = "staging", blocked = null} = {}) {
+function stagingPrerequisiteHarness({environment = "staging", blocked = null, retiredFixture = null} = {}) {
   const ownedTemp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "attendus-deploy-prerequisite-")));
   const output = path.join(ownedTemp, "receipt", "deployment.json");
   const value = candidate(environment); const state = value.predecessor[environment];
@@ -263,8 +263,10 @@ function stagingPrerequisiteHarness({environment = "staging", blocked = null} = 
     assert.equal(request.method, undefined, "prerequisite transport must be read-only");
     if (request.url.includes("/documents/")) {
       assert.ok(request.url.startsWith("https://firestore.googleapis.com/v1/projects/attendus-staging/databases/(default)/documents/"));
-      assert.deepEqual(request.params, {pageSize: 1});
       const collection = request.url.split("/").at(-1);
+      const retirement = require("./retired_web_qualification").COLLECTIONS.includes(collection);
+      assert.deepEqual(request.params, retirement ? {pageSize: 100, showMissing: true} : {pageSize: 1});
+      if (retiredFixture && retirement) return {data: {documents: retiredFixture.docs.filter((doc) => doc.name.includes(`/documents/${collection}/`))}};
       return {data: collection === blocked ? {documents: [{name: `${request.url}/existing`}]} : {}};
     }
     assert.equal(request.url, "https://identitytoolkit.googleapis.com/v1/projects/attendus-staging/accounts:batchGet");
@@ -279,6 +281,9 @@ function stagingPrerequisiteHarness({environment = "staging", blocked = null} = 
       async googleClient() { calls.push("empty-project-client"); return client; },
       firebase() { calls.push("resource-mutation"); throw Error("Unexpected resource deployment"); }};
     if (name === "./rehearse_web_backend") return {...rehearsal, validateArchives() { calls.push("validate-archives"); }};
+    if (name === "./retired_web_qualification" && retiredFixture) return {...require(name), loadManifest(selected) {
+      assert.equal(selected, value, "early preflight must bind the current candidate"); return retiredFixture.manifest;
+    }};
     if (name === "./bridge_web_assets") return {planBridge() { calls.push("plan-bridge"); },
       async publishBridge() { calls.push("resource-mutation"); throw Error("Unexpected Hosting mutation"); }};
     if (name === "node:child_process") return {execFileSync() { calls.push("resource-mutation"); throw Error("Unexpected CLI preparation/deployment"); }};
@@ -316,7 +321,26 @@ test("empty staging prerequisite is durably timestamped and candidate-bound befo
     assert.ok(Date.parse(receipt.startedAt) >= startedAt && Date.parse(receipt.verifiedAt) >= Date.parse(receipt.startedAt));
     assert.equal(receipt.verifiedAt, receipt.checks.checkedAt); assert.equal(receipt.checks.anonymousAuthCount, 1);
     assert.deepEqual(receipt.checks.collections, Object.fromEntries(require("./rehearse_web_backend").EMPTY_COLLECTIONS.map((name) => [name, 0])));
-    assert.equal(harness.requests.length, require("./rehearse_web_backend").EMPTY_COLLECTIONS.length + 1);
+    assert.equal(harness.requests.length, require("./rehearse_web_backend").EMPTY_COLLECTIONS.length + 1 + require("./retired_web_qualification").COLLECTIONS.length);
+  } finally { harness.cleanup(); }
+});
+
+test("staging early preflight preserves only the candidate-bound retired tombstones", async () => {
+  const runId = "webqa-20261004-0123456789", sourceSha = "a".repeat(40), candidateRunId = "123";
+  const field = (value) => ({stringValue: value});
+  const common = {schemaVersion: {integerValue: "1"}, projectId: field("attendus-staging")};
+  const doc = (local, fields) => ({name: "projects/attendus-staging/databases/(default)/documents/" + local, fields: {...common, ...fields},
+    createTime: "2026-10-04T10:00:00.000000001Z", updateTime: "2026-10-04T11:00:00.000000001Z"});
+  const docs = [doc(`QualificationScopes/${runId}`, {status: field("retired"), mode: field("capture"), actorUids: {arrayValue: {}}, recipientUids: {arrayValue: {}}}),
+    doc("QualificationBindings/account_" + "b".repeat(64), {state: field("retired"), runId: field(runId)}),
+    doc(`QualificationSetup/${runId}`, {state: field("retired"), sourceSha: field(sourceSha), candidateRunId: field(candidateRunId)})];
+  const manifest = {schemaVersion: 1, projectId: "attendus-staging", runs: [{runId, sourceSha, candidateRunId,
+    cleanupEvidenceSha256: "c".repeat(64), documents: docs.map((value) => ({path: value.name.split("/documents/")[1], sha256: c.digest(value)}))}]};
+  const harness = stagingPrerequisiteHarness({retiredFixture: {docs, manifest}});
+  try {
+    await assert.rejects(harness.run(), /Test stop at resource materialization/);
+    assert.equal(harness.receipt().checks.retiredIsolation.manifestSha256, c.digest(manifest));
+    assert.equal(harness.calls.includes("resource-mutation"), false);
   } finally { harness.cleanup(); }
 });
 test("production deployment never invokes the staging-only empty-project prerequisite", async () => {

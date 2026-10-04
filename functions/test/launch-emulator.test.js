@@ -33,6 +33,79 @@ test.before(async () => {
   await db.collection("Events").doc(eventId).collection("EventQuestions").doc("diet").set({id: "diet", timing: "registration", prompt: "Diet", type: "short_text", required: true});
 });
 test.after(async () => { await db.terminate(); });
+test("actual roster handlers invalidate current parents and ignore delayed deleted-parent deliveries", async () => {
+  const deletedId = `roster-deleted-${suffix}`, liveId = `roster-current-${suffix}`;
+  const sourceId = `roster-source-${suffix}`, uid = `roster-person-${suffix}`;
+  const event = db.doc(`Events/${deletedId}`), state = db.doc(`EventRosters/${deletedId}`);
+  const liveEvent = db.doc(`Events/${liveId}`), liveState = db.doc(`EventRosters/${liveId}`);
+  const registration = db.doc(`RegisterAttendance/${sourceId}`), ticket = db.doc(`Tickets/${sourceId}`);
+  const historical = db.doc(`HistoricalAttendance/${sourceId}`);
+  const refs = [event, state, liveEvent, liveState, registration, ticket, historical];
+  try {
+    await event.set({customerUid: uid, status: "active"});
+    await state.set({revision: 3, ready: true, generation: "retained", count: 2});
+    await operations.refreshRosterEvent.run({params: {id: deletedId}});
+    assert.deepEqual((await state.get()).data(), {revision: 4, ready: false, generation: "retained", count: 2});
+    await registration.set({eventId: deletedId, customerUid: uid, guestId: uid});
+    await ticket.set({eventId: deletedId, customerUid: uid, guestId: uid});
+    await historical.set({eventId: deletedId});
+    const before = await registration.get();
+    await Promise.all([event.delete(), state.delete()]);
+    await operations.refreshRosterEvent.run({params: {id: deletedId}});
+    for (const name of ["RegisterAttendance", "Attendance", "Tickets", "HistoricalAttendance"]) {
+      await operations[`refreshRoster${name}`].run({params: {id: sourceId}, data: {before, after: before}});
+    }
+    await operations.refreshRosterCorrection.run({params: {id: sourceId, correction: "late"}});
+    await operations.refreshRosterCustomers.run({params: {id: uid}});
+    await operations.refreshRosterGuestAttendees.run({params: {id: uid}});
+    assert.equal((await state.get()).exists, false);
+    // A moved source must still invalidate its surviving parent.
+    await liveEvent.set({customerUid: uid, status: "cancelled"});
+    await registration.update({eventId: liveId});
+    const after = await registration.get();
+    await operations.refreshRosterRegisterAttendance.run({params: {id: sourceId}, data: {before, after}});
+    assert.equal((await state.get()).exists, false);
+    assert.deepEqual((await liveState.get()).data(), {revision: 1, ready: false});
+  } finally {
+    await Promise.all(refs.map((ref) => ref.delete()));
+  }
+});
+for (const replacement of [false, true]) test(`roster publication fences concurrent parent ${replacement ? "replacement" : "deletion"}`, async () => {
+  const id = `roster-publish-${replacement ? "replace" : "delete"}-${suffix}`;
+  const event = db.doc(`Events/${id}`), state = db.doc(`EventRosters/${id}`);
+  let intercepted = false;
+  try {
+    await event.set({customerUid: owner, status: "active", eventRevision: 1});
+    const proxy = new Proxy(db, {get(target, property) {
+      if (property === "runTransaction") return async (...args) => {
+        if (!intercepted) {
+          intercepted = true;
+          assert.equal((await state.collection("generations").get()).size, 1,
+              "The race must occur after materialization and before final publication");
+          await event.delete();
+          if (replacement) await event.set({customerUid: `replacement-${owner}`, status: "active", eventRevision: 1});
+        }
+        return target.runTransaction(...args);
+      };
+      const value = target[property];
+      return typeof value === "function" ? value.bind(target) : value;
+    }});
+    const firestore = () => proxy;
+    firestore.FieldValue = admin.firestore.FieldValue;
+    await assert.rejects(createLaunchOperations({firestore}).listEventRosterV2.run(request(owner, {eventId: id})),
+        {code: "unavailable"});
+    assert.equal(intercepted, true);
+    assert.equal((await state.get()).exists, false);
+    assert.equal((await state.collection("generations").get()).empty, true);
+    const current = await event.get();
+    assert.equal(current.exists, replacement);
+    if (replacement) assert.equal(current.get("customerUid"), `replacement-${owner}`);
+  } finally {
+    await db.recursiveDelete(state);
+    await event.delete();
+  }
+});
+
 test("concurrent free publications consume the current final allowance only once", async () => {
   const {consumePublicationAllowance} = require("../events/wizard");
   const uid = `quota-${suffix}`;

@@ -7,6 +7,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const {digest, sha256} = require("./web_release_contract");
 const {googleClient} = require("./web_release_state");
+const retired = require("./retired_web_qualification");
 const PROJECT = "attendus-staging";
 const SCOPE = "Four representative Gen2 source-only rollback/restorations; no deletions or full-fleet rollback claim";
 const OPERATION = /^projects\/attendus-staging\/locations\/us-central1\/operations\/[A-Za-z0-9_-]+$/;
@@ -14,7 +15,7 @@ const REPRESENTATIVES = Object.freeze({publicWeb: "http", triggerAIInsights: "fi
   aggregateAdminMetricsDaily: "scheduled", getOrganizerEventRegistrationsV1: "callable"});
 const EMPTY_COLLECTIONS = Object.freeze(["Events", "Customers", "RegisterAttendance", "Tickets", "Attendance", "GuestAttendees",
   "Conversations", "EventAnnouncements", "EventExportJobs", "OutboundMessages", "scheduledNotifications", "pendingPush",
-  "Notifications", "QualificationScopes", "QualificationBindings"]);
+  "Notifications"]);
 const sourceOf = (fn) => fn.buildConfig?.sourceProvenance?.resolvedStorageSource || fn.buildConfig?.source?.storageSource;
 function sourceIdentity(source) {
   if (typeof source?.bucket !== "string" || !/^[a-z0-9][a-z0-9._-]{1,220}$/.test(source.bucket) || typeof source.object !== "string" || !source.object || source.object.length > 1024 || /[\x00-\x1f]/.test(source.object) || !/^[1-9][0-9]*$/.test(String(source.generation || ""))) throw Error("An immutable source object generation is required");
@@ -62,7 +63,7 @@ function validateArchives(manifest, predecessor) {
   }
   return byName;
 }
-async function assertEmpty(client) {
+async function assertEmpty(client, {retiredManifest = retired.emptyManifest()} = {}) {
   const collections = {};
   for (const collection of EMPTY_COLLECTIONS) {
     const response = (await client.request({url: `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents/${collection}`, params: {pageSize: 1}})).data;
@@ -72,7 +73,8 @@ async function assertEmpty(client) {
   const accounts = (await client.request({url: `https://identitytoolkit.googleapis.com/v1/projects/${PROJECT}/accounts:batchGet`, params: {maxResults: 2}})).data;
   const users = accounts.users || [];
   if (accounts.nextPageToken || users.length > 1 || users.some((user) => user.email || user.phoneNumber || user.providerUserInfo?.length)) throw Error("Backend rehearsal requires no identified Auth users");
-  return {checkedAt: new Date().toISOString(), collections, anonymousAuthCount: users.length};
+  const retiredIsolation = await retired.observeRetired(client, retiredManifest);
+  return {checkedAt: new Date().toISOString(), collections, anonymousAuthCount: users.length, retiredIsolation};
 }
 async function objectBytes(client, source) {
   const identity = sourceIdentity(source); const url = `https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(identity.bucket)}/o/${encodeURIComponent(identity.object)}`;
@@ -144,13 +146,16 @@ async function patchSource(client, name, source, {timeoutMs = 15 * 60000, sleep 
 }
 async function rehearse({candidate, predecessor, manifest, output, client = null, patch = patchSource, checkEmpty = assertEmpty, retain = retainCandidateSource}) {
   if (candidate.environment !== "staging" || candidate.projectId !== PROJECT || candidate.candidateRunId !== process.env.GITHUB_RUN_ID || candidate.sourceSha !== process.env.GITHUB_SHA) throw Error("Rehearsal is restricted to the current staging candidate workflow");
-  const archives = validateArchives(manifest, predecessor); client ||= await googleClient();
+  const archives = validateArchives(manifest, predecessor);
+  const retiredManifest = retired.loadManifest(candidate);
+  const checkIsolation = () => checkEmpty(client, {retiredManifest});
+  client ||= await googleClient();
   const receipt = {schemaVersion: 1, projectId: PROJECT, candidateRunId: candidate.candidateRunId, sourceSha: candidate.sourceSha,
     candidateSha256: digest(candidate), predecessorSha256: digest(predecessor), archiveManifestSha256: digest(manifest),
     scope: SCOPE, representatives: {}, startedAt: new Date().toISOString()};
   fs.mkdirSync(path.dirname(output), {recursive: true});
   const save = () => fs.writeFileSync(output, JSON.stringify(receipt, null, 2) + "\n");
-  receipt.emptyBefore = await checkEmpty(client); save();
+  receipt.emptyBefore = await checkIsolation(); save();
   // Confirm every private backup still exists at its immutable generation before touching a function.
   for (const entry of archives.values()) {
     const backup = sourceIdentity(entry.backup);
@@ -172,17 +177,17 @@ async function rehearse({candidate, predecessor, manifest, output, client = null
       candidateConfigurationSha256: candidateHash, priorSource: retained, candidateSource: forwardArchive}; save();
     let attempted = false; let failure;
     try {
-      await checkEmpty(client); attempted = true;
+      await checkIsolation(); attempted = true;
       item.rollback = await patch(client, name, archive.backup, {onOperation: (proof) => { item.rollbackAttempt = proof; save(); }}); save();
       if (item.rollback.configurationSha256 !== candidateHash) throw Error("Rollback changed service, trigger, runtime or entrypoint configuration");
-      item.emptyDuring = await checkEmpty(client); save();
+      item.emptyDuring = await checkIsolation(); save();
     } catch (error) { failure = error; item.failure = String(error.message); if (error.operationReceipt) item.rollbackAttempt = error.operationReceipt; save(); }
     finally {
       if (attempted) {
         try {
           item.restoration = await patch(client, name, forwardArchive.backup, {onOperation: (proof) => { item.restorationAttempt = proof; save(); }}); save();
           if (item.restoration.configurationSha256 !== candidateHash) throw Error("Restoration changed non-source configuration");
-          item.emptyAfter = await checkEmpty(client); save();
+          item.emptyAfter = await checkIsolation(); save();
         } catch (error) { item.restorationFailure = String(error.message); if (error.operationReceipt) item.restorationAttempt = error.operationReceipt; save(); throw Error(`Candidate restoration failed for ${id}; stop and recover using the retained operation/source receipt`, {cause: error}); }
       }
     }
@@ -193,6 +198,7 @@ async function rehearse({candidate, predecessor, manifest, output, client = null
 async function verifyRehearsal({candidate, receipt, manifest, client = null}) {
   if (candidate?.environment !== "staging" || candidate.projectId !== PROJECT) throw Error("Rehearsal verification is restricted to staging candidates");
   validateArchives(manifest, candidate.predecessor.staging);
+  const retiredManifest = retired.loadManifest(candidate);
   if (receipt?.schemaVersion !== 1 || receipt.scope !== SCOPE || receipt.projectId !== PROJECT || receipt.candidateRunId !== candidate.candidateRunId || receipt.sourceSha !== candidate.sourceSha || receipt.candidateSha256 !== digest(candidate) || receipt.predecessorSha256 !== digest(candidate.predecessor.staging) || receipt.archiveManifestSha256 !== digest(manifest) || !Number.isFinite(Date.parse(receipt.startedAt)) || !Number.isFinite(Date.parse(receipt.completedAt)) || Date.parse(receipt.completedAt) < Date.parse(receipt.startedAt) || digest(Object.keys(receipt.representatives || {}).sort()) !== digest(Object.keys(REPRESENTATIVES).sort())) throw Error("Backend rehearsal receipt differs from the frozen candidate");
   client ||= await googleClient(); const evidence = [];
   for (const [id, type] of Object.entries(REPRESENTATIVES)) {
@@ -221,7 +227,11 @@ async function verifyRehearsal({candidate, receipt, manifest, client = null}) {
     if (fresh.state !== "ACTIVE" || digest(stableConfig(fresh)) !== item.candidateConfigurationSha256 || digest(sourceIdentity(sourceOf(fresh))) !== digest(sourceIdentity(item.restoration.source))) throw Error("Representative no longer has the restored candidate source/configuration");
     const restored = await objectBytes(client, item.candidateSource.backup);
     if (restored.sha256 !== item.candidateSource.original.sha256) throw Error("Retained candidate restoration bytes differ");
-    for (const check of [receipt.emptyBefore, item.emptyDuring, item.emptyAfter]) if (!check || !Number.isFinite(Date.parse(check.checkedAt)) || EMPTY_COLLECTIONS.some((collection) => check.collections?.[collection] !== 0) || !Number.isInteger(check.anonymousAuthCount) || check.anonymousAuthCount < 0 || check.anonymousAuthCount > 1) throw Error("Pre-fixture empty-project evidence is incomplete");
+    for (const check of [receipt.emptyBefore, item.emptyDuring, item.emptyAfter]) {
+      if (!check || !Number.isFinite(Date.parse(check.checkedAt)) || EMPTY_COLLECTIONS.some((collection) => check.collections?.[collection] !== 0) || !Number.isInteger(check.anonymousAuthCount) || check.anonymousAuthCount < 0 || check.anonymousAuthCount > 1) throw Error("Pre-fixture empty-project evidence is incomplete");
+      retired.validateProof(check.retiredIsolation, retiredManifest, {allowLegacyEmpty: !Object.hasOwn(candidate.sourceFiles || {}, retired.FILE)});
+      if (!check.retiredIsolation && retired.COLLECTIONS.slice(0, 2).some((collection) => check.collections?.[collection] !== 0)) throw Error("Historical isolation store was not empty");
+    }
   }
   return {schemaVersion: 1, sourceSha: candidate.sourceSha, candidateRunId: candidate.candidateRunId, receiptSha256: digest(receipt),
     scope: receipt.scope, verifiedAt: new Date().toISOString(), operations: evidence};
