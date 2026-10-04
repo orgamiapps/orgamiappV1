@@ -319,3 +319,36 @@ Bounded App Check diagnostics are committed as `805c161eaac1459b23ec2b28e26d8505
 The first post-retirement complete read at17:29:05.427Z verifies all32 unchanged retired documents,1,458 total typed documents,22 Auth identities and zero Storage objects. One actual discovery delivery completed in capture-only mode at17:08, with six exact owned event references; its associated claimed rows and new capture require explicit cleanup review. No fixture data deletion has occurred. This historical timer activity does not qualify the held pilot.
 
 Historical private candidate10 supplemental, organizer and200%-text helpers still contain the old IndexedDB observer. Preserve their source/hashes and replace that logic only in newly reviewed future-candidate copies. Blind rebinding would repeat the same harness defect.
+### October 4, 18:04 UTC repair and cleanup checkpoint
+
+Source `0fce5c3775940683aac3be3b08c4bba525e20961` adds current-source
+transactional public event/community mirrors and positive Maps marker acceptance.
+All370 Functions unit tests, lint,52 serial Firestore launch cases and305 combined
+release/browser contract tests pass locally with Node22.23.2 and Java21. The
+launch log SHA256 is
+`b2ce821ad4aeabab6fbf4b927b30249e4db81f1f3661d2e4d41e53c6bababb70`;
+the combined contract log is
+`12e86e30858e5ffd7e6d51c50956e7ac72017eb4a6ba51ab59829748023c762a`.
+Changed source passed a39,618-byte staged-diff secret scan. These are local
+results, not new staged browser acceptance.
+
+Hosted web CI for the preceding source
+`0d9dd89e973240c3ccf7135dc8328eca46ba4e00` passed all six jobs in runs
+`37221132094` and `37221104316`. Browser artifact `11310580749` was downloaded
+and independently checked against ZIP SHA256
+`539e71911cabbdc042f811aa2a8270ab46a3d84a89c0bad1aa3852e5f2294ba9`.
+It contains36 passing public cases across four browser projects and a passing
+actual Flutter browser driver result. Rendered320px/200% public headings and the
+390px/200% login form were visually reviewed. Later changes require their own CI.
+
+The failed candidate10 fixture remains retired. All nine individually reviewed
+source-cleanup batches now have actual commit acknowledgments and verified
+absence: one admin role,1,201 synthetic registration rows and six source children.
+The final batch completed at `2026-10-04T18:03:23.433Z`. Seven roster markers are
+explicitly deferred until the corrected backend is deployed and a further
+cleanup verifies absence; they are not counted as removed. Event/community
+roots, profiles, Auth identities, remaining derived rows and configuration
+restoration remain open. A new complete read-only inventory precedes those
+phases. Public mirror reappearance is a separate issue, not part of the roster
+exception. All captured failed evidence, retirement tombstones and unrelated
+records remain preserved. Production has not changed.
