@@ -481,3 +481,39 @@ keep the master on whenever any type remains enabled so one tap can opt out.
 The actual before case failed; seven focused widget cases and analysis pass
 afterward. The next immutable candidate must pass fresh complete CI and staged
 acceptance; those gates remain unverified at this source freeze.
+
+## Candidate 10 failure and subsequent web repairs (October 4)
+
+Candidate `37210826673` is held after browser collector `37213445908` failed
+all five gates. The original artifacts and failed diagnostics remain preserved.
+The following rows distinguish confirmed defects from later blocked journeys.
+
+| ID / severity / surface | Reproduction and expected versus actual behavior | Root cause and correction | Verification and remaining acceptance |
+| --- | --- | --- | --- |
+| WEBQA-01 / P1 / browser tooling | Required staging App Check, Maps telemetry and legacy Auth configuration requests should reach their exact endpoints; the policy denied 92 requests. | The App Check app-ID matcher stopped at a colon and two exact SDK paths were missing. Bind the allowed method, endpoint, app, project, key and query shape. | Actual failed request evidence and focused fail-before/pass-after cases retained. Included in 290 passing combined Node assertions. Fresh staged journeys required. |
+| WEBQA-02 / P2 / evidence privacy | A scheme-less URL in a browser error should lose its query; seven actual errors retained query strings. | Redactor covered only scheme-prefixed URLs. Scrub both forms and retain structured coordinates only for sealed candidate assets. | Actual seven examples and regressions pass. Original private failed evidence retained. |
+| WEBQA-03 / P2 / Discover | Open the actual shared Discover shell and navigate to Maps. The only entry was hidden with the child header. | Add a reachable, keyboard-accessible Maps action to the shared shell for default and marketplace branches. | Nine new cases cover route entry, narrow 200% text and shared header behavior. Actual provider markers remain unverified. |
+| WEBQA-04 / P2 / public event and community pages | At 320px and 200% text, long headings should fit the viewport; the actual event title overflowed. | Allow heading wrapping and publish new immutable CSS while preserving prior assets. | Twelve rendered cases across four browser projects pass with visual review. |
+| WEBQA-05 / P1 / backend roster integrity | Replay an invalidator after event deletion. No derived record should reappear; the old handler recreated the roster marker. | Read current event state and write invalidation in one transaction across all eight handlers. | Actual-handler before failure, focused cases and 48-case real Firestore launch suite pass. Current/cancelled/recreated events still invalidate correctly. |
+| WEBQA-06 / P1 / backend roster integrity | Delete or replace an event during roster construction. The obsolete generation should not publish; the old finalization could publish it. | Compare exact current event updateTime at publication, use the committed transaction result and remove abandoned generations. | Focused concurrency and real Firestore regressions pass; backend total362 unit tests plus lint pass. |
+| WEBQA-07 / P2 / web login and reset | Press Enter once. Exactly one password/reset request is expected; both actual widgets sent two. | Manual controller start plus automatic animation callback duplicated submission. Disable automatic callback animation and fence in-flight/successful submissions, retaining explicit failure retry. | Both before reproductions fail, then11 new and4 related focused tests pass. Complete main Flutter suite465 passes with clean analysis. No real reset email sent; staged acceptance remains open. |
+| WEBQA-08 / P1 / browser acceptance identity | Sign in under packaged LOCAL persistence. The observer should identify the exact actor; old readers missed LOCAL or selected a foreign IndexedDB actor. | Read the exact packaged LOCAL record and validate app/project/actor claims. Safari keeps the public HTML namespace separate. Cache predecessor observes its already-initialized exact SDK actor and candidate additionally checks LOCAL. | Shared14-case and Safari/cache55-case focused selections pass, included in290 combined Node assertions. Unknown predecessor SDK shape fails closed. Live Safari/cache remains unverified. |
+| WEBQA-09 / P2 / failure attribution | A failed App Check exchange should preserve safe provider error classification; only403 was retained. | Add bounded status/code/allowlisted-reason projection for exact staging exchanges; omit raw body, token, message and metadata. | Three cases fail before implementation;27 producer tests pass afterward. Missing/oversize/timed-out bodies remain unavailable. The original403 cause is still unknown. |
+
+The null-check exception recorded by the failed browser run remains an
+unclassified hypothesis. Downstream export/privacy/cache timeouts from that run
+are blocked checks, not independent confirmed product defects. The narrow
+packaged screenshot shows a session spinner and cannot close layout acceptance.
+
+Local repairs are preserved through source checkpoint
+`805c161eaac1459b23ec2b28e26d8505d3ae82f5`; the isolated branch incorporates the
+protected main history afterward. The combined Node suite passes290 assertions
+without skips. Local counts overlap and are not an exhaustive coverage percentage.
+
+Staging retirement of the failed fixture's32 isolation records was acknowledged
+at `2026-10-04T17:23:14.601013Z` and all effects verified. The fresh inventory at
+17:29:05Z contains1,458 documents,22 Auth identities and zero Storage objects.
+Fixture data/Auth cleanup and configuration restoration are still open at this
+checkpoint. All production data is unchanged. See the release qualification
+record for immutable evidence hashes and the remaining provider, data and timed
+acceptance gates.
