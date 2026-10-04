@@ -53,20 +53,16 @@ class FirebaseMessagingHelper {
   late final NotificationPreferencesService _preferences =
       NotificationPreferencesService(
         currentUid: () => _auth.currentUser?.uid,
-        load: (uid) async =>
-            (await _firestore
-                    .collection('users')
-                    .doc(uid)
-                    .collection('settings')
-                    .doc('notifications')
-                    .get())
-                .data(),
-        save: (uid, data) => _firestore
-            .collection('users')
-            .doc(uid)
-            .collection('settings')
-            .doc('notifications')
-            .set(data),
+        load: (uid) async => (await NotificationPreferencesStore.read(
+          _firestore,
+          uid,
+        )).effectiveData,
+        save: (uid, patch) => NotificationPreferencesStore.save(
+          _firestore,
+          uid,
+          patch,
+          currentUid: () => _auth.currentUser?.uid,
+        ),
       );
   UserNotificationSettings? get _settings => _preferences.cached;
   EventModel? _pendingFeedbackEvent;
@@ -282,8 +278,10 @@ class FirebaseMessagingHelper {
     await _preferences.read();
   }
 
-  Future<void> _saveNotificationSettings(UserNotificationSettings settings) =>
-      _preferences.write(settings);
+  Future<void> _saveNotificationSettings(
+    UserNotificationSettings settings, {
+    UserNotificationSettings? baseline,
+  }) => _preferences.write(settings, baseline: baseline);
 
   late final PushIntentCoordinator _pushIntents = PushIntentCoordinator(
     currentUid: () => _pushUid,
@@ -616,9 +614,10 @@ class FirebaseMessagingHelper {
 
   // Public methods
   Future<void> updateNotificationSettings(
-    UserNotificationSettings settings,
-  ) async {
-    await _saveNotificationSettings(settings);
+    UserNotificationSettings settings, {
+    UserNotificationSettings? baseline,
+  }) async {
+    await _saveNotificationSettings(settings, baseline: baseline);
   }
 
   Future<UserNotificationSettings> getUserNotificationSettings() async {

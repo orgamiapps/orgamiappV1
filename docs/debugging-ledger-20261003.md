@@ -425,3 +425,59 @@ collections; report linkage is not individual-line or exhaustive branch coverage
 
 No production deployment, migration, data correction, public release or real-user
 communication occurred. See the future promotion/rollback checklist above.
+
+
+## Web qualification follow-up: profile and consent integrity (October 4)
+
+Candidate 9 source `489f4c4` deployed successfully to isolated staging but is held
+from acceptance and promotion. The following newly confirmed defects require a
+new source candidate. Reproduction evidence is retained under
+`build/web-qualification-20261004/`; the scope is the web application and its
+shared services. Native execution is not implied.
+
+| ID / severity | Reproduction; expected / actual | Root cause; correction in progress | Verification and current disposition |
+| --- | --- | --- | --- |
+| PROFILE-01 / P1 | Load profile, change its saved events/discoverability/bio elsewhere, then save only the name. Untouched current fields and exact creation time should survive; stale fields and a rounded timestamp replace them. | Editors serialize the cached whole Customer model. Capture immutable normalized control values and submit only explicitly changed editable fields, then refresh from the server after acknowledgment. | Actual model and installed codec: four failing preservation cases and two passing controls in `profile-save-regression-before.log`. Add focused and rendered editor regressions; not closed until they pass. |
+| PROFILE-02 / P2 | Save a custom profile name that differs from Firebase Auth, then reopen the current editor. Stored name should remain; provider enrichment restores the provider name. | Load-time enrichment updates differing nonempty fields. Enrich only missing fields from a fresh transaction and preserve current user input. | Source-confirmed; actual rendered reopening regression added. Verification pending. |
+| CONSENT-01 / P1 | Store canonical message opt-out and older enabled settings, then deliver a message. Current opt-out should suppress delivery; legacy settings create an inbox entry and invoke the provider stub. | Messaging reads the two preference document paths in reversed precedence. Canonical document now wins, legacy is used only when canonical is absent. | Actual delivery-handler regression: five failing cases before correction; seven passing cases after. Stub delivery only, no provider contact. Full integrated verification pending. |
+| CONSENT-02 / P1 | Load settings, update another channel elsewhere, then change one visible control. The unrelated update should survive; a full cached document save replaces it. With no canonical document, legacy opt-outs are also lost. | Whole-map writes and canonical-only loading. Submit dirty controls and read effective current preferences transactionally; preserve legacy opt-outs when first creating canonical settings. Ordinary profile save must write no preferences. | Focused service/store regressions and concurrent rendered profile test being validated. No live acceptance yet. |
+| CONSENT-03 / P1 | Load legacy `messageNotifications: false`. The all-messages control should show off; it shows on. | Client model ignores the backend-supported opt-out alias. Normalize the effective flag and synchronize the alias only for an explicit all-messages choice. | Actual Dart before proof fails in `notification-alias-before.log`. Corrected tests pending integrated validation. |
+
+Unknown historical counters and ambiguous admissions remain separate unresolved
+data questions. These application repairs do not infer or migrate those records.
+The detailed candidate, artifact, rollback and acceptance history continues in
+`web-release-qualification-20261004.md`.
+
+
+| Follow-up ID / severity | Reproduction; expected / actual | Correction and evidence |
+| --- | --- | --- |
+| CONSENT-04 / P1 | Deny this browser push permission, then try to turn off account notification preferences. Global account preferences should remain editable; every toggle and selector is disabled. | Device permission remains a separate banner/action; loaded account controls now persist normally without permission requests or FCM initialization. Actual before widget case failed; five corrected widget cases pass, including reopen, master/selector, load failure and account change. A browser scenario is included in the next integrated run. |
+| PROFILE-03 / P2 | Edit one social control after another session updates an untouched social link. Existing and unknown JSON keys should survive; replacing the whole social JSON loses them. | Merge only changed controls into the fresh profile inside the same transaction. Malformed social storage blocks only social edits; unrelated name edits preserve it. Actual editor regressions pass; browser acceptance remains separate. |
+| PROFILE-04 / P2 | Save mixed-case username `Alice_Example` with an unrelated display name, then search that handle. The account should be found; the lowercase backend query returns no match. | V2 normalizes and validates only edited usernames against the existing 3–50 letter/number/underscore contract. Unchanged historical values and explicit optional blank remain compatible. Actual backend before proof is retained, and the 30-case editor widget suite passes. Duplicate handles remain an explicitly advisory limitation; no unique identity routing or atomic reservation is claimed. |
+
+Final integrated validation is still in progress. The full 425-test Flutter run
+and earlier focused results precede the final permission and username additions;
+they do not qualify those additions by themselves.
+
+The later complete client validation passes 443 tests with clean analysis and
+formatting. Actual rendered run `browser-b1e4edf00d9d282e` then passes all five
+journeys with no driver failures. Both profile editors and denied-permission
+settings persist the expected fresh server state; exact timestamp precision and
+unrelated concurrent changes survive. All seven fixture-owned user settings
+subtrees were removed and cleanup reports complete. The backend repair passes
+355 unit and 51 real messaging/rules emulator cases. These close local regression
+verification for PROFILE-01 through PROFILE-04 and CONSENT-01 through CONSENT-04;
+packaged staging acceptance and full release qualification remain open.
+
+Final review also identified CONSENT-05: the All Notifications control derives its
+displayed state from four fields but its action changes eleven. Reproduction and
+the focused display correction are in progress; the preceding successful browser
+run must not be described as validation of that final correction.
+
+CONSENT-05 / P2 is now reproduced and locally repaired: messages enabled with
+the original four channels disabled previously displayed the master as off.
+Aggregate all eleven controlled types, label partial selections explicitly, and
+keep the master on whenever any type remains enabled so one tap can opt out.
+The actual before case failed; seven focused widget cases and analysis pass
+afterward. The next immutable candidate must pass fresh complete CI and staged
+acceptance; those gates remain unverified at this source freeze.

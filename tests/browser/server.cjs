@@ -161,6 +161,10 @@ app.post('/__cleanup', async (_req, res) => {
   for (const id of ownedEvents) { await db.recursiveDelete(db.collection('Events').doc(id)); deleted.add(`Events/${id}`); }
   for (const uid of ownedUsers) {
     await db.recursiveDelete(db.collection('Customers').doc(uid));
+    // Settings can exist below a missing users document. Delete the explicitly
+    // owned fixture subtree, not only top-level records matched by uid fields.
+    await db.recursiveDelete(db.collection('users').doc(uid));
+    deleted.add(`users/${uid}`);
     await admin.auth().deleteUser(uid).catch((error) => {if (error.code !== 'auth/user-not-found') throw error;});
     deleted.add(`Customers/${uid}`);
   }
@@ -170,12 +174,17 @@ app.post('/__cleanup', async (_req, res) => {
   }
   const remainingEvents = (await Promise.all([...ownedEvents].map((id) => db.collection('Events').doc(id).get()))).filter((doc) => doc.exists).map((doc) => doc.id);
   const remainingProfiles = (await Promise.all([...ownedUsers].map((id) => db.collection('Customers').doc(id).get()))).filter((doc) => doc.exists).map((doc) => doc.id);
+  const remainingUserSettings = [];
+  for (const uid of ownedUsers) {
+    const user = db.collection('users').doc(uid);
+    if ((await user.get()).exists || (await user.listCollections()).length) remainingUserSettings.push(uid);
+  }
   const remainingAccounts = [];
   for (const uid of ownedUsers) {
     try {await admin.auth().getUser(uid); remainingAccounts.push(uid);} catch (error) {if (error.code !== 'auth/user-not-found') throw error;}
   }
-  res.json({runId: owner.runId, deletedPaths: [...deleted], deletedObjects, remainingEvents, remainingProfiles, remainingAccounts,
-    complete: remainingEvents.length === 0 && remainingProfiles.length === 0 && remainingAccounts.length === 0});
+  res.json({runId: owner.runId, deletedPaths: [...deleted], deletedObjects, remainingEvents, remainingProfiles, remainingUserSettings, remainingAccounts,
+    complete: remainingEvents.length === 0 && remainingProfiles.length === 0 && remainingUserSettings.length === 0 && remainingAccounts.length === 0});
 });
 app.use('/public-web', express.static(path.resolve(__dirname, '../../web/public-web')));
 app.use('/icons', express.static(path.resolve(__dirname, '../../web/icons')));

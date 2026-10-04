@@ -6,7 +6,6 @@ import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/Utils/app_app_bar_view.dart';
 import 'package:attendus/Utils/toast.dart';
 import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
-import 'package:attendus/firebase/firebase_firestore_helper.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:attendus/firebase/firebase_storage_helper.dart';
@@ -14,10 +13,14 @@ import 'package:attendus/screens/Authentication/forgot_password_screen.dart';
 import 'package:attendus/Utils/full_screen_image_viewer.dart';
 import 'package:attendus/Utils/cached_image.dart';
 import 'package:attendus/Services/auth_service.dart';
+import 'package:attendus/Services/notification_preferences_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class AccountDetailsScreen extends StatefulWidget {
-  const AccountDetailsScreen({super.key});
+  const AccountDetailsScreen({super.key, this.auth, this.firestore});
+
+  final FirebaseAuth? auth;
+  final FirebaseFirestore? firestore;
 
   @override
   State<AccountDetailsScreen> createState() => _AccountDetailsScreenState();
@@ -25,6 +28,16 @@ class AccountDetailsScreen extends StatefulWidget {
 
 class _AccountDetailsScreenState extends State<AccountDetailsScreen>
     with SingleTickerProviderStateMixin {
+  FirebaseAuth get _auth => widget.auth ?? FirebaseAuth.instance;
+  FirebaseFirestore get _firestore =>
+      widget.firestore ?? FirebaseFirestore.instance;
+  ProfileEditSnapshot? _profileBaseline;
+  ProfileEditSnapshot? _notificationBaseline;
+  SocialLinksEditSnapshot? _socialBaseline;
+  bool _isLoading = true;
+  bool _isSaving = false;
+  String? _loadError;
+
   late final double _screenWidth = MediaQuery.of(context).size.width;
 
   final _btnCtlr = RoundedLoadingButtonController();
@@ -98,25 +111,21 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
       mounted &&
       !_accountChanged &&
       _ownerUid != null &&
-      FirebaseAuth.instance.currentUser?.uid == _ownerUid &&
+      _auth.currentUser?.uid == _ownerUid &&
       CustomerController.logeInCustomer?.uid == _ownerUid;
 
   @override
   void initState() {
     super.initState();
-    _ownerUid = FirebaseAuth.instance.currentUser?.uid;
-    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
+    _ownerUid = _auth.currentUser?.uid;
+    _authSubscription = _auth.authStateChanges().listen((user) {
       if (mounted && user?.uid != _ownerUid) {
         setState(() => _accountChanged = true);
       }
     });
     // Tabs removed; keep controller only if referenced elsewhere
     _tabController = TabController(length: 1, vsync: this);
-    _loadUserData();
-    // Automatically attempt to enhance profile on screen load
-    Future.delayed(const Duration(milliseconds: 500), () {
-      _autoEnhanceProfile();
-    });
+    _initializeScreen();
   }
 
   @override
@@ -159,28 +168,43 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
     super.dispose();
   }
 
+  Future<void> _initializeScreen() async {
+    if (!_sameAccount) return;
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+    try {
+      await _loadUserData();
+      if (!_sameAccount) return;
+      // Enrichment finishes before the form becomes editable.
+      await _autoEnhanceProfile();
+    } catch (_) {
+      _profileBaseline = null;
+      _notificationBaseline = null;
+      _loadError = 'Failed to load account details. Please try again.';
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _loadUserData() async {
     if (!_sameAccount) return;
-    if (CustomerController.logeInCustomer != null) {
-      final customer = CustomerController.logeInCustomer!;
+    _profileBaseline = null;
+    _notificationBaseline = null;
+    final document = await _firestore
+        .collection('Customers')
+        .doc(_ownerUid)
+        .get(const GetOptions(source: Source.server));
+    if (!_sameAccount) return;
+    if (!document.exists) throw StateError('Profile is unavailable');
+    {
+      final customer = CustomerModel.fromFirestore(document);
+      CustomerController.logeInCustomer = customer;
       _nameController.text = customer.name;
       _emailController.text = customer.email;
 
-      // Ensure username exists; if not, generate
-      if (customer.username == null || customer.username!.isEmpty) {
-        final firestoreHelper = FirebaseFirestoreHelper();
-        final newUsername = await firestoreHelper
-            .generateUsernameForExistingUser(customer.name);
-        if (!_sameAccount) return;
-        customer.username = newUsername;
-        await firestoreHelper.updateUsername(
-          userId: customer.uid,
-          newUsername: newUsername,
-        );
-        if (!_sameAccount) return;
-        CustomerController.logeInCustomer = customer;
-      }
-
+      // Usernames are edited explicitly; opening a form performs no assignment.
       _usernameController.text = customer.username ?? '';
       _phoneController.text = customer.phoneNumber ?? '';
       _ageController.text = customer.age?.toString() ?? '';
@@ -192,6 +216,18 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
       _selectedGender = customer.gender;
       _isDiscoverable = customer.isDiscoverable;
 
+      for (final controller in [
+        _twitterController,
+        _instagramController,
+        _linkedinController,
+        _facebookController,
+        _youtubeController,
+        _tiktokController,
+      ]) {
+        controller.clear();
+      }
+      // Snapshot normalized rendered social controls, not their raw JSON.
+      // Name-only edits preserve unknown social keys and storage formatting.
       // Parse social links (stored as JSON string or map)
       try {
         final raw = customer.socialMediaLinks;
@@ -212,157 +248,153 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
         }
       } catch (_) {}
 
-      // Notification settings have one canonical location shared with the
-      // server-side reminder worker. Fall back to the legacy customer fields
-      // only for accounts that have not saved the canonical settings yet.
-      try {
-        final settingsDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(customer.uid)
-            .collection('settings')
-            .doc('notifications')
-            .get();
-        if (!_sameAccount) return;
-        if (settingsDoc.exists) {
-          final prefs = settingsDoc.data()!;
-          _notifyEventReminders = (prefs['eventReminders'] ?? true) == true;
-          _notifyMessages = (prefs['messagesAll'] ?? true) == true;
-          _notifyAnnouncements =
-              (prefs['generalNotifications'] ?? true) == true;
-        } else {
-          final customerDoc = await FirebaseFirestore.instance
-              .collection(CustomerModel.firebaseKey)
-              .doc(customer.uid)
-              .get();
-          if (!_sameAccount) return;
-          final data = customerDoc.data();
-          if (data != null && data['notificationPreferences'] is Map) {
-            final prefs = Map<String, dynamic>.from(
-              data['notificationPreferences'],
-            );
-            _notifyEventReminders = (prefs['eventReminders'] ?? true) == true;
-            _notifyMessages = (prefs['messages'] ?? true) == true;
-            _notifyAnnouncements = (prefs['announcements'] ?? true) == true;
-          }
-        }
-      } catch (_) {}
+      final preferences = await NotificationPreferencesStore.read(
+        _firestore,
+        customer.uid,
+      );
+      if (!_sameAccount) return;
+      _notifyEventReminders = preferences.settings.eventReminders;
+      _notifyMessages = preferences.settings.messagesAll;
+      _notifyAnnouncements = preferences.settings.generalNotifications;
+      _profileBaseline = ProfileEditSnapshot.profile(_formValues());
+      _socialBaseline = SocialLinksEditSnapshot(_socialValues());
+      _notificationBaseline = ProfileEditSnapshot.notifications(
+        _notificationValues(),
+      );
 
       if (mounted) setState(() {});
     }
   }
 
+  Map<String, dynamic> _formValues() {
+    String? optional(TextEditingController controller) =>
+        controller.text.trim().isEmpty ? null : controller.text.trim();
+    return {
+      'name': _nameController.text.trim(),
+      'email': _emailController.text.trim(),
+      'username': optional(_usernameController)?.toLowerCase(),
+      'phoneNumber': optional(_phoneController),
+      'age': int.tryParse(_ageController.text.trim()),
+      'gender': _selectedGender,
+      'location': optional(_locationController),
+      'occupation': optional(_occupationController),
+      'company': optional(_companyController),
+      'website': optional(_websiteController),
+      'bio': optional(_bioController),
+      'isDiscoverable': _isDiscoverable,
+    };
+  }
+
+  Map<String, String> _socialValues() => {
+    'twitter': _twitterController.text.trim(),
+    'instagram': _instagramController.text.trim(),
+    'linkedin': _linkedinController.text.trim(),
+    'facebook': _facebookController.text.trim(),
+    'youtube': _youtubeController.text.trim(),
+    'tiktok': _tiktokController.text.trim(),
+  };
+
+  Map<String, dynamic> _notificationValues() => {
+    'eventReminders': _notifyEventReminders,
+    'messagesAll': _notifyMessages,
+    'generalNotifications': _notifyAnnouncements,
+  };
+
   Future<void> _saveAccountDetails() async {
-    if (!_sameAccount) return;
+    if (!_sameAccount ||
+        _isSaving ||
+        _profileBaseline == null ||
+        _notificationBaseline == null ||
+        _socialBaseline == null) {
+      _btnCtlr.reset();
+      return;
+    }
     if (!_formKey.currentState!.validate()) {
       _btnCtlr.reset();
       return;
     }
-
+    final updates = _profileBaseline!.changes(_formValues());
+    final preferenceChanges = _notificationBaseline!.changes(
+      _notificationValues(),
+    );
+    final socialChanges = _socialBaseline!.changes(_socialValues());
+    setState(() => _isSaving = true);
+    bool committed = false;
     try {
-      final customer = CustomerController.logeInCustomer!;
-
-      // Update customer model with new data
-      customer.name = _nameController.text.trim();
-      customer.email = _emailController.text.trim();
-      customer.username = _usernameController.text.trim().isEmpty
-          ? null
-          : _usernameController.text.trim().toLowerCase(); // Update username
-      customer.phoneNumber = _phoneController.text.trim().isEmpty
-          ? null
-          : _phoneController.text.trim();
-      customer.age = _ageController.text.trim().isEmpty
-          ? null
-          : int.tryParse(_ageController.text.trim());
-      customer.gender = _selectedGender;
-      customer.location = _locationController.text.trim().isEmpty
-          ? null
-          : _locationController.text.trim();
-      customer.occupation = _occupationController.text.trim().isEmpty
-          ? null
-          : _occupationController.text.trim();
-      customer.company = _companyController.text.trim().isEmpty
-          ? null
-          : _companyController.text.trim();
-      customer.website = _websiteController.text.trim().isEmpty
-          ? null
-          : _websiteController.text.trim();
-      customer.bio = _bioController.text.trim().isEmpty
-          ? null
-          : _bioController.text.trim();
-      customer.isDiscoverable = _isDiscoverable;
-
-      // Build social links JSON for storage
-      final social = <String, String>{};
-      void putIfNotEmpty(String key, String value) {
-        if (value.trim().isNotEmpty) social[key] = value.trim();
+      final profile = _firestore.collection('Customers').doc(_ownerUid);
+      if (preferenceChanges.isNotEmpty || socialChanges.isNotEmpty) {
+        await _firestore.runTransaction((transaction) async {
+          final current = socialChanges.isEmpty
+              ? null
+              : await transaction.get(profile);
+          final preferences = preferenceChanges.isEmpty
+              ? null
+              : await NotificationPreferencesStore.read(
+                  _firestore,
+                  _ownerUid!,
+                  transaction: transaction,
+                );
+          if (!_sameAccount) throw StateError('Account changed');
+          if (current != null && !current.exists) {
+            throw StateError('Profile is unavailable');
+          }
+          final profilePatch = {
+            ...updates,
+            if (socialChanges.isNotEmpty)
+              'socialMediaLinks': SocialLinksEditSnapshot.merge(
+                current!.data()?['socialMediaLinks'],
+                socialChanges,
+              ),
+          };
+          if (profilePatch.isNotEmpty) {
+            transaction.update(profile, profilePatch);
+          }
+          if (preferences != null) {
+            transaction.set(
+              preferences.canonicalRef,
+              preferences.patchForWrite(preferenceChanges),
+              SetOptions(merge: true),
+            );
+          }
+        });
+      } else if (updates.isNotEmpty) {
+        await profile.update(updates);
       }
-
-      putIfNotEmpty('twitter', _twitterController.text);
-      putIfNotEmpty('instagram', _instagramController.text);
-      putIfNotEmpty('linkedin', _linkedinController.text);
-      putIfNotEmpty('facebook', _facebookController.text);
-      putIfNotEmpty('youtube', _youtubeController.text);
-      putIfNotEmpty('tiktok', _tiktokController.text);
-      customer.socialMediaLinks = social.isEmpty ? null : json.encode(social);
-
-      // Keep profile data and canonical notification settings in one atomic
-      // write so the UI cannot report success after only one side is saved.
-      final Map<String, dynamic> updateData = CustomerModel.getProfileUpdateMap(
-        customer,
-      );
-      final firestore = FirebaseFirestore.instance;
-      final batch = firestore.batch();
-      batch.update(
-        firestore.collection(CustomerModel.firebaseKey).doc(customer.uid),
-        updateData,
-      );
-      batch.set(
-        firestore
-            .collection('users')
-            .doc(customer.uid)
-            .collection('settings')
-            .doc('notifications'),
-        {
-          'eventReminders': _notifyEventReminders,
-          'messagesAll': _notifyMessages,
-          'generalNotifications': _notifyAnnouncements,
-        },
-        SetOptions(merge: true),
-      );
-      await batch.commit();
+      committed = true;
       if (!_sameAccount) return;
-
+      await _loadUserData();
+      if (!_sameAccount) return;
       _btnCtlr.success();
-      // Haptic + snackbar style feedback
-      if (mounted) {
-        HapticFeedback.mediumImpact();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            content: Row(
-              children: const [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 8),
-                Expanded(child: Text('Account details updated successfully!')),
-              ],
-            ),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-
-      // Update the local customer data
-      CustomerController.logeInCustomer = customer;
-
-      // Navigate back after a short delay
+      HapticFeedback.mediumImpact();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Account details updated successfully!'),
+          duration: Duration(seconds: 2),
+        ),
+      );
       Future.delayed(const Duration(seconds: 1), () {
-        if (!mounted) return;
+        if (!mounted || !_sameAccount) return;
         Navigator.pop(context);
       });
     } catch (e) {
       _btnCtlr.reset();
-      ShowToast().showNormalToast(msg: 'Failed to update account details: $e');
+      if (!_sameAccount) return;
+      if (committed) {
+        _profileBaseline = null;
+        _notificationBaseline = null;
+        _loadError =
+            'Changes were saved, but the profile could not be reloaded. Please try again.';
+      }
+      ShowToast().showNormalToast(
+        msg: committed
+            ? 'Saved. Reload your profile before editing again.'
+            : e is FormatException
+            ? 'Stored social links could not be read. No changes were saved.'
+            : 'Failed to update account details',
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -378,6 +410,26 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
         ),
       );
     }
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (_loadError != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Account Details')),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_loadError!),
+              TextButton(
+                onPressed: _initializeScreen,
+                child: const Text('Try again'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
@@ -388,7 +440,9 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
               title: 'Account Details',
               subtitle: 'Manage your personal information',
             ),
-            Expanded(child: _bodyView()),
+            Expanded(
+              child: AbsorbPointer(absorbing: _isSaving, child: _bodyView()),
+            ),
           ],
         ),
       ),
@@ -409,7 +463,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
         ),
       ),
       child: RefreshIndicator(
-        onRefresh: _loadUserData,
+        onRefresh: _initializeScreen,
         color: Theme.of(context).colorScheme.primary,
         backgroundColor: Theme.of(context).colorScheme.surface,
         child: SingleChildScrollView(
@@ -434,6 +488,7 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
   Future<void> _autoEnhanceProfile() async {
     if (!_sameAccount) return;
     if (_hasAutoUpdated) return;
+    _hasAutoUpdated = true;
 
     try {
       debugPrint('🔄 Auto-enhancing profile on account details screen load...');
@@ -519,13 +574,13 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
     try {
       debugPrint('🔄 Forcing token refresh...');
 
-      final currentUser = FirebaseAuth.instance.currentUser;
+      final currentUser = _auth.currentUser;
       if (currentUser == null) return false;
 
       // Force refresh the token to get latest user info
       await currentUser.reload();
       if (!_sameAccount) return false;
-      final refreshedUser = FirebaseAuth.instance.currentUser;
+      final refreshedUser = _auth.currentUser;
 
       if (refreshedUser != null) {
         debugPrint(
@@ -1332,10 +1387,9 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
       return;
     }
 
-    await FirebaseFirestore.instance
-        .collection(CustomerModel.firebaseKey)
-        .doc(user.uid)
-        .update({'profilePictureUrl': url});
+    await _firestore.collection(CustomerModel.firebaseKey).doc(user.uid).update(
+      {'profilePictureUrl': url},
+    );
     if (!_sameAccount) return;
 
     setState(() {
@@ -1352,10 +1406,9 @@ class _AccountDetailsScreenState extends State<AccountDetailsScreen>
     await FirebaseStorageHelper.deleteProfilePicture(user.uid);
     if (!_sameAccount) return;
 
-    await FirebaseFirestore.instance
-        .collection(CustomerModel.firebaseKey)
-        .doc(user.uid)
-        .update({'profilePictureUrl': FieldValue.delete()});
+    await _firestore.collection(CustomerModel.firebaseKey).doc(user.uid).update(
+      {'profilePictureUrl': FieldValue.delete()},
+    );
     if (!_sameAccount) return;
 
     setState(() {

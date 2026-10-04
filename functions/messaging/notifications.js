@@ -16,11 +16,17 @@ async function deliverMessageNotifications(db, messaging, event) {
     if (!conversation.participantIds.includes(uid) || uid === message.senderId) continue;
     const userRef = db.collection("users").doc(uid);
     const [user, settings, legacy, person, blockA, blockB] = await db.getAll(userRef,
-        userRef.collection("notificationSettings").doc("settings"), userRef.collection("settings").doc("notifications"),
+        userRef.collection("settings").doc("notifications"), userRef.collection("notificationSettings").doc("settings"),
         db.collection("Customers").doc(uid), db.doc(`Customers/${uid}/blocks/${message.senderId}`),
         db.doc(`Customers/${message.senderId}/blocks/${uid}`));
     if (blockA.exists || blockB.exists) continue;
-    const config = settings.exists ? settings.data() : legacy.data() || {};
+    const customerPreferences = person.data()?.notificationPreferences;
+    const customerConfig = customerPreferences && typeof customerPreferences === "object" && !Array.isArray(customerPreferences) ? customerPreferences : {};
+    // An existing settings document is authoritative, including its defaults.
+    // Customer's older editor named the ordinary-message control "messages".
+    const config = settings.exists ? settings.data() : legacy.exists ? legacy.data() : {
+      ...customerConfig, ...(Object.hasOwn(customerConfig, "messages") ? {messagesAll: customerConfig.messages} : {}),
+    };
     const mention = Boolean(person.data()?.username && message.content?.includes(`@${person.data().username}`));
     const normal = config.messagesAll !== false && config.messageNotifications !== false;
     if (!normal && !(mention && config.messageMentions !== false)) continue;
