@@ -92,18 +92,34 @@ async function seal(args) {
   fs.cpSync(web, path.join(output, "web"), {recursive: true, errorOnExist: true, force: false});
   write(path.join(output, "candidate.json"), candidate);
 }
-async function verifyLive(candidate) {
-  const origins = candidate.environment === "production" ? ["https://attendus.app", "https://orgami-66nxok.web.app"] : ["https://attendus-staging.web.app", "https://attendus-staging.firebaseapp.com"];
-  const names = Object.keys(candidate.webFiles).filter((name) => ["index.html", "flutter_bootstrap.js", "firebase-messaging-sw.js", "flutter_service_worker.js", "release-manifest.json"].includes(name) || name.startsWith(`releases/${candidate.releaseId}/`) || name.startsWith(assets.PREFIX));
-  for (const origin of origins) {
-    const queue = [...names];
-    await Promise.all(Array.from({length: 4}, async () => {
-      while (queue.length) {
-        const name = queue.shift(); const response = await fetch(`${origin}/${name.split("/").map(encodeURIComponent).join("/")}`, {signal: AbortSignal.timeout(60000), cache: "no-store", redirect: "error"});
-        if (!response.ok || c.sha256(Buffer.from(await response.arrayBuffer())) !== candidate.webFiles[name]) throw Error(`Live artifact differs: ${origin}/${name}`);
-      }
-    }));
-  }
+async function verifyLive(candidate, {expectedHostingIdentity = null, output = null, client = null} = {}) {
+  client ||= await require("./web_release_state").googleClient();
+  const readHostingIdentity = ({signal, timeoutMs = 12000} = {}) => assets.currentHosting(candidate.projectId, {
+    request: (options) => client.request({...options, signal,
+      timeout: Math.min(options.timeout || timeoutMs, timeoutMs)}),
+  });
+  expectedHostingIdentity ||= await readHostingIdentity();
+  return require("./verify_web_hosting").verifyHosting({candidate, expectedHostingIdentity, readHostingIdentity,
+    onEvidence: (receipt) => { if (output) write(output, receipt); }});
+}
+async function verifyPublishedDeployment(candidate, publishedHosting, {output, client},
+    {capture = captureState, http = verifyLive, manifest = read(path.join(root, "firestore.indexes.json"))} = {}) {
+  const retain = (phase, snapshot) => write(path.join(path.dirname(output), `hosting-state-${phase}-verification.json`), {
+    schemaVersion: 1, sourceSha: candidate.sourceSha, candidateRunId: candidate.candidateRunId,
+    candidateSha256: c.digest(candidate), ...snapshot,
+  });
+  // Full deployment captures are separate from the verifier's fixed HTTP budget.
+  // Retain both observations even when candidate or drift checks then reject them.
+  const before = await capture(candidate.projectId); retain("before", before);
+  verifyState(candidate, before, manifest);
+  if (c.digest(assets.hostingPart(before.state)) !== c.digest(publishedHosting)) throw Error("Hosting release changed before live byte verification");
+  const live = await http(candidate, {expectedHostingIdentity: publishedHosting, client,
+    output: path.join(path.dirname(output), "hosting-live-verification.json")});
+  const after = await capture(candidate.projectId); retain("after", after);
+  verifyState(candidate, after, manifest);
+  if (c.digest(assets.hostingPart(after.state)) !== c.digest(publishedHosting)) throw Error("Hosting release changed after live byte verification");
+  if (c.digest(before.state) !== c.digest(after.state)) throw Error("Full deployment state changed during live byte verification");
+  return {live, before, after};
 }
 function validateFunctionCompletion(receipt, candidate, predecessor, preflight, invokedAt) {
   const adapter = require("./deploy_web_functions");
@@ -219,11 +235,18 @@ async function deploy(candidate, bundle, expectedState, output) {
   c.validateArtifact(candidate, root, path.join(bundle, "web"));
   assets.assertBridgeState(await assets.currentHosting(candidate.projectId, await require("./web_release_state").googleClient()), bridge);
   deployStep("hosting", "hosting");
-  await verifyLive(candidate);
-  const after = verifyState(candidate, await captureState(candidate.projectId), read(path.join(root, "firestore.indexes.json")));
+  const hostingClient = await require("./web_release_state").googleClient();
+  const publishedHosting = await assets.currentHosting(candidate.projectId, hostingClient);
+  if (publishedHosting.hostingVersion === bridge.live.hostingVersion || publishedHosting.hostingRelease === bridge.live.hostingRelease) throw Error("Hosting command did not publish a new final release");
+  write(path.join(path.dirname(output), "hosting-publication.json"), {schemaVersion: 1, sourceSha: candidate.sourceSha,
+    candidateRunId: candidate.candidateRunId, candidateSha256: c.digest(candidate), capturedAt: new Date().toISOString(), hosting: publishedHosting});
+  const verified = await verifyPublishedDeployment(candidate, publishedHosting, {output, client: hostingClient});
+  const {live, after} = verified;
   write(output, {schemaVersion: 1, environment: candidate.environment, sourceSha: candidate.sourceSha,
     candidateSha256: c.digest(candidate), verifiedAt: after.capturedAt, stateSha256: after.stateSha256,
-    state: after.state, predecessor: before.state, hostingAssetBridgeSha256: c.digest(bridge), workflowRunId: process.env.GITHUB_RUN_ID || null});
+    state: after.state, predecessor: before.state, hostingAssetBridgeSha256: c.digest(bridge),
+    hostingLiveVerificationSha256: c.digest(live), hostingStateBeforeVerificationSha256: verified.before.stateSha256,
+    hostingStateAfterVerificationSha256: after.stateSha256, workflowRunId: process.env.GITHUB_RUN_ID || null});
 }
 async function qualify(args) {
   const directory = path.resolve(args.output || "build/web-qualification"); const runId = args["candidate-run"];
@@ -280,4 +303,4 @@ async function main() {
   throw Error("Expected capture-predecessors, seal, stage, qualify or promote");
 }
 if (require.main === module) main().catch((error) => { console.error(error.stack); process.exitCode = 1; });
-module.exports = {download, loadCandidate, materializeBackend, materializeRules, options, verifyLive, validateFunctionCompletion, runFunctionsCommand, deploy, qualify, promote, write};
+module.exports = {download, loadCandidate, materializeBackend, materializeRules, options, verifyLive, verifyPublishedDeployment, validateFunctionCompletion, runFunctionsCommand, deploy, qualify, promote, write};
