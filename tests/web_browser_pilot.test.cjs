@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const {createHash} = require("node:crypto");
 const {runBrowserPilot, createPilotObserver, createGuestProofObserver, validatePilot} = require("../tools/web_release_producers/browser-pilot");
 const {bindingId, emailHash} = require("../functions/communications/qualification-isolation");
+const {readRosterPage, collectRosterPages} = require("../tools/web_release_producers/roster-read");
 const roles = ["owner", "attendee", "staff", "unauthorized"];
 function fixture() {
   const runId = "webqa-20261004-1234567890";
@@ -73,6 +74,93 @@ test("browser pilot uses exact authenticated APIs, safe receipts and explicit sa
   assert.notEqual(submissions[1].data.idempotencyKey, submissions[2].data.idempotencyKey);
   await runBrowserPilot({fixture: f, candidateIdentity: f, ...mock, timeoutMs: 100, pollIntervalMs: 0});
   assert.equal(mock.state.previews, 1, "a rerun reuses the actual prior announcement, never sends a fresh preview");
+});
+
+test("pilot retries transient roster readiness without replaying any mutation", async () => {
+  const f = fixture(), baseline = adapters(f), transient = adapters(f);
+  await runBrowserPilot({fixture: f, candidateIdentity: f, ...baseline, timeoutMs: 100, pollIntervalMs: 0});
+  let reads = 0;
+  const original = transient.callAs;
+  transient.callAs = async (role, name, data) => {
+    if (name === "listEventRosterV2" && ++reads === 1) throw Object.assign(Error("Roster is updating. Retry shortly."), {status: "UNAVAILABLE"});
+    return original(role, name, data);
+  };
+  const report = await runBrowserPilot({fixture: f, candidateIdentity: f, ...transient, timeoutMs: 100, pollIntervalMs: 0});
+  assert.equal(reads, 2); assert.ok(report.completedAt);
+  assert.deepEqual(transient.calls.filter((call) => call.name !== "listEventRosterV2"),
+    baseline.calls.filter((call) => call.name !== "listEventRosterV2"), "only the failing read is retried");
+  const uncertain = adapters(f); let mutations = 0;
+  uncertain.callAs = async (_, name) => {
+    assert.equal(name, "startPublicRegistrationV3"); mutations++;
+    throw Object.assign(Error("Unknown mutation result"), {status: "UNAVAILABLE"});
+  };
+  await assert.rejects(runBrowserPilot({fixture: f, candidateIdentity: f, ...uncertain, timeoutMs: 100, pollIntervalMs: 0}), /Unknown mutation/);
+  assert.equal(mutations, 1, "the same error on a mutation is never automatically retried");
+});
+
+test("roster read preserves the exact request across explicit unavailable variants", async () => {
+  for (const error of [{status: "UNAVAILABLE"}, {code: "functions/unavailable"}, {code: "unavailable"}]) {
+    const request = {eventId: "event", cursor: "signed-original-cursor", pageSize: 50, query: "name", registrationStatus: "confirmed"};
+    const calls = [];
+    const result = await readRosterPage(async (name, data) => {
+      calls.push({name, data: structuredClone(data)});
+      if (calls.length === 1) {data.cursor = "corrupted-adapter-copy"; throw Object.assign(Error("updating"), error);}
+      return {rows: []};
+    }, request, {retryDelayMs: 0});
+    assert.deepEqual(result, {rows: []});
+    assert.deepEqual(calls, [{name: "listEventRosterV2", data: request}, {name: "listEventRosterV2", data: request}]);
+  }
+});
+
+test("roster read fails closed on all other errors and bounded exhaustion", async () => {
+  for (const status of ["ABORTED", "PERMISSION_DENIED", "UNAUTHENTICATED", "INVALID_ARGUMENT", "DEADLINE_EXCEEDED", "INTERNAL", "RESOURCE_EXHAUSTED", undefined]) {
+    const error = Object.assign(Error("read failed"), {status}); let calls = 0;
+    await assert.rejects(readRosterPage(async () => {calls++; throw error;}, {eventId: "event"}, {retryDelayMs: 0}), (actual) => actual === error);
+    assert.equal(calls, 1);
+  }
+  let calls = 0;
+  await assert.rejects(readRosterPage(async () => {calls++; throw Object.assign(Error("updating"), {status: "UNAVAILABLE"});},
+    {eventId: "event"}, {maxAttempts: 3, retryDelayMs: 0}), /updating/);
+  assert.equal(calls, 3);
+  let clock = 0; calls = 0;
+  await assert.rejects(readRosterPage(async () => {calls++; throw Object.assign(Error("updating"), {status: "UNAVAILABLE"});},
+    {eventId: "event"}, {timeoutMs: 10, retryDelayMs: 10, now: () => clock, sleep: async (duration) => {clock += duration;}}), /bounded deadline/);
+  assert.equal(calls, 1, "deadline prevents another attempt even when attempt budget remains");
+  await assert.rejects(readRosterPage(() => new Promise(() => {}), {eventId: "event"}, {timeoutMs: 20}), /bounded deadline/);
+});
+
+const rosterPage = (ids, nextCursor, changes = {}) => ({rows: ids.map((id) => ({registrationId: id})), nextCursor,
+  snapshotAt: {_seconds: 123, _nanoseconds: 0}, total: 2, matchingCount: 2, ...changes});
+test("large roster scan pins snapshot and cursor during a transient page read", async () => {
+  const calls = []; let secondAttempts = 0;
+  const result = await collectRosterPages(async (name, data) => {
+    calls.push({name, data: structuredClone(data)});
+    if (!data.cursor) return rosterPage(["one"], "signed-page-two");
+    if (++secondAttempts === 1) throw Object.assign(Error("temporarily unavailable"), {status: "UNAVAILABLE"});
+    return rosterPage(["two"], null, {newerDataAvailable: true});
+  }, {eventId: "event", query: "same filter"}, {retryDelayMs: 0});
+  assert.equal(result.seen, 2); assert.equal(result.pages, 2);
+  assert.deepEqual(calls.slice(1).map((call) => call.data), [
+    {eventId: "event", query: "same filter", cursor: "signed-page-two"},
+    {eventId: "event", query: "same filter", cursor: "signed-page-two"},
+  ]);
+});
+
+test("large roster scan rejects changed or expired snapshots without restarting", async () => {
+  for (const changed of [{snapshotAt: {_seconds: 124, _nanoseconds: 0}}, {total: 3}, {matchingCount: 3}]) {
+    await assert.rejects(collectRosterPages(async (_, data) => data.cursor ? rosterPage(["two"], null, changed) :
+      rosterPage(["one"], "cursor"), {eventId: "event"}), /changed its snapshot/);
+  }
+  let calls = 0;
+  await assert.rejects(collectRosterPages(async (_, data) => {
+    calls++;
+    if (data.cursor) throw Object.assign(Error("snapshot expired"), {status: "ABORTED"});
+    return rosterPage(["one"], "cursor");
+  }, {eventId: "event"}), /snapshot expired/);
+  assert.equal(calls, 2, "expired generation never triggers a fresh first page");
+  await assert.rejects(collectRosterPages(async () => rosterPage(["one"], null), {eventId: "event"}), /omitted matching/);
+  await assert.rejects(collectRosterPages(async (_, data) => rosterPage(["one"], data.cursor ? null : "cursor"), {eventId: "event"}), /duplicate/);
+  await assert.rejects(collectRosterPages(async (_, data) => rosterPage([data.cursor || "one"], "cursor"), {eventId: "event"}), /repeated a cursor/);
 });
 test("pilot blocks wrong targets, identity drift, unowned roles and missing private observer before calls", async () => {
   const f = fixture();
