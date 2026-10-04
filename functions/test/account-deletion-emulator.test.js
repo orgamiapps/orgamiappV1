@@ -41,8 +41,16 @@ test("non-shared fixture deletion clears registry and preserves cumulative count
   await db.collection("Customers").doc(uid).set({name: "Fixture"});
   await db.collection("notifications").doc(uid).set({userId: uid});
   await db.collection("EventDrafts").doc(uid).set({ownerUid: uid});
+  const analytics = db.collection("user_analytics").doc(uid);
+  const recompute = db.collection("_user_analytics_recompute").doc(uid);
+  await analytics.set({totalEvents: 0});
+  await recompute.set({requestedGeneration: 2, processedGeneration: 1});
   let calls = 0;
-  const auth = {deleteUser: async () => { calls++; }};
+  const auth = {deleteUser: async () => {
+    assert.equal((await analytics.get()).exists, false, "Analytics must be removed before Auth");
+    assert.equal((await recompute.get()).exists, false, "Recompute identity must be removed before Auth");
+    calls++;
+  }};
   const result = await runAccountDeletion({uid, db, bucket, auth});
   assert.equal(result.status, "complete");
   assert.equal(result.documentsDeleted, 2);

@@ -455,6 +455,7 @@ const {
   createProcessUserAnalyticsRecompute,
   processUserAnalyticsRecompute,
   requestUserAnalyticsRecompute,
+  reconcileEventUserAnalytics,
 } = require("./analytics/user-analytics");
 exports.processUserAnalyticsRecomputeV2 =
   createProcessUserAnalyticsRecompute(admin);
@@ -602,24 +603,7 @@ exports.aggregateUserAnalyticsV2 = onDocumentWritten({
   retry: true,
 }, async (event) => {
   try {
-    const eventId = event.params.eventId;
-    const eventDocument = await admin.firestore()
-        .collection("Events").doc(eventId).get();
-    if (!eventDocument.exists) {
-      logger.info("Event not found, skipping user analytics request", {eventId});
-      return {skipped: true, reason: "event_not_found"};
-    }
-    const userId = eventDocument.get("customerUid");
-    if (!userId) {
-      logger.info("Event has no analytics owner", {eventId});
-      return {skipped: true, reason: "missing_owner"};
-    }
-    const generation = await requestUserAnalyticsRecompute(
-        admin,
-        userId,
-        "event_analytics_write",
-    );
-    return {requested: true, generation};
+    return await reconcileEventUserAnalytics(admin, event.params.eventId, {reason: "event_analytics_write"});
   } catch (error) {
     logger.error("Error requesting aggregate user analytics", {
       eventId: event.params.eventId,
@@ -643,24 +627,9 @@ exports.updateUserAnalyticsOnEventCreateV2 = onDocumentCreated({
   if (!userId) return {skipped: true, reason: "missing_owner"};
 
   try {
-    const db = admin.firestore();
-    const eventAnalyticsReference = db.collection("event_analytics")
-        .doc(event.params.eventId);
-    await db.runTransaction(async (transaction) => {
-      const snapshot = await transaction.get(eventAnalyticsReference);
-      if (!snapshot.exists) {
-        transaction.create(eventAnalyticsReference, {
-          totalAttendees: 0,
-          lastUpdated: admin.firestore.Timestamp.now(),
-        });
-      }
+    return await reconcileEventUserAnalytics(admin, event.params.eventId, {
+      reason: "event_create", expectedOwner: userId, initialize: true,
     });
-    const generation = await requestUserAnalyticsRecompute(
-        admin,
-        userId,
-        "event_create",
-    );
-    return {requested: true, generation};
   } catch (error) {
     logger.error("Error initializing analytics for new event", {
       eventId: event.params.eventId,
@@ -679,22 +648,15 @@ exports.updateUserAnalyticsOnEventDeleteV2 = onDocumentDeleted({
   region: "us-central1",
   retry: true,
 }, async (event) => {
-  const eventData = event.data.data();
-  const userId = eventData.customerUid;
+  const eventData = event.data?.data();
+  const userId = eventData?.customerUid;
   const eventId = event.params.eventId;
   if (!userId) return {skipped: true, reason: "missing_owner"};
 
   try {
-    await admin.firestore().collection("event_analytics").doc(eventId)
-        .delete().catch((error) => {
-          if (error.code !== 5 && error.code !== "not-found") throw error;
-        });
-    const generation = await requestUserAnalyticsRecompute(
-        admin,
-        userId,
-        "event_delete",
-    );
-    return {requested: true, generation};
+    return await reconcileEventUserAnalytics(admin, eventId, {
+      reason: "event_delete", expectedOwner: userId, deleted: true,
+    });
   } catch (error) {
     logger.error("Error requesting analytics after event deletion", {
       eventId,

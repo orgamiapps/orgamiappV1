@@ -25,6 +25,7 @@ test("account deletion contract covers sensitive user data", () => {
   assert.equal(ROOT_DOCUMENTS.includes("users"), true);
   assert.equal(deletedCollections.has("Conversations"), false, "shared conversations require selective cleanup");
   assert.equal(ROOT_DOCUMENTS.includes("Customers"), true);
+  assert.equal(ROOT_DOCUMENTS.includes("_user_analytics_recompute"), true);
   assert.equal(COLLECTION_GROUP_QUERIES.some(([collection, field]) => collection === "AccessRequests" && field === "userId"), true);
   assert.equal(PAYMENT_COLLECTIONS.includes("TicketPayments"), true);
   assert.equal(STORAGE_PREFIXES.some((prefix) => prefix.startsWith("profile_")), true);

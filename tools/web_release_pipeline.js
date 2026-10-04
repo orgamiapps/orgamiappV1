@@ -109,8 +109,21 @@ async function deploy(candidate, bundle, expectedState, output) {
   c.validateArtifact(candidate, root, path.join(bundle, "web"));
   const before = await captureState(candidate.projectId);
   if (c.digest(before.state) !== c.digest(expectedState)) throw Error("Prior deployment changed; prepare and qualify a new candidate");
-  if (candidate.environment === "staging") require("./rehearse_web_backend").validateArchives(
-      read(path.join(root, "config/web_backend_predecessor_archives.json")), before.state);
+  if (candidate.environment === "staging") {
+    const rehearsal = require("./rehearse_web_backend");
+    const startedAt = new Date().toISOString();
+    // The same strict pre-fixture check also runs immediately before and during
+    // rollback. Check here before materialization, CLI preparation (which may
+    // enable APIs), or any Hosting/rules/Functions deployment can change state.
+    const checks = await rehearsal.assertEmpty(await require("./web_release_state").googleClient());
+    write(path.join(path.dirname(output), "staging-empty-prerequisite.json"), {
+      schemaVersion: 1, kind: "staging-empty-prerequisite", environment: "staging", projectId: candidate.projectId,
+      sourceSha: candidate.sourceSha, candidateRunId: candidate.candidateRunId, candidateSha256: c.digest(candidate),
+      predecessorStateSha256: c.digest(before.state), startedAt, verifiedAt: checks.checkedAt, checks,
+      workflowRunId: process.env.GITHUB_RUN_ID || null,
+    });
+    rehearsal.validateArchives(read(path.join(root, "config/web_backend_predecessor_archives.json")), before.state);
+  }
   assets.planBridge(candidate, path.join(bundle, "web"), expectedState);
   const rulesRoot = materializeRules(candidate);
   const configuration = read(path.join(rulesRoot, "firebase.json"));
