@@ -11,6 +11,18 @@ const hash = (text) => crypto.createHash("sha256").update(text).digest("hex");
 const iso = (value) => value?.toDate?.().toISOString() || null;
 const safeId = (value) => typeof value === "string" && /^[A-Za-z0-9_.:-]{1,500}$/.test(value);
 
+function pendingDiscoveryDelay(discovery, item, observedAt) {
+  const [created, updated, ready, queued, committed, observed] =
+    [discovery.documentCreatedAt, discovery.updatedAt, item.readyAt, item.queuedAt, item.updatedAt, observedAt].map(Date.parse);
+  // enqueue() samples its clock before entering the transaction; queuedAt is
+  // the server commit timestamp. A slow commit does not shorten that delay.
+  // Bound the original computation to the retained event/queue timestamps
+  // instead of assuming that the transaction committed within one second.
+  const computed = ready - 45 * 60000;
+  return [created, updated, ready, queued, committed, observed].every(Number.isFinite) &&
+    created <= updated && updated <= observed && created <= computed && computed <= queued && queued <= committed && committed <= observed;
+}
+
 function previousDeletion({candidate, candidateIdentity, identity, priorEvidence, fixture}) {
   const {validateEvidence, relativeFile} = require("../web_release_contract");
   for (const {report, outputDir} of priorEvidence) {
@@ -103,8 +115,8 @@ function createCommunicationsObserver({fixture, candidateIdentity, db, auth}) {
         jobs: reminders.filter((doc) => doc.get("userId") === fixture.attendee.uid).map((doc) => ({id: doc.id, status: doc.get("deliveryState"),
           dueAt: iso(doc.get("originalDueAt")), deadlineAt: iso(doc.get("deliveryDeadline")), reminderMinutes: doc.get("reminderMinutes"), attempts: doc.get("attemptCount") || 0}))},
       discovery: {eventId: discovery.id, startsAt: schedule(discovery.data()).start?.toISOString(),
-        createdAt: iso(discovery.get("createdAt")),
-        items: discoveryItems.filter((doc) => doc.get("eventId") === spec.discoveryEventId).map((doc) => ({id: doc.id, status: doc.get("status"), readyAt: iso(doc.get("readyAt")), queuedAt: iso(doc.get("queuedAt"))})),
+        createdAt: iso(discovery.get("createdAt")), documentCreatedAt: iso(discovery.createTime), updatedAt: iso(discovery.updateTime),
+        items: discoveryItems.filter((doc) => doc.get("eventId") === spec.discoveryEventId).map((doc) => ({id: doc.id, status: doc.get("status"), readyAt: iso(doc.get("readyAt")), queuedAt: iso(doc.get("queuedAt")), updatedAt: iso(doc.updateTime)})),
         deliveries: discoveryDeliveries.filter((doc) => (doc.get("eventIds") || []).includes(spec.discoveryEventId))
             .map((doc) => ({id: doc.id, state: doc.get("state"), createdAt: iso(doc.get("createdAt"))}))},
       pending: {id: pending.id, exists: pending.exists, status: pending.get("status") || null,
@@ -181,7 +193,7 @@ async function runBrowserCommunications({fixture, candidateIdentity, candidate, 
     check("reminder_preserves_actual_scheduled_offset", true, proof.reminder.jobs.every((job) =>
       [15, 30, 60, 120, 1440].includes(job.reminderMinutes) && Date.parse(proof.reminder.startsAt) - Date.parse(job.dueAt) === job.reminderMinutes * 60000));
     check("discovery_preserves_real_45_minute_delay", true,
-      proof.discovery.items.some((item) => Number.isFinite(Date.parse(item.queuedAt)) && Date.parse(item.readyAt) - Date.parse(item.queuedAt) >= 45 * 60000 - 1000) ||
+      proof.discovery.items.some((item) => pendingDiscoveryDelay(proof.discovery, item, proof.observedAt)) ||
       proof.discovery.deliveries.some((item) => Date.parse(item.createdAt) - Date.parse(proof.discovery.createdAt) >= 45 * 60000 - 1000) ||
       proof.captures.some((row) => row.sourceKey.startsWith("discovery:") && row.eventIds.includes(spec.discoveryEventId) &&
         Date.parse(row.capturedAt) - Date.parse(proof.discovery.createdAt) >= 45 * 60000 - 1000));

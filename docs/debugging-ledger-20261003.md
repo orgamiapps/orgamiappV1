@@ -675,3 +675,45 @@ Platform transport doubles establish helper behavior, while the separately
 executed emulator suite establishes actual rules acceptance; neither is a live
 staging community journey. Explicitly malformed identity fields remain rejected;
 only the already-supported absent organizationId uses the membership parent path.
+
+## Staging candidate 37237620203: first browser run failed
+
+Source `c954c64c966191f3958b15679fb81b387899510a` passed the six hosted
+quality groups and deployed to isolated staging. Initial observation
+`37240369997` passed. Browser collector `37240967410` then failed all five
+gates; its retained diagnostic artifact `11317214538` has SHA256
+`e05f4cb14dc122e17f821dc1363355f6488172891312c04d67fd0277c1061f75`.
+No passing browser receipt exists, and dependent acceptance and production
+promotion remain held. Cleanup, reseeding and mutation replay have not been
+used to hide these failures.
+
+| ID / severity / surface | Reproduction and expected versus actual behavior | Root cause and correction | Verification and remaining acceptance |
+| --- | --- | --- | --- |
+| WEBQA-26 / P1 / web discovery history | Attach a ScrollPosition before its viewport supplies content dimensions, then restore browser history. Restoration should wait or preserve the saved position; instead it dereferences a null maxScrollExtent. Five retained Chromium exceptions map to the exact acquired deferred artifact at line 12169. | hasClients establishes attachment, not completed layout. Use one position with pixels and content dimensions, allow at most three frame completions, and preserve history when layout, generation, attachment or disposal makes restoration unavailable. | Before: two new real-viewport cases fail with the null-check exception, three controls pass. After: eight focused tests pass, including late layout, disposal, detachment and superseded restoration; focused analysis is clean. This local fix is not yet deployed. It does not establish the cause of every login timeout or Firefox/WebKit rethrow. |
+| WEBQA-27 / P2 / discovery qualification timing | The original queue has readyAt 23:16:48.924Z and server queuedAt 22:31:50.901Z. Its genuine 1.977-second commit lag incorrectly fails the pending 45-minute-delay assertion. | The enqueue clock is sampled before its transaction; queuedAt is assigned at commit. Bound the derived enqueue clock with the event's server createTime and queue commit timestamps; a later independent event-metadata update remains valid. Do not change the deadline or widen an arbitrary tolerance. | The initial reproduction has five passes/two failures. All eight final focused cases pass, including delayed commit, later metadata update and inconsistent ordering rejection before account deletion. Independent review is clear; all 319 release-contract tests pass. Failed B never reached this assertion; it is a separately reproduced harness defect. |
+
+The combined local client suite passes all 547 tests, and complete CI-scope
+client analysis reports no issues. These source corrections
+remain in the isolated repair branch; neither a new hosted candidate nor live
+browser acceptance of the corrected artifact has occurred.
+The retained client and 319-case contract logs have SHA256
+`ac382ce1d43c907ee14a80bd7f00fd07436ee8e166f72c8a9e693bf462439cf0`
+and `8987be6538f683d44a08217e8c5cc9285502702b4998562fb8fbf78eb457dc8b`.
+
+App Check returned 21 projected PERMISSION_DENIED responses during B.
+Read-only metadata confirms matching staging app/key/provider/domain settings;
+aggregate assessment metrics support risk rejection below the configured 0.5
+threshold but do not attribute every response individually. No threshold,
+enforcement, debug provider or production configuration has been changed.
+Guest-submission and other uncertain outcomes require retained-record
+reconciliation before any replay. The explicit staging snapshot at 23:08:14Z
+finds no committed V3 registration, ticket, attendance, session, export,
+announcement or original-conversation message from B; all 1,201 existing
+registrations belong to the seeded large roster. It accounts for six seeded
+accounts, all 14 acknowledged browser-created anonymous accounts and the one
+pre-existing anonymous account. Communications and deletion were never entered;
+the attendee reminder was never created. This current-state reconciliation
+does not manufacture an acknowledgement for the timed-out request.
+The owner could not supply the missing
+historical usage or ambiguous admission relationship; investigation of existing
+backups, logs and linked records continues without invented counters or links.
