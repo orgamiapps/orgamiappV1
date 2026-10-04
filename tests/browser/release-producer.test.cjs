@@ -74,6 +74,24 @@ test('Safari Auth iframe is read-only and bound to the staging project key and d
   assert.equal(allowStagingRequest(frame, 'GET', c), false);
 });
 
+test('GIS loader permits only its exact read-only bootstrap script without Google OAuth or data access', () => {
+  const c = context();
+  const script = 'https://accounts.google.com/gsi/client';
+  assert.equal(allowStagingRequest(script, 'GET', c), true);
+  for (const method of ['HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) {
+    assert.equal(allowStagingRequest(script, method, c), false, method);
+  }
+  for (const url of [script + '?', script + '?client_id=foreign', script + '#fragment', script + '/',
+    script.replace('https:', 'http:'), script.replace('.com/', '.com:444/'),
+    script.replace('accounts.google.com', 'user:password@accounts.google.com'),
+    script.replace('accounts.google.com', 'accounts.google.com.example.test'),
+    'https://accounts.google.com/gsi/status', 'https://accounts.google.com/gsi/iframe/select',
+    'https://accounts.google.com/o/oauth2/v2/auth', 'https://accounts.google.com/signin/oauth',
+    'https://oauth2.googleapis.com/token', 'https://www.googleapis.com/oauth2/v3/userinfo']) {
+    for (const method of ['GET', 'POST']) assert.equal(allowStagingRequest(url, method, c), false, `${method} ${url}`);
+  }
+});
+
 test('GAPI allows only the observed read-only Auth loader and iframe library', () => {
   const c = context();
   const loader = 'https://apis.google.com/js/api.js?onload=__iframefcb240125';

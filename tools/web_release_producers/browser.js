@@ -7,6 +7,7 @@ const {createRequire} = require('node:module');
 const dependencies = createRequire(path.resolve(__dirname, '../../tests/browser/package.json'));
 const serverDependencies = createRequire(path.resolve(__dirname, '../../functions/package.json'));
 const {gitSourceFiles} = require('../web_release_contract');
+const {collectRosterPages} = require('./roster-read');
 const {chromium, firefox, webkit} = dependencies('@playwright/test');
 const GATES = ['browser-auth-guest-organizer', 'account-switch-privacy', 'cache-upgrade-deeplinks',
   'accessibility-responsive', 'large-roster-export-download-expiry'];
@@ -38,6 +39,11 @@ function allowStagingRequest(value, method, context, headers = {}) {
   if (['data:', 'blob:', 'about:'].includes(url.protocol)) return true;
   if (url.origin === context.baseUrl) return true;
   if (url.protocol !== 'https:') return false;
+  // google_sign_in_web loads this static SDK during plugin registration even
+  // for email/guest sessions. This grants no Google OAuth or account API access.
+  if (url.origin === 'https://accounts.google.com') {
+    return method === 'GET' && url.href === 'https://accounts.google.com/gsi/client';
+  }
   // FlutterFire installs the popup resolver even for email/guest auth. Firebase
   // JS proactively loads this read-only iframe on Safari/mobile before auth is
   // ready; its project key and default app must stay bound to this fixture.
@@ -493,13 +499,7 @@ async function produce({candidate, context, outputDir}) {
       const exportContext = await newContext(), exportPage = await pageFor(exportContext);
       await login(exportPage, fixture.owner);
       const token = await browserToken(exportPage, fixture.owner);
-      let cursor, seen = 0, pages = 0; const rowIds = new Set();
-      do {
-        const roster = await callable('listEventRosterV2', {eventId: large.eventId, ...(cursor ? {cursor} : {})}, token);
-        for (const row of roster.rows || []) {const id = row.registrationId || row.id; if (!id || rowIds.has(id)) throw Error('Roster contains a duplicate or missing row identity.'); rowIds.add(id); seen++;}
-        cursor = roster.nextCursor; pages++;
-        if (pages > 100) throw Error('Roster pagination did not terminate.');
-      } while (cursor);
+      const {seen, pages} = await collectRosterPages((name, data) => callable(name, data, token), {eventId: large.eventId});
       record(GATES[4], 'large-roster-all-rows', large.expectedRows, seen);
       await app(exportPage, `/app/event/${encodeURIComponent(large.eventId)}`);
       await textClick(exportPage, 'Manage event');

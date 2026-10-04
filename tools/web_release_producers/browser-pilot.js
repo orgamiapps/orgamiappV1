@@ -8,6 +8,7 @@ const {bindingId, emailHash, validScope} = require("../../functions/communicatio
 const {schedule} = require("../../functions/events/schedule");
 const {digest} = require("../web_release_contract");
 const {normalizePolicy, policyWindow} = require("../../functions/attendance/v2");
+const {readRosterPage} = require("./roster-read");
 const PROJECT = "attendus-staging";
 const ROLES = ["owner", "attendee", "staff", "unauthorized"];
 const hash = (value) => crypto.createHash("sha256").update(value).digest("hex");
@@ -127,7 +128,7 @@ async function runBrowserPilot({fixture, candidateIdentity, callAs, observe, tim
   const poll = async (name, read, ready) => {
     const until = Date.now() + timeoutMs;
     for (;;) {
-      const result = await read();
+      const result = await read(Math.max(1, until - Date.now()));
       if (ready(result)) return result;
       if (Date.now() >= until) throw Error(`Pilot timed out waiting for ${name}.`);
       await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
@@ -170,7 +171,8 @@ async function runBrowserPilot({fixture, candidateIdentity, callAs, observe, tim
     check("duplicate_admission_same_receipt", admitted.attendanceId, duplicate.attendanceId);
     check("duplicate_admission_not_created", false, duplicate.created);
     await deny("unauthorized_export_denied", "createEventExportV2", {eventId, idempotencyKey: `${fixture.runId}:unauthorized-export`});
-    const materialized = await poll("authoritative roster", () => call("owner", "listEventRosterV2", {eventId, pageSize: 100}),
+    const materialized = await poll("authoritative roster", (remainingMs) => readRosterPage((name, data) => call("owner", name, data),
+      {eventId, pageSize: 100}, {timeoutMs: remainingMs, retryDelayMs: pollIntervalMs}),
       (value) => (value.rows || []).some((row) => row.registrationId === registered.registrationId && row.attendanceIds?.includes(admitted.attendanceId)));
     check("roster_has_one_account_admission", 1, materialized.rows.filter((row) => row.registrationId === registered.registrationId).length);
     const exportInput = {eventId, idempotencyKey: `${fixture.runId}:pilot-export`};
