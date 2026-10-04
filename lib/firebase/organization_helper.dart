@@ -194,8 +194,9 @@ class OrganizationHelper {
       final nameRef = _firestore
           .collection('OrganizationNames')
           .doc(normalizedName);
+      final memberRef = orgRef.collection('Members').doc(user.uid);
 
-      // Run a transaction to atomically reserve the name and create the org
+      // The organization must not exist without its reserved name and creator.
       await _firestore.runTransaction((tx) async {
         final existing = await tx.get(nameRef);
         if (existing.exists) {
@@ -224,23 +225,21 @@ class OrganizationHelper {
           'organizationId': orgRef.id,
           'createdAt': FieldValue.serverTimestamp(),
         });
+        final membership = OrganizationMembership(
+          organizationId: orgRef.id,
+          userId: user.uid,
+          role: 'Admin',
+          permissions: const [
+            'CreateEditEvents',
+            'ApproveJoinRequests',
+            'ManageMembersRoles',
+            'ViewAnalytics',
+          ],
+          status: 'approved',
+          joinedAt: DateTime.now(),
+        );
+        tx.set(memberRef, membership.toJson());
       });
-
-      final memberRef = orgRef.collection('Members').doc(user.uid);
-      final membership = OrganizationMembership(
-        organizationId: orgRef.id,
-        userId: user.uid,
-        role: 'Admin',
-        permissions: const [
-          'CreateEditEvents',
-          'ApproveJoinRequests',
-          'ManageMembersRoles',
-          'ViewAnalytics',
-        ],
-        status: 'approved',
-        joinedAt: DateTime.now(),
-      );
-      await memberRef.set(membership.toJson());
 
       return orgRef.id;
     } catch (e) {
@@ -289,29 +288,65 @@ class OrganizationHelper {
   }
 
   Future<bool> approveJoinRequest(String organizationId, String userId) async {
+    final user = _auth.currentUser;
+    if (user == null || user.isAnonymous) return false;
     try {
-      final memberRef = _firestore
-          .collection('Organizations')
-          .doc(organizationId)
-          .collection('Members')
-          .doc(userId);
-      await memberRef.set({
-        'organizationId': organizationId,
-        'userId': userId,
-        'role': 'Member',
-        'permissions': <String>[],
-        'status': 'approved',
-        'joinedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      final orgRef = _firestore.collection('Organizations').doc(organizationId);
+      final memberRef = orgRef.collection('Members').doc(userId);
+      final requestRef = orgRef.collection('JoinRequests').doc(userId);
+      final actorRef = orgRef.collection('Members').doc(user.uid);
+      return await _firestore.runTransaction((tx) async {
+        final organization = await tx.get(orgRef);
+        final actor = await tx.get(actorRef);
+        final request = await tx.get(requestRef);
+        final member = await tx.get(memberRef);
+        final actorData = actor.data();
+        if (!organization.exists ||
+            _auth.currentUser?.uid != user.uid ||
+            _auth.currentUser?.isAnonymous != false ||
+            actorData?['status'] != 'approved' ||
+            !const [
+              'Admin',
+              'admin',
+              'Owner',
+              'owner',
+            ].contains(actorData?['role'])) {
+          return false;
+        }
 
-      // Remove join request
-      await _firestore
-          .collection('Organizations')
-          .doc(organizationId)
-          .collection('JoinRequests')
-          .doc(userId)
-          .delete();
-      return true;
+        final requestData = request.data();
+        final memberData = member.data();
+        // Legacy memberships omit organizationId; their parent path supplies it.
+        if (member.exists &&
+            ((memberData!.containsKey('organizationId') &&
+                    memberData['organizationId'] != organizationId) ||
+                memberData['userId'] != userId)) {
+          return false;
+        }
+        final alreadyApproved = memberData?['status'] == 'approved';
+        if (!request.exists) return alreadyApproved;
+        if (requestData?['userId'] != userId ||
+            requestData?['status'] != 'pending') {
+          return false;
+        }
+        // A stale approval must not demote or reset an existing member.
+        if (!alreadyApproved) {
+          if (member.exists &&
+              !const ['pending', 'declined'].contains(memberData?['status'])) {
+            return false;
+          }
+          tx.set(memberRef, {
+            'organizationId': organizationId,
+            'userId': userId,
+            'role': 'Member',
+            'permissions': <String>[],
+            'status': 'approved',
+            'joinedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        }
+        tx.delete(requestRef);
+        return true;
+      });
     } catch (e) {
       Logger.error('Failed to approve join request: $e');
       return false;

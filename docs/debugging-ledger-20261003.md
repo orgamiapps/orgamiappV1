@@ -644,3 +644,34 @@ The corrected immutable registration stylesheet is
 `443a6f84d04a8f0465d4917b63932fdac32250c9250384ac18c95e8dc2e9b879`.
 Both earlier immutable copies remain available. Renderer, transaction and
 deployment-guard script contents are unchanged by this follow-up.
+
+Hosted follow-up `c179a3498c12eaaa002aaaa8cafa5cb8daea3186` passed all six
+jobs in PR run `37235032195` and push run `37235028562`. Independently retained
+PR artifact `11315630611` has SHA256
+`fa86a1465be86ffef584c6cfa32d7d5b34dc8f0c341a4dc4e9813c8de68c122d`;
+all 60 public cases pass on their first attempt, with no failures, skips or
+flakes, and all five actual Flutter journeys pass with complete fixture cleanup.
+The hosted Firefox enlarged management page was visually checked. This closes
+the two CI failures on that source; staging remains unqualified.
+
+| ID / severity / surface | Reproduction and expected versus actual behavior | Root cause and correction | Verification and remaining acceptance |
+| --- | --- | --- | --- |
+| WEBQA-24 / P1 / community approval integrity | Reject removal of a pending join request after the member write succeeds. The real helper returns false although membership is already approved. Replaying approval can also overwrite an existing Owner's role, permissions and join date. Expected: one committed decision and preserved existing privileges. | Approval performs two separate writes without reading fresh request/member state. Replace with a guarded transaction, preserve exact approved-member replay and reject missing/declined/malformed requests before granting new membership. | 53 focused cases and 542 full main Flutter tests pass. Coverage includes revoked actor, account-switch retry, declined request, concurrent Owner promotion, absent legacy organizationId, invalid identities, pending ACK and lost ACK with consistent records and safe replay. Independent source review is clear; new hosted and staging acceptance remain required. |
+| WEBQA-25 / P2 / community creation integrity | Reject the creator-member write after the organization/name transaction. The helper returns null with the organization and name reservation persisted; retry fails on the reserved name. Expected: either all three records exist or none do. | Move creator membership into the same organization/name transaction. Creator-bootstrap rules use getAfter for the same parent while retaining full-user, ownership, identity, role and approved-state conditions; legacy two-step creation stays supported. | Before correction, the actual atomic Firestore bootstrap fails and the rules suite is 48/49. With the narrow rule change, all 49 Firestore/Storage rules tests pass, including rollback, anonymous, takeover, absent-parent and existing two-step cases. Client tests verify one three-write commit, denied member/name writes and concurrent name reservation. Full 542 client tests pass; hosted/staging verification remains required. |
+
+The creation/approval wrapper reproduction has two controls passing and twelve
+behavioral failures on the old helper. These are separate from the real rules
+emulator evidence. The complete rules before/after log SHA256 values are
+`6010a13e393a6939e18904b4ab662eaa16e31217358d7e250719f2bb818f55ef`
+and `bad25d0b44d4285f2757f4c4270d105e212c5784a2999112ada8cfb6d92f65f8`.
+Independent review found no authorization expansion beyond the creator's same
+atomic bootstrap. A new complete hosted run is required after the client fixes.
+
+The final 53-case focused client log has SHA256
+`1093bef6a6f71ad1a2135b6a38efcf8c31108a11ac20718f709a21350b8f8d1b`.
+The before-fix client log has SHA256
+`c5e96dc588de7d4ce2eb8fe69964a5c3bd2b7dbb844f1b67733d00186c10df11`.
+Platform transport doubles establish helper behavior, while the separately
+executed emulator suite establishes actual rules acceptance; neither is a live
+staging community journey. Explicitly malformed identity fields remain rejected;
+only the already-supported absent organizationId uses the membership parent path.
