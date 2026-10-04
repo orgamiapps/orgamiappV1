@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:attendus/Services/notification_preferences_service.dart';
-import 'package:attendus/models/notification_model.dart';
 
 void main() {
   test(
@@ -14,7 +13,7 @@ void main() {
         load: (id) => id == 'a'
             ? old.future
             : Future.value({'generalNotifications': false}),
-        save: (_, _) async {},
+        save: (_, _) async => null,
       );
       final pending = service.read();
       uid = 'b';
@@ -54,11 +53,12 @@ void main() {
         load: (_) async => null,
         save: (id, _) {
           writes.add(id);
-          return first.future;
+          return first.future.then((_) => null);
         },
       );
-      final a = service.write(UserNotificationSettings());
-      final b = service.write(UserNotificationSettings());
+      final original = await service.read();
+      final a = service.write(original.copyWith(generalNotifications: false));
+      final b = service.write(original.copyWith(eventReminders: false));
       final expectedA = expectLater(a, throwsStateError);
       final expectedB = expectLater(b, throwsStateError);
       await Future<void>.delayed(Duration.zero);

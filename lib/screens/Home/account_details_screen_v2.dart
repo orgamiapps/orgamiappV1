@@ -8,19 +8,29 @@ import 'package:attendus/Utils/toast.dart';
 import 'package:attendus/Utils/logger.dart';
 
 class AccountDetailsScreenV2 extends StatefulWidget {
-  const AccountDetailsScreenV2({super.key});
+  const AccountDetailsScreenV2({super.key, this.auth, this.firestore});
+
+  final FirebaseAuth? auth;
+  final FirebaseFirestore? firestore;
 
   @override
   State<AccountDetailsScreenV2> createState() => _AccountDetailsScreenV2State();
 }
 
 class _AccountDetailsScreenV2State extends State<AccountDetailsScreenV2> {
+  FirebaseAuth get _auth => widget.auth ?? FirebaseAuth.instance;
+  FirebaseFirestore get _firestore =>
+      widget.firestore ?? FirebaseFirestore.instance;
+  ProfileEditSnapshot? _profileBaseline;
+  String? _loadError;
+
   // Form Controllers
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _usernameController = TextEditingController();
+  String _loadedUsernameText = '';
   final _bioController = TextEditingController();
   final _locationController = TextEditingController();
   final _occupationController = TextEditingController();
@@ -40,7 +50,7 @@ class _AccountDetailsScreenV2State extends State<AccountDetailsScreenV2> {
       mounted &&
       !_accountChanged &&
       _ownerUid != null &&
-      FirebaseAuth.instance.currentUser?.uid == _ownerUid;
+      _auth.currentUser?.uid == _ownerUid;
   User? _firebaseUser;
   CustomerModel? _customerModel;
   String? _socialProvider;
@@ -48,8 +58,8 @@ class _AccountDetailsScreenV2State extends State<AccountDetailsScreenV2> {
   @override
   void initState() {
     super.initState();
-    _ownerUid = FirebaseAuth.instance.currentUser?.uid;
-    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
+    _ownerUid = _auth.currentUser?.uid;
+    _authSubscription = _auth.authStateChanges().listen((user) {
       if (mounted && user?.uid != _ownerUid) {
         setState(() => _accountChanged = true);
       }
@@ -60,14 +70,17 @@ class _AccountDetailsScreenV2State extends State<AccountDetailsScreenV2> {
   /// Initialize screen and auto-populate data
   Future<void> _initializeScreen() async {
     try {
-      setState(() => _isLoading = true);
+      setState(() {
+        _isLoading = true;
+        _loadError = null;
+        _profileBaseline = null;
+      });
 
       // Step 1: Get Firebase Auth user
-      _firebaseUser = FirebaseAuth.instance.currentUser;
+      _firebaseUser = _auth.currentUser;
       if (_firebaseUser == null) {
         Logger.error('No Firebase user found');
-        _showError('No authenticated user found');
-        return;
+        throw StateError('No authenticated user found');
       }
 
       Logger.info('=== ACCOUNT DETAILS INITIALIZATION ===');
@@ -83,7 +96,7 @@ class _AccountDetailsScreenV2State extends State<AccountDetailsScreenV2> {
       _detectSocialProvider();
 
       // Step 3: Load or create customer model
-      await _loadCustomerData();
+      await _loadCustomerData(allowCreate: true);
       if (!_sameAccount) return;
 
       // Step 4: Always try to enhance profile data
@@ -94,7 +107,8 @@ class _AccountDetailsScreenV2State extends State<AccountDetailsScreenV2> {
       _populateFormFields();
     } catch (e) {
       Logger.error('Error initializing account details: $e');
-      _showError('Failed to load account details');
+      _profileBaseline = null;
+      _loadError = 'Failed to load account details. Please try again.';
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -124,18 +138,19 @@ class _AccountDetailsScreenV2State extends State<AccountDetailsScreenV2> {
   }
 
   /// Load customer data from Firestore
-  Future<void> _loadCustomerData() async {
+  Future<void> _loadCustomerData({bool allowCreate = false}) async {
     try {
-      final doc = await FirebaseFirestore.instance
+      final doc = await _firestore
           .collection('Customers')
           .doc(_firebaseUser!.uid)
-          .get();
+          .get(const GetOptions(source: Source.server));
 
       if (!_sameAccount) return;
       if (doc.exists) {
         _customerModel = CustomerModel.fromFirestore(doc);
         Logger.info('Loaded existing customer: ${_customerModel!.name}');
       } else {
+        if (!allowCreate) throw StateError('Profile is unavailable');
         // Create new customer model with basic info
         _customerModel = CustomerModel(
           uid: _firebaseUser!.uid,
@@ -144,18 +159,17 @@ class _AccountDetailsScreenV2State extends State<AccountDetailsScreenV2> {
           createdAt: DateTime.now(),
         );
 
-        final reference = FirebaseFirestore.instance
-            .collection('Customers')
-            .doc(_ownerUid);
+        final reference = _firestore.collection('Customers').doc(_ownerUid);
         final initial = _customerModel!;
-        _customerModel = await FirebaseFirestore.instance
-            .runTransaction<CustomerModel>((transaction) async {
-              final existing = await transaction.get(reference);
-              if (!_sameAccount) throw StateError('Account changed');
-              if (existing.exists) return CustomerModel.fromFirestore(existing);
-              transaction.set(reference, CustomerModel.getMap(initial));
-              return initial;
-            });
+        _customerModel = await _firestore.runTransaction<CustomerModel>((
+          transaction,
+        ) async {
+          final existing = await transaction.get(reference);
+          if (!_sameAccount) throw StateError('Account changed');
+          if (existing.exists) return CustomerModel.fromFirestore(existing);
+          transaction.set(reference, CustomerModel.getMap(initial));
+          return initial;
+        });
 
         Logger.info('Created new customer model');
       }
@@ -164,6 +178,7 @@ class _AccountDetailsScreenV2State extends State<AccountDetailsScreenV2> {
       if (_sameAccount) CustomerController.logeInCustomer = _customerModel;
     } catch (e) {
       Logger.error('Error loading customer data: $e');
+      rethrow;
     }
   }
 
@@ -178,7 +193,7 @@ class _AccountDetailsScreenV2State extends State<AccountDetailsScreenV2> {
       // Strategy 1: Force reload Firebase user
       await _firebaseUser!.reload();
       if (!_sameAccount) return;
-      _firebaseUser = FirebaseAuth.instance.currentUser;
+      _firebaseUser = _auth.currentUser;
 
       // Strategy 2: Extract from Firebase Auth
       if (_firebaseUser != null) {
@@ -220,65 +235,23 @@ class _AccountDetailsScreenV2State extends State<AccountDetailsScreenV2> {
     }
   }
 
-  /// Check if name needs updating
-  bool _needsNameUpdate(String? currentName) {
-    if (currentName == null || currentName.isEmpty) return true;
-    if (_customerModel == null) return true;
-
-    return currentName == _customerModel!.email.split('@')[0] ||
-        currentName.toLowerCase().contains('user') ||
-        currentName.contains('@');
-  }
-
-  /// Update profile with extracted data
+  /// Read current values in the same transaction as enrichment so an editor or
+  /// another session cannot have a newly saved profile replaced by Auth data.
   Future<void> _updateProfileData(String name, String? phone) async {
-    if (!_sameAccount || _customerModel == null) return;
-
-    try {
-      Map<String, dynamic> updates = {};
-
-      // Update name if better than current
-      if (name.isNotEmpty &&
-          (name != _customerModel!.name ||
-              _needsNameUpdate(_customerModel!.name))) {
-        updates['name'] = name;
-        _customerModel!.name = name;
-        Logger.info('Updating name to: "$name"');
-      }
-
-      // Update phone if available and not set
-      if (phone != null &&
-          phone.isNotEmpty &&
-          (_customerModel!.phoneNumber == null ||
-              _customerModel!.phoneNumber!.isEmpty)) {
-        updates['phoneNumber'] = phone;
-        _customerModel!.phoneNumber = phone;
-        Logger.info('Updating phone to: "$phone"');
-      }
-
-      // Update profile picture if available
-      if (_firebaseUser?.photoURL != null &&
-          (_customerModel!.profilePictureUrl == null ||
-              _customerModel!.profilePictureUrl!.isEmpty)) {
-        updates['profilePictureUrl'] = _firebaseUser!.photoURL;
-        _customerModel!.profilePictureUrl = _firebaseUser!.photoURL;
-      }
-
-      // Apply updates to Firestore
-      if (updates.isNotEmpty) {
-        await FirebaseFirestore.instance
-            .collection('Customers')
-            .doc(_customerModel!.uid)
-            .update(updates);
-
-        // Update controller
-        if (_sameAccount) CustomerController.logeInCustomer = _customerModel;
-
-        Logger.info('✅ Profile updated with: ${updates.keys.join(', ')}');
-      }
-    } catch (e) {
-      Logger.error('Error updating profile data: $e');
-    }
+    if (!_sameAccount) return;
+    final reference = _firestore.collection('Customers').doc(_ownerUid);
+    await _firestore.runTransaction((transaction) async {
+      final current = await transaction.get(reference);
+      if (!_sameAccount) throw StateError('Account changed');
+      if (!current.exists) throw StateError('Profile is unavailable');
+      final updates = CustomerModel.missingAuthProfileFields(
+        CustomerModel.fromFirestore(current),
+        name: name,
+        phoneNumber: phone,
+        profilePictureUrl: _firebaseUser?.photoURL,
+      );
+      if (updates.isNotEmpty) transaction.update(reference, updates);
+    });
   }
 
   /// Populate form fields with current data
@@ -289,69 +262,79 @@ class _AccountDetailsScreenV2State extends State<AccountDetailsScreenV2> {
     _emailController.text = _customerModel!.email;
     _phoneController.text = _customerModel!.phoneNumber ?? '';
     _usernameController.text = _customerModel!.username ?? '';
+    _loadedUsernameText = _usernameController.text;
     _bioController.text = _customerModel!.bio ?? '';
     _locationController.text = _customerModel!.location ?? '';
     _occupationController.text = _customerModel!.occupation ?? '';
     _companyController.text = _customerModel!.company ?? '';
     _websiteController.text = _customerModel!.website ?? '';
 
+    _profileBaseline = ProfileEditSnapshot.profile(_formValues());
     Logger.info('Form fields populated with current data');
   }
 
-  /// Save account details
+  Map<String, dynamic> _formValues() {
+    String? optional(TextEditingController controller) =>
+        controller.text.trim().isEmpty ? null : controller.text.trim();
+    return {
+      'name': _nameController.text.trim(),
+      'email': _emailController.text.trim(),
+      'phoneNumber': optional(_phoneController),
+      'username': _usernameController.text == _loadedUsernameText
+          ? _customerModel!.username
+          : optional(_usernameController)?.toLowerCase(),
+      'bio': optional(_bioController),
+      'location': optional(_locationController),
+      'occupation': optional(_occupationController),
+      'company': optional(_companyController),
+      'website': optional(_websiteController),
+    };
+  }
+
+  String? _validateUsername(String? value) {
+    // Historical handles remain untouched during unrelated profile edits.
+    if (value == _loadedUsernameText) return null;
+    final normalized = (value ?? '').trim().toLowerCase();
+    if (normalized.isEmpty) return null;
+    if (!RegExp(r'^[a-z0-9_]{3,50}$').hasMatch(normalized)) {
+      return 'Use 3 to 50 letters, numbers or underscores';
+    }
+    return null;
+  }
+
+  /// Save only controls changed since this form was loaded.
   Future<void> _saveAccountDetails() async {
-    if (!_sameAccount) return;
+    if (!_sameAccount || _isSaving || _profileBaseline == null) return;
     if (!_formKey.currentState!.validate()) return;
-
+    final updates = _profileBaseline!.changes(_formValues());
     setState(() => _isSaving = true);
-
+    bool committed = false;
     try {
-      if (_customerModel == null) throw Exception('No customer model');
-
-      // Update customer model
-      _customerModel!.name = _nameController.text.trim();
-      _customerModel!.email = _emailController.text.trim();
-      _customerModel!.phoneNumber = _phoneController.text.trim().isEmpty
-          ? null
-          : _phoneController.text.trim();
-      _customerModel!.username = _usernameController.text.trim().isEmpty
-          ? null
-          : _usernameController.text.trim();
-      _customerModel!.bio = _bioController.text.trim().isEmpty
-          ? null
-          : _bioController.text.trim();
-      _customerModel!.location = _locationController.text.trim().isEmpty
-          ? null
-          : _locationController.text.trim();
-      _customerModel!.occupation = _occupationController.text.trim().isEmpty
-          ? null
-          : _occupationController.text.trim();
-      _customerModel!.company = _companyController.text.trim().isEmpty
-          ? null
-          : _companyController.text.trim();
-      _customerModel!.website = _websiteController.text.trim().isEmpty
-          ? null
-          : _websiteController.text.trim();
-
-      // Save to Firestore
-      await FirebaseFirestore.instance
-          .collection('Customers')
-          .doc(_customerModel!.uid)
-          .update(CustomerModel.getProfileUpdateMap(_customerModel!));
-
-      // Update controller
-      if (_sameAccount) CustomerController.logeInCustomer = _customerModel;
-
-      if (mounted) {
-        ShowToast().showNormalToast(msg: 'Profile updated successfully');
+      if (updates.isNotEmpty) {
+        await _firestore.collection('Customers').doc(_ownerUid).update(updates);
       }
+      committed = true;
+      if (!_sameAccount) return;
+      // Never replace current independent fields with the model opened earlier.
+      await _loadCustomerData();
+      if (!_sameAccount) return;
+      _populateFormFields();
+      ShowToast().showNormalToast(msg: 'Profile updated successfully');
     } catch (e) {
       Logger.error('Error saving account details: $e');
-      _showError('Failed to save changes');
-    } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
+      if (!_sameAccount) return;
+      if (committed) {
+        _profileBaseline = null;
+        _loadError =
+            'Changes were saved, but the profile could not be reloaded. Please try again.';
       }
+      _showError(
+        committed
+            ? 'Saved. Reload your profile before editing again.'
+            : 'Failed to save changes',
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -400,6 +383,24 @@ class _AccountDetailsScreenV2State extends State<AccountDetailsScreenV2> {
               Text(
                 'Loading your profile...',
                 style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_loadError != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Account Details')),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_loadError!),
+              TextButton(
+                onPressed: _initializeScreen,
+                child: const Text('Try again'),
               ),
             ],
           ),
@@ -516,6 +517,7 @@ class _AccountDetailsScreenV2State extends State<AccountDetailsScreenV2> {
                   label: 'Username',
                   icon: Icons.alternate_email,
                   prefixText: '@',
+                  validator: _validateUsername,
                 ),
                 const SizedBox(height: 32),
 
@@ -631,7 +633,7 @@ class _AccountDetailsScreenV2State extends State<AccountDetailsScreenV2> {
   }) {
     return TextFormField(
       controller: controller,
-      enabled: enabled,
+      enabled: enabled && !_isSaving,
       keyboardType: keyboardType,
       maxLines: maxLines,
       validator: validator,

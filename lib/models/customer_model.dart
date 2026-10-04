@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class CustomerModel {
@@ -125,11 +126,22 @@ class CustomerModel {
     };
   }
 
-  /// Profile editors must not write stale copies of server-owned quota fields.
-  static Map<String, dynamic> getProfileUpdateMap(CustomerModel customer) =>
-      getMap(customer)
-        ..remove('eventsCreated')
-        ..remove('groupsCreated');
+  /// Auth enrichment only fills absent values; a saved profile wins over Auth.
+  static Map<String, dynamic> missingAuthProfileFields(
+    CustomerModel current, {
+    String? name,
+    String? phoneNumber,
+    String? profilePictureUrl,
+  }) => {
+    if (current.name.trim().isEmpty && name?.trim().isNotEmpty == true)
+      'name': name!.trim(),
+    if (current.phoneNumber?.trim().isNotEmpty != true &&
+        phoneNumber?.trim().isNotEmpty == true)
+      'phoneNumber': phoneNumber!.trim(),
+    if (current.profilePictureUrl?.trim().isNotEmpty != true &&
+        profilePictureUrl?.trim().isNotEmpty == true)
+      'profilePictureUrl': profilePictureUrl!.trim(),
+  };
 
   static Map<String, dynamic> getPublicMap(CustomerModel customer) => {
     'uid': customer.uid,
@@ -140,4 +152,102 @@ class CustomerModel {
     'bio': customer.bio,
     'isDiscoverable': customer.isDiscoverable,
   };
+}
+
+/// An immutable snapshot of normalized, rendered form values. Editors submit
+/// only changes to their own controls, never a cached Customer document.
+class ProfileEditSnapshot {
+  static const profileFields = {
+    'name',
+    'email',
+    'username',
+    'phoneNumber',
+    'age',
+    'gender',
+    'location',
+    'occupation',
+    'company',
+    'website',
+    'bio',
+    'socialMediaLinks',
+    'isDiscoverable',
+  };
+  static const notificationFields = {
+    'eventReminders',
+    'messagesAll',
+    'generalNotifications',
+  };
+
+  ProfileEditSnapshot.profile(Map<String, dynamic> values)
+    : this._(values, profileFields);
+  ProfileEditSnapshot.notifications(Map<String, dynamic> values)
+    : this._(values, notificationFields);
+
+  ProfileEditSnapshot._(Map<String, dynamic> values, Set<String> allowed)
+    : _values = Map.unmodifiable(values) {
+    if (values.keys.any((key) => !allowed.contains(key)) ||
+        values.values.any(
+          (value) =>
+              value != null &&
+              value is! String &&
+              value is! bool &&
+              value is! int,
+        )) {
+      throw ArgumentError('Only normalized editable form values are supported');
+    }
+  }
+
+  final Map<String, dynamic> _values;
+
+  Map<String, dynamic> changes(Map<String, dynamic> current) {
+    if (current.length != _values.length ||
+        current.keys.any((key) => !_values.containsKey(key))) {
+      throw StateError('The loaded form does not match the submitted controls');
+    }
+    return {
+      for (final entry in current.entries)
+        if (entry.value != _values[entry.key]) entry.key: entry.value,
+    };
+  }
+}
+
+/// Social links are stored as one JSON field. Merge only edited controls into
+/// freshly read JSON so unknown links and another session's changes survive.
+class SocialLinksEditSnapshot {
+  SocialLinksEditSnapshot(Map<String, String> initial)
+    : _initial = Map.unmodifiable(initial);
+  final Map<String, String> _initial;
+
+  Map<String, String> changes(Map<String, String> current) {
+    if (current.length != _initial.length ||
+        current.keys.any((key) => !_initial.containsKey(key))) {
+      throw StateError('Social controls changed after load');
+    }
+    return {
+      for (final entry in current.entries)
+        if (entry.value != _initial[entry.key]) entry.key: entry.value,
+    };
+  }
+
+  static String? merge(Object? stored, Map<String, String> dirty) {
+    Map<String, dynamic> current = {};
+    if (stored != null && stored != '') {
+      if (stored is! String) {
+        throw const FormatException('Stored social links are invalid');
+      }
+      final decoded = jsonDecode(stored);
+      if (decoded is! Map<String, dynamic>) {
+        throw const FormatException('Stored social links are invalid');
+      }
+      current = Map.of(decoded);
+    }
+    for (final entry in dirty.entries) {
+      if (entry.value.isEmpty) {
+        current.remove(entry.key);
+      } else {
+        current[entry.key] = entry.value;
+      }
+    }
+    return current.isEmpty ? null : jsonEncode(current);
+  }
 }

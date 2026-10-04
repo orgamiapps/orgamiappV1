@@ -8,7 +8,16 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
-  const NotificationSettingsScreen({super.key});
+  const NotificationSettingsScreen({
+    super.key,
+    this.auth,
+    this.messagingHelper,
+    this.readPermissionStatus,
+  });
+
+  final FirebaseAuth? auth;
+  final FirebaseMessagingHelper? messagingHelper;
+  final Future<AuthorizationStatus> Function()? readPermissionStatus;
 
   @override
   State<NotificationSettingsScreen> createState() =>
@@ -17,8 +26,11 @@ class NotificationSettingsScreen extends StatefulWidget {
 
 class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     with SingleTickerProviderStateMixin {
-  final FirebaseMessagingHelper _messagingHelper = FirebaseMessagingHelper();
+  FirebaseAuth get _auth => widget.auth ?? FirebaseAuth.instance;
+  FirebaseMessagingHelper get _messagingHelper =>
+      widget.messagingHelper ?? FirebaseMessagingHelper();
   UserNotificationSettings? _settings;
+  String? _settingsUid;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   StreamSubscription<User?>? _authSubscription;
@@ -38,10 +50,11 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       parent: _animationController,
       curve: Curves.easeInOut,
     );
-    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((_) {
+    _authSubscription = _auth.authStateChanges().listen((_) {
       if (!mounted) return;
       setState(() {
         _settings = null;
+        _settingsUid = null;
         _settingsError = null;
       });
       _loadSettings();
@@ -63,11 +76,14 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
 
   Future<void> _checkPermissionStatus() async {
     try {
-      final settings = await FirebaseMessaging.instance
-          .getNotificationSettings();
+      final status =
+          await (widget.readPermissionStatus?.call() ??
+              FirebaseMessaging.instance.getNotificationSettings().then(
+                (settings) => settings.authorizationStatus,
+              ));
       if (!mounted) return;
       setState(() {
-        _hasPermission = _allowed(settings.authorizationStatus);
+        _hasPermission = _allowed(status);
         _permissionChecked = true;
       });
     } catch (_) {
@@ -77,16 +93,15 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
 
   Future<void> _loadSettings() async {
     final revision = ++_revision;
-    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final uid = _auth.currentUser?.uid;
     try {
       final settings = await _messagingHelper.getUserNotificationSettings();
-      if (!mounted ||
-          revision != _revision ||
-          uid != FirebaseAuth.instance.currentUser?.uid) {
+      if (!mounted || revision != _revision || uid != _auth.currentUser?.uid) {
         return;
       }
       setState(() {
         _settings = settings;
+        _settingsUid = uid;
         _settingsError = null;
       });
       _animationController.forward();
@@ -99,13 +114,26 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   }
 
   Future<void> _updateSettings(UserNotificationSettings newSettings) async {
+    final uid = _settingsUid;
+    if (_settingsUid == null || _settingsUid != _auth.currentUser?.uid) {
+      return;
+    }
     final revision = ++_revision;
     final previous = _settings;
     setState(() => _settings = newSettings);
     try {
-      await _messagingHelper.updateNotificationSettings(newSettings);
+      await _messagingHelper.updateNotificationSettings(
+        newSettings,
+        baseline: previous,
+      );
+      if (!mounted || revision != _revision || uid != _auth.currentUser?.uid) {
+        return;
+      }
+      setState(() => _settings = _messagingHelper.settings ?? newSettings);
     } catch (error) {
-      if (!mounted || revision != _revision) return;
+      if (!mounted || revision != _revision || uid != _auth.currentUser?.uid) {
+        return;
+      }
       setState(() => _settings = _messagingHelper.settings ?? previous);
       ShowToast().showSnackBar(
         'Preferences were not saved. Please retry.',
@@ -261,7 +289,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           ),
           const SizedBox(height: 12),
           const Text(
-            'Notifications are turned off',
+            'Notifications are off on this device',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -270,7 +298,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           ),
           const SizedBox(height: 8),
           const Text(
-            'Enable notifications to stay updated with events, messages, and important updates.',
+            'You can still change your saved preferences below. Enable device notifications to receive alerts here.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
           ),
@@ -297,11 +325,21 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   }
 
   Widget _buildMasterToggle() {
-    final allEnabled =
-        _settings!.eventReminders &&
-        _settings!.newEvents &&
-        _settings!.ticketUpdates &&
-        _settings!.generalNotifications;
+    final channels = [
+      _settings!.eventReminders,
+      _settings!.newEvents,
+      _settings!.ticketUpdates,
+      _settings!.eventFeedback,
+      _settings!.generalNotifications,
+      _settings!.eventChanges,
+      _settings!.geofenceCheckIn,
+      _settings!.messagesAll,
+      _settings!.messageMentions,
+      _settings!.organizationUpdates,
+      _settings!.organizerFeedback,
+    ];
+    final anyEnabled = channels.any((enabled) => enabled);
+    final allEnabled = channels.every((enabled) => enabled);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -316,42 +354,50 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
           ),
         ],
       ),
-      child: SwitchListTile(
-        title: const Text(
-          'All Notifications',
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF1A1A1A),
+      child: Material(
+        type: MaterialType.transparency,
+        child: SwitchListTile(
+          title: const Text(
+            'All Notifications',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF1A1A1A),
+            ),
+          ),
+          subtitle: Text(
+            allEnabled
+                ? 'All notification types are on'
+                : anyEnabled
+                ? 'Some notification types are on'
+                : 'All notification types are off',
+            style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
+          ),
+          // A partial selection must still offer a single-action opt-out.
+          value: anyEnabled,
+          onChanged: (value) {
+            _updateSettings(
+              _settings!.copyWith(
+                eventReminders: value,
+                newEvents: value,
+                ticketUpdates: value,
+                eventFeedback: value,
+                generalNotifications: value,
+                eventChanges: value,
+                geofenceCheckIn: value,
+                messagesAll: value,
+                messageMentions: value,
+                organizationUpdates: value,
+                organizerFeedback: value,
+              ),
+            );
+          },
+          activeThumbColor: const Color(0xFF667EEA),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
           ),
         ),
-        subtitle: const Text(
-          'Master switch for all notification types',
-          style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
-        ),
-        value: allEnabled,
-        onChanged: _hasPermission
-            ? (value) {
-                _updateSettings(
-                  _settings!.copyWith(
-                    eventReminders: value,
-                    newEvents: value,
-                    ticketUpdates: value,
-                    eventFeedback: value,
-                    generalNotifications: value,
-                    eventChanges: value,
-                    geofenceCheckIn: value,
-                    messagesAll: value,
-                    messageMentions: value,
-                    organizationUpdates: value,
-                    organizerFeedback: value,
-                  ),
-                );
-              }
-            : null,
-        activeThumbColor: const Color(0xFF667EEA),
-        inactiveThumbColor: _hasPermission ? null : Colors.grey[400],
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       ),
     );
   }
@@ -603,29 +649,31 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   }) {
     return Column(
       children: [
-        SwitchListTile(
-          secondary: icon != null
-              ? Icon(icon, color: const Color(0xFF6B7280), size: 22)
-              : null,
-          title: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF1A1A1A),
+        Material(
+          type: MaterialType.transparency,
+          child: SwitchListTile(
+            secondary: icon != null
+                ? Icon(icon, color: const Color(0xFF6B7280), size: 22)
+                : null,
+            title: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF1A1A1A),
+              ),
             ),
-          ),
-          subtitle: Text(
-            subtitle,
-            style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
-          ),
-          value: value,
-          onChanged: _hasPermission ? onChanged : null,
-          activeThumbColor: const Color(0xFF667EEA),
-          inactiveThumbColor: _hasPermission ? null : Colors.grey[400],
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 4,
+            subtitle: Text(
+              subtitle,
+              style: const TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
+            ),
+            value: value,
+            onChanged: onChanged,
+            activeThumbColor: const Color(0xFF667EEA),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 4,
+            ),
           ),
         ),
         if (showDivider) const Divider(height: 1),
@@ -669,15 +717,11 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                   const DropdownMenuItem(value: 120, child: Text('2 hours')),
                   const DropdownMenuItem(value: 1440, child: Text('1 day')),
                 ].toList(),
-                onChanged: _hasPermission
-                    ? (value) {
-                        if (value != null) {
-                          _updateSettings(
-                            _settings!.copyWith(reminderTime: value),
-                          );
-                        }
-                      }
-                    : null,
+                onChanged: (value) {
+                  if (value != null) {
+                    _updateSettings(_settings!.copyWith(reminderTime: value));
+                  }
+                },
               ),
             ),
           ),
@@ -731,15 +775,13 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                   const DropdownMenuItem(value: 25, child: Text('25 miles')),
                   const DropdownMenuItem(value: 50, child: Text('50 miles')),
                 ].toList(),
-                onChanged: _hasPermission
-                    ? (value) {
-                        if (value != null) {
-                          _updateSettings(
-                            _settings!.copyWith(newEventsDistance: value),
-                          );
-                        }
-                      }
-                    : null,
+                onChanged: (value) {
+                  if (value != null) {
+                    _updateSettings(
+                      _settings!.copyWith(newEventsDistance: value),
+                    );
+                  }
+                },
               ),
             ),
           ),
