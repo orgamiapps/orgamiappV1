@@ -12,6 +12,7 @@ const {sha256, digest} = require("../web_release_contract");
 const {validScope, bindingId} = require("../../functions/communications/qualification-isolation");
 const {schedule, calendarDate, calendarText} = require("../../functions/events/schedule");
 const {activateFlutterSemanticsDriver} = require("./flutter-semantics");
+const {readFirebaseAuthStatePage} = require("./firebase-auth-state");
 const GATE = "safari-web-acceptance";
 const ORIGIN = "https://attendus-staging.web.app";
 const ELEMENT = "element-6066-11e4-a52e-4f735466cecf";
@@ -157,8 +158,25 @@ async function click(driver, selector) {
 async function semantics(driver) {
   await activateFlutterSemanticsDriver(driver);
 }
+function packagedAuthIdentity(apiKey) {
+  // Observation only, including anonymous identities retained for reconciliation.
+  // Known fixture login is separately verified by the strict JWT/actor reader.
+  // Flutter explicitly selects LOCAL; do not consult stale IndexedDB identities.
+  if (typeof apiKey !== "string" || !/^[A-Za-z0-9_-]{8,200}$/.test(apiKey)) return {error: "auth-storage-invalid"};
+  let raw;
+  try {raw = localStorage.getItem(`firebase:authUser:${apiKey}:[DEFAULT]`);} catch {return {error: "auth-storage-unavailable"};}
+  if (raw === null) return null;
+  if (typeof raw !== "string" || raw.length > 65536) return {error: "auth-storage-invalid"};
+  let user;
+  try {user = JSON.parse(raw);} catch {return {error: "auth-storage-invalid"};}
+  if (!user || user.apiKey !== apiKey || user.appName !== "[DEFAULT]" ||
+      typeof user.uid !== "string" || !user.uid || user.uid.length > 128 || user.uid.trim() !== user.uid ||
+      /[\x00-\x1f\x7f/]/.test(user.uid) || typeof user.isAnonymous !== "boolean") return {error: "auth-storage-invalid"};
+  return {uid: user.uid, isAnonymous: user.isAnonymous};
+}
 async function authIdentity(driver, apiKey, appName = "[DEFAULT]") {
   if (!["[DEFAULT]", "attendus-public-web"].includes(appName)) fail("safari-auth-app-invalid");
+  if (appName === "[DEFAULT]") return driver.execute(packagedAuthIdentity, apiKey);
   return driver.executeAsync(`
     const key=arguments[0], appName=arguments[1], done=arguments[arguments.length-1];
     const opening=indexedDB.open('firebaseLocalStorageDb');
@@ -250,6 +268,11 @@ async function produce({candidate, context, outputDir}) {
     await driver.fill(await find(driver, {input: "Email address"}), account.email);
     await driver.fill(await find(driver, {input: "Password"}), account.password); await driver.key("\uE007");
     await until(async () => (await observeAuth())?.uid === account.uid, "safari-ui-login-identity-mismatch", 90000);
+    // The token remains in memory and is not included in Safari evidence.
+    await readFirebaseAuthStatePage({evaluate: (fn, options) => driver.execute(fn, options)}, {
+      apiKey: fixture.firebase.apiKey, projectId: fixture.firebase.projectId,
+      appName: "[DEFAULT]", expectedUid: account.uid, timeoutMs: 10000,
+    });
     await find(driver, {text: "Discover"}); record(`ui-login-${account.uid}`, account.uid, (await observeAuth()).uid);
   }
   async function shot(name) {

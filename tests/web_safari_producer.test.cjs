@@ -50,7 +50,7 @@ test("driver uses real Safari capability requests and never propagates credentia
   assert.equal(JSON.parse(requests[0].body).capabilities.alwaysMatch.acceptInsecureCerts, false);
   await driver.close(); assert.equal(requests.at(-1).method, "DELETE");
 });
-test("Safari auth observation reads only bound UID/anonymous state, never stored tokens", async () => {
+test("Safari public HTML auth observation retains its exact IndexedDB namespace and never stored tokens", async () => {
   const user = {uid: "anonymous-fixture", isAnonymous: true, stsTokenManager: {accessToken: "secret-jwt", refreshToken: "secret-refresh"}};
   const driver = {executeAsync: async (script, args) => new Promise((resolve) => {
     const indexedDB = {open: () => {
@@ -63,8 +63,8 @@ test("Safari auth observation reads only bound UID/anonymous state, never stored
     }};
     vm.runInNewContext(`(function(){${script}}).apply(null,args)`, {indexedDB, args: [...args, resolve]});
   })};
-  const result = await authIdentity(driver, "fixture-key");
-  assert.equal(JSON.stringify(result), JSON.stringify({uid: "anonymous-fixture", isAnonymous: true}));
+  const result = await authIdentity(driver, "fixture-key", "attendus-public-web");
+  assert.equal(JSON.stringify(result), JSON.stringify({uid: "public-anonymous", isAnonymous: true}));
   assert.equal(JSON.stringify(result).includes("secret"), false);
   assert.equal((await authIdentity(driver, "fixture-key", "attendus-public-web")).uid, "public-anonymous");
 });
