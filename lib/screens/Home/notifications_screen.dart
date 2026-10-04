@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:attendus/Services/push_notification_intent.dart';
 import 'package:attendus/firebase/firebase_messaging_helper.dart';
 import 'package:attendus/models/notification_model.dart';
 import 'package:intl/intl.dart';
@@ -15,15 +16,33 @@ import 'dart:async';
 import 'package:attendus/widgets/attendus_design_system.dart';
 
 class NotificationsScreen extends StatefulWidget {
-  const NotificationsScreen({super.key});
+  const NotificationsScreen({
+    super.key,
+    this.messagingHelper,
+    this.notificationChanges,
+    this.openEvent,
+  });
+
+  @visibleForTesting
+  final FirebaseMessagingHelper? messagingHelper;
+  @visibleForTesting
+  final Stream<QuerySnapshot>? notificationChanges;
+  @visibleForTesting
+  final Future<void> Function(String eventId)? openEvent;
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  final FirebaseMessagingHelper _messagingHelper = FirebaseMessagingHelper();
+  late final FirebaseMessagingHelper _messagingHelper =
+      widget.messagingHelper ?? FirebaseMessagingHelper();
   bool _isLoading = true;
+  bool _loadFailed = false;
+  bool _loadMoreFailed = false;
+  bool _realtimeFailed = false;
+  static const _readTimeout = Duration(seconds: 20);
+  int _readGeneration = 0;
 
   // Infinite scroll state
   final ScrollController _scrollController = ScrollController();
@@ -39,7 +58,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     super.initState();
     _loadInitial();
     _scrollController.addListener(() {
-      if (!_hasMore || _isLoadingMore) return;
+      if (!_hasMore || _isLoadingMore || _loadMoreFailed) return;
       if (_scrollController.position.pixels >=
           _scrollController.position.maxScrollExtent - 200) {
         _loadMore();
@@ -55,86 +74,129 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> _loadInitial() async {
+    final generation = ++_readGeneration;
+    _realtimeSub?.cancel();
     setState(() {
       _isLoading = true;
+      _isLoadingMore = false;
       _items.clear();
       _ids.clear();
       _lastDoc = null;
       _hasMore = true;
+      _loadFailed = false;
+      _loadMoreFailed = false;
+      _realtimeFailed = false;
     });
-    final page = await _messagingHelper.fetchUserNotificationsPage(
-      pageSize: 20,
-    );
-    setState(() {
-      _items.addAll(page.items);
-      _ids.addAll(page.items.map((e) => e.id));
-      _lastDoc = page.lastDoc;
-      _hasMore = page.items.length >= 20;
-      _isLoading = false;
-    });
-    _startRealtimeTopListener();
+    try {
+      final page = await _messagingHelper
+          .fetchUserNotificationsPage(pageSize: 20)
+          .timeout(_readTimeout);
+      if (!mounted || generation != _readGeneration) return;
+      setState(() {
+        _items.addAll(page.items);
+        _ids.addAll(page.items.map((e) => e.id));
+        _lastDoc = page.lastDoc;
+        _hasMore = page.items.length >= 20;
+        _isLoading = false;
+      });
+      _startRealtimeTopListener();
+    } catch (_) {
+      if (!mounted || generation != _readGeneration) return;
+      setState(() {
+        _isLoading = false;
+        _loadFailed = true;
+      });
+    }
   }
 
-  void _startRealtimeTopListener() {
-    _realtimeSub?.cancel();
+  Stream<QuerySnapshot> _notificationChanges() {
+    if (widget.notificationChanges != null) {
+      return widget.notificationChanges!;
+    }
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-    _realtimeSub = FirebaseFirestore.instance
+    if (uid == null) return const Stream.empty();
+    return FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
         .collection('notifications')
         .orderBy('createdAt', descending: true)
         .limit(20)
-        .snapshots()
-        .listen((snapshot) {
-          for (final change in snapshot.docChanges) {
-            if (change.type == DocumentChangeType.added) {
-              final model = NotificationModel.fromFirestore(change.doc);
-              if (!_ids.contains(model.id)) {
-                setState(() {
-                  _items.insert(0, model);
-                  _ids.add(model.id);
-                });
-              }
-            } else if (change.type == DocumentChangeType.modified) {
-              final model = NotificationModel.fromFirestore(change.doc);
-              final index = _items.indexWhere((n) => n.id == model.id);
-              if (index != -1) {
-                setState(() {
-                  _items[index] = model;
-                });
-              }
-            } else if (change.type == DocumentChangeType.removed) {
-              final removedId = change.doc.id;
-              final index = _items.indexWhere((n) => n.id == removedId);
-              if (index != -1) {
-                setState(() {
-                  _items.removeAt(index);
-                  _ids.remove(removedId);
-                });
-              }
+        .snapshots();
+  }
+
+  void _startRealtimeTopListener() {
+    if (!mounted) return;
+    _realtimeSub?.cancel();
+    setState(() => _realtimeFailed = false);
+    _realtimeSub = _notificationChanges().listen(
+      (snapshot) {
+        if (!mounted) return;
+        for (final change in snapshot.docChanges) {
+          if (change.type == DocumentChangeType.added) {
+            final model = NotificationModel.fromFirestore(change.doc);
+            if (!_ids.contains(model.id)) {
+              setState(() {
+                _items.insert(0, model);
+                _ids.add(model.id);
+              });
+            }
+          } else if (change.type == DocumentChangeType.modified) {
+            final model = NotificationModel.fromFirestore(change.doc);
+            final index = _items.indexWhere((n) => n.id == model.id);
+            if (index != -1) {
+              setState(() {
+                _items[index] = model;
+              });
+            }
+          } else if (change.type == DocumentChangeType.removed) {
+            final removedId = change.doc.id;
+            final index = _items.indexWhere((n) => n.id == removedId);
+            if (index != -1) {
+              setState(() {
+                _items.removeAt(index);
+                _ids.remove(removedId);
+              });
             }
           }
-        });
+        }
+      },
+      onError: (Object _) {
+        if (!mounted) return;
+        setState(() => _realtimeFailed = true);
+      },
+      cancelOnError: true,
+    );
   }
 
   Future<void> _loadMore() async {
     if (!_hasMore || _isLoadingMore) return;
-    setState(() => _isLoadingMore = true);
-    final page = await _messagingHelper.fetchUserNotificationsPage(
-      startAfter: _lastDoc,
-      pageSize: 20,
-    );
+    final generation = _readGeneration;
     setState(() {
-      for (final it in page.items) {
-        if (_ids.add(it.id)) {
-          _items.add(it);
-        }
-      }
-      _lastDoc = page.lastDoc;
-      _hasMore = page.items.length >= 20;
-      _isLoadingMore = false;
+      _isLoadingMore = true;
+      _loadMoreFailed = false;
     });
+    try {
+      final page = await _messagingHelper
+          .fetchUserNotificationsPage(startAfter: _lastDoc, pageSize: 20)
+          .timeout(_readTimeout);
+      if (!mounted || generation != _readGeneration) return;
+      setState(() {
+        for (final it in page.items) {
+          if (_ids.add(it.id)) {
+            _items.add(it);
+          }
+        }
+        _lastDoc = page.lastDoc;
+        _hasMore = page.items.length >= 20;
+        _isLoadingMore = false;
+      });
+    } catch (_) {
+      if (!mounted || generation != _readGeneration) return;
+      setState(() {
+        _isLoadingMore = false;
+        _loadMoreFailed = true;
+      });
+    }
   }
 
   @override
@@ -176,6 +238,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   child: CustomScrollView(
                     controller: _scrollController,
                     slivers: [
+                      if (_realtimeFailed)
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              children: [
+                                const Text('Live updates unavailable.'),
+                                TextButton(
+                                  onPressed: _startRealtimeTopListener,
+                                  child: const Text('Retry live updates'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       SliverToBoxAdapter(
                         child: AttendUsPageSection(
                           title: 'Activity center',
@@ -212,6 +289,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             index,
                           ) {
                             if (index >= entries.length) {
+                              if (_loadMoreFailed) {
+                                return Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Column(
+                                    children: [
+                                      const Text(
+                                        'More notifications could not be loaded.',
+                                      ),
+                                      TextButton(
+                                        onPressed: _loadMore,
+                                        child: const Text('Retry'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
                               return const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 24),
                                 child: Center(
@@ -237,6 +330,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Widget _buildEmptyState() {
+    if (_loadFailed) {
+      return AttendUsEmptyState(
+        icon: Icons.cloud_off_outlined,
+        title: 'Notifications unavailable',
+        message: 'Your notifications could not be loaded. Please try again.',
+        action: AttendUsButton.secondary(
+          label: 'Retry',
+          icon: Icons.refresh,
+          onPressed: _loadInitial,
+        ),
+      );
+    }
     return AttendUsEmptyState(
       icon: Icons.notifications_none_outlined,
       title: 'All caught up',
@@ -601,9 +706,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   void _handleNotificationTap(NotificationModel notification) async {
+    if (notification.hasInvalidEventId) return;
     switch (notification.type) {
+      case 'discovery_new_events':
+        final intent = PushNotificationIntent.parse({
+          'type': notification.type,
+          'eventId': notification.eventId,
+        });
+        if (intent?.destination == PushDestination.event) {
+          await _openEvent(intent!.id);
+        } else if (intent?.destination == PushDestination.discovery &&
+            mounted) {
+          Navigator.of(context).pushNamed('/app/discover');
+        }
+        break;
       case 'event_reminder':
       case 'event_changes':
+      case 'event_update':
+      case 'event_feedback':
       case 'geofence_checkin':
       case 'group_event':
         await _openEvent(notification.eventId);
@@ -642,8 +762,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'organizer_feedback':
         await _openFeedbackManagement(notification.eventId);
         break;
-      case 'event_feedback':
-        break;
       default:
         break;
     }
@@ -651,6 +769,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _openEvent(String? eventId) async {
     if (eventId == null) return;
+    if (widget.openEvent != null) {
+      await widget.openEvent!(eventId);
+      return;
+    }
     final doc = await FirebaseFirestore.instance
         .collection(EventModel.firebaseKey)
         .doc(eventId)

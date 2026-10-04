@@ -18,6 +18,7 @@ const PINS = Object.freeze({
   "lib/commands/deploy.js": "f79b5f7ae11e033e4dfe8ec4f2539a684422e346a22cf16355e908967a89fa5b",
   "lib/command.js": "8694788bf242975de8e0b1e5e532ea1e51723d78286a62741f4034abb21119fa",
   "lib/logger.js": "72eb50a1733b9d225cb01a5efb873503f4a542bd680f19c605ab461fa6feb229",
+  "lib/deploy/extensions/prepare.js": "b47d8b26f01457f52b747f6e9c6509cec147f29926d913a9ede13e8cc7322be8",
 });
 const PUBLIC_KEYS = ["id", "platform", "project", "region", "runtime", "entryPoint", "state", "codebase", "labels", "eventTrigger", "scheduleTrigger", "callableTrigger", "httpsTrigger", "serviceAccountEmail", "availableMemoryMb", "timeout", "minInstances", "maxInstances", "concurrency", "secretEnvironmentVariables"];
 const key = (endpoint) => `${endpoint.region}/${endpoint.id}`;
@@ -35,7 +36,8 @@ function loadPinned() {
   return {directory, prompts: require(path.join(directory, "lib/deploy/functions/prompts")),
     planner: require(path.join(directory, "lib/deploy/functions/release/planner")),
     prepare: require(path.join(directory, "lib/deploy/functions/prepare")),
-    deploy: require(path.join(directory, "lib/deploy/functions/deploy"))};
+    deploy: require(path.join(directory, "lib/deploy/functions/deploy")),
+    release: require(path.join(directory, "lib/deploy/functions/release"))};
 }
 function descriptor(endpoint) {
   return {id: endpoint.id, region: endpoint.region, platform: endpoint.platform,
@@ -110,16 +112,25 @@ function assertPlan(plan, candidate) {
   if (!same(planned.map((fn) => fn.id).sort(), candidate.deployment.functions)) throw Error("Planner omitted or duplicated a Function");
   return planned.sort((a, b) => key(a).localeCompare(key(b)));
 }
-function installGuards({candidate, predecessor, outputPath}, modules = loadPinned()) {
+function assertEmptyExtensions(payload) {
+  if (!Object.hasOwn(payload, "extensions")) return;
+  const value = payload.extensions;
+  // Pinned SDK discovery always supplies build.extensions={}, and the CLI
+  // consequently retains payload.extensions={} when no instances exist.
+  if (!value || Object.getPrototypeOf(value) !== Object.prototype || Object.keys(value).length) throw Error("Actual extension deployment is forbidden");
+}
+function installGuards({candidate, predecessor, outputPath, preflight = false}, modules = loadPinned()) {
   const {only} = validateInputs(candidate, predecessor);
+  if (typeof preflight !== "boolean") throw Error("Explicit boolean preflight mode required");
   if (installed) throw Error("Concurrent Functions adapters are forbidden");
   installed = true;
   const original = {retry: modules.prompts.promptForFailurePolicies, planner: modules.planner.createDeploymentPlan,
-    prepare: modules.prepare.prepare, deploy: modules.deploy.deploy};
+    prepare: modules.prepare.prepare, deploy: modules.deploy.deploy, release: modules.release.release,
+    uploadSourceV2: modules.deploy.uploadSourceV2};
   const receipt = {schemaVersion: 1, sourceSha: candidate.sourceSha, projectId: candidate.projectId,
     candidateRunId: candidate.candidateRunId, candidateSha256: digest(candidate), predecessorFunctionsSha256: digest(predecessor.functions),
     firebaseToolsVersion: VERSION, moduleHashes: PINS, globalForce: false, transitions: [], plans: [],
-    status: "preparing", startedAt: new Date().toISOString()};
+    mode: preflight ? "preflight" : "deploy", status: "preparing", startedAt: new Date().toISOString()};
   function persist() {
     if (!outputPath) return;
     const absolute = path.resolve(outputPath);
@@ -130,7 +141,7 @@ function installGuards({candidate, predecessor, outputPath}, modules = loadPinne
   let preparing = null;
   let phase = "release";
   const optionsGuard = (options) => {
-    if (options.force !== false || options.nonInteractive !== true || options.interactive || options.dryRun || options.except || options.only !== only || (options.projectId || options.project) !== candidate.projectId) throw Error("Functions adapter options changed or broad force requested");
+    if (options.force !== false || options.nonInteractive !== true || options.interactive || options.dryRun !== preflight || options.except || options.only !== only || (options.projectId || options.project) !== candidate.projectId) throw Error("Functions adapter options changed or broad force requested");
   };
   modules.planner.createDeploymentPlan = async (args) => {
     if (args.codebase !== "default" || args.projectId !== candidate.projectId || args.deleteAll) throw Error("Unreviewed planner scope");
@@ -142,7 +153,8 @@ function installGuards({candidate, predecessor, outputPath}, modules = loadPinne
     return plan;
   };
   async function guardPayload(context, payload) {
-    if (context.projectId !== candidate.projectId || !payload.functions || !same(Object.keys(payload.functions), ["default"]) || payload.extensions) throw Error("Unreviewed prepared deployment scope");
+    if (context.projectId !== candidate.projectId || !payload.functions || !same(Object.keys(payload.functions), ["default"])) throw Error("Unreviewed prepared deployment scope");
+    assertEmptyExtensions(payload);
     for (const [codebase, values] of Object.entries(payload.functions)) await modules.planner.createDeploymentPlan({...values, codebase, projectId: context.projectId, filters: context.filters});
   }
   modules.prompts.promptForFailurePolicies = async (options, want, have) => {
@@ -159,22 +171,33 @@ function installGuards({candidate, predecessor, outputPath}, modules = loadPinne
     finally { preparing = null; }
   };
   modules.deploy.deploy = async (context, options, payload) => {
+    if (preflight) throw Error("Preflight cannot deploy or upload Function source");
     optionsGuard(options); phase = "before-upload";
     try { await guardPayload(context, payload); return await original.deploy(context, options, payload); }
     finally { phase = "release"; }
   };
+  modules.deploy.uploadSourceV2 = async (...args) => {
+    if (preflight) throw Error("Preflight cannot upload Function source");
+    return original.uploadSourceV2(...args);
+  };
+  modules.release.release = async (context, options, payload) => {
+    if (preflight) throw Error("Preflight cannot release Functions");
+    optionsGuard(options);
+    return original.release(context, options, payload);
+  };
   return {receipt, persist, restore() {
     modules.prompts.promptForFailurePolicies = original.retry; modules.planner.createDeploymentPlan = original.planner;
-    modules.prepare.prepare = original.prepare; modules.deploy.deploy = original.deploy; installed = false;
+    modules.prepare.prepare = original.prepare; modules.deploy.deploy = original.deploy;
+    modules.deploy.uploadSourceV2 = original.uploadSourceV2; modules.release.release = original.release; installed = false;
   }};
 }
-async function run({candidate, configPath, predecessor, outputPath}) {
+async function run({candidate, configPath, predecessor, outputPath, preflight = false}) {
   const {only} = validateInputs(candidate, predecessor);
   const absoluteConfig = path.resolve(configPath);
   const config = JSON.parse(fs.readFileSync(absoluteConfig, "utf8"));
   const configurations = Array.isArray(config.functions) ? config.functions : [config.functions];
   if (configurations.length !== 1 || !configurations[0]?.source || (configurations[0].codebase || "default") !== "default" || config.extensions) throw Error("Only one frozen Functions codebase is supported");
-  const modules = loadPinned(); const guards = installGuards({candidate, predecessor, outputPath}, modules);
+  const modules = loadPinned(); const guards = installGuards({candidate, predecessor, outputPath, preflight}, modules);
   try {
     // The programmatic runner defaults to a silent logger. Enable only its
     // ordinary info console transport, never a debug log or inherited DEBUG.
@@ -185,9 +208,12 @@ async function run({candidate, configPath, predecessor, outputPath}) {
       if (previousCli === undefined) delete process.env.IS_FIREBASE_CLI; else process.env.IS_FIREBASE_CLI = previousCli;
     }
     const command = require(path.join(modules.directory, "lib/commands/deploy")).command;
-    await command.runner()({project: candidate.projectId, config: absoluteConfig, only, nonInteractive: true, force: false});
-    if (!guards.receipt.plans.some((plan) => plan.phase === "prepare-before-upload") || !guards.receipt.plans.some((plan) => plan.phase === "release")) throw Error("Pinned CLI did not execute required plan guards");
-    guards.receipt.status = "success";
+    // Firebase's supported dry run still performs predeploy/prepare, including
+    // possible prerequisite API enablement. It must not upload/release Functions.
+    await command.runner()({project: candidate.projectId, config: absoluteConfig, only, nonInteractive: true, force: false, dryRun: preflight});
+    if (!guards.receipt.plans.some((plan) => plan.phase === "prepare-before-upload") ||
+        (preflight ? guards.receipt.plans.some((plan) => plan.phase !== "prepare-before-upload") : !guards.receipt.plans.some((plan) => plan.phase === "release"))) throw Error("Pinned CLI did not execute required plan guards");
+    guards.receipt.status = preflight ? "preflight-passed" : "success";
     return guards.receipt;
   } catch (error) {
     guards.receipt.status = "failure";
@@ -199,9 +225,9 @@ async function run({candidate, configPath, predecessor, outputPath}) {
   }
 }
 if (require.main === module) {
-  const [candidateFile, configPath, predecessorFile, outputPath, extra] = process.argv.slice(2);
-  if (!candidateFile || !configPath || !predecessorFile || !outputPath || extra) { console.error("Usage: node tools/deploy_web_functions.js <candidate.json> <config.json> <predecessor.json> <receipt.json>"); process.exitCode = 1; }
+  const [candidateFile, configPath, predecessorFile, outputPath, mode, extra] = process.argv.slice(2);
+  if (!candidateFile || !configPath || !predecessorFile || !outputPath || (mode !== undefined && mode !== "--preflight") || extra) { console.error("Usage: node tools/deploy_web_functions.js <candidate.json> <config.json> <predecessor.json> <receipt.json> [--preflight]"); process.exitCode = 1; }
   else Promise.resolve().then(() => run({candidate: JSON.parse(fs.readFileSync(candidateFile, "utf8")), configPath,
-    predecessor: JSON.parse(fs.readFileSync(predecessorFile, "utf8")), outputPath})).catch((error) => { console.error(error.message); process.exitCode = 1; });
+    predecessor: JSON.parse(fs.readFileSync(predecessorFile, "utf8")), outputPath, preflight: mode === "--preflight"})).catch((error) => { console.error(error.message); process.exitCode = 1; });
 }
-module.exports = {VERSION, PINS, assertPins, loadPinned, descriptor, publicEndpoint, validateInputs, validateBackends, assertPlan, installGuards, run};
+module.exports = {VERSION, PINS, assertPins, loadPinned, descriptor, publicEndpoint, validateInputs, validateBackends, assertPlan, assertEmptyExtensions, installGuards, run};

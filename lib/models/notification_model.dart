@@ -7,6 +7,7 @@ class NotificationModel {
   final String
   type; // 'event_reminder', 'new_event', 'group_event', 'ticket_update', 'event_feedback', 'general', etc.
   final String? eventId;
+  final bool hasInvalidEventId;
   final String? eventTitle;
   final DateTime createdAt;
   final bool isRead;
@@ -18,6 +19,7 @@ class NotificationModel {
     required this.body,
     required this.type,
     this.eventId,
+    this.hasInvalidEventId = false,
     this.eventTitle,
     required this.createdAt,
     this.isRead = false,
@@ -26,21 +28,48 @@ class NotificationModel {
 
   factory NotificationModel.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    final rawPayload = data['data'];
+    final payload =
+        rawPayload is Map && rawPayload.keys.every((key) => key is String)
+        ? Map<String, dynamic>.from(rawPayload)
+        : null;
+    final rawEventId = data['eventId'] ?? payload?['eventId'];
+    final eventId = _validEventId(rawEventId);
     return NotificationModel(
       id: doc.id,
       title: data['title'] ?? '',
       body: data['body'] ?? '',
       type: data['type'] ?? 'general',
-      eventId: data['eventId'],
+      // Legacy senders use a root ID; administrative sends retain it in data.
+      // An invalid explicit root value must not select a different destination.
+      eventId: eventId,
+      // Discovery uses absent/empty IDs for batches. Preserve malformed-ID
+      // evidence so an invalid single-event payload cannot become a batch.
+      hasInvalidEventId:
+          rawEventId != null && rawEventId != '' && eventId == null,
       eventTitle: data['eventTitle'],
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       isRead: data['isRead'] ?? false,
       data:
-          data['data'] ??
+          payload ??
           (data['conversationId'] is String
               ? {'conversationId': data['conversationId']}
               : null),
     );
+  }
+
+  static String? _validEventId(dynamic value) {
+    if (value is! String ||
+        value.isEmpty ||
+        value.length > 300 ||
+        value.trim() != value ||
+        value == '.' ||
+        value == '..' ||
+        value.contains('/') ||
+        value.contains(RegExp(r'[\x00-\x1f\x7f]'))) {
+      return null;
+    }
+    return value;
   }
 
   Map<String, dynamic> toFirestore() {
@@ -73,6 +102,9 @@ class NotificationModel {
       body: body ?? this.body,
       type: type ?? this.type,
       eventId: eventId ?? this.eventId,
+      hasInvalidEventId: eventId == null
+          ? hasInvalidEventId
+          : eventId.isNotEmpty && _validEventId(eventId) == null,
       eventTitle: eventTitle ?? this.eventTitle,
       createdAt: createdAt ?? this.createdAt,
       isRead: isRead ?? this.isRead,

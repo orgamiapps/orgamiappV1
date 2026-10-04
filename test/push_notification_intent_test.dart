@@ -4,6 +4,70 @@ import 'package:attendus/Services/push_notification_intent.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('imported-account and Unicode IDs preserve recipient-safe routes', () {
+    for (final id in [
+      'imported.user_other',
+      'imported:user_other',
+      'imported@example.com_other',
+      'membre_élève_日本',
+      '%2f',
+      'a?next=x',
+      'a#x',
+    ]) {
+      for (final type in ['new_message', 'event_update']) {
+        final payload = {
+          'type': type,
+          'conversationId': id,
+          'eventId': id,
+          'recipientUid': 'account-a',
+        };
+        expect(
+          PushNotificationIntent.parse(payload, currentUid: 'account-a')?.id,
+          id,
+        );
+        expect(
+          PushNotificationIntent.parse(payload, currentUid: 'account-b'),
+          isNull,
+        );
+      }
+    }
+    for (final id in ['.', '..', 'a\u0000', 'a\u007f', 'a' * 301]) {
+      expect(
+        PushNotificationIntent.parse({
+          'type': 'new_message',
+          'conversationId': id,
+        }),
+        isNull,
+      );
+    }
+  });
+
+  test('active group events and organizer updates keep event navigation', () {
+    for (final type in ['group_event', 'event_update']) {
+      final intent = PushNotificationIntent.parse({
+        'type': type,
+        'eventId': 'owned-event',
+        'recipientUid': 'account-a',
+      }, currentUid: 'account-a');
+      expect(intent?.destination, PushDestination.event);
+      expect(intent?.id, 'owned-event');
+      expect(
+        PushNotificationIntent.parse({
+          'type': type,
+          'eventId': 'owned-event',
+          'recipientUid': 'account-a',
+        }, currentUid: 'account-b'),
+        isNull,
+      );
+      for (final eventId in [null, '', 42, <String, dynamic>{}, '../foreign']) {
+        expect(
+          PushNotificationIntent.parse({'type': type, 'eventId': eventId}),
+          isNull,
+        );
+      }
+    }
+  });
+
   test(
     'event, organization and conversation pushes resolve real destinations',
     () {

@@ -16,8 +16,10 @@ function attendusPushDestination(data) {
       break;
     case 'event_reminder':
     case 'event_changes':
+    case 'event_update':
     case 'geofence_checkin':
     case 'new_event':
+    case 'group_event':
     case 'ticket_update':
     case 'organizer_feedback':
     case 'event_feedback':
@@ -38,7 +40,9 @@ function attendusPushDestination(data) {
     default:
       return null;
   }
-  if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,300}$/.test(id)) return null;
+  if (typeof id !== 'string' || !id || id.length > 300 ||
+      id.trim() !== id || id === '.' || id === '..' ||
+      id.includes('/') || /[\x00-\x1f\x7f]/.test(id)) return null;
   const destination = new URL(path, self.location.origin);
   if (path === '/') destination.searchParams.set('conversationId', id);
   else destination.pathname += encodeURIComponent(id);

@@ -8,6 +8,8 @@ const dependencies = createRequire(path.resolve(__dirname, '../../tests/browser/
 const serverDependencies = createRequire(path.resolve(__dirname, '../../functions/package.json'));
 const {gitSourceFiles} = require('../web_release_contract');
 const {collectRosterPages} = require('./roster-read');
+const {htmlResponsiveProbe} = require('./safari');
+const {validScope, bindingId} = require('../../functions/communications/qualification-isolation');
 const {chromium, firefox, webkit} = dependencies('@playwright/test');
 const GATES = ['browser-auth-guest-organizer', 'account-switch-privacy', 'cache-upgrade-deeplinks',
   'accessibility-responsive', 'large-roster-export-download-expiry'];
@@ -162,6 +164,48 @@ async function preflightBrandedBrowsers(replayOnly, launcher = chromium) {
     } finally {if (engine) await engine.close();}
   }
   return results;
+}
+
+async function readOwnedHistoryTitles(context, db) {
+  const fixture = validateFixture(context), ids = [fixture.event.id, fixture.secondEventId];
+  if (db.projectId !== 'attendus-staging' || process.env.FIRESTORE_EMULATOR_HOST || process.env.FIREBASE_AUTH_EMULATOR_HOST ||
+      !/^[a-f0-9]{40}$/.test(context.sourceSha || '') || !context.candidateRunId ||
+      fixture.sourceSha !== context.sourceSha || fixture.candidateRunId !== context.candidateRunId ||
+      new Set(ids).size !== 2 || ids.some((id) => !/^[A-Za-z0-9_-]{1,128}$/.test(id)) ||
+      !/^[A-Za-z0-9_-]{1,128}$/.test(fixture.owner.uid)) throw Error('History titles require the exact owned staging candidate.');
+  return db.runTransaction(async (tx) => {
+    const refs = [db.doc(`QualificationScopes/${fixture.runId}`), db.doc(`QualificationSetup/${fixture.runId}`),
+      db.doc(`QualificationBindings/${bindingId('account', fixture.owner.uid)}`), db.doc(`account_deletion_jobs/${fixture.owner.uid}`),
+      ...ids.flatMap((id) => [db.doc(`Events/${id}`), db.doc(`QualificationBindings/${bindingId('event', id)}`)])];
+    const [scope, setup, owner, deleting, first, firstBinding, second, secondBinding] = await Promise.all(refs.map((ref) => tx.get(ref)));
+    const bound = (row) => row.get('schemaVersion') === 1 && row.get('state') === 'bound' && row.get('projectId') === context.projectId && row.get('runId') === fixture.runId;
+    if (!validScope(scope.data(), fixture.runId, context.projectId, Date.now()) || !scope.get('actorUids').includes(fixture.owner.uid) ||
+        setup.get('state') !== 'seeded' || setup.get('projectId') !== context.projectId || setup.get('sourceSha') !== context.sourceSha ||
+        setup.get('candidateRunId') !== context.candidateRunId || ![owner, firstBinding, secondBinding].every(bound) || deleting.exists) {
+      throw Error('History fixture ownership, scope or candidate changed.');
+    }
+    const titles = {};
+    for (const event of [first, second]) {
+      const title = event.get('title');
+      if (!event.exists || !scope.get('eventIds').includes(event.id) || event.get('customerUid') !== fixture.owner.uid ||
+          event.get('private') !== false || event.get('deleted') === true || event.get('isHidden') === true ||
+          !['active', 'scheduled'].includes(event.get('status')) || typeof title !== 'string' || !title.trim() || title.length > 500) {
+        throw Error('History event is unavailable, unowned or has no valid title.');
+      }
+      titles[event.id] = title;
+    }
+    if (titles[fixture.event.id] !== fixture.event.title) throw Error('History fixture title differs from the live event.');
+    return {projectId: context.projectId, runId: fixture.runId, sourceSha: context.sourceSha,
+      candidateRunId: context.candidateRunId, checkedAt: new Date().toISOString(), titles};
+  }, {readOnly: true});
+}
+
+async function visibleHistoryTitle(page, title, flutter = false) {
+  if (typeof title !== 'string' || !title.trim() || title.length > 500) throw Error('Expected history content is missing.');
+  const element = (flutter ? page.getByText(title, {exact: true}) : page.getByRole('heading', {level: 1, name: title, exact: true})).first();
+  await element.waitFor({state: 'visible'});
+  if (!await element.isVisible()) throw Error('Expected history event content is not visible.');
+  return true;
 }
 
 async function produce({candidate, context, outputDir}) {
@@ -375,6 +419,19 @@ async function produce({candidate, context, outputDir}) {
       }
       return {gates, observedDeploymentIdentity: identity};
     }
+    let history;
+    await step(GATES[2], async () => {
+      const {initializeApp, applicationDefault, deleteApp} = serverDependencies('firebase-admin/app');
+      const {getFirestore} = serverDependencies('firebase-admin/firestore');
+      const observer = initializeApp({projectId: 'attendus-staging', credential: applicationDefault()}, `browser-history-${fixture.runId}`);
+      const db = getFirestore(observer);
+      try {history = await readOwnedHistoryTitles(context, db); write(GATES[2], 'history-owned-events.json', history);}
+      finally {await db.terminate(); await deleteApp(observer);}
+    });
+    if (!history) {
+      for (const gate of GATES) gates[gate].blockers.push('Owned history event preflight failed; no browser fixture mutations started.');
+      return {gates, observedDeploymentIdentity: identity};
+    }
     const publicContext = await newContext(), publicPage = await pageFor(publicContext);
     const ownerContext = await newContext(), ownerPage = await pageFor(ownerContext);
     await step(GATES[0], async () => {
@@ -420,6 +477,35 @@ async function produce({candidate, context, outputDir}) {
       record(GATES[0], 'owner-management-visible', true, await ownerPage.getByText('Manage event', {exact: true}).isVisible());
       await screenshot(GATES[0], ownerPage, 'owner-event-management.png');
     });
+    await step(GATES[0], async () => {
+      const helperName = 'tools/web_release_producers/browser-inbox.js';
+      const helperBytes = gitSourceFiles(path.resolve(__dirname, '../..'), 'tools/web_release_producers/')[helperName];
+      if (!helperBytes || candidate.sourceFiles?.[helperName] !== sha(helperBytes)) throw Error('Synthetic inbox helper differs from the frozen candidate.');
+      if (process.env.FIRESTORE_EMULATOR_HOST || process.env.FIREBASE_AUTH_EMULATOR_HOST) throw Error('Synthetic inbox UI qualification requires staging.');
+      const {initializeApp, applicationDefault, deleteApp} = serverDependencies('firebase-admin/app');
+      const {getFirestore} = serverDependencies('firebase-admin/firestore');
+      const observer = initializeApp({projectId: 'attendus-staging', credential: applicationDefault()}, `browser-inbox-${fixture.runId}`);
+      const db = getFirestore(observer);
+      try {
+        const {runBrowserInbox} = require('./browser-inbox');
+        // A separate real UI login leaves the account-switch journey's session
+        // intact. These bounded Admin create/delete records are synthetic UI
+        // fixtures; delivery capture and provider isolation are tested later.
+        const page = await actorPage('owner');
+        const report = await runBrowserInbox({fixture, candidateIdentity: context, db, page,
+          openApp: (pathname) => app(page, pathname),
+          currentUid: async () => {await browserToken(page, fixture.owner); return fixture.owner.uid;},
+          screenshot: (name) => screenshot(GATES[0], page, name)});
+        write(GATES[0], 'synthetic-inbox-ui.json', report);
+        gates[GATES[0]].assertions.push(...report.assertions);
+      } catch (error) {
+        if (error.inboxReport) {
+          write(GATES[0], 'synthetic-inbox-ui.json', error.inboxReport);
+          gates[GATES[0]].assertions.push(...error.inboxReport.assertions);
+        }
+        throw error;
+      } finally {await db.terminate(); await deleteApp(observer);}
+    });
     await step(GATES[1], async () => {
       await app(ownerPage);
       await textClick(ownerPage, 'Profile'); await textClick(ownerPage, 'Settings'); await textClick(ownerPage, 'Sign out');
@@ -443,21 +529,31 @@ async function produce({candidate, context, outputDir}) {
     });
     await step(GATES[2], async () => {
       await publicPage.goto(context.baseUrl + fixture.event.publicPath);
+      await visibleHistoryTitle(publicPage, history.titles[fixture.event.id]);
       await publicPage.goto(context.baseUrl + `/event/${encodeURIComponent(fixture.secondEventId)}`);
+      await visibleHistoryTitle(publicPage, history.titles[fixture.secondEventId]);
       await publicPage.goBack();
       record(GATES[2], 'back-restores-event-route', context.baseUrl + fixture.event.publicPath, publicPage.url());
-      await publicPage.goForward(); await publicPage.reload();
+      record(GATES[2], 'back-restores-visible-event-content', true, await visibleHistoryTitle(publicPage, history.titles[fixture.event.id]));
+      await publicPage.goForward();
+      record(GATES[2], 'forward-restores-visible-second-content', true, await visibleHistoryTitle(publicPage, history.titles[fixture.secondEventId]));
+      await publicPage.reload();
       record(GATES[2], 'forward-reload-preserves-second-route', context.baseUrl + `/event/${encodeURIComponent(fixture.secondEventId)}`, publicPage.url());
+      record(GATES[2], 'reload-preserves-visible-second-content', true, await visibleHistoryTitle(publicPage, history.titles[fixture.secondEventId]));
       const firstAppPath = `/app/event/${encodeURIComponent(fixture.event.id)}`;
       const secondAppPath = `/app/event/${encodeURIComponent(fixture.secondEventId)}`;
       await app(ownerPage, firstAppPath);
       await ownerPage.getByText(fixture.event.title, {exact: true}).first().waitFor();
       await app(ownerPage, secondAppPath);
+      await visibleHistoryTitle(ownerPage, history.titles[fixture.secondEventId], true);
       await ownerPage.goBack(); await semantics(ownerPage);
       await ownerPage.getByText(fixture.event.title, {exact: true}).first().waitFor();
       record(GATES[2], 'flutter-back-restores-event-deep-link', context.baseUrl + firstAppPath, ownerPage.url());
-      await ownerPage.goForward(); await ownerPage.reload(); await semantics(ownerPage);
+      await ownerPage.goForward(); await semantics(ownerPage);
+      record(GATES[2], 'flutter-forward-visible-second-content', true, await visibleHistoryTitle(ownerPage, history.titles[fixture.secondEventId], true));
+      await ownerPage.reload(); await semantics(ownerPage);
       record(GATES[2], 'flutter-forward-reload-preserves-deep-link', context.baseUrl + secondAppPath, ownerPage.url());
+      record(GATES[2], 'flutter-reload-visible-second-content', true, await visibleHistoryTitle(ownerPage, history.titles[fixture.secondEventId], true));
       record(GATES[2], 'flutter-history-retains-switched-actor', fixture.unauthorized.uid,
         (await browserToken(ownerPage, fixture.unauthorized)) ? fixture.unauthorized.uid : null);
       const helperPath = path.join(__dirname, 'browser-cache-upgrade.js');
@@ -473,15 +569,18 @@ async function produce({candidate, context, outputDir}) {
         await publicPage.goto(context.baseUrl + fixture.event.publicPath);
         await publicPage.keyboard.press('Tab');
         record(GATES[3], `skip-link-keyboard-${width}`, true, await publicPage.locator('.skip-link').evaluate((node) => node === document.activeElement));
-        await publicPage.evaluate(() => {
-          const sizes = [...document.querySelectorAll('h1,h2,p,a,dt,dd,button,label,input')].map((node) => [node, parseFloat(getComputedStyle(node).fontSize)]);
-          for (const [node, size] of sizes) node.style.fontSize = `${size * 2}px`;
-        });
-        record(GATES[3], `200-percent-no-horizontal-overflow-${width}`, true, await publicPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+        const pageScale = await publicPage.evaluate(htmlResponsiveProbe);
+        record(GATES[3], `actual-200-percent-public-text-${width}`, true, pageScale.textIs200Percent);
+        record(GATES[3], `200-percent-no-horizontal-overflow-${width}`, true, pageScale.pageFits);
         await screenshot(GATES[3], publicPage, `public-${width}-200percent.png`);
         const trigger = publicPage.locator('[data-public-action]:visible').first();
         await trigger.focus(); await publicPage.keyboard.press('Enter');
         await publicPage.getByRole('dialog').waitFor();
+        const formScale = await publicPage.evaluate(htmlResponsiveProbe);
+        record(GATES[3], `actual-200-percent-inserted-dialog-text-${width}`, true, formScale.textIs200Percent && formScale.dialogOpen);
+        record(GATES[3], `200-percent-dialog-and-controls-fit-${width}`, true, formScale.pageFits && formScale.dialogFits && formScale.controlCount >= 3 && formScale.controlsFit);
+        write(GATES[3], `responsive-${width}.json`, {page: pageScale, dialog: formScale});
+        await screenshot(GATES[3], publicPage, `dialog-${width}-200percent.png`);
         await publicPage.keyboard.press('Escape');
         record(GATES[3], `dialog-returns-keyboard-focus-${width}`, true, await trigger.evaluate((node) => node === document.activeElement));
       }
@@ -611,19 +710,30 @@ async function produce({candidate, context, outputDir}) {
         await page.getByText('This event requires access', {exact: true}).waitFor();
         record(GATES[1], `${entry.name}-reload-retains-restricted-state`, 0, await page.getByText('Manage event', {exact: true}).count());
         await page.goto(context.baseUrl + fixture.event.publicPath);
+        await visibleHistoryTitle(page, history.titles[fixture.event.id]);
         await page.goto(context.baseUrl + `/event/${encodeURIComponent(fixture.secondEventId)}`);
+        await visibleHistoryTitle(page, history.titles[fixture.secondEventId]);
         await page.goBack();
         record(GATES[2], `${entry.name}-back-route`, context.baseUrl + fixture.event.publicPath, page.url());
-        await page.goForward(); await page.reload();
+        record(GATES[2], `${entry.name}-back-visible-content`, true, await visibleHistoryTitle(page, history.titles[fixture.event.id]));
+        await page.goForward();
+        record(GATES[2], `${entry.name}-forward-visible-content`, true, await visibleHistoryTitle(page, history.titles[fixture.secondEventId]));
+        await page.reload();
         record(GATES[2], `${entry.name}-forward-reload-route`, context.baseUrl + `/event/${encodeURIComponent(fixture.secondEventId)}`, page.url());
+        record(GATES[2], `${entry.name}-reload-visible-content`, true, await visibleHistoryTitle(page, history.titles[fixture.secondEventId]));
         await page.setViewportSize({width: 390, height: 844});
         await page.goto(context.baseUrl + fixture.event.publicPath);
-        await page.evaluate(() => {
-          const sizes = [...document.querySelectorAll('h1,h2,p,a,dt,dd,button,label,input')].map((node) => [node, parseFloat(getComputedStyle(node).fontSize)]);
-          for (const [node, size] of sizes) node.style.fontSize = `${size * 2}px`;
-        });
-        record(GATES[3], `${entry.name}-390-200-percent-no-overflow`, true, await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+        const pageScale = await page.evaluate(htmlResponsiveProbe);
+        record(GATES[3], `${entry.name}-actual-200-percent-text`, true, pageScale.textIs200Percent);
+        record(GATES[3], `${entry.name}-390-200-percent-no-overflow`, true, pageScale.pageFits);
+        await page.locator('[data-public-action]:visible').first().click();
+        await page.getByRole('dialog').waitFor();
+        const formScale = await page.evaluate(htmlResponsiveProbe);
+        record(GATES[3], `${entry.name}-actual-200-percent-dialog-text`, true, formScale.textIs200Percent && formScale.dialogOpen);
+        record(GATES[3], `${entry.name}-390-200-percent-dialog-controls-fit`, true, formScale.pageFits && formScale.dialogFits && formScale.controlCount >= 3 && formScale.controlsFit);
+        write(GATES[3], `${entry.name}-responsive.json`, {page: pageScale, dialog: formScale});
         await screenshot(GATES[3], page, `${entry.name}-390-200percent.png`);
+        await page.keyboard.press('Escape');
       });
       if (gates[GATES[0]].blockers.length > beforeBlockers) {
         for (const gate of [GATES[1], GATES[2], GATES[3]]) gates[gate].blockers.push(`${entry.name} did not complete the required browser journeys; see browser-auth-guest-organizer evidence.`);
@@ -684,4 +794,4 @@ async function produce({candidate, context, outputDir}) {
 
 module.exports = produce;
 module.exports.produce = produce;
-module.exports._test = {validateFixture, allowStagingRequest, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers};
+module.exports._test = {validateFixture, allowStagingRequest, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, htmlResponsiveProbe, readOwnedHistoryTitles, visibleHistoryTitle};

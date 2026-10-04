@@ -6,7 +6,12 @@ const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
 const {files} = require('../../tools/web_release_contract');
-const {validateFixture, allowStagingRequest, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers} = require('../../tools/web_release_producers/browser')._test;
+const {validateFixture, allowStagingRequest, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, readOwnedHistoryTitles, visibleHistoryTitle} = require('../../tools/web_release_producers/browser')._test;
+const {bindingId} = require('../../functions/communications/qualification-isolation');
+test('browser and Safari use the same insertion-aware computed text scaling and control-boundary probe', () => {
+  assert.equal(require('../../tools/web_release_producers/browser')._test.htmlResponsiveProbe,
+    require('../../tools/web_release_producers/safari').htmlResponsiveProbe);
+});
 function context() {
   const runId = 'qa-browser-20261004';
   const fixture = {runId, controlledRecipientDomain: 'example.test', runStartsAt: '2026-10-04T00:00:00Z',
@@ -24,6 +29,59 @@ test('staging evidence rejects real recipients, unowned records and production c
     c => {c.fixture.staff = {uid: 'owner', email: 'staff@real.example', password: 'fixture-password'};}]) {
     const value = context(); mutate(value); assert.throws(() => validateFixture(value));
   }
+});
+
+test('history content expectations come only from current, candidate-bound owned event snapshots', async () => {
+  function setup() {
+    const c = context(); c.sourceSha = 'a'.repeat(40); c.candidateRunId = '123';
+    Object.assign(c.fixture, {sourceSha: c.sourceSha, candidateRunId: c.candidateRunId});
+    const runId = c.fixture.runId, rows = new Map(), reads = [];
+    rows.set(`QualificationScopes/${runId}`, {schemaVersion: 1, projectId: c.projectId, status: 'active', mode: 'capture',
+      createdAt: new Date(Date.now() - 60000), expiresAt: new Date(Date.now() + 60000), actorUids: ['owner'], recipientUids: ['owner'],
+      eventIds: ['event', 'second'], organizationIds: [], conversationIds: [], recipientEmailHashes: []});
+    rows.set(`QualificationSetup/${runId}`, {state: 'seeded', projectId: c.projectId, sourceSha: c.sourceSha, candidateRunId: c.candidateRunId});
+    for (const [kind, id] of [['account', 'owner'], ['event', 'event'], ['event', 'second']]) {
+      rows.set(`QualificationBindings/${bindingId(kind, id)}`, {schemaVersion: 1, state: 'bound', projectId: c.projectId, runId});
+    }
+    for (const [id, title] of [['event', 'Fixture'], ['second', 'Second owned title']]) rows.set(`Events/${id}`, {customerUid: 'owner', private: false, status: 'active', title});
+    const db = {projectId: c.projectId, doc: (value) => value, runTransaction: async (fn, options) => {
+      assert.deepEqual(options, {readOnly: true});
+      return fn({get: async (key) => {reads.push(key); const value = rows.get(key);
+        return {id: key.split('/').at(-1), exists: !!value, data: () => value, get: (name) => value?.[name]};}});
+    }};
+    return {c, db, rows, reads};
+  }
+  const good = setup();
+  assert.deepEqual((await readOwnedHistoryTitles(good.c, good.db)).titles, {event: 'Fixture', second: 'Second owned title'});
+  assert.equal(good.reads.length, 8);
+  for (const mutate of [
+    f => {f.db.projectId = 'orgami-66nxok';}, f => {f.c.fixture.sourceSha = 'b'.repeat(40);},
+    f => {f.c.fixture.secondEventId = '../unowned'; f.c.fixture.ownedFixtureIds.push('../unowned');},
+    f => {f.rows.get(`QualificationSetup/${f.c.fixture.runId}`).candidateRunId = 'other';},
+    f => {f.rows.get(`QualificationScopes/${f.c.fixture.runId}`).expiresAt = new Date(0);},
+    f => {f.rows.get(`QualificationBindings/${bindingId('event', 'second')}`).runId = 'other';},
+    f => {f.rows.set('account_deletion_jobs/owner', {status: 'running'});},
+    f => {f.rows.get('Events/second').customerUid = 'other';}, f => {f.rows.get('Events/second').title = '';},
+    f => {f.rows.get('Events/second').private = true;}, f => {f.rows.get('Events/second').status = 'cancelled';},
+    f => {f.rows.get('Events/event').title = 'Mismatched context';},
+  ]) {const value = setup(); mutate(value); await assert.rejects(readOwnedHistoryTitles(value.c, value.db));}
+});
+
+test('correct history URL alone cannot pass a blank, wrong-title or hidden public/Flutter page', async () => {
+  let visible = true, actualTitle = 'Second owned title'; const calls = [];
+  const match = (expected) => ({first: () => ({waitFor: async ({state}) => {
+    assert.equal(state, 'visible'); if (!visible || actualTitle !== expected) throw Error('Expected content unavailable');
+  }, isVisible: async () => visible && actualTitle === expected})});
+  const page = {url: () => 'https://attendus-staging.web.app/event/second',
+    getByRole: (role, options) => {calls.push({role, ...options}); return match(options.name);},
+    getByText: (title, options) => {calls.push({title, ...options}); return match(title);}};
+  for (const flutter of [false, true]) {
+    visible = true; actualTitle = 'Second owned title';
+    assert.equal(await visibleHistoryTitle(page, actualTitle, flutter), true);
+    actualTitle = 'Page unavailable'; await assert.rejects(visibleHistoryTitle(page, 'Second owned title', flutter));
+    actualTitle = 'Second owned title'; visible = false; await assert.rejects(visibleHistoryTitle(page, actualTitle, flutter));
+  }
+  assert.ok(calls.every((call) => call.exact === true)); assert.equal(calls[0].role, 'heading'); assert.equal(calls[0].level, 1);
 });
 test('network boundary permits required App Check but blocks cross-project data and providers', () => {
   const c = context();

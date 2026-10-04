@@ -75,6 +75,37 @@ test("conversation clicks keep the app's existing auth continuation query", asyn
   }
 });
 
+test("active group events and organizer updates open their event from an FCM click", async () => {
+  for (const type of ["group_event", "event_update"]) {
+    const f = fixture();
+    await f.click({FCM_MSG: {data: {type, eventId: "owned-event", recipientUid: "account-a"}}});
+    assert.deepEqual(f.calls.opened, ["https://attendus-staging.web.app/app/event/owned-event"]);
+    const count = f.calls.opened.length;
+    for (const eventId of [null, "", 42, {}, "../foreign", "https://evil.invalid"]) {
+      await f.click({FCM_MSG: {data: {type, eventId}}});
+    }
+    assert.equal(f.calls.opened.length, count);
+  }
+});
+
+test("valid imported-account and Unicode document IDs stay encoded in known same-origin routes", async () => {
+  for (const id of ["imported.user_other", "imported:user_other", "imported@example.com_other", "membre_élève_日本", "%2f", "a?next=x", "a#x"]) {
+    const f = fixture();
+    await f.click({FCM_MSG: {data: {type: "new_message", conversationId: id, recipientUid: "account-a"}}});
+    const conversation = new URL(f.calls.opened.at(-1));
+    assert.equal(conversation.origin, "https://attendus-staging.web.app");
+    assert.equal(conversation.pathname, "/");
+    assert.equal(conversation.searchParams.get("conversationId"), id);
+    await f.click({type: "event_update", eventId: id});
+    const event = new URL(f.calls.opened.at(-1));
+    assert.equal(event.origin, "https://attendus-staging.web.app");
+    assert.equal(event.pathname, `/app/event/${encodeURIComponent(id)}`);
+    assert.equal(decodeURIComponent(event.pathname.slice("/app/event/".length)), id);
+    assert.equal(event.search, "");
+    assert.equal(event.hash, "");
+  }
+});
+
 test("Discovery pushes preserve a single event or open the public app home for a batch", async () => {
   const f = fixture();
   await f.click({FCM_MSG: {data: {type: "discovery_new_events", eventId: "event-1"}}});
@@ -92,7 +123,7 @@ test("Discovery pushes preserve a single event or open the public app home for a
 
 test("unknown types, malformed IDs, arbitrary links, and notification actions cannot navigate", async () => {
   const f = fixture();
-  for (const id of [null, undefined, 7, {}, [], "", "../private", "a/b", "https://evil.invalid", "a?next=x", "a#x", " a", "a\n", "a".repeat(301)]) {
+  for (const id of [null, undefined, 7, {}, [], "", ".", "..", "../private", "a/b", "https://evil.invalid", " a", "a ", "a\n", "a\u0000", "a\u007f", "a".repeat(301)]) {
     await f.click({FCM_MSG: {data: {type: "event_reminder", eventId: id}, fcmOptions: {link: "https://evil.invalid"}}});
   }
   for (const data of [null, [], {}, {type: "unknown", eventId: "valid", url: "https://evil.invalid"}]) {
