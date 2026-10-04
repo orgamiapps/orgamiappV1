@@ -44,6 +44,7 @@ async function analyticsState(db, ownerId, eventIds) {
   ));
   return {
     aggregateExists: aggregate.exists,
+    recomputeExists: recompute.exists,
     totalEvents: aggregate.get("totalEvents"),
     totalAttendees: aggregate.get("totalAttendees"),
     sourceGeneration: aggregate.get("sourceGeneration"),
@@ -106,6 +107,7 @@ test("analytics V2 triggers aggregate create, update, and deletion", async () =>
       const recompute = await db.collection(RECOMPUTE_COLLECTION)
           .doc(ownerId).get();
       return aggregate.exists && aggregate.get("totalAttendees") === 10 &&
+        recompute.exists &&
         recompute.get("processedGeneration") ===
           recompute.get("requestedGeneration");
     }, "updated V2 user aggregate", {describe});
@@ -135,8 +137,12 @@ test("analytics V2 triggers aggregate create, update, and deletion", async () =>
       db.collection("Events").doc(secondEventId).delete(),
       db.collection("Events").doc(thirdEventId).delete(),
     ]);
-    await waitFor(async () =>
-      !(await db.collection("user_analytics").doc(ownerId).get()).exists,
+    await waitFor(async () => {
+      const state = await describe();
+      return !state.aggregateExists && state.eventAnalytics.every((exists) => !exists) &&
+        state.recomputeExists && Number.isSafeInteger(state.requestedGeneration) &&
+        state.processedGeneration === state.requestedGeneration;
+    },
     "V2 aggregate cleanup after final event deletion", {describe});
   } finally {
     await Promise.all(eventIds.map(async (eventId) => {

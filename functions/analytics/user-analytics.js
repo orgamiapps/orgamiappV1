@@ -52,23 +52,72 @@ async function requestUserAnalyticsRecompute(
   const db = adminSdk.firestore();
   const reference = recomputeReference(db, userId);
   const timestamp = adminSdk.firestore.Timestamp.now();
-  let generation;
 
-  await db.runTransaction(async (transaction) => {
-    const snapshot = await transaction.get(reference);
+  return db.runTransaction(async (transaction) => {
+    const [snapshot, deleting] = await Promise.all([
+      transaction.get(reference),
+      transaction.get(db.collection("account_deletion_jobs").doc(normalizedUserId(userId))),
+    ]);
+    if (deleting.exists) return null;
     const data = snapshot.exists ? snapshot.data() : {};
     const requestedGeneration = Number(data.requestedGeneration || 0);
     const processedGeneration = Number(data.processedGeneration || 0);
-    generation = requestedGeneration + 1;
+    const generation = requestedGeneration + 1;
     transaction.set(reference, {
       requestedGeneration: generation,
       processedGeneration,
       requestedAt: timestamp,
       lastReason: normalizedReason(reason),
     }, {merge: true});
+    return generation;
   });
+}
 
-  return generation;
+// Event-trigger deliveries can arrive after deletion or out of order. Fence
+// initialization, cleanup, and enqueue against the same current source snapshot.
+async function reconcileEventUserAnalytics(adminSdk, eventId, {
+  reason, expectedOwner = null, initialize = false, deleted = false,
+}) {
+  const db = adminSdk.firestore();
+  const eventRef = db.collection("Events").doc(eventId);
+  const eventAnalyticsRef = db.collection("event_analytics").doc(eventId);
+  return db.runTransaction(async (tx) => {
+    const currentEvent = await tx.get(eventRef);
+    if (!deleted && !currentEvent.exists) return {skipped: true, reason: "event_not_found"};
+    const userId = deleted ? expectedOwner : currentEvent.get("customerUid");
+    if (!userId) return {skipped: true, reason: "missing_owner"};
+    if (!deleted && expectedOwner && userId !== expectedOwner) return {skipped: true, reason: "owner_changed"};
+    const recomputeRef = recomputeReference(db, userId);
+    const userAnalyticsRef = db.collection("user_analytics").doc(userId);
+    const [recompute, eventAnalytics, deleting, remainingEvents] = await Promise.all([
+      tx.get(recomputeRef), tx.get(eventAnalyticsRef),
+      tx.get(db.collection("account_deletion_jobs").doc(userId)),
+      deleted ? tx.get(db.collection("Events").where("customerUid", "==", userId).limit(1)) : null,
+    ]);
+    if (deleting.exists) return {skipped: true, reason: "account_deleting"};
+    const data = recompute.data() || {};
+    const generation = Number(data.requestedGeneration || 0) + 1;
+    if (deleted) {
+      // A delayed old delete cannot remove the analytics of a recreated event.
+      if (!currentEvent.exists && eventAnalytics.exists) tx.delete(eventAnalyticsRef);
+      if (remainingEvents.empty) {
+        tx.delete(userAnalyticsRef);
+        // Preserve a monotonic fence for workers that computed before deletion.
+        // A later event must not reuse their generation after an empty period.
+        // Do not recreate a marker already removed by owned fixture cleanup.
+        if (recompute.exists) tx.set(recomputeRef, {requestedGeneration: generation,
+          processedGeneration: generation, requestedAt: adminSdk.firestore.Timestamp.now(),
+          processedAt: adminSdk.firestore.Timestamp.now(), lastReason: normalizedReason(reason)}, {merge: true});
+        return {removed: true, reason: "no_owned_events"};
+      }
+    } else if (initialize && !eventAnalytics.exists) {
+      tx.create(eventAnalyticsRef, {totalAttendees: 0, lastUpdated: adminSdk.firestore.Timestamp.now()});
+    }
+    tx.set(recomputeRef, {requestedGeneration: generation,
+      processedGeneration: Number(data.processedGeneration || 0),
+      requestedAt: adminSdk.firestore.Timestamp.now(), lastReason: normalizedReason(reason)}, {merge: true});
+    return {requested: true, generation};
+  });
 }
 
 async function buildUserAnalytics(adminSdk, userId) {
@@ -174,24 +223,22 @@ async function commitUserAnalyticsGeneration(
   const normalizedId = normalizedUserId(userId);
   const recomputeRef = recomputeReference(db, normalizedId);
   const analyticsRef = db.collection("user_analytics").doc(normalizedId);
-  let outcome = "superseded";
-
-  await db.runTransaction(async (transaction) => {
-    const recomputeSnapshot = await transaction.get(recomputeRef);
+  return db.runTransaction(async (transaction) => {
+    const [recomputeSnapshot, deleting] = await Promise.all([
+      transaction.get(recomputeRef), transaction.get(db.collection("account_deletion_jobs").doc(normalizedId)),
+    ]);
+    if (deleting.exists) return "account_deleting";
     if (!recomputeSnapshot.exists) {
-      outcome = "missing";
-      return;
+      return "missing";
     }
     const data = recomputeSnapshot.data();
     const requestedGeneration = Number(data.requestedGeneration || 0);
     const processedGeneration = Number(data.processedGeneration || 0);
     if (processedGeneration >= generation) {
-      outcome = "already_processed";
-      return;
+      return "already_processed";
     }
     if (requestedGeneration !== generation) {
-      outcome = "superseded";
-      return;
+      return "superseded";
     }
 
     if (analytics === null) {
@@ -206,10 +253,8 @@ async function commitUserAnalyticsGeneration(
       processedGeneration: generation,
       processedAt: adminSdk.firestore.Timestamp.now(),
     }, {merge: true});
-    outcome = "committed";
+    return "committed";
   });
-
-  return outcome;
 }
 
 async function processUserAnalyticsRecompute(
@@ -224,7 +269,10 @@ async function processUserAnalyticsRecompute(
     MAX_PROCESSING_ATTEMPTS);
 
   for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
-    const snapshot = await recomputeRef.get();
+    const [snapshot, deleting] = await Promise.all([
+      recomputeRef.get(), db.collection("account_deletion_jobs").doc(normalizedId).get(),
+    ]);
+    if (deleting.exists) return {status: "account_deleting"};
     if (!snapshot.exists) return {status: "missing"};
     const requestedGeneration = Number(
         snapshot.get("requestedGeneration") || 0,
@@ -243,7 +291,7 @@ async function processUserAnalyticsRecompute(
         requestedGeneration,
         analytics,
     );
-    if (outcome === "committed" || outcome === "already_processed") {
+    if (["committed", "already_processed", "account_deleting", "missing"].includes(outcome)) {
       return {status: outcome, generation: requestedGeneration};
     }
   }
@@ -289,4 +337,5 @@ module.exports = {
   createProcessUserAnalyticsRecompute,
   processUserAnalyticsRecompute,
   requestUserAnalyticsRecompute,
+  reconcileEventUserAnalytics,
 };

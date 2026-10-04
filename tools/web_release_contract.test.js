@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const vm = require("node:vm");
 const c = require("./web_release_contract");
 const {verifyState, captureFunctionSources, pages} = require("./web_release_state");
 const {options, materializeBackend, materializeRules} = require("./web_release_pipeline");
@@ -247,4 +248,82 @@ test("unsafe raw paths and producer execution failures retain only safe blocked 
     const failed = retainReports({output: empty, candidate: candidate(), result: null, collectionFailure: "producer-execution-failed"});
     assert.equal(failed.qualificationStatus, "blocked"); assert.equal(fs.existsSync(path.join(`${empty}-publish`, "reports.json")), true);
   } finally { fs.rmSync(temp, {recursive: true, force: true}); }
+});
+
+// Execute the real deploy orchestration with the real strict empty-project
+// reader. Only remote transport, artifact validation and later mutations are
+// mocked, so moving this prerequisite after deployment makes these tests fail.
+function stagingPrerequisiteHarness({environment = "staging", blocked = null} = {}) {
+  const ownedTemp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "attendus-deploy-prerequisite-")));
+  const output = path.join(ownedTemp, "receipt", "deployment.json");
+  const value = candidate(environment); const state = value.predecessor[environment];
+  const calls = []; const requests = [];
+  const client = {async request(request) {
+    requests.push(request);
+    assert.equal(request.method, undefined, "prerequisite transport must be read-only");
+    if (request.url.includes("/documents/")) {
+      assert.ok(request.url.startsWith("https://firestore.googleapis.com/v1/projects/attendus-staging/databases/(default)/documents/"));
+      assert.deepEqual(request.params, {pageSize: 1});
+      const collection = request.url.split("/").at(-1);
+      return {data: collection === blocked ? {documents: [{name: `${request.url}/existing`}]} : {}};
+    }
+    assert.equal(request.url, "https://identitytoolkit.googleapis.com/v1/projects/attendus-staging/accounts:batchGet");
+    assert.deepEqual(request.params, {maxResults: 2});
+    return {data: {users: [{localId: "existing-anonymous"}]}};
+  }};
+  const rehearsal = require("./rehearse_web_backend");
+  const module = {exports: {}};
+  const controlledRequire = (name) => {
+    if (name === "./web_release_contract") return {...c, validateArtifact() { calls.push("validate-artifact"); }};
+    if (name === "./web_release_state") return {async captureState() { calls.push("capture-state"); return {state}; },
+      async googleClient() { calls.push("empty-project-client"); return client; },
+      firebase() { calls.push("resource-mutation"); throw Error("Unexpected resource deployment"); }};
+    if (name === "./rehearse_web_backend") return {...rehearsal, validateArchives() { calls.push("validate-archives"); }};
+    if (name === "./bridge_web_assets") return {planBridge() { calls.push("plan-bridge"); },
+      async publishBridge() { calls.push("resource-mutation"); throw Error("Unexpected Hosting mutation"); }};
+    if (name === "node:child_process") return {execFileSync() { calls.push("resource-mutation"); throw Error("Unexpected CLI preparation/deployment"); }};
+    if (name === "node:fs") return {...fs, mkdtempSync() { calls.push("materialize-resources"); throw Error("Test stop at resource materialization"); }};
+    return require(name);
+  };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, "web_release_pipeline.js"), "utf8"),
+      {module, exports: module.exports, require: controlledRequire, __dirname, process, console, Buffer}, {filename: "web_release_pipeline.js"});
+  return {value, state, output, calls, requests, run: () => module.exports.deploy(value, ownedTemp, state, output),
+    receipt: () => JSON.parse(fs.readFileSync(path.join(path.dirname(output), "staging-empty-prerequisite.json"))),
+    cleanup() {
+      const resolved = fs.realpathSync(ownedTemp); const tempRoot = fs.realpathSync(os.tmpdir());
+      assert.equal(resolved, ownedTemp); assert.ok(path.relative(tempRoot, resolved) && !path.relative(tempRoot, resolved).startsWith("..") && !path.isAbsolute(path.relative(tempRoot, resolved)));
+      fs.rmSync(resolved, {recursive: true});
+    }};
+}
+test("staging deploy rejects nonempty scheduledNotifications before materialization or any mutation", async () => {
+  const harness = stagingPrerequisiteHarness({blocked: "scheduledNotifications"});
+  try {
+    await assert.rejects(harness.run(), /Backend rehearsal requires empty scheduledNotifications/);
+    assert.deepEqual(harness.calls, ["validate-artifact", "capture-state", "empty-project-client"]);
+    assert.equal(harness.requests.at(-1).url.split("/").at(-1), "scheduledNotifications");
+    assert.equal(fs.existsSync(path.join(path.dirname(harness.output), "staging-empty-prerequisite.json")), false);
+  } finally { harness.cleanup(); }
+});
+test("empty staging prerequisite is durably timestamped and candidate-bound before materialization", async () => {
+  const harness = stagingPrerequisiteHarness(); const startedAt = Date.now();
+  try {
+    await assert.rejects(harness.run(), /Test stop at resource materialization/);
+    assert.deepEqual(harness.calls, ["validate-artifact", "capture-state", "empty-project-client", "validate-archives", "plan-bridge", "materialize-resources"]);
+    const receipt = harness.receipt();
+    assert.equal(receipt.kind, "staging-empty-prerequisite"); assert.equal(receipt.projectId, "attendus-staging");
+    assert.equal(receipt.candidateSha256, c.digest(harness.value)); assert.equal(receipt.sourceSha, harness.value.sourceSha);
+    assert.equal(receipt.candidateRunId, harness.value.candidateRunId); assert.equal(receipt.predecessorStateSha256, c.digest(harness.state));
+    assert.ok(Date.parse(receipt.startedAt) >= startedAt && Date.parse(receipt.verifiedAt) >= Date.parse(receipt.startedAt));
+    assert.equal(receipt.verifiedAt, receipt.checks.checkedAt); assert.equal(receipt.checks.anonymousAuthCount, 1);
+    assert.deepEqual(receipt.checks.collections, Object.fromEntries(require("./rehearse_web_backend").EMPTY_COLLECTIONS.map((name) => [name, 0])));
+    assert.equal(harness.requests.length, require("./rehearse_web_backend").EMPTY_COLLECTIONS.length + 1);
+  } finally { harness.cleanup(); }
+});
+test("production deployment never invokes the staging-only empty-project prerequisite", async () => {
+  const harness = stagingPrerequisiteHarness({environment: "production", blocked: "scheduledNotifications"});
+  try {
+    await assert.rejects(harness.run(), /Test stop at resource materialization/);
+    assert.deepEqual(harness.calls, ["validate-artifact", "capture-state", "plan-bridge", "materialize-resources"]);
+    assert.equal(harness.requests.length, 0); assert.equal(fs.existsSync(path.join(path.dirname(harness.output), "staging-empty-prerequisite.json")), false);
+  } finally { harness.cleanup(); }
 });

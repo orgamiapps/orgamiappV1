@@ -144,6 +144,9 @@ for (let pass = 1; pass <= repeat; pass += 1) {
     childEnv.GOOGLE_CLOUD_PROJECT = projectId;
     childEnv.FUNCTIONS_EMULATOR = "true";
     childEnv.FUNCTIONS_DISCOVERY_TIMEOUT = "120";
+    // Pinned CLI/SDK support one-shot manifest discovery. On Windows this
+    // avoids local HTTP discovery and its leftover server after startup errors.
+    if (process.platform === "win32") childEnv.FIREBASE_FUNCTIONS_DISCOVERY_OUTPUT_PATH = "true";
     childEnv.FIREBASE_FUNCTIONS_EMULATOR_HOST = `127.0.0.1:${emulatorConfig.functions.port}`;
     childEnv.ATTENDUS_EMULATOR_PUBLIC_ORIGIN = "http://127.0.0.1:4173";
     childEnv.ATTENDUS_RECOVERY_DIRECTORY = `${recoveryRoot}-pass${pass}`;

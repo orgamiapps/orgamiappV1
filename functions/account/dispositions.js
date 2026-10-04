@@ -48,6 +48,7 @@ const ROOT_DOCUMENTS = Object.freeze([
   "users",
   "subscriptions",
   "user_analytics",
+  "_user_analytics_recompute",
   "notificationSettings",
   "ProfileReadLimits",
   "discovery_notification_batches",
