@@ -404,6 +404,86 @@ async function visibleHistoryTitle(page, title, flutter = false) {
   return true;
 }
 
+async function readOwnedMapEvents(context, db, now = Date.now()) {
+  const fixture = validateFixture(context), ids = [fixture.secondEventId, fixture.canaryEventId];
+  if (db.projectId !== 'attendus-staging' || process.env.FIRESTORE_EMULATOR_HOST || process.env.FIREBASE_AUTH_EMULATOR_HOST ||
+      !/^[a-f0-9]{40}$/.test(context.sourceSha || '') || !context.candidateRunId || !Number.isFinite(now) ||
+      fixture.sourceSha !== context.sourceSha || fixture.candidateRunId !== context.candidateRunId ||
+      new Set(ids).size !== 2 || ids.some((id) => !/^[A-Za-z0-9_-]{1,128}$/.test(id || '') || !fixture.ownedFixtureIds.includes(id)) ||
+      !/^[A-Za-z0-9_-]{1,128}$/.test(fixture.owner.uid)) throw Error('Maps requires two exact owned staging event fixtures.');
+  return db.runTransaction(async (tx) => {
+    const refs = [db.doc(`QualificationScopes/${fixture.runId}`), db.doc(`QualificationSetup/${fixture.runId}`),
+      db.doc(`QualificationBindings/${bindingId('account', fixture.owner.uid)}`), db.doc(`account_deletion_jobs/${fixture.owner.uid}`),
+      ...ids.flatMap((id) => [db.doc(`Events/${id}`), db.doc(`QualificationBindings/${bindingId('event', id)}`)])];
+    const [scope, setup, owner, deleting, first, firstBinding, second, secondBinding] = await Promise.all(refs.map((ref) => tx.get(ref)));
+    const bound = (row) => row.get('schemaVersion') === 1 && row.get('state') === 'bound' && row.get('projectId') === context.projectId && row.get('runId') === fixture.runId;
+    if (!validScope(scope.data(), fixture.runId, context.projectId, now) || !scope.get('actorUids').includes(fixture.owner.uid) ||
+        setup.get('state') !== 'seeded' || setup.get('projectId') !== context.projectId || setup.get('sourceSha') !== context.sourceSha ||
+        setup.get('candidateRunId') !== context.candidateRunId || ![owner, firstBinding, secondBinding].every(bound) || deleting.exists) {
+      throw Error('Maps fixture ownership, scope or candidate changed.');
+    }
+    const events = [first, second].map((event, index) => {
+      const title = event.get('title'), latitude = event.get('latitude'), longitude = event.get('longitude');
+      const locationName = event.get('locationName'), location = event.get('location');
+      const start = event.get('selectedDateTime')?.toMillis?.(), duration = event.get('eventDurationMinutes');
+      const expected = index === 0 ? [40.7829, -73.9654, 'Synthetic qualification venue A'] : [40.7851, -73.9683, 'Synthetic qualification venue B'];
+      if (!event.exists || !scope.get('eventIds').includes(event.id) || event.get('customerUid') !== fixture.owner.uid ||
+          event.get('private') !== false || event.get('deleted') === true || event.get('isHidden') === true ||
+          !['active', 'scheduled'].includes(event.get('status')) || event.get('locationType') !== 'in_person' ||
+          typeof title !== 'string' || !title.trim() || title.length > 500 ||
+          latitude !== expected[0] || longitude !== expected[1] || locationName !== expected[2] ||
+          typeof location !== 'string' || !location.includes('synthetic test location') || location.length > 1000 ||
+          !Number.isFinite(start) || !Number.isInteger(duration) || duration <= 0 || now >= start + (duration + 120) * 60000) {
+        throw Error('Maps event is unowned, ineligible or missing the seeded synthetic geometry.');
+      }
+      return {id: event.id, title, latitude, longitude, locationName, location};
+    });
+    if (events[0].title === events[1].title) throw Error('Maps fixture marker titles must be distinct.');
+    return {projectId: context.projectId, runId: fixture.runId, sourceSha: context.sourceSha,
+      candidateRunId: context.candidateRunId, checkedAt: new Date(now).toISOString(), events};
+  }, {readOnly: true});
+}
+
+async function openOwnedMapMarker(page, events, {screenshot = async () => {}} = {}) {
+  if (!Array.isArray(events) || events.length !== 2 || new Set(events.map((event) => event.id)).size !== 2 ||
+      new Set(events.map((event) => event.title)).size !== 2 || events.some((event) =>
+        typeof event.title !== 'string' || !event.title.trim() || typeof event.locationName !== 'string' ||
+        !event.locationName || typeof event.location !== 'string' || !event.location)) throw Error('Missing verified Maps fixture landmarks.');
+  await page.getByRole('button', {name: 'View events map', exact: true}).click();
+  const map = page.locator('.gm-style').first();
+  await map.waitFor({state: 'visible', timeout: 30000});
+  try {
+    if (await page.getByText('Map unavailable', {exact: true}).count()) throw Error('The Maps screen reports unavailable.');
+    // The pinned Flutter web plugin passes InfoWindow.title to the real Maps
+    // marker title and installs a click listener. Require the SDK's named
+    // control; never invoke its callback, inject a button, or select a search
+    // result as a substitute. Optimized SDK markers may lack this control;
+    // that is an explicit accessibility/acceptance failure, not a pass.
+    for (const event of events) await map.getByRole('button', {name: event.title, exact: true}).waitFor({state: 'visible', timeout: 30000});
+    await screenshot('discover-maps-markers.png');
+    const selected = events[0];
+    await map.getByRole('button', {name: selected.title, exact: true}).click();
+    const details = page.getByRole('button', {name: 'View event details', exact: true});
+    await details.waitFor({state: 'visible'});
+    await page.getByText(selected.title, {exact: true}).last().waitFor({state: 'visible'});
+    await page.getByText(`${selected.locationName}\n${selected.location}`, {exact: true}).waitFor({state: 'visible'});
+    await screenshot('discover-maps-selected-event.png');
+    await details.click();
+    await details.waitFor({state: 'hidden'});
+    await page.getByText(selected.title, {exact: true}).last().waitFor({state: 'visible'});
+    await page.getByText('Manage event', {exact: true}).waitFor({state: 'visible'});
+    await screenshot('discover-maps-event-details.png');
+    // This product path pushes an unnamed Flutter Navigator route. Its actual
+    // details screen/content, not an invented browser URL, proves navigation.
+    return {mapVisible: true, mapUnavailable: false, markerEventIds: events.map((event) => event.id), markerTitles: events.map((event) => event.title),
+      selectedEventId: selected.id, selectedTitle: selected.title, selectedLocation: `${selected.locationName}\n${selected.location}`,
+      detailsTitle: selected.title, detailsManagementVisible: true};
+  } catch (error) {
+    await screenshot('discover-maps-failure.png');
+    throw error;
+  }
+}
+
 async function produce({candidate, context, outputDir}) {
   const fixture = validateFixture(context);
   const replayOnly = context.requestedGates?.length === 1 && context.requestedGates[0] === 'post-close-replay';
@@ -630,7 +710,7 @@ async function produce({candidate, context, outputDir}) {
       }
       return {gates, observedDeploymentIdentity: identity};
     }
-    let history;
+    let history, mapEvents;
     await step(GATES[2], async () => {
       const {initializeApp, applicationDefault, deleteApp} = serverDependencies('firebase-admin/app');
       const {getFirestore} = serverDependencies('firebase-admin/firestore');
@@ -641,6 +721,18 @@ async function produce({candidate, context, outputDir}) {
     });
     if (!history) {
       for (const gate of GATES) gates[gate].blockers.push('Owned history event preflight failed; no browser fixture mutations started.');
+      return {gates, observedDeploymentIdentity: identity};
+    }
+    await step(GATES[0], async () => {
+      const {initializeApp, applicationDefault, deleteApp} = serverDependencies('firebase-admin/app');
+      const {getFirestore} = serverDependencies('firebase-admin/firestore');
+      const observer = initializeApp({projectId: 'attendus-staging', credential: applicationDefault()}, `browser-maps-${fixture.runId}`);
+      const db = getFirestore(observer);
+      try {mapEvents = await readOwnedMapEvents(context, db); write(GATES[0], 'maps-owned-events.json', mapEvents);}
+      finally {await db.terminate(); await deleteApp(observer);}
+    });
+    if (!mapEvents) {
+      for (const gate of GATES) gates[gate].blockers.push('Owned Maps event preflight failed; no browser fixture mutations started.');
       return {gates, observedDeploymentIdentity: identity};
     }
     const publicContext = await newContext(), publicPage = await pageFor(publicContext, 'public');
@@ -673,16 +765,23 @@ async function produce({candidate, context, outputDir}) {
         registrationId: proof.registrationId, captureId: proof.captureId, fingerprint: proof.fingerprint, status: proof.status});
       await screenshot(GATES[0], publicPage, 'guest-confirmation.png');
       await login(ownerPage, fixture.owner);
+      await browserToken(ownerPage, fixture.owner);
       if (!fixture.mapsApiKey) throw Error('A verified staging Maps browser key is required for Discover/Maps acceptance.');
       await ownerPage.waitForFunction(() => typeof globalThis.google?.maps?.Map === 'function', undefined, {timeout: 30000});
       const mapsLoader = await ownerPage.locator('script[data-attendus-google-maps]').getAttribute('src');
       record(GATES[0], 'discover-maps-loader-bound-to-staging-key', fixture.mapsApiKey, new URL(mapsLoader).searchParams.get('key'));
-      await ownerPage.getByRole('button', {name: 'View events map', exact: true}).click();
-      await ownerPage.locator('.gm-style').first().waitFor({timeout: 30000});
-      record(GATES[0], 'discover-renders-live-map', true, await ownerPage.locator('.gm-style').first().isVisible());
-      record(GATES[0], 'discover-map-not-unavailable', 0, await ownerPage.getByText('Map unavailable', {exact: true}).count());
+      const mapJourney = await openOwnedMapMarker(ownerPage, mapEvents.events, {
+        screenshot: (name) => screenshot(GATES[0], ownerPage, name),
+      });
+      write(GATES[0], 'maps-ui-journey.json', {...mapJourney, projectId: context.projectId, runId: fixture.runId,
+        sourceSha: context.sourceSha, candidateRunId: context.candidateRunId});
+      record(GATES[0], 'discover-renders-two-owned-marker-controls', mapEvents.events.map((event) => event.id), mapJourney.markerEventIds);
+      record(GATES[0], 'discover-marker-opens-exact-venue', `${mapEvents.events[0].locationName}\n${mapEvents.events[0].location}`, mapJourney.selectedLocation);
+      record(GATES[0], 'discover-marker-details-navigation', {title: mapEvents.events[0].title, management: true},
+        {title: mapJourney.detailsTitle, management: mapJourney.detailsManagementVisible});
+      record(GATES[0], 'discover-renders-live-map', true, mapJourney.mapVisible);
+      record(GATES[0], 'discover-map-not-unavailable', false, mapJourney.mapUnavailable);
       record(GATES[0], 'discover-maps-requests-not-blocked', [], blocked.filter((entry) => /^https:\/\/maps\./.test(entry.origin)));
-      await screenshot(GATES[0], ownerPage, 'discover-maps.png');
       await app(ownerPage, `/app/event/${encodeURIComponent(fixture.event.id)}`);
       await ownerPage.getByText('Manage event', {exact: true}).waitFor();
       record(GATES[0], 'owner-management-visible', true, await ownerPage.getByText('Manage event', {exact: true}).isVisible());
@@ -1017,4 +1116,4 @@ async function produce({candidate, context, outputDir}) {
 
 module.exports = produce;
 module.exports.produce = produce;
-module.exports._test = {validateFixture, allowStagingRequest, scrubBrowserError, pageErrorDiagnostic, createPageErrorRecorder, projectAppCheckError, readAppCheckFailure, createAppCheckErrorRecorder, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, htmlResponsiveProbe, readOwnedHistoryTitles, visibleHistoryTitle, openCheckInConsole};
+module.exports._test = {validateFixture, allowStagingRequest, scrubBrowserError, pageErrorDiagnostic, createPageErrorRecorder, projectAppCheckError, readAppCheckFailure, createAppCheckErrorRecorder, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, htmlResponsiveProbe, readOwnedHistoryTitles, visibleHistoryTitle, openCheckInConsole, readOwnedMapEvents, openOwnedMapMarker};

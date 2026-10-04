@@ -27,7 +27,7 @@
     "event-wizard:rollout": "node tools/set-event-creation-rollout.js",
     "test:attendance": "firebase emulators:exec --config ../firebase.test.json --project demo-attendus-admin --only firestore \"node --test --test-concurrency=1 test/arrival-emulator.test.js\"",
     "test:messaging": "firebase emulators:exec --config ../firebase.test.json --project demo-attendus-admin --only firestore \"node --test --test-concurrency=1 test/messaging-emulator.test.js test/firestore-rules.test.js\"",
-    "test:launch": "firebase emulators:exec --config ../firebase.test.json --project demo-attendus-admin --only firestore \"node --test --test-concurrency=1 test/launch-emulator.test.js test/launch-jobs-emulator.test.js test/account-deletion-emulator.test.js test/guest-deletion-guards-emulator.test.js test/launch-migration-continuation-emulator.test.js test/shared-conversation-deletion-emulator.test.js\""
+    "test:launch": "firebase emulators:exec --config ../firebase.test.json --project demo-attendus-admin --only firestore \"node --test --test-concurrency=1 test/launch-emulator.test.js test/launch-jobs-emulator.test.js test/account-deletion-emulator.test.js test/guest-deletion-guards-emulator.test.js test/launch-migration-continuation-emulator.test.js test/shared-conversation-deletion-emulator.test.js test/public-web-emulator.test.js\""
   },
   "engines": {
     "node": "22"

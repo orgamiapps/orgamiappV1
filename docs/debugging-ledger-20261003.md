@@ -505,6 +505,17 @@ unclassified hypothesis. Downstream export/privacy/cache timeouts from that run
 are blocked checks, not independent confirmed product defects. The narrow
 packaged screenshot shows a session spinner and cannot close layout acceptance.
 
+| ID / severity / surface | Reproduction and expected versus actual behavior | Root cause and correction | Verification and remaining acceptance |
+| --- | --- | --- | --- |
+| WEBQA-10 / P1 / public event and community privacy | Deliver an old public update after the current source becomes private or is deleted; then deliver an old deletion after a public source is recreated. The mirror must follow the current source, but both old handlers could republish private/deleted labels or delete the replacement projection. | Both handlers trusted the delivered snapshot and wrote unconditionally. Read the current source and set/delete its allowlisted projection in one Firestore transaction, so concurrent source changes cause a retry. | Eight new actual-handler unit cases fail before and pass after. All370 Functions tests and lint pass; all52 Firestore launch cases pass, including four real-SDK lifecycle/retry cases. Independent review clear. New cases are registered in the recurring launch suite. The correction has not yet been deployed. |
+
+Maps qualification now seeds two existing owned events with distinct synthetic
+locations and requires actual named marker controls, marker selection, the exact
+venue sheet and navigation to the matching event details. Thirteen producer
+regressions and three fixture tests pass. This adds a positive acceptance check;
+actual provider marker accessibility remains unverified and must fail the run if
+the Maps SDK does not expose usable controls.
+
 Local repairs are preserved through source checkpoint
 `805c161eaac1459b23ec2b28e26d8505d3ae82f5`; the isolated branch incorporates the
 protected main history afterward. The combined Node suite passes290 assertions

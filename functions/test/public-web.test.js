@@ -5,14 +5,19 @@ process.env.FUNCTIONS_EMULATOR = "true";
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
+const {memoryAdmin} = require("./helpers/community-memory");
 const {
   communityEligibility,
+  createMaintainPublicCommunityPage,
+  createMaintainPublicEventPage,
   escapeHtml,
   eventEligibility,
   eventDescription,
   eventJsonLd,
   eventState,
   isoInTimeZone,
+  projectionForCommunity,
+  projectionForEvent,
   safeJson,
   ticketState,
 } = require("../public-web/renderer");
@@ -96,3 +101,61 @@ test("missing archive descriptions receive a truthful visible metadata fallback"
   assert.match(value, /Summer Social/);
   assert.match(value, /Miami Neighbors/);
 });
+
+// Include direct writes so these regressions exercise the old handler too;
+// the transaction double separately rejects reads after pending writes.
+function mirrorAdmin(initial) {
+  const admin = memoryAdmin(initial), collection = admin.db.collection;
+  admin.db.collection = (name) => {
+    const result = collection(name), doc = result.doc;
+    result.doc = (id) => ({...doc(id),
+      set: async (data) => admin.db.values.set(`${name}/${id}`, data),
+      delete: async () => admin.db.values.delete(`${name}/${id}`)});
+    return result;
+  };
+  return admin;
+}
+
+const mirrorCases = [
+  {name: "event", source: "Events", mirror: "PublicWebEvents", param: "eventId",
+    factory: createMaintainPublicEventPage, project: projectionForEvent,
+    publicData: {...future, createdAt: new Date("2026-01-01T00:00:00Z")},
+    privateData: {...future, private: true}},
+  {name: "community", source: "Organizations", mirror: "PublicWebCommunities", param: "organizationId",
+    factory: createMaintainPublicCommunityPage, project: projectionForCommunity,
+    publicData: {name: "Current community", publicPageEnabled: true, createdAt: new Date("2026-01-01T00:00:00Z")},
+    privateData: {name: "Private community", publicPageEnabled: false}},
+];
+for (const item of mirrorCases) {
+  const trigger = (data) => ({params: {[item.param]: "item"}, data: {after: {
+    exists: data !== null, data: () => data,
+  }}});
+  for (const state of ["missing", "private"]) test(`${item.name} mirror cannot be resurrected by stale public delivery after parent becomes ${state}`, async () => {
+    const admin = mirrorAdmin({[`${item.mirror}/item`]: {title: "Stale public value"},
+      ...(state === "private" ? {[`${item.source}/item`]: item.privateData} : {})});
+    await item.factory(admin).run(trigger(item.publicData));
+    assert.equal(admin.db.values.has(`${item.mirror}/item`), false);
+  });
+  test(`${item.name} mirror old delete follows the current recreated public parent`, async () => {
+    const admin = mirrorAdmin({[`${item.source}/item`]: item.publicData});
+    const handler = item.factory(admin);
+    await handler.run(trigger(null));
+    assert.deepEqual(admin.db.values.get(`${item.mirror}/item`), item.project("item", item.publicData));
+    await handler.run(trigger(item.privateData));
+    assert.deepEqual(admin.db.values.get(`${item.mirror}/item`), item.project("item", item.publicData));
+  });
+  test(`${item.name} mirror rechecks source after a discarded transaction attempt`, async () => {
+    const admin = mirrorAdmin({[`${item.source}/item`]: item.publicData});
+    const run = admin.db.runTransaction;
+    let discardedAttempts = 0;
+    admin.db.runTransaction = async (callback) => {
+      await callback({get: (ref) => ref.get(), set() {}, delete() {}});
+      discardedAttempts++;
+      admin.db.values.set(`${item.source}/item`, item.privateData);
+      return run(callback);
+    };
+    await item.factory(admin).run(trigger(item.publicData));
+    assert.equal(discardedAttempts, 1);
+    assert.equal(admin.db.values.has(`${item.mirror}/item`), false);
+  });
+}

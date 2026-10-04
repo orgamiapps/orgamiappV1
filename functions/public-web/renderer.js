@@ -770,11 +770,17 @@ function createMaintainPublicEventPage(admin) {
     document: "Events/{eventId}",
     region: "us-central1",
   }, async (event) => {
-    const after = event.data?.after;
-    const ref = admin.firestore().collection("PublicWebEvents")
-        .doc(event.params.eventId);
-    if (!after?.exists || !eventEligibility(after.data())) return ref.delete();
-    return ref.set(projectionForEvent(event.params.eventId, after.data()));
+    const db = admin.firestore(), id = event.params.eventId;
+    const source = db.collection("Events").doc(id);
+    const ref = db.collection("PublicWebEvents").doc(id);
+    // Deliveries can arrive after deletion, privacy changes or recreation.
+    // Couple the current source read and mirror write so a concurrent source
+    // change retries the transaction instead of publishing a stale projection.
+    return db.runTransaction(async (tx) => {
+      const current = await tx.get(source);
+      if (!current.exists || !eventEligibility(current.data())) return tx.delete(ref);
+      return tx.set(ref, projectionForEvent(id, current.data()));
+    });
   });
 }
 
@@ -783,11 +789,14 @@ function createMaintainPublicCommunityPage(admin) {
     document: "Organizations/{organizationId}",
     region: "us-central1",
   }, async (event) => {
-    const after = event.data?.after;
-    const ref = admin.firestore().collection("PublicWebCommunities")
-        .doc(event.params.organizationId);
-    if (!after?.exists || !communityEligibility(after.data())) return ref.delete();
-    return ref.set(projectionForCommunity(event.params.organizationId, after.data()));
+    const db = admin.firestore(), id = event.params.organizationId;
+    const source = db.collection("Organizations").doc(id);
+    const ref = db.collection("PublicWebCommunities").doc(id);
+    return db.runTransaction(async (tx) => {
+      const current = await tx.get(source);
+      if (!current.exists || !communityEligibility(current.data())) return tx.delete(ref);
+      return tx.set(ref, projectionForCommunity(id, current.data()));
+    });
   });
 }
 
