@@ -5,8 +5,15 @@ const path = require("node:path");
 const c = require("./web_release_contract");
 const {download, loadCandidate, options, write} = require("./web_release_pipeline");
 const {captureState, verifyState} = require("./web_release_state");
+const {createAppCheckTestMode} = require("./web_release_producers/appcheck-test-mode");
 const root = path.resolve(__dirname, "..");
 const PRODUCERS = Object.freeze({browser: "tools/web_release_producers/browser.js", backend: "tools/web_release_producers/backend.js", operations: "tools/web_release_producers/operations.js", safari: "tools/web_release_producers/safari.js"});
+function collectionAppCheckMode(producer, gates = "all", mode = "real", env = process.env) {
+  if (!["real", "staging-debug-functional"].includes(mode)) throw Error("Unsupported App Check collection mode");
+  if (mode !== "real" && (producer !== "browser" || gates !== "all")) throw Error("App Check diagnostics require the full browser producer; Safari and replay require real attestation");
+  if (mode === "real" && (env.STAGING_APPCHECK_DEBUG_TOKEN !== undefined || env.STAGING_APPCHECK_DEBUG_RESOURCE !== undefined)) throw Error("Debug credentials must not enter real-provider collection");
+  return mode;
+}
 function selectedGates(producer, mode = "all") {
   if (mode === "post-close-replay" && producer === "browser") return [mode];
   if (mode === "observation" && ["backend", "operations"].includes(producer)) return [mode];
@@ -24,28 +31,36 @@ function evidenceFile(output, name) {
   if (!fs.statSync(file).isFile()) throw Error("Evidence must be a regular file");
   return file;
 }
-function publishEvidence(output, reports) {
+function publishEvidence(output, reports, assertPublishable = () => {}) {
   const names = new Set(["reports.json", ...reports]);
   for (const reportPath of reports) {
     const report = JSON.parse(fs.readFileSync(path.join(output, reportPath), "utf8"));
     for (const name of Object.keys(report.rawFiles)) names.add(name);
   }
-  const published = `${output}-publish`;
+  // Inspect the actual publication buffers before copying any file. Do not leave
+  // a partially published credential-bearing bundle for the always-upload step.
+  const buffers = new Map();
   for (const name of names) {
     const file = evidenceFile(output, name);
-    const target = path.join(published, name); fs.mkdirSync(path.dirname(target), {recursive: true}); fs.copyFileSync(file, target);
+    const bytes = fs.readFileSync(file); assertPublishable(bytes); buffers.set(name, bytes);
+  }
+  const published = `${output}-publish`;
+  if (fs.existsSync(published)) throw Error("Evidence publication directory already exists");
+  for (const [name, bytes] of buffers) {
+    const target = path.join(published, name); fs.mkdirSync(path.dirname(target), {recursive: true}); fs.writeFileSync(target, bytes);
   }
   return published;
 }
-function retainReports({output, candidate, producerPath, source, startedAt, finishedAt, after, result, requestedGates, collectionFailure = null}) {
+function retainReports({output, candidate, producerPath, source, startedAt, finishedAt, after, result, requestedGates, collectionFailure = null, appCheckTestMode}) {
   const reports = []; const diagnosticReports = []; const failures = [];
   if (after) write(path.join(output, "deployment-state.json"), after);
+  if (appCheckTestMode) write(path.join(output, "appcheck-test-mode.json"), appCheckTestMode.metadata);
   for (const [gate, evidence] of Object.entries(result?.gates || {})) {
     if (requestedGates && !requestedGates.includes(gate)) continue;
     if (![...c.GATES, ...c.AUXILIARY_GATES].includes(gate)) { failures.push("unknown-gate"); continue; }
     const rawFiles = {}; const validationErrors = [];
     if (!Array.isArray(evidence?.rawPaths) || !evidence.rawPaths.length) validationErrors.push("missing-raw-evidence");
-    for (const name of new Set([...(Array.isArray(evidence?.rawPaths) ? evidence.rawPaths : []), ...(after ? ["deployment-state.json"] : [])])) {
+    for (const name of new Set([...(Array.isArray(evidence?.rawPaths) ? evidence.rawPaths : []), ...(after ? ["deployment-state.json"] : []), ...(appCheckTestMode ? ["appcheck-test-mode.json"] : [])])) {
       try { rawFiles[name] = c.sha256(fs.readFileSync(evidenceFile(output, name))); }
       catch (_) { validationErrors.push("unsafe-or-unavailable-raw-evidence"); }
     }
@@ -54,6 +69,7 @@ function retainReports({output, candidate, producerPath, source, startedAt, fini
       deploymentSha256: candidate.deploymentSha256, configSha256: candidate.configSha256, producer: producerPath, producerSha256: source,
       workflowRunId: process.env.GITHUB_RUN_ID, startedAt, finishedAt, observedStateSha256: after?.stateSha256 || null,
       assertions: evidence?.assertions, blockers: evidence?.blockers, rawFiles,
+      ...(appCheckTestMode ? {appCheck: appCheckTestMode.metadata} : {}),
       ...(evidence?.window ? {window: evidence.window} : {})};
     if (collectionFailure) validationErrors.push(collectionFailure);
     try { c.validateEvidence(report, candidate, output); }
@@ -69,15 +85,18 @@ function retainReports({output, candidate, producerPath, source, startedAt, fini
   if (!Object.keys(result?.gates || {}).length) failures.push("producer-emitted-no-gates");
   if (requestedGates?.some((gate) => !result?.gates?.[gate])) failures.push("missing-requested-gate");
   if (collectionFailure) failures.push(collectionFailure);
-  const index = {schemaVersion: 1, reports, diagnosticReports, qualificationStatus: failures.length ? "blocked" : "passed", failures: [...new Set(failures)]};
+  if (appCheckTestMode) failures.push("appcheck-functional-diagnostics-cannot-qualify");
+  const index = {schemaVersion: 1, reports, diagnosticReports, qualificationStatus: failures.length ? "blocked" : "passed", failures: [...new Set(failures)],
+    ...(appCheckTestMode ? {appCheck: appCheckTestMode.metadata} : {})};
   write(path.join(output, "reports.json"), index);
-  publishEvidence(output, [...reports, ...diagnosticReports]);
+  publishEvidence(output, [...reports, ...diagnosticReports], appCheckTestMode?.assertPublishable);
   return index;
 }
 async function run(args) {
   const producerPath = PRODUCERS[args.producer];
   if (!producerPath || !args.output) throw Error("An allowlisted producer and output directory are required");
   const requestedGates = selectedGates(args.producer, args.gates);
+  const appCheckMode = collectionAppCheckMode(args.producer, args.gates, args["app-check-mode"]);
   const output = path.resolve(args.output); const bundle = `${output}-candidate`; const deployed = `${output}-deployment`;
   download(args["candidate-run"], "candidate", "web-candidate-staging", bundle);
   download(args["candidate-run"], "candidate", "web-staging-deployment", deployed);
@@ -95,6 +114,8 @@ async function run(args) {
   if (candidate.sourceFiles[producerPath] !== source) throw Error("Producer source changed since candidate freeze");
   fs.mkdirSync(output, {recursive: true});
   const fixture = JSON.parse(process.env.STAGING_WEB_QA_CONTEXT_JSON || "{}");
+  const appCheckTestMode = appCheckMode === "real" ? undefined : createAppCheckTestMode({mode: appCheckMode,
+    candidate, fixture, producer: args.producer, registeredResource: process.env.STAGING_APPCHECK_DEBUG_RESOURCE});
   fixture.cacheUpgrade = {...fixture.cacheUpgrade, previousFiles: priorBundle.files, previousHostingVersion: priorBundle.hostingVersion};
   const priorEvidence = [];
   const priorRuns = args["prior-evidence-runs"] ? [...new Set(args["prior-evidence-runs"].split(","))] : [];
@@ -111,7 +132,7 @@ async function run(args) {
   }
   const context = {candidateRunId: candidate.candidateRunId, sourceSha: candidate.sourceSha, projectId: candidate.projectId,
     baseUrl: "https://attendus-staging.web.app", releaseId: candidate.releaseId, webSha256: candidate.webSha256,
-    deploymentSha256: candidate.deploymentSha256, configSha256: candidate.configSha256, deployment, backendRehearsal, fixture, priorEvidence, requestedGates,
+    deploymentSha256: candidate.deploymentSha256, configSha256: candidate.configSha256, deployment, backendRehearsal, fixture, priorEvidence, requestedGates, appCheckTestMode,
     candidateRoot: path.join(bundle, "web"), artifacts: {webRoot: path.join(bundle, "web"), previousStagingRoot: path.join(previous, "web"), previousStagingFiles: priorBundle.files, previousStagingHostingVersion: priorBundle.hostingVersion}};
   const startedAt = new Date().toISOString();
   const module = require(path.join(root, producerPath));
@@ -124,8 +145,8 @@ async function run(args) {
     after = await captureState(candidate.projectId);
     if (after.stateSha256 !== before.stateSha256) collectionFailure = "deployment-drift-during-collection";
   } catch (_) { collectionFailure ||= "deployment-recheck-failed"; }
-  const index = retainReports({output, candidate, producerPath, source, startedAt, finishedAt: new Date().toISOString(), after, result, requestedGates, collectionFailure});
+  const index = retainReports({output, candidate, producerPath, source, startedAt, finishedAt: new Date().toISOString(), after, result, requestedGates, collectionFailure, appCheckTestMode});
   if (index.qualificationStatus !== "passed") throw Error("Qualification evidence is blocked; curated reports and raw hashes were retained in the diagnostic artifact");
 }
 if (require.main === module) run(options(process.argv.slice(2))).catch((error) => { console.error(error.stack); process.exitCode = 1; });
-module.exports = {run, PRODUCERS, selectedGates, publishEvidence, retainReports, evidenceFile};
+module.exports = {run, PRODUCERS, selectedGates, collectionAppCheckMode, publishEvidence, retainReports, evidenceFile};

@@ -36,18 +36,25 @@ class AuthGateNavigation {
     bool forceDiscover = false,
     bool restoreNavigation = true,
   }) async {
-    if (forceDiscover) {
-      await PendingAuthIntentService.clear();
-      await NavigationStateService().clearNavigationState();
+    try {
+      if (forceDiscover) {
+        await PendingAuthIntentService.clear();
+        await NavigationStateService().clearNavigationState();
+        return const AuthGateNavigation(restoreNavigation: false);
+      }
+      final pending = await PendingAuthIntentService.consume();
+      final restore = restoreNavigation && pending == null;
+      if (!restore) await NavigationStateService().clearNavigationState();
+      return AuthGateNavigation(
+        restoreNavigation: restore,
+        pendingIntent: pending,
+      );
+    } catch (error) {
+      // Saved navigation is optional. A blocked browser preference store must
+      // not prevent entry or discard the authoritative Firebase identity.
+      Logger.warning('AuthGate: Saved navigation unavailable: $error');
       return const AuthGateNavigation(restoreNavigation: false);
     }
-    final pending = await PendingAuthIntentService.consume();
-    final restore = restoreNavigation && pending == null;
-    if (!restore) await NavigationStateService().clearNavigationState();
-    return AuthGateNavigation(
-      restoreNavigation: restore,
-      pendingIntent: pending,
-    );
   }
 }
 
@@ -109,7 +116,7 @@ class _AuthGateState extends State<AuthGate> {
           );
           await AuthService().ensureInMemoryUserModel();
         }
-        _setUserAndNavigate(redirectUser, restoreNavigation: false);
+        await _setUserAndNavigate(redirectUser, restoreNavigation: false);
         return;
       }
 
@@ -129,7 +136,7 @@ class _AuthGateState extends State<AuthGate> {
         if (firebaseUser.isAnonymous) {
           _setGuestAndNavigate();
         } else {
-          _setUserAndNavigate(firebaseUser);
+          await _setUserAndNavigate(firebaseUser);
         }
         return;
       }
@@ -160,7 +167,7 @@ class _AuthGateState extends State<AuthGate> {
         if (restoredUser.isAnonymous) {
           _setGuestAndNavigate();
         } else {
-          _setUserAndNavigate(restoredUser);
+          await _setUserAndNavigate(restoredUser);
         }
         return;
       }
@@ -194,7 +201,10 @@ class _AuthGateState extends State<AuthGate> {
     });
   }
 
-  void _setUserAndNavigate(User user, {bool restoreNavigation = true}) async {
+  Future<void> _setUserAndNavigate(
+    User user, {
+    bool restoreNavigation = true,
+  }) async {
     if (!mounted || !_isChecking) return;
 
     // Set minimal customer model for immediate navigation

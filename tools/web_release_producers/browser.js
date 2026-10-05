@@ -484,8 +484,100 @@ async function openOwnedMapMarker(page, events, {screenshot = async () => {}} = 
   }
 }
 
+function createBrowserAppCheckIntegration({candidate, context}) {
+  const controller = context.appCheckTestMode;
+  if (controller && (!['real', 'staging-debug-functional'].includes(controller.metadata?.mode) ||
+      controller.metadata.projectId !== context.projectId || controller.metadata.appId !== context.fixture.firebase.appId ||
+      controller.metadata.sourceSha !== candidate.sourceSha || controller.metadata.candidateRunId !== candidate.candidateRunId ||
+      controller.metadata.fixtureRunId !== context.fixture.runId ||
+      ['install', 'allowsDebugRequest', 'redact', 'assertPublishable'].some((key) => typeof controller[key] !== 'function'))) {
+    throw Error('App Check diagnostic controller does not match the browser fixture.');
+  }
+  const debug = controller?.metadata.mode === 'staging-debug-functional';
+  const observations = []; let totalCount = 0;
+  const redact = (value) => debug ? controller.redact(value) : value;
+  function requestAllowed(request, headers) {
+    if (!debug) return allowStagingRequest(request.url(), request.method(), context, headers);
+    let url;
+    try {url = new URL(request.url());} catch {return false;}
+    if (!['content-firebaseappcheck.googleapis.com', 'firebaseappcheck.googleapis.com'].includes(url.hostname)) {
+      return allowStagingRequest(request.url(), request.method(), context, headers);
+    }
+    // No Enterprise fallback in debug mode. Init scripts do not cover workers
+    // or child frames: reject unattributable, SW and non-top-level exchanges.
+    // Dedicated-worker attribution is limited by Playwright; workers remain
+    // unqualified and all service workers are blocked at context creation.
+    try {
+      if (request.serviceWorker?.()) return false;
+      const frame = request.frame();
+      if (!frame || frame.parentFrame() || new URL(frame.url()).origin !== context.baseUrl) return false;
+      return controller.allowsDebugRequest(request.url(), request.method(), request.postData());
+    } catch {return false;}
+  }
+  return {
+    debug, redact, requestAllowed,
+    async newContext(engine, options, {contextId, blocked, onAppCheckToken}) {
+      if (debug && (options.recordHar !== undefined || options.storageState !== undefined)) {
+        throw Error('App Check diagnostic requires a fresh context without HAR or stored state.');
+      }
+      const browserContext = await engine.newContext({...options, ...(debug ? {serviceWorkers: 'block'} : {})});
+      if (debug) {
+        try {await controller.install(browserContext, {origin: context.baseUrl,
+          capturePolicy: {rawConsole: false, trace: false, har: false, storageState: false}});}
+        catch {
+          try {await browserContext.close();} catch {/* Preserve a fixed secret-free setup error. */}
+          throw Error('App Check diagnostic initializer failed before page creation.');
+        }
+      }
+      await browserContext.route('**/*', async (route) => {
+        const request = route.request(), url = new URL(request.url());
+        const headers = await request.allHeaders();
+        if (!requestAllowed(request, headers)) {
+          blocked.push({method: request.method(), origin: redact(url.origin), path: redact(url.pathname)});
+          return route.abort('blockedbyclient');
+        }
+        if (headers['x-firebase-appcheck']) onAppCheckToken(headers['x-firebase-appcheck']);
+        return route.continue();
+      });
+      await browserContext.routeWebSocket('**/*', (socket) => {
+        blocked.push({method: 'WEBSOCKET', origin: redact(new URL(socket.url()).origin)}); socket.close();
+      });
+      browserContext.on('response', (response) => this.observe(response, contextId));
+      return browserContext;
+    },
+    sanitizedError(error) {
+      if (!debug) return error;
+      return {name: redact(String(error?.name || 'Error')), message: redact(String(error?.message || error)),
+        stack: typeof error?.stack === 'string' ? redact(error.stack) : ''};
+    },
+    observe(response, contextId) {
+      if (!debug || !Number.isSafeInteger(contextId) || contextId < 1) return;
+      try {
+        const request = response.request();
+        if (!controller.allowsDebugRequest(request.url(), request.method(), request.postData()) || !requestAllowed(request, {})) return;
+        const status = response.status();
+        if (!Number.isInteger(status) || status < 100 || status > 599) return;
+        totalCount++;
+        if (observations.length < 200) observations.push({sequence: totalCount, contextId,
+          method: request.method(), at: new Date().toISOString(), httpStatus: status});
+      } catch {/* Do not retain response errors, URLs, request bodies or tokens. */}
+    },
+    requireCacheSupport() {
+      if (debug) throw Error('App Check debug diagnostic cannot qualify cache upgrade: independent predecessor bootstrap and worker initialization are unsupported.');
+    },
+    snapshot() {
+      return {configuration: controller?.metadata || {mode: 'real', configurationOnly: true,
+        realProviderAttestation: 'unverified', qualifiesCandidate: false},
+      observations: structuredClone(observations), totalCount, omittedCount: totalCount - observations.length,
+      observationMeaning: 'HTTP status only; not token validation or real-provider attestation',
+      workerCoverage: debug ? 'unsupported-service-workers-blocked' : 'existing-real-mode'};
+    },
+  };
+}
+
 async function produce({candidate, context, outputDir}) {
   const fixture = validateFixture(context);
+  const appCheckMode = createBrowserAppCheckIntegration({candidate, context});
   const replayOnly = context.requestedGates?.length === 1 && context.requestedGates[0] === 'post-close-replay';
   if (context.requestedGates && !replayOnly) throw Error('Browser evidence supports only full journeys or post-close-replay.');
   const activeGates = replayOnly ? ['post-close-replay'] : GATES;
@@ -497,22 +589,13 @@ async function produce({candidate, context, outputDir}) {
   let appCheckToken;
   const write = (gate, name, value) => { fs.writeFileSync(path.join(outputDir, name), JSON.stringify(value, null, 2)); gates[gate].rawPaths.push(name); };
   const record = (gate, id, expected, actual) => gates[gate].assertions.push({id, expected, actual});
-  const scrub = (error) => scrubBrowserError(error, fixture);
+  const scrub = (error) => scrubBrowserError(appCheckMode.sanitizedError(error), fixture);
   const browser = await chromium.launch({headless: true});
   async function newContext(viewport = {width: 1440, height: 1000}, engine = browser, engineName = 'chromium') {
-    const browserContext = await engine.newContext({viewport, serviceWorkers: replayOnly ? 'block' : 'allow'});
-    contextMetadata.set(browserContext, {contextId: ++contextSequence, engine: engineName});
-    await browserContext.route('**/*', async (route) => {
-      const request = route.request(), url = new URL(request.url());
-      const headers = await request.allHeaders();
-      if (!allowStagingRequest(request.url(), request.method(), context, headers)) {
-        blocked.push({method: request.method(), origin: url.origin, path: url.pathname});
-        return route.abort('blockedbyclient');
-      }
-      if (headers['x-firebase-appcheck']) appCheckToken = headers['x-firebase-appcheck'];
-      return route.continue();
-    });
-    await browserContext.routeWebSocket('**/*', (socket) => { blocked.push({method: 'WEBSOCKET', origin: new URL(socket.url()).origin}); socket.close(); });
+    const contextId = ++contextSequence;
+    const browserContext = await appCheckMode.newContext(engine, {viewport, serviceWorkers: replayOnly ? 'block' : 'allow'},
+      {contextId, blocked, onAppCheckToken: (token) => {appCheckToken = token;}});
+    contextMetadata.set(browserContext, {contextId, engine: engineName});
     return browserContext;
   }
   async function pageFor(browserContext, pageRole) {
@@ -520,10 +603,11 @@ async function produce({candidate, context, outputDir}) {
     const metadata = {...contextMetadata.get(browserContext), pageId: ++pageSequence, pageRole};
     page.setDefaultTimeout(30000);
     page.on('pageerror', (error) => {
-      const errorIndex = browserErrors.push(scrub(error)) - 1;
-      pageErrors.record(error, {...metadata, errorIndex, pageUrl: page.url(), observedDuringStep});
+      const safeError = appCheckMode.sanitizedError(error);
+      const errorIndex = browserErrors.push(scrub(safeError)) - 1;
+      pageErrors.record(safeError, {...metadata, errorIndex, pageUrl: page.url(), observedDuringStep});
     });
-    page.on('response', (response) => appCheckErrors.observe(response));
+    page.on('response', (response) => {if (!appCheckMode.debug) appCheckErrors.observe(response);});
     observeCreatedIdentities(page);
     return page;
   }
@@ -866,6 +950,7 @@ async function produce({candidate, context, outputDir}) {
       record(GATES[2], 'flutter-reload-visible-second-content', true, await visibleHistoryTitle(ownerPage, history.titles[fixture.secondEventId], true));
       record(GATES[2], 'flutter-history-retains-switched-actor', fixture.unauthorized.uid,
         (await browserToken(ownerPage, fixture.unauthorized)) ? fixture.unauthorized.uid : null);
+      appCheckMode.requireCacheSupport();
       const helperPath = path.join(__dirname, 'browser-cache-upgrade.js');
       if (!fs.existsSync(helperPath)) throw Error('Prior-artifact cache upgrade producer is unavailable.');
       const helper = require(helperPath), output = await (helper.produce || helper)({browser, context, candidate, outputDir, observeCreatedIdentities});
@@ -1091,6 +1176,10 @@ async function produce({candidate, context, outputDir}) {
     for (const gate of GATES) gates[gate].rawPaths.push('browser-network.json');
     return {gates, observedDeploymentIdentity: identity};
   } finally {
+    const saveAppCheckMode = (phase) => fs.writeFileSync(path.join(outputDir, 'appcheck-browser-observations.json'),
+      JSON.stringify({phase, ...appCheckMode.snapshot()}, null, 2));
+    saveAppCheckMode('before-close');
+    for (const gate of activeGates) gates[gate].rawPaths.push('appcheck-browser-observations.json');
     // Retain setup failures before teardown; replace with the completed
     // snapshot only after the browser and identity observations have settled.
     const savePageErrors = (phase) => fs.writeFileSync(path.join(outputDir, 'page-error-diagnostics.json'),
@@ -1105,6 +1194,7 @@ async function produce({candidate, context, outputDir}) {
     await browser.close();
     await Promise.allSettled([...identityObservations]);
     await appCheckErrors.drain();
+    saveAppCheckMode('after-close');
     savePageErrors('after-close');
     saveAppCheckErrors('after-close');
     // Keep the cleanup manifest even when candidate identity or a browser
@@ -1116,4 +1206,4 @@ async function produce({candidate, context, outputDir}) {
 
 module.exports = produce;
 module.exports.produce = produce;
-module.exports._test = {validateFixture, allowStagingRequest, scrubBrowserError, pageErrorDiagnostic, createPageErrorRecorder, projectAppCheckError, readAppCheckFailure, createAppCheckErrorRecorder, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, htmlResponsiveProbe, readOwnedHistoryTitles, visibleHistoryTitle, openCheckInConsole, readOwnedMapEvents, openOwnedMapMarker};
+module.exports._test = {validateFixture, allowStagingRequest, scrubBrowserError, pageErrorDiagnostic, createPageErrorRecorder, projectAppCheckError, readAppCheckFailure, createAppCheckErrorRecorder, parseCsv, signedFixtureUrl, createdAnonymousUid, requirePassingBrowserJourneys, preflightBrandedBrowsers, htmlResponsiveProbe, readOwnedHistoryTitles, visibleHistoryTitle, openCheckInConsole, readOwnedMapEvents, openOwnedMapMarker, createBrowserAppCheckIntegration};

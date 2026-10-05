@@ -8,7 +8,7 @@ const vm = require("node:vm");
 const c = require("./web_release_contract");
 const {verifyState, captureFunctionSources, pages} = require("./web_release_state");
 const {options, materializeBackend, materializeRules, runFunctionsCommand, verifyPublishedDeployment} = require("./web_release_pipeline");
-const {publishEvidence, retainReports, selectedGates} = require("./web_release_evidence");
+const {publishEvidence, retainReports, selectedGates, collectionAppCheckMode} = require("./web_release_evidence");
 const hash = "a".repeat(64); const sourceSha = "a".repeat(40);
 function candidate(environment = "staging") {
   const value = {schemaVersion: 1, sourceSha, candidateRunId: "123", environment, projectId: c.PROJECTS[environment], releaseId: hash,
@@ -49,6 +49,67 @@ test("invalid deployment verification time cannot bypass observation chronology"
     const f = fixture(); f.deployment.verifiedAt = verifiedAt;
     assert.throws(() => c.qualify(f.value, f.production, f.deployment, f.reports, f.now), /verified staging deployment/);
   }
+});
+test("App Check functional diagnostics never qualify even with every assertion passing", () => {
+  for (const marker of [{mode: "staging-debug-functional"}, {mode: "real", passed: true}, null, false]) {
+    const f = fixture(); f.reports[0].appCheck = marker;
+    assert.throws(() => c.qualify(f.value, f.production, f.deployment, f.reports, f.now), /functional diagnostics cannot qualify/);
+  }
+  const f = fixture(); f.reports[0].rawFiles["appcheck-test-mode.json"] = hash;
+  assert.throws(() => c.qualify(f.value, f.production, f.deployment, f.reports, f.now), /functional diagnostics cannot qualify/);
+});
+test("diagnostic mode is explicit, browser-only, and cannot enter replay or Safari", () => {
+  assert.equal(collectionAppCheckMode("browser", "all", undefined, {}), "real");
+  assert.equal(collectionAppCheckMode("browser", "all", "staging-debug-functional", {}), "staging-debug-functional");
+  for (const producer of ["safari", "backend", "operations", "anything"]) {
+    assert.throws(() => collectionAppCheckMode(producer, "all", "staging-debug-functional", {}), /full browser/);
+  }
+  for (const gates of ["post-close-replay", "observation"]) assert.throws(() => collectionAppCheckMode("browser", gates, "staging-debug-functional", {}), /full browser/);
+  assert.throws(() => collectionAppCheckMode("browser", "all", "custom", {}), /Unsupported/);
+  for (const key of ["STAGING_APPCHECK_DEBUG_TOKEN", "STAGING_APPCHECK_DEBUG_RESOURCE"]) {
+    assert.throws(() => collectionAppCheckMode("browser", "all", "real", {[key]: ""}), /must not enter/);
+  }
+});
+
+test("publication scans every actual buffer before copying any evidence", () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), "attendus-publication-scan-"));
+  const output = path.join(temp, "run"); fs.mkdirSync(output);
+  try {
+    fs.mkdirSync(path.join(output, "reports"));
+    fs.writeFileSync(path.join(output, "reports.json"), "{}");
+    fs.writeFileSync(path.join(output, "reports/browser.json"), JSON.stringify({rawFiles: {"first.json": hash, "last.png": hash}}));
+    fs.writeFileSync(path.join(output, "first.json"), "{}");
+    fs.writeFileSync(path.join(output, "last.png"), "sensitive-test-bytes");
+    const scanned = [];
+    assert.throws(() => publishEvidence(output, ["reports/browser.json"], (bytes) => {
+      assert.ok(Buffer.isBuffer(bytes)); scanned.push(bytes.toString());
+      if (bytes.includes("sensitive-test-bytes")) throw Error("publication rejected");
+    }), /publication rejected/);
+    assert.equal(scanned.length, 4);
+    assert.equal(fs.existsSync(`${output}-publish`), false);
+  } finally {fs.rmSync(temp, {recursive: true, force: true});}
+});
+
+test("collector forces debug reports and raw provenance into blocked diagnostics", () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), "attendus-debug-diagnostics-"));
+  const output = path.join(temp, "run"); fs.mkdirSync(output);
+  const metadata = {mode: "staging-debug-functional", configurationOnly: true, qualifiesCandidate: false};
+  const scanned = [];
+  try {
+    fs.writeFileSync(path.join(output, "journey.json"), "{}"); const now = new Date().toISOString();
+    const index = retainReports({output, candidate: candidate(), producerPath: "tools/web_release_producers/browser.js", source: hash,
+      startedAt: now, finishedAt: now, after: {stateSha256: hash},
+      appCheckTestMode: {metadata, assertPublishable: (bytes) => scanned.push(bytes)},
+      result: {gates: {"browser-auth-guest-organizer": {assertions: [{id: "flow", expected: true, actual: true}], blockers: [], rawPaths: ["journey.json"], appCheck: {mode: "real"}}}}});
+    assert.equal(index.qualificationStatus, "blocked"); assert.deepEqual(index.reports, []);
+    assert.ok(index.failures.includes("appcheck-functional-diagnostics-cannot-qualify"));
+    const report = JSON.parse(fs.readFileSync(path.join(`${output}-publish`, index.diagnosticReports[0])));
+    assert.deepEqual(report.appCheck, metadata);
+    assert.ok(report.rawFiles["appcheck-test-mode.json"]);
+    assert.equal(report.assertions[0].actual, true);
+    assert.equal(scanned.length, 5);
+    assert.throws(() => c.validateEvidence(report, candidate()), /functional diagnostics cannot qualify/);
+  } finally {fs.rmSync(temp, {recursive: true, force: true});}
 });
 
 test("candidate must retain its explicitly reviewed retry acknowledgement manifest", () => {

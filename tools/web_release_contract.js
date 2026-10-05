@@ -136,6 +136,10 @@ function validateAssertions(report) {
   if (!Array.isArray(report.blockers) || report.blockers.length) fail("Unresolved active journey blockers");
 }
 function validateEvidence(report, candidate, rawRoot) {
+  // The optional test-mode marker is emitted only by the explicitly diagnostic
+  // path. Never infer real attestation from a supplied mode/pass flag, even if
+  // the functional assertions all pass or somebody relabels its mode as real.
+  if (Object.hasOwn(report, "appCheck") || Object.hasOwn(report.rawFiles || {}, "appcheck-test-mode.json")) fail("App Check functional diagnostics cannot qualify; real-provider collection is required");
   if (report.schemaVersion !== 1 || ![...GATES, ...AUXILIARY_GATES].includes(report.gate) || report.environment !== "staging" || report.projectId !== PROJECTS.staging || report.sourceSha !== candidate.sourceSha || report.candidateRunId !== candidate.candidateRunId || report.candidateSha256 !== digest(candidate) || report.webSha256 !== candidate.webSha256 || report.deploymentSha256 !== candidate.deploymentSha256 || report.configSha256 !== candidate.configSha256) fail("Evidence is bound to a different candidate");
   const start = Date.parse(report.startedAt); const end = Date.parse(report.finishedAt);
   if (!Number.isFinite(start) || !Number.isFinite(end) || end < start || end > Date.now() + 60000) fail("Invalid evidence time");

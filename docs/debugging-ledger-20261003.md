@@ -777,3 +777,53 @@ Enterprise webworker resource, so that local experiment is still confounded by
 the diagnostic's network restriction. It establishes the observed rejection,
 not normal-browser acceptance or its complete cause. Both attempts remain
 preserved, and production enforcement is unchanged.
+
+## October 5 UTC: startup recovery and isolated App Check diagnostics
+
+Both exact-source web CI runs for `d83c4743ebc79294a2ed6694ec626d96ef5fee06`
+passed all six jobs. PR run `37244571225` artifact `11318966485`, ZIP SHA256
+`ad9a8709cf93e991080a30c8b237650dc7522329cbb735431387298b811098f6`,
+contains 60 first-attempt public-browser passes, five successful Flutter
+journeys and complete fixture cleanup. That source predates the repair below;
+it is not final-source or staged acceptance.
+
+| ID / severity / surface | Reproduction and expected versus actual behavior | Root cause and correction | Verification and remaining acceptance |
+| --- | --- | --- | --- |
+| WEBQA-30 / P1 / authenticated web startup | With a current full Firebase user, reject a saved-navigation preference read or pending-intent removal. Entry should retain the user and recover to Discover; the old gate throws and remains loading. Failed explicit Discover cleanup can instead demote the in-memory full user to guest. | Optional navigation I/O escapes its error boundary, and signed-in navigation uses an unawaited async-void method. Resolve failed optional navigation as fresh Discover without restoration; return Future<void> and await all three signed-in navigation calls. Authentication, authorization and existing timeouts remain unchanged. | Against preserved d83 source: three intended failures and three valid controls. After: six new actual-gate cases plus four existing navigation controls pass; focused analysis and independent review are clear. Tests inspect the mounted gate's selected Dashboard configuration with offline platform boundaries, not full Dashboard rendering. Readiness receipt SHA256 `5bcde8b94af275bcf523448620ec750bf1462c22dcf8c012d599f09fea36f749`. Full client and fresh hosted checks remain required for the final source. |
+
+The third deliberate local provider diagnostic allowed the official Enterprise
+worker. It retained HTTP 403 / App attestation failed with no policy blocks or
+helper errors. All three original attempts remain preserved. This is an
+automated synthetic-shell rejection, not a demonstrated normal-user defect.
+Neither the approximately 50-day-old staging key nor its lower aggregate traffic
+establishes a causal explanation. No provider threshold or enforcement changed.
+
+An opt-in `staging-debug-functional` browser collection path now supports
+diagnostics using a private staging-only token. It initializes each fresh
+top-level context before navigation, forbids Enterprise fallback, blocks service
+workers, and leaves the separate cache-upgrade and Safari paths unsupported.
+Observed HTTP status is distinguished from configuration and attestation. Every
+diagnostic report/index remains blocked and the workflow cannot be acquired as
+passing qualification evidence. All thirteen original gates remain required.
+No token has been registered and no live diagnostic run has occurred. The
+optional fully intercepted Chromium SDK smoke timed out before its exchange;
+this incomplete test is retained separately from the passing unit contracts.
+
+The combined Node selection has 356 cases: the default-parallel run passed 355
+and retained one existing 20-second child-process timeout in the unfinished
+deployment guard. The same complete selection then passed all 356 sequentially
+with no changed timeout, skips or cancellations. The delay's cause remains
+unproven; local parallel reliability is not claimed. All 36 workflow/native
+configuration guards pass using local Python 3.11.15; hosted CI uses 3.12.
+Helper, browser and shared contract changes have independent focused reviews.
+These changes are not deployed, and the failed staged pilot remains held.
+
+Final local client validation for WEBQA-30 passes all 553 tests under Flutter
+3.44.6, with complete client analysis clean and 452 files passing the formatting
+check. Test log SHA256:
+`1957b4ef9c33971a83d54610d83f7654121054b2c42dbb6bf1d68b24bbc3584b`.
+Sequential contract log SHA256:
+`6bbccdd2de5ba40c423f53e0d5d8dac11b14748a0d90acb5ea3194f791fd181f`.
+The original parallel failure remains at SHA256
+`a26ef4286cf1b166973df834b130c096e6afccf2af24e96e5e1049e1388c17fc`.
+Fresh hosted CI must cover the exact committed source before staging work.

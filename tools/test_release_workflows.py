@@ -56,6 +56,52 @@ def guarded(jobs, name, seen=None):
     return any(guarded(jobs, parent, set(seen)) for parent in dependencies(job))
 
 
+def validate_appcheck_diagnostics(workflows):
+    collector = workflows["web-release-observe.yml"]
+    collect = collector["jobs"]["collect"]
+    mode = collector["on"]["workflow_dispatch"]["inputs"].get("app_check_mode", {})
+    if mode.get("type") != "choice" or mode.get("options") != ["real", "staging-debug-functional"] or mode.get("default") != "real" or mode.get("required") is not True:
+        raise ValueError("App Check diagnostics require an explicit choice with real default")
+    if collect.get("environment") != "staging" or collect.get("env", {}).get("APPCHECK_MODE") != "${{ inputs.app_check_mode }}":
+        raise ValueError("App Check diagnostics require the staging environment and explicit mode binding")
+    steps = collect.get("steps", [])
+    guard = "collectionAppCheckMode(process.env.PRODUCER, process.env.GATES, process.env.APPCHECK_MODE)"
+    guards = [index for index, step in enumerate(steps) if guard in step.get("run", "")]
+    protected = [index for index, step in enumerate(steps) if step.get("uses", "").startswith(("google-github-actions/auth@", "actions/setup-node@")) or "npm ci" in step.get("run", "")]
+    if len(guards) != 1 or not protected or guards[0] >= min(protected) or steps[guards[0]].get("if"):
+        raise ValueError("App Check browser-only preflight must precede installation and authentication")
+    command = "node tools/web_release_evidence.js"
+    execution = [step for step in steps if command in step.get("run", "")]
+    diagnostic = [step for step in execution if "--app-check-mode staging-debug-functional" in step["run"]]
+    real = [step for step in execution if "--app-check-mode" not in step["run"]]
+    if len(execution) != 2 or len(diagnostic) != 1 or len(real) != 1 or diagnostic[0].get("if") != "${{ inputs.app_check_mode == 'staging-debug-functional' }}" or real[0].get("if") != "${{ inputs.app_check_mode == 'real' }}":
+        raise ValueError("Real and debug execution must have exclusive explicit mode conditions")
+    secrets = {"STAGING_APPCHECK_DEBUG_TOKEN": "${{ secrets.STAGING_APPCHECK_DEBUG_TOKEN }}",
+               "STAGING_APPCHECK_DEBUG_RESOURCE": "${{ vars.STAGING_APPCHECK_DEBUG_RESOURCE }}"}
+    if diagnostic[0].get("env") != secrets:
+        raise ValueError("Debug credential and resource must be scoped to the diagnostic execution step")
+    # Search every workflow, including build/real jobs. Only the exact diagnostic
+    # step's environment mapping may reference these settings, never shell text.
+    def contains_debug(value):
+        return any(name in str(value) for name in secrets)
+    for filename, workflow in workflows.items():
+        if contains_debug({key: value for key, value in workflow.items() if key != "jobs"}):
+            raise ValueError("Debug settings escaped the diagnostic execution step")
+        for name, job in workflow["jobs"].items():
+            if contains_debug({key: value for key, value in job.items() if key != "steps"}):
+                raise ValueError("Debug settings escaped the diagnostic execution step")
+            for step in job.get("steps", []):
+                allowed = filename == "web-release-observe.yml" and name == "collect" and step is diagnostic[0]
+                scanned = {key: value for key, value in step.items() if key != "env"} if allowed else step
+                if contains_debug(scanned):
+                    raise ValueError("Debug settings escaped the diagnostic execution step")
+    ignored_failure = re.compile(r"\|\|\s*(?:true\b|:\s*(?:$|;)|exit\s+0\b)|\bset\s+\+e\b|\bexit\s+0\b")
+    if collect.get("continue-on-error") or any(step.get("continue-on-error") or ignored_failure.search(step.get("run", "")) for step in steps):
+        raise ValueError("Diagnostic failure must remain a failed workflow, never continue-on-error")
+    if any("web_release_pipeline.js qualify" in step.get("run", "") or "web_release_pipeline.js promote" in step.get("run", "") or step.get("uses") in ["./.github/workflows/web-release-qualify.yml", "./.github/workflows/web-release-promote.yml"] for step in steps):
+        raise ValueError("Diagnostic collection cannot invoke qualification or promotion")
+
+
 def validate(workflows):
     for filename, required in [("quality.yml", REQUIRED), ("web-quality.yml", WEB_REQUIRED)]:
         quality = workflows[filename]
@@ -162,6 +208,7 @@ def validate(workflows):
     authentication = next(index for index, step in enumerate(collector_steps) if step.get("uses", "").startswith("google-github-actions/auth@"))
     if mode_check is None or mode_check >= authentication:
         raise ValueError("Producer/mode guard must precede cloud authentication")
+    validate_appcheck_diagnostics(workflows)
     if "safari" not in collector["on"]["workflow_dispatch"]["inputs"]["producer"]["options"] or collect.get("runs-on") != "${{ inputs.producer == 'safari' && 'macos-15' || 'ubuntu-latest' }}":
         raise ValueError("Actual Safari evidence requires the pinned macOS runner")
     for step in collect.get("steps", []):
@@ -231,6 +278,72 @@ class ReleaseWorkflowTests(unittest.TestCase):
             steps = w["web-release-observe.yml"]["jobs"]["collect"]["steps"]
             steps[:] = [step for step in steps if "selectedGates(" not in step.get("run", "")]
         self.mutate(remove, "guard must precede")
+
+    def test_appcheck_diagnostics_are_explicit_and_real_by_default(self):
+        for patch in [{"default": "staging-debug-functional"}, {"required": False}, {"type": "string"}, {"options": ["real", "staging-debug-functional", "skip"]}]:
+            self.mutate(lambda w: w["web-release-observe.yml"]["on"]["workflow_dispatch"]["inputs"]["app_check_mode"].update(patch), "explicit choice with real default")
+        self.mutate(lambda w: w["web-release-observe.yml"]["jobs"]["collect"]["env"].update(APPCHECK_MODE="real"), "explicit mode binding")
+
+    def test_appcheck_browser_only_preflight_cannot_be_skipped_or_delayed(self):
+        for action in ["remove", "after-install", "conditional"]:
+            def change(w):
+                steps = w["web-release-observe.yml"]["jobs"]["collect"]["steps"]
+                guard = next(step for step in steps if "collectionAppCheckMode(" in step.get("run", ""))
+                if action == "remove":
+                    guard["run"] = guard["run"].replace("e.collectionAppCheckMode(process.env.PRODUCER, process.env.GATES, process.env.APPCHECK_MODE)", "void 0")
+                elif action == "conditional":
+                    guard["if"] = "${{ inputs.producer == 'browser' }}"
+                else:
+                    steps.remove(guard)
+                    install = next(index for index, step in enumerate(steps) if step.get("uses", "").startswith("actions/setup-node@"))
+                    steps.insert(install + 1, guard)
+            self.mutate(change, "browser-only preflight")
+
+    def test_appcheck_credentials_do_not_escape_to_job_build_or_real_steps(self):
+        for key in ["STAGING_APPCHECK_DEBUG_TOKEN", "STAGING_APPCHECK_DEBUG_RESOURCE"]:
+            for location in ["workflow", "job", "build", "real", "diagnostic-command"]:
+                def change(w):
+                    collect = w["web-release-observe.yml"]["jobs"]["collect"]
+                    diagnostic = next(step for step in collect["steps"] if "--app-check-mode staging-debug-functional" in step.get("run", ""))
+                    value = diagnostic["env"][key]
+                    if location == "workflow":
+                        w["web-release-observe.yml"].setdefault("env", {})[key] = value
+                    elif location == "job":
+                        collect["env"][key] = value
+                    elif location == "build":
+                        w["firebase-release.yml"]["jobs"]["candidates"].setdefault("env", {})[key] = value
+                    elif location == "diagnostic-command":
+                        diagnostic["run"] += "\necho $" + key
+                    else:
+                        real = next(step for step in collect["steps"] if "node tools/web_release_evidence.js" in step.get("run", "") and "--app-check-mode" not in step["run"])
+                        real.setdefault("env", {})[key] = value
+                self.mutate(change, "escaped the diagnostic execution")
+
+    def test_appcheck_execution_modes_and_secret_mapping_are_not_interchangeable(self):
+        for kind in ["real", "diagnostic"]:
+            for condition in [None, "always()", "${{ inputs.producer == 'browser' }}"]:
+                def change(w):
+                    steps = w["web-release-observe.yml"]["jobs"]["collect"]["steps"]
+                    step = next(step for step in steps if "node tools/web_release_evidence.js" in step.get("run", "") and ("--app-check-mode" in step["run"]) == (kind == "diagnostic"))
+                    step["if"] = condition
+                self.mutate(change, "exclusive explicit mode")
+        def remove_resource(w):
+            steps = w["web-release-observe.yml"]["jobs"]["collect"]["steps"]
+            next(step for step in steps if "--app-check-mode staging-debug-functional" in step.get("run", ""))["env"].pop("STAGING_APPCHECK_DEBUG_RESOURCE")
+        self.mutate(remove_resource, "scoped to the diagnostic execution")
+
+    def test_appcheck_diagnostic_failures_cannot_be_made_green(self):
+        self.mutate(lambda w: w["web-release-observe.yml"]["jobs"]["collect"].update({"continue-on-error": True}), "failed workflow")
+        for suffix in ["continue", " || true", " || exit 0", "\nset +e", "\nexit 0"]:
+            def change(w):
+                steps = w["web-release-observe.yml"]["jobs"]["collect"]["steps"]
+                step = next(step for step in steps if "--app-check-mode staging-debug-functional" in step.get("run", ""))
+                if suffix == "continue":
+                    step["continue-on-error"] = True
+                else:
+                    step["run"] += suffix
+            self.mutate(change, "failed workflow")
+        self.mutate(lambda w: w["web-release-observe.yml"]["jobs"]["collect"]["steps"].append({"run": "node tools/web_release_pipeline.js qualify"}), "cannot invoke qualification")
 
     def test_launch_and_browser_gates_cannot_be_omitted(self):
         for filename in ["quality.yml", "web-quality.yml"]:
