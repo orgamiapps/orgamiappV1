@@ -36,7 +36,7 @@ def validate_secret_scan(job):
         raise ValueError("Secret scanning requires the standalone pinned CLI")
     scan = scans[0]
     script = scan["run"]
-    required = ["set -euo pipefail", GITLEAKS_ARCHIVE, GITLEAKS_SHA256, "sha256sum --check --strict", 'tar -xzf "$tool_dir/gitleaks.tar.gz"', '"$tool_dir/gitleaks" git --redact --config .gitleaks.toml --log-opts="--all" .']
+    required = ["set -euo pipefail", GITLEAKS_ARCHIVE, GITLEAKS_SHA256, "sha256sum --check --strict", 'tar -xzf "$tool_dir/gitleaks.tar.gz"', 'node tools/test_gitleaks_allowlists.js "$tool_dir/gitleaks"', '"$tool_dir/gitleaks" git --redact --config .gitleaks.toml --log-opts="--all" .']
     if any(marker not in script for marker in required) or scan.get("shell") != "bash":
         raise ValueError("Secret scanning requires verified Gitleaks 8.30.1, redaction, config and all refs")
     if script.index("sha256sum --check --strict") > script.index("tar -xzf"):
@@ -421,16 +421,16 @@ class ReleaseWorkflowTests(unittest.TestCase):
 
     def test_secret_scan_pins_checksum_and_redacts_all_refs(self):
         for filename in ["quality.yml", "web-quality.yml"]:
-            for marker in [GITLEAKS_ARCHIVE, GITLEAKS_SHA256, "set -euo pipefail", "--redact", "--config .gitleaks.toml", '--log-opts="--all"']:
+            for marker in [GITLEAKS_ARCHIVE, GITLEAKS_SHA256, "set -euo pipefail", "--redact", "--config .gitleaks.toml", '--log-opts="--all"', 'node tools/test_gitleaks_allowlists.js "$tool_dir/gitleaks"']:
                 def change(w):
-                    step = w[filename]["jobs"]["secret-scan"]["steps"][1]
+                    step = next(s for s in w[filename]["jobs"]["secret-scan"]["steps"] if '"$tool_dir/gitleaks" git ' in s.get("run", ""))
                     step["run"] = step["run"].replace(marker, "omitted")
                 self.mutate(change, "verified Gitleaks")
 
     def test_secret_scanner_checksum_precedes_extraction(self):
         for filename in ["quality.yml", "web-quality.yml"]:
             def change(w):
-                step = w[filename]["jobs"]["secret-scan"]["steps"][1]
+                step = next(s for s in w[filename]["jobs"]["secret-scan"]["steps"] if '"$tool_dir/gitleaks" git ' in s.get("run", ""))
                 lines = step["run"].splitlines()
                 verification = next(line for line in lines if "sha256sum --check --strict" in line)
                 lines.remove(verification)

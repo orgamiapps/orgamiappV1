@@ -827,3 +827,31 @@ Sequential contract log SHA256:
 The original parallel failure remains at SHA256
 `a26ef4286cf1b166973df834b130c096e6afccf2af24e96e5e1049e1388c17fc`.
 Fresh hosted CI must cover the exact committed source before staging work.
+
+## October 5 UTC: secret-scanner exception boundaries
+
+Exact `ed97e1e` PR run `37247566632` and push run `37247563705` both
+passed Flutter, Functions, browser journeys and Firebase emulators. The secret
+scan and aggregate failed on two occurrences of the same synthetic, unregistered
+UUID used by offline App Check tests. Failed runs remain preserved; no retry or
+qualification claim replaces them.
+
+| Defect / severity / surface | Reproduction and expected/actual behavior | Root cause and correction | Verification |
+|---|---|---|---|
+| WEBQA-31 / P1 / release secret scanning | Place a different synthetic credential-shaped value in a path covered by a historical allowlist. Expected: report the value. Actual: Gitleaks 8.30.1 skips the whole path, even with `condition = "AND"`. The first proposed test-UUID exception reproduced the same issue. | `ruleIds` is not a supported global allowlist field. Replace it with `targetRules` so path/value conditions apply to their named rules. Scope the new exception to exactly the synthetic UUID and its two offline test files. Preserve exact reviewed public-identifier exceptions; do not exempt arbitrary test files or UUIDs. | Actual pinned-scanner controls and negative cases cover both test paths, the same literal elsewhere, and historical manifest/Podfile/VAPID paths. Add the executable regression to both quality workflows before the full-history scan. Fresh full-history and hosted results are required for the final correction. |
+
+The pinned scanner's [configuration reference](https://github.com/gitleaks/gitleaks/blob/v8.30.1/README.md#configuration)
+documents `targetRules` and global path skipping. Independent nine-case proof
+SHA256 is `34e25dbe3b72b8672a2919070b0bfe7562d299c9c92865040b19ee449f0decee`.
+Its first correctly scoped full-history scan exposed 29 further findings requiring
+exact-value review; that intermediate scan is not a passing result. No secret
+value or private fixture payload is included in this ledger.
+
+All 29 findings match exact public Firebase literals already reviewed in the
+configuration: 23 current and six historical occurrences, zero unmatched. Only
+those two literal allowlists now name both detecting rules. Final local
+Gitleaks 8.30.1 scans all history successfully with zero findings. The persisted
+scanner regression passes all nine cases under the corrected configuration and
+fails against both the original configuration and the rejected path-skipping
+variant. Root independently reran all nine cases successfully; all 36 workflow
+and native configuration guards also pass. Fresh hosted CI remains required.

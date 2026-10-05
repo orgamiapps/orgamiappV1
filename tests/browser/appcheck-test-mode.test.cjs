@@ -2,7 +2,7 @@
 const test = require('node:test'), assert = require('node:assert/strict'), vm = require('node:vm');
 const {createAppCheckTestMode: create} = require('../../tools/web_release_producers/appcheck-test-mode');
 // Synthetic UUID4, never generated/registered/exchanged with any service.
-const TOKEN = '01234567-89ab-4cde-8fab-0123456789ab';
+const TOKEN = '01234567-89ab-4cde-8fab-0123456789ab'; // Synthetic, unregistered; offline tests only.
 const ENV = 'STAGING_APPCHECK_DEBUG_TOKEN';
 const appId = '1:925344893088:web:3be71e809ba516e1d021c5';
 const stage = 'https://attendus-staging.web.app';

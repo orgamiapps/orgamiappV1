@@ -3,8 +3,16 @@ title = "Attendus reviewed public identifiers and documentation fixtures"
 useDefault = true
 
 [[allowlists]]
+description = "Exact unregistered synthetic UUID used only by offline App Check tests"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['^tests/browser/appcheck-browser\.test\.cjs$', '^tests/browser/appcheck-test-mode\.test\.cjs$']
+regexTarget = "secret"
+regexes = ['^01234567-89ab-4cde-8fab-0123456789ab$']
+
+[[allowlists]]
 description = "Firebase client API identifiers intentionally shipped in public app configuration"
-ruleIds = ["gcp-api-key"]
+targetRules = ["gcp-api-key", "generic-api-key"]
 regexTarget = "secret"
 regexes = [
   '''^AIzaSyA\-PFyqhP5aEVE6XwGku3jMe91G3efMaVw$''',
@@ -15,21 +23,21 @@ regexes = [
 
 [[allowlists]]
 description = "Literal ID-token placeholder in analytics documentation, not a credential"
-ruleIds = ["curl-auth-header"]
+targetRules = ["curl-auth-header"]
 regexTarget = "match"
 regexes = ['YOUR_ID_TOKEN']
 
 [[allowlists]]
 description = "Reviewed SHA-256 file digests in the historical candidate manifest"
 condition = "AND"
-ruleIds = ["generic-api-key"]
+targetRules = ["generic-api-key"]
 paths = ['docs/launch-candidate-manifest-20260927\.json$']
 regexTarget = "secret"
 regexes = ['^[a-f0-9]{64}$']
 
 [[allowlists]]
 description = "Reviewed historical public Firebase client identifiers"
-ruleIds = ["gcp-api-key"]
+targetRules = ["gcp-api-key", "generic-api-key"]
 regexTarget = "secret"
 regexes = [
   '''^AIzaSyAgxBhWgtmRA_cc\-JcuMP8fXl7NjZIthOI$''',
@@ -38,7 +46,7 @@ regexes = [
 [[allowlists]]
 description = "CocoaPods dependency SHA-1 checksums, not credentials"
 condition = "AND"
-ruleIds = ["generic-api-key"]
+targetRules = ["generic-api-key"]
 paths = ['ios/Podfile\.lock$']
 regexTarget = "secret"
 regexes = ['^[a-f0-9]{40}$']
@@ -47,7 +55,7 @@ regexes = ['^[a-f0-9]{40}$']
 description = "Reviewed retired public VAPID configuration literal (historically malformed)"
 condition = "AND"
 paths = ['lib/firebase/firebase_messaging_helper\.dart$']
-ruleIds = ["generic-api-key"]
+targetRules = ["generic-api-key"]
 regexTarget = "secret"
 regexes = [
   '''^BCFlVkRk4wUzL3pNaP7bVYqg8uH3M2vYsmYcB5dOSdpnqjWcW1O9xv5v3kHcQ8bYl1o3tB6Qx4HjG3C2D5E6F7G8$''',
