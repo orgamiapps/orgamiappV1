@@ -675,3 +675,227 @@ Platform transport doubles establish helper behavior, while the separately
 executed emulator suite establishes actual rules acceptance; neither is a live
 staging community journey. Explicitly malformed identity fields remain rejected;
 only the already-supported absent organizationId uses the membership parent path.
+
+## Staging candidate 37237620203: first browser run failed
+
+Source `c954c64c966191f3958b15679fb81b387899510a` passed the six hosted
+quality groups and deployed to isolated staging. Initial observation
+`37240369997` passed. Browser collector `37240967410` then failed all five
+gates; its retained diagnostic artifact `11317214538` has SHA256
+`e05f4cb14dc122e17f821dc1363355f6488172891312c04d67fd0277c1061f75`.
+No passing browser receipt exists, and dependent acceptance and production
+promotion remain held. Cleanup, reseeding and mutation replay have not been
+used to hide these failures.
+
+| ID / severity / surface | Reproduction and expected versus actual behavior | Root cause and correction | Verification and remaining acceptance |
+| --- | --- | --- | --- |
+| WEBQA-26 / P1 / web discovery history | Attach a ScrollPosition before its viewport supplies content dimensions, then restore browser history. Restoration should wait or preserve the saved position; instead it dereferences a null maxScrollExtent. Five retained Chromium exceptions map to the exact acquired deferred artifact at line 12169. | hasClients establishes attachment, not completed layout. Use one position with pixels and content dimensions, allow at most three frame completions, and preserve history when layout, generation, attachment or disposal makes restoration unavailable. | Before: two new real-viewport cases fail with the null-check exception, three controls pass. After: eight focused tests pass, including late layout, disposal, detachment and superseded restoration; focused analysis is clean. This local fix is not yet deployed. It does not establish the cause of every login timeout or Firefox/WebKit rethrow. |
+| WEBQA-27 / P2 / discovery qualification timing | The original queue has readyAt 23:16:48.924Z and server queuedAt 22:31:50.901Z. Its genuine 1.977-second commit lag incorrectly fails the pending 45-minute-delay assertion. | The enqueue clock is sampled before its transaction; queuedAt is assigned at commit. Bound the derived enqueue clock with the event's server createTime and queue commit timestamps; a later independent event-metadata update remains valid. Do not change the deadline or widen an arbitrary tolerance. | The initial reproduction has five passes/two failures. All eight final focused cases pass, including delayed commit, later metadata update and inconsistent ordering rejection before account deletion. Independent review is clear; all 319 release-contract tests pass. Failed B never reached this assertion; it is a separately reproduced harness defect. |
+
+The combined local client suite passes all 547 tests, and complete CI-scope
+client analysis reports no issues. These source corrections
+remain in the isolated repair branch; neither a new hosted candidate nor live
+browser acceptance of the corrected artifact has occurred.
+The retained client and 319-case contract logs have SHA256
+`ac382ce1d43c907ee14a80bd7f00fd07436ee8e166f72c8a9e693bf462439cf0`
+and `8987be6538f683d44a08217e8c5cc9285502702b4998562fb8fbf78eb457dc8b`.
+
+App Check returned 21 projected PERMISSION_DENIED responses during B.
+Read-only metadata confirms matching staging app/key/provider/domain settings;
+aggregate assessment metrics support risk rejection below the configured 0.5
+threshold but do not attribute every response individually. No threshold,
+enforcement, debug provider or production configuration has been changed.
+Guest-submission and other uncertain outcomes require retained-record
+reconciliation before any replay. The explicit staging snapshot at 23:08:14Z
+finds no committed V3 registration, ticket, attendance, session, export,
+announcement or original-conversation message from B; all 1,201 existing
+registrations belong to the seeded large roster. It accounts for six seeded
+accounts, all 14 acknowledged browser-created anonymous accounts and the one
+pre-existing anonymous account. Communications and deletion were never entered;
+the attendee reminder was never created. This current-state reconciliation
+does not manufacture an acknowledgement for the timed-out request.
+The owner could not supply the missing historical usage or ambiguous admission
+relationship and requested an investigation. The completed bounded read-only
+review recovered five deleted historical events, including one belonging to an
+account with no counter. No complete charged-publication ledger was found.
+Forty enabled accounts remain blocked under the current quota policy. Retained
+snapshots preserve the missing counters; PITR is disabled and no managed backups
+or backup schedules exist. No restore would recover values absent from these
+sources. Empty retained log queries do not prove zero historical usage.
+
+WISE's ticket, registration and separate manual attendance retain the same
+versions as September 2025. Legacy source permits one ticket flow to create a
+separate registration but also permits independent registrations; the surviving
+two generic notifications contain no shared operation identifier. Seven related
+payment/operation collections supply no linking record. The ticket/registration
+relationship remains unresolved. The manual attendance is preserved unidentified
+historical evidence, not an additional current migration blocker. The forensic
+summary SHA256 is `bebad42664fc51ca5abd7b710e36cd4c9922619414c2d2e144470f1ed1a62262`;
+its completeness/policy addendum is
+`a39216fa3541265bfa9c0c820d915cf924bb699f0a91760b6aaac80dd66b2dbf`.
+No counter, admission relationship, entitlement or production data was changed.
+
+## Candidate12 CI cancellation defect
+
+At source `f257e9c914bc313246b38acb65bdbc7250de030b`, PR run `37243299474`
+passed all six hosted groups. Artifact `11318446849`, SHA256
+`e344a494a16265f5de55aeb2f799f1263d8264ca8315fb060ab228bfd0d2e530`,
+contains 60 first-attempt public-browser passes, five successful Flutter journeys
+and complete fixture cleanup. The same-source push run `37243295645` failed its
+Functions contract step on a post-timeout polling assertion. Both results are
+retained; the successful run does not waive the observed defect.
+
+| ID / severity / surface | Reproduction and expected versus actual behavior | Root cause and correction | Verification and remaining acceptance |
+| --- | --- | --- | --- |
+| WEBQA-28 / P2 / browser qualification authentication reader | Fire the timeout at monotonic 9.5 ms for a 10 ms budget, then wake the pending poll at 9.75 ms. The caller has already received timeout, but the original adapter starts another page read. A late in-flight evaluation can also schedule another poll. Expected: no new reads or polling after timeout. | Promise.race rejects without cancelling the losing loop; the timer can fire before the fractional monotonic deadline. Add a synchronous cancellation fence before rejection, clear and settle pending poll sleep, and check cancellation after each evaluation. | Before: 14 controls pass and two deterministic regressions fail. After: all 16 focused cases pass, including the unchanged real-timer assertion. An already-started page evaluation may finish; its completion cannot schedule further work. Combined contracts and fresh exact-source hosted CI remain required. |
+| WEBQA-29 / P2 / release qualification chronology | Supply a complete passing fixture with deployment.verifiedAt set to not-a-date. Expected: reject the invalid deployment receipt. Actual: qualification succeeds because comparisons against NaN are false. | Require a string that parses to a finite deployment timestamp before comparing report chronology and observation deadlines. | New regression fails on the original qualifier. All 33 contract cases pass after correction and in independent review; valid ISO deployment receipts and all other gates remain required. Fresh combined and hosted validation remain required. |
+
+All 323 combined release-contract cases now pass using Node 22's default
+parallel test execution, with zero failures, cancellations or skips. This
+includes the reader, timer provenance and release chronology corrections.
+No Dart source changed since the retained 547-test client pass. Fresh hosted
+CI remains required for the combined revision; staging acceptance remains held.
+
+Original-timer evidence now also records the Firestore snapshot's immutable
+createTime, retaining nanoseconds and distinguishing it from mutable document
+fields and updateTime. The old reader omitted that provenance required by the
+corrected delay verification. Before: 11 controls pass and two assertions fail.
+After and independent review: all 13 reader cases pass. Historical baselines
+without createTime remain unchanged and cannot be silently upgraded into proof.
+
+The local Edge App Check diagnostic attempted one token request and one
+exchange. Its response capture closed the browser context before draining the
+body reader, and its SDK error allowlist omitted the SDK's initial-throttle
+classification. It therefore retains no usable exchange response; it is
+inconclusive evidence, not proof of a particular provider rejection or successful
+attestation. Preparation of a corrected diagnostic preserves that attempt and
+does not authorize an automatic retry or any App Check configuration change.
+One deliberate capture-repair diagnostic then retained HTTP 403,
+PERMISSION_DENIED and App attestation failed, with the matching SDK
+initial-throttle classification. It also identified a blocked official
+Enterprise webworker resource, so that local experiment is still confounded by
+the diagnostic's network restriction. It establishes the observed rejection,
+not normal-browser acceptance or its complete cause. Both attempts remain
+preserved, and production enforcement is unchanged.
+
+## October 5 UTC: startup recovery and isolated App Check diagnostics
+
+Both exact-source web CI runs for `d83c4743ebc79294a2ed6694ec626d96ef5fee06`
+passed all six jobs. PR run `37244571225` artifact `11318966485`, ZIP SHA256
+`ad9a8709cf93e991080a30c8b237650dc7522329cbb735431387298b811098f6`,
+contains 60 first-attempt public-browser passes, five successful Flutter
+journeys and complete fixture cleanup. That source predates the repair below;
+it is not final-source or staged acceptance.
+
+| ID / severity / surface | Reproduction and expected versus actual behavior | Root cause and correction | Verification and remaining acceptance |
+| --- | --- | --- | --- |
+| WEBQA-30 / P1 / authenticated web startup | With a current full Firebase user, reject a saved-navigation preference read or pending-intent removal. Entry should retain the user and recover to Discover; the old gate throws and remains loading. Failed explicit Discover cleanup can instead demote the in-memory full user to guest. | Optional navigation I/O escapes its error boundary, and signed-in navigation uses an unawaited async-void method. Resolve failed optional navigation as fresh Discover without restoration; return Future<void> and await all three signed-in navigation calls. Authentication, authorization and existing timeouts remain unchanged. | Against preserved d83 source: three intended failures and three valid controls. After: six new actual-gate cases plus four existing navigation controls pass; focused analysis and independent review are clear. Tests inspect the mounted gate's selected Dashboard configuration with offline platform boundaries, not full Dashboard rendering. Readiness receipt SHA256 `5bcde8b94af275bcf523448620ec750bf1462c22dcf8c012d599f09fea36f749`. Full client and fresh hosted checks remain required for the final source. |
+
+The third deliberate local provider diagnostic allowed the official Enterprise
+worker. It retained HTTP 403 / App attestation failed with no policy blocks or
+helper errors. All three original attempts remain preserved. This is an
+automated synthetic-shell rejection, not a demonstrated normal-user defect.
+Neither the approximately 50-day-old staging key nor its lower aggregate traffic
+establishes a causal explanation. No provider threshold or enforcement changed.
+
+An opt-in `staging-debug-functional` browser collection path now supports
+diagnostics using a private staging-only token. It initializes each fresh
+top-level context before navigation, forbids Enterprise fallback, blocks service
+workers, and leaves the separate cache-upgrade and Safari paths unsupported.
+Observed HTTP status is distinguished from configuration and attestation. Every
+diagnostic report/index remains blocked and the workflow cannot be acquired as
+passing qualification evidence. All thirteen original gates remain required.
+No token has been registered and no live diagnostic run has occurred. The
+optional fully intercepted Chromium SDK smoke timed out before its exchange;
+this incomplete test is retained separately from the passing unit contracts.
+
+The combined Node selection has 356 cases: the default-parallel run passed 355
+and retained one existing 20-second child-process timeout in the unfinished
+deployment guard. The same complete selection then passed all 356 sequentially
+with no changed timeout, skips or cancellations. The delay's cause remains
+unproven; local parallel reliability is not claimed. All 36 workflow/native
+configuration guards pass using local Python 3.11.15; hosted CI uses 3.12.
+Helper, browser and shared contract changes have independent focused reviews.
+These changes are not deployed, and the failed staged pilot remains held.
+
+Final local client validation for WEBQA-30 passes all 553 tests under Flutter
+3.44.6, with complete client analysis clean and 452 files passing the formatting
+check. Test log SHA256:
+`1957b4ef9c33971a83d54610d83f7654121054b2c42dbb6bf1d68b24bbc3584b`.
+Sequential contract log SHA256:
+`6bbccdd2de5ba40c423f53e0d5d8dac11b14748a0d90acb5ea3194f791fd181f`.
+The original parallel failure remains at SHA256
+`a26ef4286cf1b166973df834b130c096e6afccf2af24e96e5e1049e1388c17fc`.
+Fresh hosted CI must cover the exact committed source before staging work.
+
+## October 5 UTC: secret-scanner exception boundaries
+
+Exact `ed97e1e` PR run `37247566632` and push run `37247563705` both
+passed Flutter, Functions, browser journeys and Firebase emulators. The secret
+scan and aggregate failed on two occurrences of the same synthetic, unregistered
+UUID used by offline App Check tests. Failed runs remain preserved; no retry or
+qualification claim replaces them.
+
+| Defect / severity / surface | Reproduction and expected/actual behavior | Root cause and correction | Verification |
+|---|---|---|---|
+| WEBQA-31 / P1 / release secret scanning | Place a different synthetic credential-shaped value in a path covered by a historical allowlist. Expected: report the value. Actual: Gitleaks 8.30.1 skips the whole path, even with `condition = "AND"`. The first proposed test-UUID exception reproduced the same issue. | `ruleIds` is not a supported global allowlist field. Replace it with `targetRules` so path/value conditions apply to their named rules. Scope the new exception to exactly the synthetic UUID and its two offline test files. Preserve exact reviewed public-identifier exceptions; do not exempt arbitrary test files or UUIDs. | Actual pinned-scanner controls and negative cases cover both test paths, the same literal elsewhere, and historical manifest/Podfile/VAPID paths. Add the executable regression to both quality workflows before the full-history scan. Fresh full-history and hosted results are required for the final correction. |
+
+The pinned scanner's [configuration reference](https://github.com/gitleaks/gitleaks/blob/v8.30.1/README.md#configuration)
+documents `targetRules` and global path skipping. Independent nine-case proof
+SHA256 is `34e25dbe3b72b8672a2919070b0bfe7562d299c9c92865040b19ee449f0decee`.
+Its first correctly scoped full-history scan exposed 29 further findings requiring
+exact-value review; that intermediate scan is not a passing result. No secret
+value or private fixture payload is included in this ledger.
+
+All 29 findings match exact public Firebase literals already reviewed in the
+configuration: 23 current and six historical occurrences, zero unmatched. Only
+those two literal allowlists now name both detecting rules. Final local
+Gitleaks 8.30.1 scans all history successfully with zero findings. The persisted
+scanner regression passes all nine cases under the corrected configuration and
+fails against both the original configuration and the rejected path-skipping
+variant. Root independently reran all nine cases successfully; all 36 workflow
+and native configuration guards also pass. Fresh hosted CI remains required.
+
+Exact correction source `682788860961fe34638179de53d8212ddc0f5dc0` subsequently
+passes both first-attempt six-job hosted web runs `37249084682` and `37249081782`.
+Actual Linux Gitleaks scans all 439 available commits with zero findings and
+passes the nine real-scanner regressions. The retained PR artifact proves 60
+public-browser cases, five Flutter journeys and both fixture cleanups complete.
+This closes WEBQA-31 for that source and scope. It does not qualify later source
+changes or the failed staged browser run.
+
+| Defect / severity / surface | Reproduction and expected/actual behavior | Root cause and correction | Verification |
+|---|---|---|---|
+| WEBQA-32 / P2 / private staging archive tooling | Serialize the copier's JSON rewrite request with installed gaxios 6.7.1 and its actual nested node-fetch. Expected: application/json. Actual: text/plain;charset=UTF-8, despite an unchanged JSON body. | Native Headers loses gaxios's bracket-assigned Content-Type when converted by node-fetch. Pass a plain header record while preserving authorization/quota values in memory; disable redirects and retain bounded safe error classifications. | Actual installed-serializer offline before/after proof and 48 focused cases pass independently. The first live request's HTTP response remains unknown. A separately reviewed recovery uses the same source generations/destinations and ifGenerationMatch=0; all 152 copies receive acknowledgements and pass destination byte verification, with source/configuration fences unchanged. Original unknown receipt remains preserved. |
+
+Archive recovery receipt SHA256:
+`4d123f24aebebfb760d496bc6d52ecace070d8a51489e0573d62f7b362ae5ff6`.
+Verified proposed manifest SHA256:
+`db263e1c5125065cd64ada943686bd305fc1f656a2b7852d8caa0a6d73c0cca1`.
+The conditional recovery does not turn the original unknown acknowledgement
+into a successful response. It changes no Function source, permissions or
+production data.
+
+## October 5 UTC: delayed legacy analytics after event deletion
+
+| Defect / severity / surface | Reproduction and expected/actual behavior | Root cause and correction | Verification |
+|---|---|---|---|
+| WEBQA-33 / P1 / backend analytics and deletion | Deliver retained feedback after its parent Event is absent, or delete an Event after attendance preflight but before its analytics transaction. Expected: preserve the source evidence without recreating event analytics or processing markers. Actual: both handlers recreate those records. | Feedback had no Event check; attendance checked the parent outside its transaction. Both handlers now read the current parent inside the transaction before any analytics or marker write. Existing source-existence and replay checks remain. | The unchanged implementation fails both new cases while four controls pass. The correction passes all six legacy cases, the combined 21-case analytics selection, 397 Functions cases and five actual Firestore cases. Independent review is clear. Failed startup and passing isolated emulator evidence are retained below; staging verification remains open. |
+
+Before-fix log SHA256: `eac64d4460ea0eefb2d094cc47280ddeba7fb219af68271ec4d7dba1f41fad39`.
+After-fix combined log SHA256: `39c2b18717afd22e388e99f0d022f2b61eed300dfd68a37035948a0608fea022`.
+Independent peer receipt SHA256: `87a4b24e545d35b88d06309f0577588d40d585ec59ac5cd2b299089e38de5740`.
+That immutable receipt used WEBQA32 before the existing archive-tooling entry was noticed; this defect's correct identifier is WEBQA-33.
+
+All 397 Functions unit cases pass with the correction. The real Firestore
+selection passes all five cases, including both new parent-deletion cases,
+under Node 22.23.2 and Java 21.0.12 in `demo-attendus-admin`; affected lint is
+clean. The first emulator invocation timed out before port 8180 became active
+and ran no assertions. One isolated-environment rerun passes with the original
+startup deadline and assertions unchanged. The initial cause remains unproven.
+Failed startup SHA256: `a478b2070cb8c9f327350a28a38eeee6a502927c47cc432df1262ae0750aed60`.
+Passing emulator SHA256: `063c57b0038c1430896f595070a73beabe2f0ddb7f8ac217365caf8f199dbf32`.
+Full unit SHA256: `7543643939361c7109f543fac2c1abe35cd5a80dea270910a6a48c92ad840219`.
+The server log retains transaction-lock retries; successful assertions do not
+claim retry-free SDK execution. Emulators have stopped. Fresh exact-source
+hosted CI and staging verification remain required.

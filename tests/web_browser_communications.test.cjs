@@ -22,7 +22,7 @@ function adapters(f, {lostDeletionResponse = false, alreadyDeleted = false, time
   const hash = (text) => createHash("sha256").update(text).digest("hex");
   const capture = (sourceKey, recipientUid) => ({sourceKey, recipientUid, provider: "qualification_capture", valid: true, eventIds: []});
   const time = new Date(Date.now() + 3600000).toISOString();
-  return {calls, observe: async () => ({
+  return {calls, observe: async () => ({observedAt: new Date(Date.parse(time) - 40 * 60000).toISOString(),
     captures: [capture("message:message-1", f.attendee.uid), capture("legacy:feedback:event_feedback/feedback-1:delivery-1", f.owner.uid),
       capture(`admin:${hash(`sendCustomNotifications:${f.administrator.uid}:${f.runId}:admin-notification`)}`, f.attendee.uid),
       capture(`pending:${f.communications.pendingPushId}`, f.attendee.uid)],
@@ -30,8 +30,11 @@ function adapters(f, {lostDeletionResponse = false, alreadyDeleted = false, time
     pending: {sourceMatches: true, status: "qualification_capture"},
     reminder: {eventId: f.communications.reminderEventId, startsAt: new Date(Date.parse(time) + 3600000).toISOString(),
       jobs: [{id: "reminder-1", status: timerFailed ? "unknown" : "pending", dueAt: time, deadlineAt: time, reminderMinutes: 60}]},
-    discovery: {eventId: f.communications.discoveryEventId, items: [{id: "queue-1", status: "pending", readyAt: time,
-      queuedAt: new Date(Date.parse(time) - 45 * 60000).toISOString()}], deliveries: []},
+    discovery: {eventId: f.communications.discoveryEventId,
+      createdAt: new Date(Date.parse(time) - 46 * 60000).toISOString(), documentCreatedAt: new Date(Date.parse(time) - 46 * 60000).toISOString(),
+      updatedAt: new Date(Date.parse(time) - 46 * 60000).toISOString(),
+      items: [{id: "queue-1", status: "pending", readyAt: time,
+        queuedAt: new Date(Date.parse(time) - 45 * 60000).toISOString(), updatedAt: new Date(Date.parse(time) - 45 * 60000).toISOString()}], deliveries: []},
     deletion: {uid: f.deletion.uid, authenticationExists: !state.deleted, profileExists: !state.deleted, userExists: !state.deleted,
       appFeedbackExists: state.appFeedback && !state.deleted, status: state.deleted ? "complete" : null, remaining: 0, verificationRecorded: state.deleted}}),
   callAs: async (role, name, data) => {
@@ -72,6 +75,52 @@ test("lost deletion response reconciles the original completed job without repla
   assert.equal(mock.calls.filter((item) => item.name === "deleteUserAccount").length, 1);
   assert.equal(report.observations.at(-1).deletion.status, "complete");
   assert.ok(!JSON.stringify(report).includes("private request contents"));
+});
+
+test("discovery pending delay survives a real server commit lag without moving its deadline", async () => {
+  const f = fixture(), mock = adapters(f), observe = mock.observe;
+  mock.observe = async (...args) => ({...await observe(...args), observedAt: "2026-10-04T22:43:58.000Z",
+    discovery: {eventId: f.communications.discoveryEventId, createdAt: "2026-10-04T22:31:34.442Z", documentCreatedAt: "2026-10-04T22:31:34.442Z",
+      updatedAt: "2026-10-04T22:31:40.000Z", deliveries: [], items: [{id: "original-queue", status: "pending",
+        readyAt: "2026-10-04T23:16:48.924Z", queuedAt: "2026-10-04T22:31:50.901Z",
+        updatedAt: "2026-10-04T22:31:50.901Z"}]}});
+  const report = await runBrowserCommunications({fixture: f, candidateIdentity: f, ...mock, timeoutMs: 10, pollIntervalMs: 0});
+  assert.equal(report.timers.discovery.items[0].readyAt, "2026-10-04T23:16:48.924Z");
+  assert.equal(mock.calls.at(-1).name, "deleteUserAccount");
+});
+
+test("pending discovery proof rejects an enqueue clock outside its retained source and commit interval", async () => {
+  for (const change of [
+    {source: {updatedAt: "2026-10-04T22:44:00.000Z"}},
+    {source: {documentCreatedAt: "2026-10-04T22:32:00.000Z"}},
+    {item: {queuedAt: "2026-10-04T22:31:48.000Z"}},
+    {item: {updatedAt: "2026-10-04T22:31:49.000Z"}},
+    {item: {readyAt: "not-a-timestamp"}},
+    {observedAt: "2026-10-04T22:31:49.000Z"},
+  ]) {
+    const f = fixture(), mock = adapters(f), observe = mock.observe;
+    mock.observe = async (...args) => ({...await observe(...args), observedAt: change.observedAt || "2026-10-04T22:43:58.000Z",
+      discovery: {eventId: f.communications.discoveryEventId, createdAt: "2026-10-04T22:31:34.442Z", documentCreatedAt: "2026-10-04T22:31:34.442Z",
+        updatedAt: "2026-10-04T22:31:40.000Z", ...change.source, deliveries: [], items: [{id: "original-queue", status: "pending",
+          readyAt: "2026-10-04T23:16:48.924Z", queuedAt: "2026-10-04T22:31:50.901Z",
+          updatedAt: "2026-10-04T22:31:50.901Z", ...change.item}]}});
+    await assert.rejects(() => runBrowserCommunications({fixture: f, candidateIdentity: f, ...mock, timeoutMs: 10, pollIntervalMs: 0}),
+        /discovery_preserves_real_45_minute_delay/);
+    assert.equal(mock.calls.some((item) => item.name === "deleteUserAccount"), false);
+  }
+});
+
+test("discovery metadata may finish updating after the enqueue clock was sampled", async () => {
+  const f = fixture(), mock = adapters(f), observe = mock.observe;
+  mock.observe = async (...args) => {
+    const value = await observe(...args);
+    const queuedAt = Date.parse(value.discovery.items[0].queuedAt);
+    // maintainDiscoveryMetadata is independent of the enqueue trigger.
+    value.discovery.updatedAt = new Date(queuedAt + 1977).toISOString();
+    return value;
+  };
+  const report = await runBrowserCommunications({fixture: f, candidateIdentity: f, ...mock, timeoutMs: 10, pollIntervalMs: 0});
+  assert.equal(report.assertions.find((item) => item.id === "discovery_preserves_real_45_minute_delay").actual, true);
 });
 test("predeleted identity without authenticated prior proof and failed timer sources block deletion", async () => {
   const f = fixture(), gone = adapters(f, {alreadyDeleted: true});

@@ -27,7 +27,8 @@ test("attendance trigger replay increments once and uses actual registration den
   assert.equal(analytics.totalAttendees, 1); assert.equal(analytics.dropoutRate, 50); assert.equal(analytics.hourlySignIns["10:00"], 1);
 });
 test("feedback trigger replay is exact, malformed ratings are ignored, and deleted source is not resurrected", async () => {
-  const admin = memoryAdmin({"event_feedback/good": {eventId: "event", rating: 5, isAnonymous: true, comment: "Good"},
+  const admin = memoryAdmin({"Events/event": {customerUid: "host"},
+    "event_feedback/good": {eventId: "event", rating: 5, isAnonymous: true, comment: "Good"},
     "event_feedback/bad": {eventId: "event", rating: "5"}, "event_feedback/deleted": {eventId: "event", rating: 1}});
   const operations = createLegacyAnalyticsHandlers(admin);
   const event = await trigger(admin, "event_feedback", "good");
@@ -38,6 +39,31 @@ test("feedback trigger replay is exact, malformed ratings are ignored, and delet
   await operations.aggregateFeedback(removed);
   const analytics = admin.db.values.get("event_analytics/event").feedbackAnalytics;
   assert.equal(analytics.totalRatings, 1); assert.equal(analytics.averageRating, 5); assert.equal(analytics.anonymousCount, 1);
+});
+
+test("late feedback delivery cannot recreate analytics for a deleted event", async () => {
+  const admin = memoryAdmin({"event_feedback/retained": {eventId: "removed", rating: 5, isAnonymous: true}});
+  const event = await trigger(admin, "event_feedback", "retained");
+  const operations = createLegacyAnalyticsHandlers(admin);
+  await operations.aggregateFeedback(event);
+  await operations.aggregateFeedback(event);
+  assert.deepEqual([...admin.db.values.keys()], ["event_feedback/retained"]);
+});
+
+test("event deletion after attendance preflight prevents analytics and marker recreation", async () => {
+  const admin = memoryAdmin({"Events/event": {customerUid: "host", eventTimeZone: "UTC"},
+    "Attendance/retained": {eventId: "event", customerUid: "member", checkedInAt: new Date("2026-10-03T14:00:00Z")}});
+  const event = await trigger(admin, "Attendance", "retained");
+  const transaction = admin.db.runTransaction;
+  let calls = 0;
+  admin.db.runTransaction = (body) => {
+    calls++;
+    admin.db.values.delete("Events/event");
+    return transaction(body);
+  };
+  await createLegacyAnalyticsHandlers(admin).aggregateAttendance(event);
+  assert.equal(calls, 1);
+  assert.deepEqual([...admin.db.values.keys()], ["Attendance/retained"]);
 });
 test("monthly reset handles over 500 subscriptions and retries preserve new usage and future periods", async () => {
   const initial = {};

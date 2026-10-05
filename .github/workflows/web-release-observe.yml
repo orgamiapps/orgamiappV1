@@ -25,6 +25,14 @@ name: Collect executable staging web evidence
         - post-close-replay
         default: all
         required: true
+      app_check_mode:
+        description: Debug mode collects functional diagnostics only and can never qualify a release
+        type: choice
+        options:
+        - real
+        - staging-debug-functional
+        default: real
+        required: true
 permissions:
   contents: read
   actions: read
@@ -41,10 +49,11 @@ jobs:
       PRODUCER: ${{ inputs.producer }}
       PRIOR_EVIDENCE_RUNS: ${{ inputs.prior_evidence_runs }}
       GATES: ${{ inputs.gates }}
+      APPCHECK_MODE: ${{ inputs.app_check_mode }}
     steps:
     - uses: actions/checkout@v4
     - name: Validate producer gate mode before installing or authenticating
-      run: node -e "require('./tools/web_release_evidence').selectedGates(process.env.PRODUCER, process.env.GATES)"
+      run: node -e "const e = require('./tools/web_release_evidence'); e.selectedGates(process.env.PRODUCER, process.env.GATES); e.collectionAppCheckMode(process.env.PRODUCER, process.env.GATES, process.env.APPCHECK_MODE)"
     - uses: actions/setup-node@v4
       with:
         node-version: '22'
@@ -66,6 +75,16 @@ jobs:
         node tools/web_release_evidence.js --candidate-run "$CANDIDATE_RUN" --producer "$PRODUCER" --gates "$GATES"
         --output build/staging-evidence "${args[@]}"'
       name: Execute allowlisted producer against frozen staging
+      if: ${{ inputs.app_check_mode == 'real' }}
+    - name: Collect staging App Check functional diagnostics (never qualification)
+      if: ${{ inputs.app_check_mode == 'staging-debug-functional' }}
+      env:
+        STAGING_APPCHECK_DEBUG_TOKEN: ${{ secrets.STAGING_APPCHECK_DEBUG_TOKEN }}
+        STAGING_APPCHECK_DEBUG_RESOURCE: ${{ vars.STAGING_APPCHECK_DEBUG_RESOURCE }}
+      run: |
+        args=()
+        if [ -n "$PRIOR_EVIDENCE_RUNS" ]; then args+=(--prior-evidence-runs "$PRIOR_EVIDENCE_RUNS"); fi
+        node tools/web_release_evidence.js --candidate-run "$CANDIDATE_RUN" --producer "$PRODUCER" --gates "$GATES" --app-check-mode staging-debug-functional --output build/staging-evidence "${args[@]}"
     - uses: actions/upload-artifact@v4
       with:
         name: web-staging-evidence

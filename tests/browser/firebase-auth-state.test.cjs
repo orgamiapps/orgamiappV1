@@ -1,5 +1,6 @@
 'use strict';
 const test = require('node:test'), assert = require('node:assert/strict'), vm = require('node:vm');
+const fs = require('node:fs');
 const {readFirebaseAuthStateInBrowser: read, readFirebaseAuthStatePage: readPage} = require('../../tools/web_release_producers/firebase-auth-state');
 const now = 1791132000;
 const options = {projectId: 'attendus-staging', apiKey: 'synthetic_fixture_api_key', appName: '[DEFAULT]', expectedUid: 'controlled-owner'};
@@ -96,4 +97,73 @@ test('missing state stops within budget; invalid timeout starts no read', async 
   const after = calls; await new Promise(resolve => setTimeout(resolve, 25)); assert.equal(calls, after);
   for (const timeoutMs of [0, -1, 30001, Infinity]) await assert.rejects(readPage({evaluate() {throw Error('should not run');}}, {...options, timeoutMs}), {code: 'invalid_expected_identity'});
   await assert.rejects(readPage({evaluate() {throw Error('should not run');}}), {code: 'invalid_expected_identity'});
+});
+
+test('an early timeout timer cancels the polling loop before any post-return read', async () => {
+  let monotonicNow = 0, nextTimer = 0, calls = 0;
+  const timers = new Map();
+  const module = {exports: {}};
+  vm.runInNewContext(fs.readFileSync(require.resolve('../../tools/web_release_producers/firebase-auth-state'), 'utf8'), {
+    module, performance: {now: () => monotonicNow},
+    setTimeout(callback, delay) {const id = ++nextTimer; timers.set(id, {callback, delay}); return id;},
+    clearTimeout(id) {timers.delete(id);},
+  });
+  const pending = module.exports.readFirebaseAuthStatePage({async evaluate() {calls++; return {state: 'missing'};}}, {...options, timeoutMs: 10});
+  const rejected = assert.rejects(pending, {code: 'local_state_timeout'});
+  // Drain cross-realm Promise adoption without depending on wall-clock timing.
+  for (let tick = 0; tick < 12; tick++) await Promise.resolve();
+  assert.equal(calls, 1);
+  assert.equal(timers.size, 2, 'One deadline and one pending poll timer');
+  const [deadlineId, deadlineTimer] = timers.entries().next().value;
+  assert.equal(deadlineTimer.delay, 10);
+  // Real timers can fire before the fractional performance.now deadline.
+  monotonicNow = 9.5;
+  timers.delete(deadlineId);
+  deadlineTimer.callback();
+  await rejected;
+  const callsWhenReturned = calls;
+  try {
+    // Wake any previously scheduled poll while the monotonic deadline is still
+    // in the future. Cancellation, not the clock comparison, must stop it.
+    monotonicNow = 9.75;
+    for (const [id, timer] of [...timers]) {timers.delete(id); timer.callback();}
+    for (let tick = 0; tick < 12; tick++) await Promise.resolve();
+    assert.equal(calls, callsWhenReturned, 'No evaluation starts after timeout returns');
+    assert.equal(timers.size, 0, 'Cancelled polling leaves no scheduled work');
+  } finally {
+    monotonicNow = 11;
+    for (const [id, timer] of [...timers]) {timers.delete(id); timer.callback();}
+    await Promise.resolve();
+  }
+});
+
+test('an in-flight evaluation settling after timeout cannot schedule further polling', async () => {
+  let monotonicNow = 0, nextTimer = 0, calls = 0, finishRead;
+  const timers = new Map(), module = {exports: {}};
+  vm.runInNewContext(fs.readFileSync(require.resolve('../../tools/web_release_producers/firebase-auth-state'), 'utf8'), {
+    module, performance: {now: () => monotonicNow},
+    setTimeout(callback, delay) {const id = ++nextTimer; timers.set(id, {callback, delay}); return id;},
+    clearTimeout(id) {timers.delete(id);},
+  });
+  const pending = module.exports.readFirebaseAuthStatePage({evaluate() {
+    calls++;
+    return new Promise(resolve => {finishRead = resolve;});
+  }}, {...options, timeoutMs: 10});
+  const rejected = assert.rejects(pending, {code: 'local_state_timeout'});
+  assert.equal(calls, 1);
+  assert.equal(timers.size, 1, 'Only the deadline is scheduled while evaluation is pending');
+  const [id, timer] = timers.entries().next().value;
+  monotonicNow = 9.5;
+  timers.delete(id); timer.callback();
+  await rejected;
+  try {
+    finishRead({state: 'missing'});
+    for (let tick = 0; tick < 12; tick++) await Promise.resolve();
+    assert.equal(calls, 1, 'Only the already-started evaluation may complete');
+    assert.equal(timers.size, 0, 'Late completion cannot schedule post-return work');
+  } finally {
+    monotonicNow = 11;
+    for (const [id, timer] of [...timers]) {timers.delete(id); timer.callback();}
+    for (let tick = 0; tick < 12; tick++) await Promise.resolve();
+  }
 });

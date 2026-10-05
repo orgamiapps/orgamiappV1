@@ -9,7 +9,38 @@ const admin = require("../firebase-admin-compat"), db = admin.firestore();
 const {createTriggerAIInsights, createTriggerAIInsightsV2} = require("../analytics/insights");
 const {reconcileEventUserAnalytics, processUserAnalyticsRecompute,
   requestUserAnalyticsRecompute, commitUserAnalyticsGeneration} = require("../analytics/user-analytics");
+const {createLegacyAnalyticsHandlers} = require("../analytics/legacy-operations");
 test.after(async () => { await db.terminate(); });
+
+for (const [collection, handler, payload] of [
+  ["Attendance", "aggregateAttendance", {customerUid: "member", checkedInAt: new Date("2026-10-03T14:00:00Z")}],
+  ["event_feedback", "aggregateFeedback", {rating: 5, isAnonymous: true}],
+]) test(`real ${collection} delivery preserves event deletion after preflight`, async () => {
+  const id = `legacy-parent-fence-${randomUUID()}`, eventRef = db.doc(`Events/${id}`);
+  const sourceRef = db.doc(`${collection}/${id}`), analyticsRef = db.doc(`event_analytics/${id}`);
+  try {
+    await eventRef.set({customerUid: `owner-${id}`, eventTimeZone: "UTC"});
+    await sourceRef.set({eventId: id, ...payload});
+    const event = {params: {docId: id}, data: await sourceRef.get()};
+    assert.equal((await createLegacyAnalyticsHandlers(admin)[handler](event)).processed, true);
+    assert.equal((await analyticsRef.get()).exists, true);
+    await db.recursiveDelete(analyticsRef);
+    const firestore = Object.assign(() => ({collection: db.collection.bind(db), runTransaction: async (body) => {
+      await eventRef.delete();
+      return db.runTransaction(body);
+    }}), {FieldValue: admin.firestore.FieldValue});
+    assert.equal((await createLegacyAnalyticsHandlers({firestore})[handler](event)).skipped, true);
+    await createLegacyAnalyticsHandlers(admin)[handler](event);
+    assert.equal((await eventRef.get()).exists, false);
+    assert.equal((await sourceRef.get()).exists, true);
+    assert.equal((await analyticsRef.get()).exists, false);
+    assert.deepEqual(await analyticsRef.listCollections(), []);
+  } finally {
+    await db.recursiveDelete(analyticsRef);
+    await sourceRef.delete();
+    await eventRef.delete();
+  }
+});
 
 test("actual Firestore serializes overlapping legacy/written insight delivery and preserves deletion", async () => {
   const id = `insights-transition-${randomUUID()}`;

@@ -41,8 +41,16 @@ class DiscoveryHistoryCoordinator {
     }
   }
 
-  double get offset =>
-      scrollController()?.hasClients == true ? scrollController()!.offset : 0;
+  ScrollPosition? get _readyPosition {
+    final controller = scrollController();
+    if (controller == null || controller.positions.length != 1) return null;
+    final position = controller.position;
+    return position.hasPixels && position.hasContentDimensions
+        ? position
+        : null;
+  }
+
+  double get offset => _readyPosition?.pixels ?? 0;
   void schedule() {
     if (_disposed || _restoring || !_backend.available || !_isActive()) return;
     _timer?.cancel();
@@ -59,8 +67,7 @@ class DiscoveryHistoryCoordinator {
       if (_lastUri != null) _backend.write(_lastUri!, offset, push: false);
       _backend.write(next, 0, push: true);
       _lastUri = next;
-      final controller = scrollController();
-      if (controller?.hasClients == true) controller!.jumpTo(0);
+      _readyPosition?.jumpTo(0);
     } else {
       _backend.write(next, offset, push: false);
     }
@@ -73,16 +80,18 @@ class DiscoveryHistoryCoordinator {
     _lastUri = DiscoveryRouteState.fromUri(uri).uri;
     try {
       await restore(DiscoveryRouteState.fromUri(uri));
-      await WidgetsBinding.instance.endOfFrame;
-      if (_disposed || generation != _generation) return;
-      final controller = scrollController();
-      if (controller?.hasClients == true) {
-        controller!.jumpTo(
-          offset.clamp(0, controller.position.maxScrollExtent),
-        );
-      }
-      if (_isActive()) {
-        _backend.write(_lastUri!, this.offset, push: false);
+      // Attachment precedes viewport layout. Allow a short, bounded layout
+      // window; an unlaid-out/removed viewport must not erase its saved offset.
+      for (var frame = 0; frame < 3; frame++) {
+        await WidgetsBinding.instance.endOfFrame;
+        if (_disposed || generation != _generation) return;
+        final position = _readyPosition;
+        if (position == null) continue;
+        position.jumpTo(offset.clamp(0, position.maxScrollExtent));
+        if (_isActive()) {
+          _backend.write(_lastUri!, this.offset, push: false);
+        }
+        return;
       }
     } finally {
       if (generation == _generation) _restoring = false;
@@ -97,7 +106,11 @@ class DiscoveryHistoryCoordinator {
   void saveScroll() {
     _scrollTimer?.cancel();
     _scrollTimer = null;
-    if (!_disposed && !_restoring && _lastUri != null && _isActive()) {
+    if (!_disposed &&
+        !_restoring &&
+        _lastUri != null &&
+        _readyPosition != null &&
+        _isActive()) {
       _backend.write(_lastUri!, offset, push: false);
     }
   }
