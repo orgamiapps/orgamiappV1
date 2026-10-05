@@ -40,8 +40,10 @@ function createLegacyAnalyticsHandlers(admin) {
     const ref = db.collection("event_analytics").doc(eventId);
     const marker = ref.collection("processedAttendance").doc(markerId(event.params.docId));
     return db.runTransaction(async (tx) => {
-      const [current, processed, live] = await Promise.all([tx.get(ref), tx.get(marker), tx.get(event.data.ref)]);
-      if (processed.exists || !live.exists) return {skipped: true};
+      const [current, processed, live, parent] = await Promise.all([
+        tx.get(ref), tx.get(marker), tx.get(event.data.ref), tx.get(root.ref),
+      ]);
+      if (processed.exists || !live.exists || !parent.exists) return {skipped: true};
       const existing = current.data() || {};
       const total = count(existing.totalAttendees) + 1;
       const hours = {...existing.hourlySignIns, [bucket]: count(existing.hourlySignIns?.[bucket]) + 1};
@@ -58,10 +60,13 @@ function createLegacyAnalyticsHandlers(admin) {
     if (!documentId(source?.eventId) || !documentId(event.params?.docId) ||
         !Number.isInteger(source.rating) || source.rating < 1 || source.rating > 5) return {skipped: true, reason: "invalid_feedback"};
     const ref = db.collection("event_analytics").doc(source.eventId);
+    const eventRef = db.collection("Events").doc(source.eventId);
     const marker = ref.collection("processedFeedback").doc(markerId(event.params.docId));
     return db.runTransaction(async (tx) => {
-      const [current, processed, live] = await Promise.all([tx.get(ref), tx.get(marker), tx.get(event.data.ref)]);
-      if (processed.exists || !live.exists) return {skipped: true};
+      const [current, processed, live, parent] = await Promise.all([
+        tx.get(ref), tx.get(marker), tx.get(event.data.ref), tx.get(eventRef),
+      ]);
+      if (processed.exists || !live.exists || !parent.exists) return {skipped: true};
       const existing = current.get("feedbackAnalytics") || {};
       const oldTotal = count(existing.totalRatings);
       const totalRatings = oldTotal + 1;
