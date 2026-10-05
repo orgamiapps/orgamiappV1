@@ -855,3 +855,47 @@ scanner regression passes all nine cases under the corrected configuration and
 fails against both the original configuration and the rejected path-skipping
 variant. Root independently reran all nine cases successfully; all 36 workflow
 and native configuration guards also pass. Fresh hosted CI remains required.
+
+Exact correction source `682788860961fe34638179de53d8212ddc0f5dc0` subsequently
+passes both first-attempt six-job hosted web runs `37249084682` and `37249081782`.
+Actual Linux Gitleaks scans all 439 available commits with zero findings and
+passes the nine real-scanner regressions. The retained PR artifact proves 60
+public-browser cases, five Flutter journeys and both fixture cleanups complete.
+This closes WEBQA-31 for that source and scope. It does not qualify later source
+changes or the failed staged browser run.
+
+| Defect / severity / surface | Reproduction and expected/actual behavior | Root cause and correction | Verification |
+|---|---|---|---|
+| WEBQA-32 / P2 / private staging archive tooling | Serialize the copier's JSON rewrite request with installed gaxios 6.7.1 and its actual nested node-fetch. Expected: application/json. Actual: text/plain;charset=UTF-8, despite an unchanged JSON body. | Native Headers loses gaxios's bracket-assigned Content-Type when converted by node-fetch. Pass a plain header record while preserving authorization/quota values in memory; disable redirects and retain bounded safe error classifications. | Actual installed-serializer offline before/after proof and 48 focused cases pass independently. The first live request's HTTP response remains unknown. A separately reviewed recovery uses the same source generations/destinations and ifGenerationMatch=0; all 152 copies receive acknowledgements and pass destination byte verification, with source/configuration fences unchanged. Original unknown receipt remains preserved. |
+
+Archive recovery receipt SHA256:
+`4d123f24aebebfb760d496bc6d52ecace070d8a51489e0573d62f7b362ae5ff6`.
+Verified proposed manifest SHA256:
+`db263e1c5125065cd64ada943686bd305fc1f656a2b7852d8caa0a6d73c0cca1`.
+The conditional recovery does not turn the original unknown acknowledgement
+into a successful response. It changes no Function source, permissions or
+production data.
+
+## October 5 UTC: delayed legacy analytics after event deletion
+
+| Defect / severity / surface | Reproduction and expected/actual behavior | Root cause and correction | Verification |
+|---|---|---|---|
+| WEBQA-33 / P1 / backend analytics and deletion | Deliver retained feedback after its parent Event is absent, or delete an Event after attendance preflight but before its analytics transaction. Expected: preserve the source evidence without recreating event analytics or processing markers. Actual: both handlers recreate those records. | Feedback had no Event check; attendance checked the parent outside its transaction. Both handlers now read the current parent inside the transaction before any analytics or marker write. Existing source-existence and replay checks remain. | The unchanged implementation fails both new cases while four controls pass. The correction passes all six legacy cases, the combined 21-case analytics selection, 397 Functions cases and five actual Firestore cases. Independent review is clear. Failed startup and passing isolated emulator evidence are retained below; staging verification remains open. |
+
+Before-fix log SHA256: `eac64d4460ea0eefb2d094cc47280ddeba7fb219af68271ec4d7dba1f41fad39`.
+After-fix combined log SHA256: `39c2b18717afd22e388e99f0d022f2b61eed300dfd68a37035948a0608fea022`.
+Independent peer receipt SHA256: `87a4b24e545d35b88d06309f0577588d40d585ec59ac5cd2b299089e38de5740`.
+That immutable receipt used WEBQA32 before the existing archive-tooling entry was noticed; this defect's correct identifier is WEBQA-33.
+
+All 397 Functions unit cases pass with the correction. The real Firestore
+selection passes all five cases, including both new parent-deletion cases,
+under Node 22.23.2 and Java 21.0.12 in `demo-attendus-admin`; affected lint is
+clean. The first emulator invocation timed out before port 8180 became active
+and ran no assertions. One isolated-environment rerun passes with the original
+startup deadline and assertions unchanged. The initial cause remains unproven.
+Failed startup SHA256: `a478b2070cb8c9f327350a28a38eeee6a502927c47cc432df1262ae0750aed60`.
+Passing emulator SHA256: `063c57b0038c1430896f595070a73beabe2f0ddb7f8ac217365caf8f199dbf32`.
+Full unit SHA256: `7543643939361c7109f543fac2c1abe35cd5a80dea270910a6a48c92ad840219`.
+The server log retains transaction-lock retries; successful assertions do not
+claim retry-free SDK execution. Emulators have stopped. Fresh exact-source
+hosted CI and staging verification remain required.
