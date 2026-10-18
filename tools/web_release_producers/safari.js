@@ -29,6 +29,10 @@ function htmlResponsiveProbe() {
     if (previous.value) node.style.setProperty("font-size", previous.value, previous.priority);
     else node.style.removeProperty("font-size");
   }
+  // Safari can defer style resolution after a WebDriver mutation. Flush the
+  // restored layout before taking inherited baselines, and the scaled layout
+  // before measuring computed text and overflow.
+  document.body.getBoundingClientRect();
   const visible = (node) => {
     const box = node.getBoundingClientRect(), style = getComputedStyle(node);
     return box.width > 0 && box.height > 0 && style.display !== "none" && style.visibility !== "hidden";
@@ -42,6 +46,7 @@ function htmlResponsiveProbe() {
     return {node, before: parseFloat(getComputedStyle(node).fontSize)};
   });
   for (const {node, before} of sizes) node.style.setProperty("font-size", `${before * 2}px`, "important");
+  document.body.getBoundingClientRect();
   const samples = sizes.map(({node, before}) => ({tag: node.tagName.toLowerCase(), before, after: parseFloat(getComputedStyle(node).fontSize)}));
   const textIs200Percent = samples.length > 0 && samples.every((sample) => Number.isFinite(sample.before) && sample.before > 0 && Math.abs(sample.after - sample.before * 2) < 0.1);
   const dialog = document.querySelector("dialog[open]");
