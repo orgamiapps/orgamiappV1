@@ -37,6 +37,13 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
       assert.equal(result.samples.find(s=>s.tag==='h1').before,20);
       assert.equal(result.controlsFit,true);
     }
+    if(process.env.STAGING_PUBLIC_EVENT){
+      assert.match(process.env.STAGING_PUBLIC_EVENT,/^webqa-[0-9]{8}-[a-f0-9]{10}-pilot$/);
+      await request(`/session/${session}/url`,{url:'https://attendus-staging.web.app/event/'+process.env.STAGING_PUBLIC_EVENT});
+      await request(`/session/${session}/window/rect`,{width:500,height:900});
+      results.stagingPage=await execute(htmlResponsiveProbe);
+      assert.equal(results.stagingPage.textIs200Percent,true);
+    }
   } finally {
     fs.mkdirSync('build',{recursive:true});fs.writeFileSync('build/safari-layout-regression.json',JSON.stringify(results,null,2));
     if(session)await request(`/session/${session}`,undefined,'DELETE');child.kill('SIGTERM');await new Promise(resolve=>server.close(resolve));
