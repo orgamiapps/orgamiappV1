@@ -21,7 +21,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     const res = await fetch('http://127.0.0.1:4446'+route, {method,headers:{'Content-Type':'application/json'},...(data===undefined?{}:{body:JSON.stringify(data)}),signal:AbortSignal.timeout(30000)});
     const body=await res.json();assert.equal(res.ok,true,JSON.stringify(body));return body.value;
   }
-  const execute = fn => request(`/session/${session}/execute/sync`, {script:`return (${fn.toString()})();`,args:[]});
+  const execute = fn => request(`/session/${session}/execute/async`, {script:`const done=arguments[arguments.length-1];Promise.resolve().then(()=>(${fn.toString()})()).then(done,e=>done({error:String(e)}));`,args:[]});
   try {
     for(let n=0;n<50;n++){try{if((await request('/status')).ready)break;}catch{}await delay(100);}
     const started=await request('/session',{capabilities:{alwaysMatch:{browserName:'safari'}}});session=started.sessionId;results.capabilities=started.capabilities;
