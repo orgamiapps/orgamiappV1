@@ -279,6 +279,82 @@
         "recoveryReceiptSha256": "6ec856558b4fdc7553e5e93309497f7fa952a76364831c310bfa944a7f97f9bf",
         "recoveredAt": "2026-10-18T20:29:17.134459Z"
       }
+    },
+    {
+      "runId": "webqa-20261018-41e9082ab8",
+      "sourceSha": "f277d419070bdd32d8fb832ec84d15682ae2f001",
+      "candidateRunId": "39164341158",
+      "cleanupEvidenceSha256": "dca7f6abfe1a1367e28fe5ceb5f6933528fddb65c24602f3c170131f58cc1ec2",
+      "documents": [
+        {
+          "path": "QualificationBindings/account_05ec40630deff8aeb59d648d16e4c9d6fc127379f013a0ee0b20fdd6689ff6fe",
+          "sha256": "ec7e98e02169f3f1af7e927567c43792fa8de904033bb608bd1390bfe491c066"
+        },
+        {
+          "path": "QualificationBindings/account_1055040437095e5f0be3dfc33e08047224c654a6abc9b02ad71914dafc73d780",
+          "sha256": "9ea351ffc36b5084841a79936b295f78f8e24460c2375f22522e8ab03e83054b"
+        },
+        {
+          "path": "QualificationBindings/account_4221f2e14a36e41dd33319eafa2bebf524958a68790b609b9cf1b6b0098624c2",
+          "sha256": "560bf6b6c1bb5726a9a3921968b6c76f1644117047edce0fc438b3e14d51acd5"
+        },
+        {
+          "path": "QualificationBindings/account_48f4511ed07dc2a9efdeeaed99854b8294964c88bb8f7822abe56abac0103292",
+          "sha256": "675df2a52dc71fbc715ba604b59b4638cfd384b99bcaa99820da4e2925842e51"
+        },
+        {
+          "path": "QualificationBindings/account_b7fbb2b0c4e0513eaab9848d24e8d5030c76a524d2a132bb5472c8c820d28413",
+          "sha256": "d738aa1edfbcacf5bcf7f1dc7d8dc7136ba92669f559b9191cc5fdc54d311b60"
+        },
+        {
+          "path": "QualificationBindings/account_c475e80d275f522c27564d9cec60601d32bad3f580b08f288d6a9fcba1b49f47",
+          "sha256": "46bf7fce387cedc42bb5c02563154b88f8bfa5ba89bfb201bb7696a835c9994e"
+        },
+        {
+          "path": "QualificationBindings/conversation_59531bab7c0d66841e55c63fe10bd3976b02f81cc045b1eba5d81c3ed5399cd0",
+          "sha256": "3e2cab60feba7cacabc3c399c9c2d5f46ab84cba5a952b3e3a8820f5c46abfbd"
+        },
+        {
+          "path": "QualificationBindings/event_04f7a3bbeccf7159450a7a5aac2871b02e78d552f0d4d79f3c66b398a702f0a6",
+          "sha256": "6b0f25cdb39a50adf8aec21c2176adb6023e7c9b6e43791a2f717f0db5e083bf"
+        },
+        {
+          "path": "QualificationBindings/event_141d0abdeda393ad8f720fee2ec1dbc623ef6322794957ef10832c4820763e41",
+          "sha256": "e077970f8513fb492232c70cc9c509c2d781018ab6d96030a96ce21da5a3286b"
+        },
+        {
+          "path": "QualificationBindings/event_362d51d6809b79938c9f900a5f6e589fba8ff76a86a55ba827e404175e365f08",
+          "sha256": "2af0de03a9bcb439851201ffd331a673240000373c4b13c57c347558fb529d08"
+        },
+        {
+          "path": "QualificationBindings/event_535fa69e54bbca9e12c748a74715df21788b15d979298197f9a3e4669a01b170",
+          "sha256": "23b1228262467cce64aa3f54382c67cef03f9015c35da0bb5a863ddf27fded19"
+        },
+        {
+          "path": "QualificationBindings/event_a60c1d1f85aa8f64aded094a45215bc1a20f73e109cd5024cd5e1da3cab9fb65",
+          "sha256": "2e335cf8b5a2fa3f9587531b80a727c1c04f6de721aadc2a63904c05a4495b6f"
+        },
+        {
+          "path": "QualificationBindings/event_accdc8c4116a7ee41fd7d88c0cbc59c9f0731188ac98fdb4dc5a8935c30a33d0",
+          "sha256": "d56eb202c50dbdd4f9e084c4c8a8f22b6923c689cbec3f0969b8bcbd388494f0"
+        },
+        {
+          "path": "QualificationBindings/event_c12aff48f84359f1ef5b6d9dae984ea2e2614b3d3d75bcd1063206cf8706d536",
+          "sha256": "e161feea00670964f1031808c3ffec640732db9c4cc7942b9aa7b561254dced0"
+        },
+        {
+          "path": "QualificationBindings/organization_12862f7250dc47102607108fbc84afbd690aef4231cb35c4cef4b7ede268f1d9",
+          "sha256": "46ba4e3df255cbc94342e473e6af98ae794cbaa5ce9b4df47ea20eba2ab04e3e"
+        },
+        {
+          "path": "QualificationScopes/webqa-20261018-41e9082ab8",
+          "sha256": "31f90440319c95350a6791194b20285d84ce5cfd921c21ccd2be02611f22c4df"
+        },
+        {
+          "path": "QualificationSetup/webqa-20261018-41e9082ab8",
+          "sha256": "f2ad74735cb54f2427922ea160e4c7663392377e3da9429b2bd6b4b2b06512cb"
+        }
+      ]
     }
   ]
 }
