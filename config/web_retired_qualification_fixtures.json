@@ -130,13 +130,18 @@
         },
         {
           "path": "QualificationScopes/webqa-20261004-671be56c38",
-          "sha256": "cccea059cc81dc1f349bff276058f54ea780db333df7c041b78764c1627c0b33"
+          "sha256": "007156fa3658210fea8a6eb5a353799f0529fdb668cc087cda736517b13500bb"
         },
         {
           "path": "QualificationSetup/webqa-20261004-671be56c38",
           "sha256": "203ea7d7e05620104304d1e2b7b773dd704dedbbd8ab1e0f12b5e0a489105a8a"
         }
-      ]
+      ],
+      "scopeRecovery": {
+        "originalDocumentSha256": "cccea059cc81dc1f349bff276058f54ea780db333df7c041b78764c1627c0b33",
+        "recoveryReceiptSha256": "6ec856558b4fdc7553e5e93309497f7fa952a76364831c310bfa944a7f97f9bf",
+        "recoveredAt": "2026-10-18T20:29:17.134459Z"
+      }
     },
     {
       "runId": "webqa-20261004-9252da2efd",
@@ -262,13 +267,18 @@
         },
         {
           "path": "QualificationScopes/webqa-20261004-9252da2efd",
-          "sha256": "9a96a88bbbcf01120bd12a6ca04c2cd8580ef2b9a88102226df7bc09f3767320"
+          "sha256": "179f5e55df5f1e08f8846652c8a421abdaca8e6d8cdf5c3073ced3c0d4aafcbe"
         },
         {
           "path": "QualificationSetup/webqa-20261004-9252da2efd",
           "sha256": "da74081c09e521d602060f9f924e4077890f6740085240aa64f35cc06021954b"
         }
-      ]
+      ],
+      "scopeRecovery": {
+        "originalDocumentSha256": "9a96a88bbbcf01120bd12a6ca04c2cd8580ef2b9a88102226df7bc09f3767320",
+        "recoveryReceiptSha256": "6ec856558b4fdc7553e5e93309497f7fa952a76364831c310bfa944a7f97f9bf",
+        "recoveredAt": "2026-10-18T20:29:17.134459Z"
+      }
     }
   ]
 }
