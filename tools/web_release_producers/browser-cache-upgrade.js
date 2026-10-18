@@ -4,7 +4,7 @@ const path = require('node:path');
 const http = require('node:http');
 const crypto = require('node:crypto');
 const {files, gitSourceFiles} = require('../web_release_contract');
-const {activateFlutterSemanticsPage} = require('./flutter-semantics');
+const {activateFlutterSemanticsPage, enterFlutterText} = require('./flutter-semantics');
 const {readFirebaseAuthStatePage} = require('./firebase-auth-state');
 const sha = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
@@ -165,9 +165,9 @@ async function produce({browser, context, candidate, outputDir, observeCreatedId
   async function login() {
     await page.getByText('Log in', {exact: true}).last().click();
     if (!await page.getByText('Welcome back', {exact: true}).isVisible()) await page.getByText('Log in', {exact: true}).last().click();
-    await page.getByRole('textbox', {name: 'Email address', exact: true}).fill(context.fixture.owner.email);
-    await page.getByRole('textbox', {name: 'Password', exact: true}).fill(context.fixture.owner.password);
-    await page.getByRole('textbox', {name: 'Password', exact: true}).press('Enter');
+    await enterFlutterText(page, 'Email address', context.fixture.owner.email);
+    await enterFlutterText(page, 'Password', context.fixture.owner.password);
+    await page.getByText('Log in', {exact: true}).last().click();
     await page.getByText('Welcome back', {exact: true}).waitFor({state: 'hidden'});
   }
   try {

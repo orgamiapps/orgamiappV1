@@ -1,6 +1,6 @@
 'use strict';
 const test = require('node:test'), assert = require('node:assert/strict'), vm = require('node:vm');
-const {flutterSemanticsDom, ensureFlutterSemantics, activateFlutterSemanticsPage, activateFlutterSemanticsDriver} = require('../../tools/web_release_producers/flutter-semantics');
+const {enterFlutterText, flutterSemanticsDom, ensureFlutterSemantics, activateFlutterSemanticsPage, activateFlutterSemanticsDriver} = require('../../tools/web_release_producers/flutter-semantics');
 
 function dom({enabled = false, rectangle = {x: -1, y: -1, width: 1, height: 1}, count = 1, role = 'button', label = 'Enable accessibility'} = {}) {
   const state = {enabled, clicks: 0, count, queries: []};
@@ -81,4 +81,25 @@ test('large-roster entry traverses management sheet Check-in control before wait
   }; return target;}};
   await openCheckInConsole(page);
   assert.equal(state, 'console'); assert.deepEqual(steps, ['Manage event', 'Check-in', 'observed:Check-in Console', 'observed:Event roster']);
+});
+
+
+test('text entry activates the real editor and refuses keyboard input if focus was not acquired', async () => {
+  let focused = false, pointer = false, value = '';
+  const page = {
+    getByRole(role, options) {
+      assert.equal(role, 'textbox'); assert.deepEqual(options, {name: 'Password', exact: true});
+      return {click: async () => {pointer = true;}};
+    },
+    evaluate: async () => focused,
+    keyboard: {
+      press: async key => {assert.equal(pointer, true); assert.equal(key, 'ControlOrMeta+A'); value = '';},
+      insertText: async text => {value += text;},
+    },
+  };
+  await assert.rejects(() => enterFlutterText(page, 'Password', 'synthetic-password'), /editor-not-focused/);
+  assert.equal(value, '');
+  focused = true;
+  await enterFlutterText(page, 'Password', 'synthetic-password');
+  assert.equal(value, 'synthetic-password');
 });

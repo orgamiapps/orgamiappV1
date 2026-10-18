@@ -32,7 +32,7 @@ class DiscoveryHistoryCoordinator {
   int _generation = 0;
 
   Future<void> initialize() async {
-    if (!_backend.available) return;
+    if (_disposed || !_backend.available || !_isActive()) return;
     if (DiscoveryRouteState.matches(_backend.currentUri)) {
       await _restore(_backend.currentUri, _backend.scroll);
     } else {

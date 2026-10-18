@@ -261,7 +261,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       sizing: StackFit.expand,
       children: List.generate(_destinations.length, (index) {
         if (_visitedScreens.contains(index)) {
-          return _screenCache.putIfAbsent(index, () => _buildScreen(index));
+          return TickerMode(
+            enabled: index == _selectedIndex,
+            child: _screenCache.putIfAbsent(index, () => _buildScreen(index)),
+          );
         }
         return const SizedBox.shrink();
       }),

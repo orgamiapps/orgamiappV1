@@ -30,8 +30,13 @@ int resolveActiveDiscoveryExperience(
 
 class DiscoveryMarketplaceView extends StatefulWidget {
   final int experienceVersion;
+  final DiscoveryLocationService? locationService;
 
-  const DiscoveryMarketplaceView({super.key, this.experienceVersion = 1});
+  const DiscoveryMarketplaceView({
+    super.key,
+    this.experienceVersion = 1,
+    this.locationService,
+  });
 
   @override
   State<DiscoveryMarketplaceView> createState() =>
@@ -114,7 +119,14 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
   }
 
   final _marketplace = DiscoveryMarketplaceService();
-  final _locations = DiscoveryLocationService();
+  late final _locations = widget.locationService ?? DiscoveryLocationService();
+  bool _locationOnboardingPending = false;
+  bool _locationOnboardingShowing = false;
+
+  bool get _isForeground =>
+      mounted &&
+      (ModalRoute.isCurrentOf(context) ?? false) &&
+      TickerMode.of(context);
   final _searchController = TextEditingController();
   DiscoveryLocation? _location;
   DiscoveryHomeResult? _home;
@@ -218,6 +230,33 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Subscribe to route/tab visibility and defer presentation until the event
+    // or login route above Discover has closed.
+    final foreground = _isForeground;
+    if (foreground) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _offerLocationWhenVisible(),
+      );
+    }
+  }
+
+  Future<void> _offerLocationWhenVisible() async {
+    if (!_locationOnboardingPending ||
+        _locationOnboardingShowing ||
+        !_isForeground)
+      return;
+    _locationOnboardingPending = false;
+    _locationOnboardingShowing = true;
+    try {
+      await _showLocationOnboarding();
+    } finally {
+      _locationOnboardingShowing = false;
+    }
+  }
+
+  @override
   void dispose() {
     _history?.dispose();
     _discoveryScroll.dispose();
@@ -235,14 +274,15 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
       snapshot: _routeSnapshot,
       restore: _restoreRoute,
       scrollController: () => _discoveryScroll,
-      isActive: () => mounted && (ModalRoute.of(context)?.isCurrent ?? false),
+      isActive: () => _isForeground,
     );
     _discoveryScroll.addListener(() => _history?.scheduleScroll());
     await _history!.initialize();
     if (_home != null || _search != null) return;
     if (_location == null) {
       setState(() => _loading = false);
-      await _showLocationOnboarding();
+      _locationOnboardingPending = true;
+      await _offerLocationWhenVisible();
       return;
     }
     if (_searchMode) {
@@ -253,7 +293,7 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
   }
 
   Future<void> _showLocationOnboarding() async {
-    if (!mounted) return;
+    if (!_isForeground) return;
     final useLocation = await showModalBottomSheet<bool>(
       context: context,
       isDismissible: false,
@@ -298,6 +338,7 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
         ),
       ),
     );
+    if (!mounted) return;
     ProductFunnelService().record(
       'discovery_location_prompt',
       dimensions: {
