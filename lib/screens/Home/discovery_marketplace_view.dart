@@ -126,7 +126,7 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
   bool get _isForeground =>
       mounted &&
       (ModalRoute.isCurrentOf(context) ?? false) &&
-      TickerMode.of(context);
+      TickerMode.valuesOf(context).enabled;
   final _searchController = TextEditingController();
   DiscoveryLocation? _location;
   DiscoveryHomeResult? _home;
@@ -245,8 +245,9 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
   Future<void> _offerLocationWhenVisible() async {
     if (!_locationOnboardingPending ||
         _locationOnboardingShowing ||
-        !_isForeground)
+        !_isForeground) {
       return;
+    }
     _locationOnboardingPending = false;
     _locationOnboardingShowing = true;
     try {
