@@ -1,8 +1,8 @@
 "use strict";
 
-// The packaged Flutter initializer selects Persistence.LOCAL. FlutterFire maps
-// that to browserLocalPersistence, not indexedDBLocalPersistence. Read exactly
-// the requested app's LOCAL record; never fall back to another app/account.
+// Prefer the already-initialized SDK account, independent of its durable backend.
+// Older retained artifacts without the SDK namespace use their exact LOCAL record.
+// Never initialize Auth or fall back to stale storage when an SDK is present.
 // This function is self-contained for page.evaluate and WebDriver serialization.
 // Tokens remain in memory for authenticated requests, never in evidence/errors.
 function readFirebaseAuthStateInBrowser(options) {
@@ -12,15 +12,34 @@ function readFirebaseAuthStateInBrowser(options) {
       options.appName !== "[DEFAULT]" || typeof options.expectedUid !== "string" ||
       !options.expectedUid || options.expectedUid.length > 128 || options.expectedUid.trim() !== options.expectedUid ||
       /[\u0000-\u001f\u007f/]/.test(options.expectedUid)) return reject("invalid_expected_identity");
-  let raw;
-  try {
-    raw = localStorage.getItem(`firebase:authUser:${options.apiKey}:${options.appName}`);
-  } catch {
-    return reject("local_storage_unavailable");
+  let raw, user;
+  if (typeof globalThis.firebase_core !== "undefined") {
+    try {
+      const apps = globalThis.firebase_core.getApps().filter(app => app?.name === options.appName);
+      if (!apps.length) return {state: "missing"};
+      if (apps.length !== 1) return reject("app_identity_mismatch");
+      const app = apps[0]._delegate || apps[0];
+      if (app.options?.apiKey !== options.apiKey || app.options?.projectId !== options.projectId) return reject("app_identity_mismatch");
+      const providers = app.container?.getProviders?.();
+      if (!Array.isArray(providers)) return reject("browser_read_failed");
+      const matches = providers.filter(provider => provider?.name === "auth");
+      if (!matches.length) return {state: "missing"};
+      if (matches.length !== 1) return reject("app_identity_mismatch");
+      if (matches[0].isInitialized?.() !== true) return {state: "missing"};
+      const auth = matches[0].getImmediate({optional: true});
+      if (!auth || auth._isInitialized !== true) return {state: "missing"};
+      if (auth.app?.name !== options.appName || auth.app.options?.apiKey !== options.apiKey ||
+          auth.app.options?.projectId !== options.projectId) return reject("app_identity_mismatch");
+      if (!auth.currentUser) return {state: "missing"};
+      user = auth.currentUser.toJSON();
+      raw = JSON.stringify(user);
+    } catch {return reject("browser_read_failed");}
+  } else {
+    try {raw = localStorage.getItem(`firebase:authUser:${options.apiKey}:${options.appName}`);}
+    catch {return reject("local_storage_unavailable");}
+    if (raw === null) return {state: "missing"};
   }
-  if (raw === null) return {state: "missing"};
   if (typeof raw !== "string" || raw.length > 65536) return reject("malformed_local_record");
-  let user;
   try {user = JSON.parse(raw);} catch {return reject("malformed_local_record");}
   if (!user || Array.isArray(user) || typeof user !== "object") return reject("malformed_local_record");
   if (user.apiKey !== options.apiKey || user.appName !== options.appName) return reject("app_identity_mismatch");

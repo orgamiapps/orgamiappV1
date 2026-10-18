@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:attendus/Services/web_auth_session.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -27,7 +28,9 @@ class AuthService extends ChangeNotifier {
       _loadCustomerOverride = null,
       _initializeFirebaseOverride = null,
       _onAuthenticatedSessionOverride = null,
-      _onLogoutOverride = null;
+      _onLogoutOverride = null,
+      _clearNotificationsOverride = null,
+      _isWeb = kIsWeb;
 
   @visibleForTesting
   AuthService.forTesting({
@@ -38,14 +41,20 @@ class AuthService extends ChangeNotifier {
     Future<void> Function()? initializeFirebase,
     Future<void> Function()? onAuthenticatedSession,
     Future<void> Function()? onLogout,
+    Future<void> Function()? clearNotifications,
+    bool isWeb = kIsWeb,
   }) : _authOverride = auth,
        _firestoreOverride = firestore,
        _storageOverride = storage,
        _loadCustomerOverride = loadCustomer,
        _initializeFirebaseOverride = initializeFirebase,
        _onAuthenticatedSessionOverride = onAuthenticatedSession,
-       _onLogoutOverride = onLogout;
+       _onLogoutOverride = onLogout,
+       _clearNotificationsOverride = clearNotifications,
+       _isWeb = isWeb;
 
+  final bool _isWeb;
+  final Future<void> Function()? _clearNotificationsOverride;
   final FirebaseAuth? _authOverride;
   final FirebaseFirestore? _firestoreOverride;
   final FlutterSecureStorage? _storageOverride;
@@ -101,12 +110,16 @@ class AuthService extends ChangeNotifier {
     if (_initializeFirebaseOverride != null) {
       return _initializeFirebaseOverride();
     }
+    if (kIsWeb) {
+      await FirebaseInitializer.initializeOnce();
+      await WebAuthSession.instance.ready();
+      return;
+    }
     try {
       await FirebaseInitializer.initializeOnce();
-      Logger.info('Firebase initialized via FirebaseInitializer (AuthService)');
-    } catch (e) {
+    } catch (error) {
       Logger.warning(
-        'Proceeding without confirmed Firebase init (AuthService): $e',
+        'Proceeding without confirmed Firebase init (AuthService): $error',
       );
     }
   }
@@ -343,7 +356,7 @@ class AuthService extends ChangeNotifier {
       // Check if session is still valid (optional: implement session timeout)
       final lastLoginTimeStr = await _storage.read(key: _keyLastLoginTime);
       if (!_isCurrent(user, revision)) return false;
-      if (lastLoginTimeStr != null) {
+      if (!_isWeb && lastLoginTimeStr != null) {
         final lastLoginTime = DateTime.parse(lastLoginTimeStr);
         final sessionAge = DateTime.now().difference(lastLoginTime);
 
@@ -528,8 +541,14 @@ class AuthService extends ChangeNotifier {
   /// Sign out user and clear all session data
   Future<void> signOut() async {
     try {
-      if (_authOverride == null) {
-        await FirebaseMessagingHelper().clearForSignOut();
+      if (_authOverride == null || _clearNotificationsOverride != null) {
+        try {
+          await (_clearNotificationsOverride?.call() ??
+                  FirebaseMessagingHelper().clearForSignOut())
+              .timeout(const Duration(seconds: 3));
+        } catch (_) {
+          Logger.warning('Notification cleanup failed; continuing logout');
+        }
       }
       await _auth.signOut();
       await _clearUserSession();

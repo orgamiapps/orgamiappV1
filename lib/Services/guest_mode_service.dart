@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:attendus/Services/web_auth_session.dart';
 
 import 'package:attendus/Utils/logger.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -12,15 +13,21 @@ class GuestModeService extends ChangeNotifier {
   static final GuestModeService _instance = GuestModeService._internal();
   factory GuestModeService() => _instance;
 
-  GuestModeService._internal() : _authOverride = null, _storageOverride = null;
+  GuestModeService._internal()
+    : _authOverride = null,
+      _storageOverride = null,
+      _restoreOverride = null;
 
   @visibleForTesting
   GuestModeService.forTesting({
     required FirebaseAuth auth,
     required FlutterSecureStorage storage,
+    Future<void> Function()? restoreSession,
   }) : _authOverride = auth,
-       _storageOverride = storage;
+       _storageOverride = storage,
+       _restoreOverride = restoreSession;
 
+  final Future<void> Function()? _restoreOverride;
   final FirebaseAuth? _authOverride;
   final FlutterSecureStorage? _storageOverride;
 
@@ -77,6 +84,18 @@ class GuestModeService extends ChangeNotifier {
   /// Reuses an anonymous user, creates one when signed out, and never replaces
   /// a fully authenticated account.
   Future<User?> ensureGuestSession() {
+    if (_restoreOverride != null) {
+      return _restoreOverride().then((_) => _ensureRestoredGuestSession());
+    }
+    if (kIsWeb && _authOverride == null) {
+      return WebAuthSession.instance.ready().then(
+        (_) => _ensureRestoredGuestSession(),
+      );
+    }
+    return _ensureRestoredGuestSession();
+  }
+
+  Future<User?> _ensureRestoredGuestSession() {
     final current = _auth.currentUser;
     if (current != null) {
       _syncFromAuthUser(current);

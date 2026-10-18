@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:attendus/Services/auth_service.dart';
 import 'package:attendus/Utils/colors.dart';
@@ -59,6 +60,20 @@ class _LoginSettingsScreenState extends State<LoginSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Sign-in settings')),
+        body: const Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'You stay signed in on this browser until you log out. '
+            'Use Log out in Settings when you are finished on a shared device.\n\n'
+            'Clearing browser data, private browsing, or account security changes '
+            'may require you to sign in again.',
+          ),
+        ),
+      );
+    }
     return Scaffold(
       backgroundColor: AppColors.backgroundColor,
       appBar: AppBar(

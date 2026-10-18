@@ -48,6 +48,47 @@ void main() {
   });
 
   test(
+    'web keeps a restored account when cached session dates are old',
+    () async {
+      service.dispose();
+      auth.user = TestAuthUser('a');
+      service = AuthService.forTesting(
+        auth: auth,
+        storage: _OldSessionStorage(),
+        loadCustomer: (uid) async => profile(uid),
+        initializeFirebase: () async {},
+        onAuthenticatedSession: () async {},
+        onLogout: () async {},
+        isWeb: true,
+      );
+      await service.initialize();
+      expect(auth.currentUser?.uid, 'a');
+      expect(service.isLoggedIn, true);
+    },
+  );
+
+  test('notification cleanup failure cannot prevent explicit logout', () async {
+    service.dispose();
+    auth.user = TestAuthUser('a');
+    service = AuthService.forTesting(
+      auth: auth,
+      storage: storage,
+      loadCustomer: (uid) async => profile(uid),
+      initializeFirebase: () async {},
+      onAuthenticatedSession: () async {},
+      onLogout: () async {},
+      clearNotifications: () async {
+        throw StateError('offline');
+      },
+    );
+    await service.initialize();
+    await service.signOut();
+    expect(auth.currentUser, isNull);
+    expect(CustomerController.logeInCustomer, isNull);
+    expect(await storage.read(key: 'user_id'), isNull);
+  });
+
+  test(
     'anonymous authentication never grants full-account UI access',
     () async {
       auth.user = TestAuthUser('guest', isAnonymous: true);
@@ -161,4 +202,20 @@ void main() {
       expect(CustomerController.logeInCustomer?.uid, 'c');
     },
   );
+}
+
+class _OldSessionStorage extends TestSecureStorage {
+  @override
+  Future<String?> read({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    if (key == 'last_login_time') return '2000-01-01T00:00:00.000';
+    return super.read(key: key);
+  }
 }
