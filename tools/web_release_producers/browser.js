@@ -8,7 +8,7 @@ const dependencies = createRequire(path.resolve(__dirname, '../../tests/browser/
 const serverDependencies = createRequire(path.resolve(__dirname, '../../functions/package.json'));
 const {gitSourceFiles} = require('../web_release_contract');
 const {collectRosterPages} = require('./roster-read');
-const {activateFlutterSemanticsPage} = require('./flutter-semantics');
+const {activateFlutterSemanticsPage, enterFlutterText} = require('./flutter-semantics');
 const {readFirebaseAuthStatePage} = require('./firebase-auth-state');
 const {htmlResponsiveProbe} = require('./safari');
 const {validScope, bindingId} = require('../../functions/communications/qualification-isolation');
@@ -638,9 +638,9 @@ async function produce({candidate, context, outputDir}) {
     await app(page);
     await textClick(page, 'Log in');
     if (!await page.getByText('Welcome back', {exact: true}).isVisible()) await textClick(page, 'Log in');
-    await page.getByRole('textbox', {name: 'Email address', exact: true}).fill(account.email);
-    await page.getByRole('textbox', {name: 'Password', exact: true}).fill(account.password);
-    await page.getByRole('textbox', {name: 'Password', exact: true}).press('Enter');
+    await enterFlutterText(page, 'Email address', account.email);
+    await enterFlutterText(page, 'Password', account.password);
+    await page.getByText('Log in', {exact: true}).last().click();
     await page.getByText('Welcome back', {exact: true}).waitFor({state: 'hidden', timeout: 90000});
     await page.getByText('Discover', {exact: true}).first().waitFor();
   }

@@ -9,3 +9,26 @@ With deployment recovery authorized, a read-only inventory validated all 61 reta
 The exact plan, commit acknowledgement, and readback are in `web-retired-scope-repair-20261018.json`, canonical receipt SHA256 `6ec856558b4fdc7553e5e93309497f7fa952a76364831c310bfa944a7f97f9bf`. The manifest pins the new versions and retains each original hash and receipt linkage. All 63 records and the complete empty-staging prerequisite passed after repair at `2026-10-18T20:29:32.743Z`. All 27 retirement/rehearsal tests pass; release guards remain unchanged. Original failure and trace evidence are retained in workflow 39160955560 and the release worktree's build directory.
 
 This repair permits a fresh candidate attempt; it does not qualify or promote production. Same-candidate executable acceptance and observation requirements still apply.
+
+## App Check and Safari diagnosis, 2026-10-18
+
+The real provider returned a valid staging token with action `fire_app_check` and score 0.1 for a local automated Chromium session. Staging's configured minimum is 0.5; domains, key, enabled APIs and the App Check service-agent role match. No threshold or enforcement was changed. The operator then completed the normal-browser public RSVP flow; read-only server inspection found confirmed registration/flow records at 22:23:58Z and 22:25:01Z. This proves that bounded normal-browser path, not the entire release. Private diagnostic receipts are retained in the original checkout's `build/login-manual-appcheck-receipt.json` and `build/login-recaptcha-assessment-diagnostic.json`.
+
+Temporary staging-only debug credentials isolated the application behavior. Each credential was revoked in the diagnostic's `finally` block. These runs remain diagnostic-only and cannot qualify a release. Real App Check and the release contract remain enabled.
+
+Two independent acceptance defects were reproduced:
+
+- Programmatic Playwright `fill()` changed Flutter's semantics mirror without updating the form controllers. No password-login request occurred; clicking submit produced both empty-field validation errors. Pointer activation followed by keyboard input produced HTTP 200 and the exact owned account UID. Browser and cache-upgrade collectors now use that interaction and the visible submit button.
+- Background Discover initialized under an event route, opened a location-onboarding modal, and could replace the event URL. Discover now defers the modal until its route and dashboard tab are visible. Its history coordinator does not initialize an inactive page. Regressions cover covered routes, inactive tabs, and preservation of the foreground event URL.
+
+Safari WebDriver returned stale computed styles within the same script task on the live public page. A synchronous layout flush did not fix it. The shared probe now waits for rendering after baseline restoration and after applying 200-percent text. Safari uses the asynchronous WebDriver endpoint to await the result. The isolated loopback test and exact owned staging page passed in branded Safari 26.6.1 on macOS 15.7.9: run 39171904745. Failed live reproduction 39171432609 and unsuccessful synchronous fix 39171577590 remain retained. This focused regression is not a passing full Safari journey.
+
+Local validation: 75 JavaScript producer/security tests, 11 navigation/foreground Flutter tests, 9 WebKit layout tests, and 31 workflow contract tests passed. Full candidate qualification, the remaining Safari journey, real-provider browser acceptance and the required observation/replay window remain separate release requirements. Staging still serves candidate 39164341158; production has not been promoted. Do not reuse the failed pilot as a passing new candidate or reset its original schedule.
+
+## Replacement candidate prerequisites (2026-10-18)
+
+The failed pilot `webqa-20261018-41e9082ab8` / candidate `39164341158` is deliberately abandoned, never qualified. Its immutable failed browser/Safari evidence and private snapshot remain retained. The exact reviewed cleanup removed 1,273 version-pinned synthetic documents and 30 individually reviewed fixture Auth identities. The pre-existing anonymous account remains. All 19 communication captures and all AppConfig records remain; no unverified configuration defaults were restored. Normal analytics triggers removed seven owned event insight projections, and shared operation scan checkpoints advanced without cleanup writes.
+
+Seventeen isolation records were retired with original source/candidate lineage retained, scope actor/recipient arrays cleared, and expiry removed. The retired manifest now pins 80 records across three runs; the previous 63 pins are unchanged. Read-back empty-site prerequisites passed with one anonymous account. Cleanup receipt SHA-256: `dca7f6abfe1a1367e28fe5ceb5f6933528fddb65c24602f3c170131f58cc1ec2`.
+
+The staging predecessor archive manifest was refreshed to all 152 currently deployed function source generations from candidate `39164341158`, including four restored generations from the backend rehearsal. Every private create-only backup was downloaded and hashed against that immutable deployment's source verification. The 135 production archive entries are unchanged. This enables the next candidate's rollback rehearsal; it does not qualify that candidate or deploy production.

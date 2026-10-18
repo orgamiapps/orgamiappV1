@@ -84,4 +84,18 @@ function activateFlutterSemanticsDriver(driver, options) {
   }, options);
 }
 
-module.exports = {flutterSemanticsDom, ensureFlutterSemantics, activateFlutterSemanticsPage, activateFlutterSemanticsDriver};
+// Flutter's semantics textboxes mirror the engine's editor. Programmatic fill()
+// can change only that mirror. A real pointer focuses the engine editor; keyboard
+// input then updates the controller used by validation and submission.
+async function enterFlutterText(page, name, value) {
+  await page.getByRole('textbox', {name, exact: true}).click();
+  const editing = await page.evaluate(() => {
+    const element = document.activeElement;
+    return element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement;
+  });
+  if (!editing) throw Error('flutter-editor-not-focused');
+  await page.keyboard.press('ControlOrMeta+A');
+  await page.keyboard.insertText(value);
+}
+
+module.exports = {enterFlutterText, flutterSemanticsDom, ensureFlutterSemantics, activateFlutterSemanticsPage, activateFlutterSemanticsDriver};

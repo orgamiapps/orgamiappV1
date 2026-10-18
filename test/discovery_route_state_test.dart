@@ -42,6 +42,38 @@ class MemoryHistory implements DiscoveryHistoryPort {
 }
 
 void main() {
+  test(
+    'background Discover initialization preserves the foreground event URL',
+    () async {
+      var active = false;
+      var restores = 0;
+      late MemoryHistory history;
+      final event = Uri(path: '/app/event/owned-event');
+      final coordinator = DiscoveryHistoryCoordinator(
+        snapshot: () => DiscoveryRouteState({'q': 'nearby'}),
+        restore: (_) async {
+          restores++;
+        },
+        scrollController: () => null,
+        isActive: () => active,
+        createBackend: (restore, _) {
+          history = MemoryHistory(restore);
+          history.entries[0] = (event, 25);
+          return history;
+        },
+      );
+      await coordinator.initialize();
+      expect(history.currentUri, event);
+      expect(history.scroll, 25);
+      expect(restores, 0);
+      active = true;
+      await coordinator.initialize();
+      expect(history.currentUri.path, '/app/discover');
+      expect(history.currentUri.queryParameters['q'], 'nearby');
+      coordinator.dispose();
+    },
+  );
+
   for (final scenario in ['unready', 'late', 'disposed', 'detached']) {
     testWidgets(
       'history restoration handles an attached viewport that is $scenario',

@@ -1,0 +1,33 @@
+name: Safari layout regression
+on:
+  push:
+    branches: [main, codex/appcheck-safari-20261018]
+    paths: ['tools/safari_layout_regression.js', 'tools/web_release_producers/safari.js', '.github/workflows/safari-layout-regression.yml']
+  workflow_dispatch:
+    inputs:
+      staging_public_event:
+        description: Optional owned public pilot for read-only diagnosis
+        required: false
+        default: ''
+permissions:
+  contents: read
+jobs:
+  safari-layout:
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+        working-directory: functions
+      - run: node tools/safari_layout_regression.js
+        env:
+          STAGING_PUBLIC_EVENT: ${{ inputs.staging_public_event }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: safari-layout-regression
+          path: build/safari-layout-regression.json
+

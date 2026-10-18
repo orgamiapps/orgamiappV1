@@ -103,7 +103,7 @@ test("correct history URL cannot substitute for visible expected event content",
   }
 });
 
-test("200-percent probe scales inserted form from original computed baselines without 400-percent inheritance", () => {
+test("200-percent probe scales inserted form from original computed baselines without 400-percent inheritance", async () => {
   const nodes = []; let dialog = null;
   function node(tag, parent = null, base = null) {
     const properties = new Map();
@@ -122,16 +122,16 @@ test("200-percent probe scales inserted form from original computed baselines wi
     assert.equal(selector, "*"); return nodes.filter((value) => value !== body);
   };
   const computed = (value) => value.style.getPropertyValue("font-size") || `${value.base || (value.parent ? parseFloat(computed(value.parent)) : 16)}px`;
-  const context = vm.createContext({document: {body, documentElement: {scrollWidth: 390}, querySelector: () => dialog}, innerWidth: 390,
+  const context = vm.createContext({requestAnimationFrame: callback => queueMicrotask(callback), document: {body, documentElement: {scrollWidth: 390}, querySelector: () => dialog}, innerWidth: 390,
     getComputedStyle: (value) => ({fontSize: computed(value), display: "block", visibility: "visible"})});
   const probe = () => vm.runInContext(`(${htmlResponsiveProbe.toString()})()`, context);
-  assert.equal(probe().textIs200Percent, true); assert.equal(computed(heading), "40px");
+  assert.equal((await probe()).textIs200Percent, true); assert.equal(computed(heading), "40px");
   assert.equal(computed(eyebrow), "26.24px"); assert.equal(computed(footerText), "32px");
   dialog = node("dialog", null, 16);
   const label = node("label", dialog); const input = node("input", label); const textarea = node("textarea", dialog); const button = node("button", dialog);
   dialog.querySelectorAll = () => [input, textarea, button];
   for (let pass = 0; pass < 2; pass++) {
-    const result = probe();
+    const result = await probe();
     assert.equal(result.textIs200Percent, true); assert.equal(result.controlsFit, true); assert.equal(result.dialogFits, true);
     assert.equal(result.controlCount, 3); assert.equal(computed(input), "32px"); assert.equal(computed(label), "32px");
     assert.equal(computed(heading), "40px");
@@ -140,9 +140,9 @@ test("200-percent probe scales inserted form from original computed baselines wi
   }
   // A fitting outer dialog/viewport cannot hide a clipped or oversized field.
   input.box = {...input.box, right: 600, width: 588};
-  let result = probe(); assert.equal(result.pageFits, true); assert.equal(result.dialogFits, true); assert.equal(result.controlsFit, false);
+  let result = await probe(); assert.equal(result.pageFits, true); assert.equal(result.dialogFits, true); assert.equal(result.controlsFit, false);
   input.box = {...input.box, right: 378, width: 366}; button.scrollWidth = 700;
-  result = probe(); assert.equal(result.dialogFits, true); assert.equal(result.controlsFit, false);
+  result = await probe(); assert.equal(result.dialogFits, true); assert.equal(result.controlsFit, false);
   button.scrollWidth = 360; dialog.scrollWidth = 700;
-  assert.equal(probe().dialogFits, false);
+  assert.equal((await probe()).dialogFits, false);
 });

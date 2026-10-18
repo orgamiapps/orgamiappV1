@@ -22,13 +22,17 @@ const fail = (code) => { throw Object.assign(new Error(code), {code}); };
 // Serializable in both WebDriver and Playwright. Restore every previously
 // touched inline size before measuring, so newly inserted dialog descendants
 // inherit the original baseline and a second probe never compounds to 400%.
-function htmlResponsiveProbe() {
+async function htmlResponsiveProbe() {
   const saved = globalThis.__attendusHtmlTextBaselines ||= new Map();
   for (const [node, previous] of saved) {
     if (!node.isConnected) { saved.delete(node); continue; }
     if (previous.value) node.style.setProperty("font-size", previous.value, previous.priority);
     else node.style.removeProperty("font-size");
   }
+  // Safari WebDriver can expose stale computed styles within the mutation
+  // task. Let rendering run before reading baselines and scaled results.
+  const rendered = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  await rendered();
   const visible = (node) => {
     const box = node.getBoundingClientRect(), style = getComputedStyle(node);
     return box.width > 0 && box.height > 0 && style.display !== "none" && style.visibility !== "hidden";
@@ -42,6 +46,7 @@ function htmlResponsiveProbe() {
     return {node, before: parseFloat(getComputedStyle(node).fontSize)};
   });
   for (const {node, before} of sizes) node.style.setProperty("font-size", `${before * 2}px`, "important");
+  await rendered();
   const samples = sizes.map(({node, before}) => ({tag: node.tagName.toLowerCase(), before, after: parseFloat(getComputedStyle(node).fontSize)}));
   const textIs200Percent = samples.length > 0 && samples.every((sample) => Number.isFinite(sample.before) && sample.before > 0 && Math.abs(sample.after - sample.before * 2) < 0.1);
   const dialog = document.querySelector("dialog[open]");
@@ -55,6 +60,13 @@ function htmlResponsiveProbe() {
     dialogOpen: !!dialog, dialogFits: !!dialogBounds && dialogBounds.left >= -1 && dialogBounds.right <= innerWidth + 1 && dialog.scrollWidth <= dialog.clientWidth + 1,
     controlCount: controls.length, controls,
     controlsFit: controls.length > 0 && controls.every((box) => box.left >= Math.max(0, dialogBounds.left) - 1 && box.right <= Math.min(innerWidth, dialogBounds.right) + 1 && box.scrollWidth <= box.clientWidth + 1)};
+}
+
+async function responsiveProbe(driver) {
+  const result = await driver.executeAsync(`const done = arguments[arguments.length - 1];
+    (${htmlResponsiveProbe.toString()})().then(done, () => done({error: 'safari-responsive-probe-failed'}));`);
+  if (result?.error) fail(result.error);
+  return result;
 }
 
 function validateContext(candidate, context) {
@@ -332,12 +344,12 @@ async function produce({candidate, context, outputDir}) {
     record("dialog-restores-trigger-focus", true, await driver.execute(() => document.activeElement?.hasAttribute("data-public-action") === true));
     await shot("guest-form.png");
     stage = "responsive"; await driver.resize(500, 900);
-    const responsive = await driver.execute(htmlResponsiveProbe);
+    const responsive = await responsiveProbe(driver);
     record("narrow-safari-viewport", true, responsive.width >= 280 && responsive.width <= 600);
     record("actual-200-percent-public-text", true, responsive.textIs200Percent);
     record("200-percent-text-no-horizontal-overflow", true, responsive.pageFits);
     await click(driver, {css: "[data-public-action]"}); await find(driver, {css: "dialog input[name=fullName]"});
-    const form = await driver.execute(htmlResponsiveProbe);
+    const form = await responsiveProbe(driver);
     record("actual-200-percent-inserted-dialog-text", true, form.textIs200Percent && form.dialogOpen);
     record("200-percent-guest-dialog-fits", true, form.pageFits && form.dialogFits);
     record("200-percent-guest-fields-buttons-fit", true, form.controlCount >= 3 && form.controlsFit);
