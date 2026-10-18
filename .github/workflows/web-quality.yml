@@ -178,6 +178,10 @@ jobs:
     - name: Public registration across browser engines
       run: node functions/tools/run-integration-tests.js --project demo-attendus-admin --suite public-browser
     - run: flutter pub get --enforce-lockfile
+    - name: Build persistent web session regression harness
+      run: flutter build web --no-pub --target integration_test/web_session_harness.dart --output build/web-auth-session --no-wasm-dry-run
+    - name: Verify browser restart, persistence migration, and cross-tab logout
+      run: functions/node_modules/.bin/firebase emulators:exec --only auth --config firebase.test.json --project demo-attendus-admin "node tests/browser/session-restart.cjs"
     - name: Flutter form and real local Firebase journey
       env:
         CHROME_EXECUTABLE: ${{ steps.chrome.outputs.chrome-path }}

@@ -167,3 +167,39 @@ test('an in-flight evaluation settling after timeout cannot schedule further pol
     for (let tick = 0; tick < 12; tick++) await Promise.resolve();
   }
 });
+
+function runtimeReader(value = record()) {
+  const app = {name: options.appName, options: {apiKey: options.apiKey, projectId: options.projectId}};
+  const auth = {app, _isInitialized: true, currentUser: value && {toJSON: () => value}};
+  const provider = {name: 'auth', isInitialized: () => true, getImmediate: ({optional}) => {assert.equal(optional, true); return auth;}};
+  app.container = {getProviders: () => [provider]};
+  const context = {firebase_core: {getApps: () => [app]}, Date: class extends Date {static now() {return now * 1000;}},
+    Uint8Array, TextDecoder, atob, localStorage: {getItem() {throw Error('Never read stale LOCAL state');}},
+    get indexedDB() {throw Error('Never scan stored accounts');}};
+  context.options = options;
+  return {app, auth, provider, context, run: () => JSON.parse(JSON.stringify(vm.runInNewContext(`(${read.toString()})(options)`, context)))};
+}
+test('initialized SDK account supplies strictly bound token without accessing either persistence store', () => {
+  const runtime = runtimeReader();
+  assert.deepEqual(runtime.run(), {state: 'ready', uid: options.expectedUid, isAnonymous: false, token: token()});
+  assert.equal(JSON.stringify(runtime.run()).includes('MUST_NOT_BE_RETURNED'), false);
+});
+test('SDK signed-out and initializing states never resurrect a stored account', () => {
+  const runtime = runtimeReader(null);
+  assert.deepEqual(runtime.run(), {state: 'missing'});
+  runtime.auth.currentUser = {toJSON: () => record()};
+  runtime.auth._isInitialized = false;
+  assert.deepEqual(runtime.run(), {state: 'missing'});
+  runtime.provider.isInitialized = () => false;
+  runtime.provider.getImmediate = () => {throw Error('Must not initialize provider');};
+  assert.deepEqual(runtime.run(), {state: 'missing'});
+});
+test('SDK reader rejects ambiguous apps, mismatched active app and invalid actor/token', () => {
+  for (const change of [r => {r.context.firebase_core.getApps = () => [r.app, r.app];},
+    r => {r.auth.app = {name: 'other', options: r.app.options};},
+    r => {r.auth.currentUser = {toJSON: () => record({uid: 'other'})};},
+    r => {r.auth.currentUser = {toJSON: () => record({stsTokenManager: {accessToken: token({exp: now - 1})}})};}]) {
+    const runtime = runtimeReader(); change(runtime);
+    assert.equal(runtime.run().state, 'rejected');
+  }
+});

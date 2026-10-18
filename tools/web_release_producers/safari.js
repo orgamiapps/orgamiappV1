@@ -161,13 +161,34 @@ async function semantics(driver) {
 function packagedAuthIdentity(apiKey) {
   // Observation only, including anonymous identities retained for reconciliation.
   // Known fixture login is separately verified by the strict JWT/actor reader.
-  // Flutter explicitly selects LOCAL; do not consult stale IndexedDB identities.
+  // Observe the existing SDK; never choose a stale storage account.
   if (typeof apiKey !== "string" || !/^[A-Za-z0-9_-]{8,200}$/.test(apiKey)) return {error: "auth-storage-invalid"};
-  let raw;
-  try {raw = localStorage.getItem(`firebase:authUser:${apiKey}:[DEFAULT]`);} catch {return {error: "auth-storage-unavailable"};}
-  if (raw === null) return null;
+  let raw, user;
+  if (typeof globalThis.firebase_core !== "undefined") {
+    try {
+      const apps = globalThis.firebase_core.getApps().filter(app => app?.name === "[DEFAULT]");
+      if (!apps.length) return null;
+      if (apps.length !== 1) return {error: "auth-storage-invalid"};
+      const app = apps[0]._delegate || apps[0];
+      if (app.options?.apiKey !== apiKey || app.options?.projectId !== "attendus-staging") return {error: "auth-storage-invalid"};
+      const providers = app.container?.getProviders?.();
+      if (!Array.isArray(providers)) return {error: "auth-storage-invalid"};
+      const matches = providers.filter(provider => provider?.name === "auth");
+      if (!matches.length) return null;
+      if (matches.length !== 1) return {error: "auth-storage-invalid"};
+      if (matches[0].isInitialized?.() !== true) return null;
+      const auth = matches[0].getImmediate({optional: true});
+      if (!auth || auth._isInitialized !== true) return null;
+      if (auth.app?.name !== "[DEFAULT]" || auth.app.options?.apiKey !== apiKey ||
+          auth.app.options?.projectId !== "attendus-staging") return {error: "auth-storage-invalid"};
+      if (!auth.currentUser) return null;
+      raw = JSON.stringify(auth.currentUser.toJSON());
+    } catch {return {error: "auth-storage-unavailable"};}
+  } else {
+    try {raw = localStorage.getItem(`firebase:authUser:${apiKey}:[DEFAULT]`);} catch {return {error: "auth-storage-unavailable"};}
+    if (raw === null) return null;
+  }
   if (typeof raw !== "string" || raw.length > 65536) return {error: "auth-storage-invalid"};
-  let user;
   try {user = JSON.parse(raw);} catch {return {error: "auth-storage-invalid"};}
   if (!user || user.apiKey !== apiKey || user.appName !== "[DEFAULT]" ||
       typeof user.uid !== "string" || !user.uid || user.uid.length > 128 || user.uid.trim() !== user.uid ||

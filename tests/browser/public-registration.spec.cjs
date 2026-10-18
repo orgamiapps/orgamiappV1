@@ -178,6 +178,9 @@ test('registration stays keyboard-operable at narrow width and 200-percent text'
   try {
     await expect(dialog).toHaveCount(0);
     await expect(trigger).toBeFocused();
+    // Native close is queued after open=false and focus restoration. The trace
+    // can reach these assertions before that event is dispatched.
+    await expect.poll(() => page.evaluate(() => window.keyboardEvidence.filter((event) => event.type === 'close').length)).toBe(1);
     const events = await page.evaluate(() => window.keyboardEvidence);
     expect(events.some((event) => event.type === 'keydown' && event.key === 'Escape' && event.isTrusted && event.target === 'INPUT')).toBe(true);
     expect(events.filter((event) => event.type === 'close')).toHaveLength(1);

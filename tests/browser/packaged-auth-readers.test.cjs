@@ -124,3 +124,22 @@ test('actual installed Firebase Auth provider is inspected without initializing 
     assert.equal(networkCalls, 0);
   } finally {await deleteApp(app); global.fetch = previousFetch;}
 });
+
+test('Safari observes initialized SDK user and logout without reading stale LOCAL or IndexedDB', async () => {
+  const app = {name: '[DEFAULT]', options: {apiKey: key, projectId: 'attendus-staging'}};
+  const auth = {app, _isInitialized: true, currentUser: {toJSON: () => JSON.parse(local())}};
+  const provider = {name: 'auth', isInitialized: () => true, getImmediate: () => auth};
+  app.container = {getProviders: () => [provider]};
+  const context = {firebase_core: {getApps: () => [app]}, get localStorage() {throw Error('No stale LOCAL reads');},
+    get indexedDB() {throw Error('No stale IndexedDB reads');}};
+  const driver = {execute: async (fn, ...args) => {
+    context.args = args;
+    return vm.runInNewContext(`(${fn.toString()})(...args)`, context);
+  }};
+  assert.equal((await authIdentity(driver, key)).uid, 'controlled-owner');
+  auth.currentUser = null;
+  assert.equal(await authIdentity(driver, key), null);
+  provider.isInitialized = () => false;
+  provider.getImmediate = () => {throw Error('No provider initialization');};
+  assert.equal(await authIdentity(driver, key), null);
+});

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:attendus/Utils/logger.dart';
@@ -43,22 +42,6 @@ class FirebaseInitializer {
         _completedSuccessfully = true;
         _completer!.complete();
         return;
-      }
-
-      // FlutterFire normally defaults to local persistence on web, but make
-      // that contract explicit so closing the tab or browser does not turn a
-      // durable login into a session-only login.
-      if (kIsWeb) {
-        try {
-          await FirebaseAuth.instance
-              .setPersistence(Persistence.LOCAL)
-              .timeout(const Duration(seconds: 3));
-          Logger.info('Firebase Auth browser persistence set to local');
-        } catch (e) {
-          // Some privacy modes block durable browser storage. Firebase can
-          // still authenticate for the current page, so do not block startup.
-          Logger.warning('Could not enable persistent browser sign-in: $e');
-        }
       }
 
       try {

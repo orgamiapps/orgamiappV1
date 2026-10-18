@@ -1,6 +1,8 @@
 import 'package:attendus/widgets/deferred_shared_community_screen.dart';
 import 'package:attendus/widgets/deferred_conversation_screen.dart';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:attendus/Services/web_auth_session.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/screens/Home/dashboard_screen.dart'
@@ -73,6 +75,45 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   bool _isChecking = true;
+  bool _restorationDelayed = false;
+  bool _restorationFailed = false;
+  bool _checkInFlight = false;
+  Timer? _restorationTimer;
+  StreamSubscription<User?>? _webAuthChanges;
+  String? _visibleUid;
+  bool _showingAccount = false;
+
+  void _watchWebAccount() {
+    if (!kIsWeb) return;
+    _webAuthChanges ??= FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (!mounted ||
+          _isChecking ||
+          !_showingAccount ||
+          user?.uid == _visibleUid) {
+        return;
+      }
+      // Another tab can sign out or switch accounts while private routes are open.
+      Navigator.of(
+        context,
+        rootNavigator: true,
+      ).popUntil((route) => route.isFirst);
+      CustomerController.logeInCustomer = null;
+      setState(() {
+        _isChecking = true;
+        _restoredWidget = null;
+        _restorationDelayed = false;
+      });
+      _checkAuthState();
+    });
+  }
+
+  @override
+  void dispose() {
+    _restorationTimer?.cancel();
+    _webAuthChanges?.cancel();
+    super.dispose();
+  }
+
   Widget? _restoredWidget;
   final NavigationStateService _navStateService = NavigationStateService();
 
@@ -89,7 +130,23 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   Future<void> _checkAuthState() async {
+    if (_checkInFlight) return;
+    _checkInFlight = true;
+    if (mounted) {
+      setState(() {
+        _restorationFailed = false;
+      });
+    }
+    _restorationTimer?.cancel();
+    _restorationTimer = Timer(const Duration(seconds: 10), () {
+      if (mounted && _isChecking) {
+        setState(() {
+          _restorationDelayed = true;
+        });
+      }
+    });
     try {
+      if (kIsWeb) await WebAuthSession.instance.ready();
       if (widget.forceDiscover) {
         await AuthGateNavigation.resolve(forceDiscover: true);
         if (!mounted) return;
@@ -145,18 +202,12 @@ class _AuthGateState extends State<AuthGate> {
       // Wait for Firebase's authoritative initial event instead of racing it
       // with a short UI timer.
       Logger.debug('🔄 AuthGate: Waiting for initial auth state...');
-      User? restoredUser;
-      try {
-        restoredUser = await FirebaseAuth.instance
-            .authStateChanges()
-            .first
-            .timeout(const Duration(seconds: 10));
-      } on TimeoutException {
-        // Do not discard a user that became available while waiting for an
-        // unusually delayed stream event.
-        restoredUser = FirebaseAuth.instance.currentUser;
-        Logger.warning('AuthGate: Initial auth-state check timed out');
-      }
+      final restoredUser = kIsWeb
+          ? FirebaseAuth.instance.currentUser
+          : await FirebaseAuth.instance.authStateChanges().first.timeout(
+              const Duration(seconds: 10),
+              onTimeout: () => FirebaseAuth.instance.currentUser,
+            );
 
       if (!mounted || !_isChecking) return;
 
@@ -183,13 +234,21 @@ class _AuthGateState extends State<AuthGate> {
     } catch (e) {
       Logger.error('AuthGate: Error checking auth state', e);
       if (!mounted) return;
-      _setGuestAndNavigate();
+      setState(() {
+        _restorationFailed = true;
+      });
+    } finally {
+      _checkInFlight = false;
+      _restorationTimer?.cancel();
     }
   }
 
   void _setGuestAndNavigate() {
     if (!mounted || !_isChecking) return;
     CustomerController.logeInCustomer = null;
+    _showingAccount = false;
+    _visibleUid = FirebaseAuth.instance.currentUser?.uid;
+    _watchWebAccount();
     setState(() {
       _isChecking = false;
       _restoredWidget = DeferredScreenLoader(
@@ -208,13 +267,15 @@ class _AuthGateState extends State<AuthGate> {
     if (!mounted || !_isChecking) return;
 
     // Set minimal customer model for immediate navigation
-    CustomerController.logeInCustomer ??= CustomerModel(
-      uid: user.uid,
-      name: user.displayName ?? '',
-      email: user.email ?? '',
-      createdAt: DateTime.now(),
-      profilePictureUrl: user.photoURL,
-    );
+    if (CustomerController.logeInCustomer?.uid != user.uid) {
+      CustomerController.logeInCustomer = CustomerModel(
+        uid: user.uid,
+        name: user.displayName ?? '',
+        email: user.email ?? '',
+        createdAt: DateTime.now(),
+        profilePictureUrl: user.photoURL,
+      );
+    }
 
     final entry = widget.forceDiscover
         ? const AuthGateNavigation(restoreNavigation: false)
@@ -259,7 +320,15 @@ class _AuthGateState extends State<AuthGate> {
     );
 
     if (!mounted) return;
-
+    if (FirebaseAuth.instance.currentUser?.uid != user.uid) {
+      Future<void>.delayed(Duration.zero, () {
+        if (mounted) _checkAuthState();
+      });
+      return;
+    }
+    _showingAccount = true;
+    _visibleUid = user.uid;
+    _watchWebAccount();
     setState(() {
       _isChecking = false;
       _restoredWidget = restoredScreen;
@@ -367,17 +436,54 @@ class _AuthGateState extends State<AuthGate> {
   Widget build(BuildContext context) {
     if (_isChecking) {
       // Show minimal loading while checking auth state
-      return const Scaffold(
-        backgroundColor: Color(0xFF667EEA),
+      return Scaffold(
         body: Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!_restorationFailed) const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                _restorationFailed
+                    ? 'Unable to restore your session. Check your connection.'
+                    : _restorationDelayed
+                    ? 'Restoring your session is taking longer than usual.'
+                    : 'Checking your session...',
+              ),
+              if (_restorationDelayed || _restorationFailed)
+                TextButton(
+                  onPressed: _checkAuthState,
+                  child: const Text('Retry'),
+                ),
+            ],
           ),
         ),
       );
     }
 
     Logger.debug('AuthGate: Returning resolved destination');
-    return _restoredWidget!;
+    if (!kIsWeb) return _restoredWidget!;
+    return ValueListenableBuilder<bool>(
+      valueListenable: WebAuthSession.instance.temporaryStorage,
+      child: _restoredWidget!,
+      builder: (context, temporary, child) => Column(
+        children: [
+          if (temporary)
+            const Material(
+              color: Color(0xFFFFF3CD),
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Text(
+                    'Your browser cannot save this sign-in. You may need to sign in again after closing it.',
+                  ),
+                ),
+              ),
+            ),
+          Expanded(child: child!),
+        ],
+      ),
+    );
   }
 }

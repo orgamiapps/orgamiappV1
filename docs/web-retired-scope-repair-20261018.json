@@ -1,0 +1,176 @@
+{
+  "plan": {
+    "projectId": "attendus-staging",
+    "originalManifestSha256": "11030d3bf5cc9961c6101823f3720be194176a7a77f0a1f9bc8f0306eb7d7a18",
+    "preservedCount": 61,
+    "writes": [
+      {
+        "update": {
+          "name": "projects/attendus-staging/databases/(default)/documents/QualificationScopes/webqa-20261004-671be56c38",
+          "fields": {
+            "schemaVersion": {
+              "integerValue": "1"
+            },
+            "projectId": {
+              "stringValue": "attendus-staging"
+            },
+            "runId": {
+              "stringValue": "webqa-20261004-671be56c38"
+            },
+            "status": {
+              "stringValue": "retired"
+            },
+            "mode": {
+              "stringValue": "capture"
+            },
+            "actorUids": {
+              "arrayValue": {}
+            },
+            "recipientUids": {
+              "arrayValue": {}
+            },
+            "recoveryKind": {
+              "stringValue": "recreated-retirement-marker-after-observed-absence"
+            },
+            "originalDocumentSha256": {
+              "stringValue": "cccea059cc81dc1f349bff276058f54ea780db333df7c041b78764c1627c0b33"
+            },
+            "recoveredAt": {
+              "timestampValue": "2026-10-18T20:29:17.062Z"
+            }
+          }
+        },
+        "currentDocument": {
+          "exists": false
+        }
+      },
+      {
+        "update": {
+          "name": "projects/attendus-staging/databases/(default)/documents/QualificationScopes/webqa-20261004-9252da2efd",
+          "fields": {
+            "schemaVersion": {
+              "integerValue": "1"
+            },
+            "projectId": {
+              "stringValue": "attendus-staging"
+            },
+            "runId": {
+              "stringValue": "webqa-20261004-9252da2efd"
+            },
+            "status": {
+              "stringValue": "retired"
+            },
+            "mode": {
+              "stringValue": "capture"
+            },
+            "actorUids": {
+              "arrayValue": {}
+            },
+            "recipientUids": {
+              "arrayValue": {}
+            },
+            "recoveryKind": {
+              "stringValue": "recreated-retirement-marker-after-observed-absence"
+            },
+            "originalDocumentSha256": {
+              "stringValue": "9a96a88bbbcf01120bd12a6ca04c2cd8580ef2b9a88102226df7bc09f3767320"
+            },
+            "recoveredAt": {
+              "timestampValue": "2026-10-18T20:29:17.064Z"
+            }
+          }
+        },
+        "currentDocument": {
+          "exists": false
+        }
+      }
+    ]
+  },
+  "response": {
+    "writeResults": [
+      {
+        "updateTime": "2026-10-18T20:29:17.134459Z"
+      },
+      {
+        "updateTime": "2026-10-18T20:29:17.134459Z"
+      }
+    ],
+    "commitTime": "2026-10-18T20:29:17.134459Z"
+  },
+  "documents": [
+    {
+      "name": "projects/attendus-staging/databases/(default)/documents/QualificationScopes/webqa-20261004-671be56c38",
+      "fields": {
+        "recoveredAt": {
+          "timestampValue": "2026-10-18T20:29:17.062Z"
+        },
+        "actorUids": {
+          "arrayValue": {}
+        },
+        "schemaVersion": {
+          "integerValue": "1"
+        },
+        "runId": {
+          "stringValue": "webqa-20261004-671be56c38"
+        },
+        "recipientUids": {
+          "arrayValue": {}
+        },
+        "status": {
+          "stringValue": "retired"
+        },
+        "originalDocumentSha256": {
+          "stringValue": "cccea059cc81dc1f349bff276058f54ea780db333df7c041b78764c1627c0b33"
+        },
+        "mode": {
+          "stringValue": "capture"
+        },
+        "projectId": {
+          "stringValue": "attendus-staging"
+        },
+        "recoveryKind": {
+          "stringValue": "recreated-retirement-marker-after-observed-absence"
+        }
+      },
+      "createTime": "2026-10-18T20:29:17.134459Z",
+      "updateTime": "2026-10-18T20:29:17.134459Z"
+    },
+    {
+      "name": "projects/attendus-staging/databases/(default)/documents/QualificationScopes/webqa-20261004-9252da2efd",
+      "fields": {
+        "schemaVersion": {
+          "integerValue": "1"
+        },
+        "originalDocumentSha256": {
+          "stringValue": "9a96a88bbbcf01120bd12a6ca04c2cd8580ef2b9a88102226df7bc09f3767320"
+        },
+        "mode": {
+          "stringValue": "capture"
+        },
+        "recoveryKind": {
+          "stringValue": "recreated-retirement-marker-after-observed-absence"
+        },
+        "status": {
+          "stringValue": "retired"
+        },
+        "runId": {
+          "stringValue": "webqa-20261004-9252da2efd"
+        },
+        "actorUids": {
+          "arrayValue": {}
+        },
+        "projectId": {
+          "stringValue": "attendus-staging"
+        },
+        "recipientUids": {
+          "arrayValue": {}
+        },
+        "recoveredAt": {
+          "timestampValue": "2026-10-18T20:29:17.064Z"
+        }
+      },
+      "createTime": "2026-10-18T20:29:17.134459Z",
+      "updateTime": "2026-10-18T20:29:17.134459Z"
+    }
+  ]
+}

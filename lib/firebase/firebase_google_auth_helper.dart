@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:attendus/Services/web_auth_session.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'package:cryptography/cryptography.dart';
@@ -36,6 +37,7 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
     lastGoogleErrorMessage = null;
 
     try {
+      if (kIsWeb) await WebAuthSession.instance.ready();
       final provider = GoogleAuthProvider()
         ..addScope('email')
         ..addScope('profile')
@@ -116,10 +118,9 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
     if (!kIsWeb) return null;
 
     try {
-      final credential = await _auth.getRedirectResult().timeout(
-        const Duration(seconds: 45),
-      );
-      final user = credential.user;
+      await WebAuthSession.instance.ready();
+      final credential = WebAuthSession.instance.takeRedirectResult();
+      final user = credential?.user;
       if (user == null) return null;
 
       final isGoogleSignIn = user.providerData.any(
@@ -210,6 +211,7 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
     }
 
     try {
+      if (kIsWeb) await WebAuthSession.instance.ready();
       if (!await SignInWithApple.isAvailable()) {
         lastAppleErrorMessage =
             'Apple login is not available on this device or browser.';
@@ -313,6 +315,7 @@ class FirebaseGoogleAuthHelper extends ChangeNotifier {
     try {
       if (kIsWeb) {
         final twitterProvider = TwitterAuthProvider();
+        await WebAuthSession.instance.ready();
         final credential = await _auth.signInWithPopup(twitterProvider);
         final user = credential.user;
 

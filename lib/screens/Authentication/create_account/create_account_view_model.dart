@@ -1,3 +1,4 @@
+import 'package:attendus/Services/web_auth_session.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -130,6 +131,7 @@ class CreateAccountViewModel extends ChangeNotifier {
         return false;
       }
       if (user == null) {
+        if (kIsWeb) await WebAuthSession.instance.ready();
         user = (await _auth.createUserWithEmailAndPassword(
           email: accountEmail,
           password: password,
