@@ -11,6 +11,8 @@ REQUIRED = WEB_REQUIRED | {"web-release", "android-release", "ios-release", "adm
 MUTATION = re.compile(r"firebase deploy|action-hosting-deploy@|fastlane (?:supply|pilot upload)|web_release_pipeline.js (?:stage|promote)")
 GITLEAKS_ARCHIVE = "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz"
 GITLEAKS_SHA256 = "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+SESSION_HARNESS_BUILD = "flutter build web --no-pub --target integration_test/web_session_harness.dart --output build/web-auth-session --no-wasm-dry-run"
+SESSION_HARNESS_RUN = 'functions/node_modules/.bin/firebase emulators:exec --only auth --config firebase.test.json --project demo-attendus-admin "node tests/browser/session-restart.cjs"'
 
 
 def load_workflows():
@@ -141,6 +143,16 @@ def validate(workflows):
                         raise ValueError("Android builds must regenerate the release plugin registry")
             for index, command in enumerate(ordered):
                 if "flutter build web" in command:
+                    if command == SESSION_HARNESS_BUILD:
+                        # This exact emulator-only target never enters release packaging.
+                        steps = job.get("steps", [])
+                        if (filename != "web-quality.yml" or name != "browser-journeys" or
+                                job.get("environment") or "write" in str(job.get("permissions", workflow.get("permissions", {}))) or
+                                any(step.get("uses", "").startswith("google-github-actions/auth@") for step in steps) or
+                                MUTATION.search(str(steps)) or "package_web_release.dart" in runs(job) or
+                                SESSION_HARNESS_RUN not in ordered[index + 1:]):
+                            raise ValueError("Session harness must remain in credential-free emulator quality")
+                        continue
                     environment = '\"$TARGET_ENV\"' if "ATTENDUS_FIREBASE_ENV=\"$TARGET_ENV\"" in command else "production"
                     later = ordered[index + 1:]
                     configured = False
@@ -234,6 +246,22 @@ class ReleaseWorkflowTests(unittest.TestCase):
 
     def test_repository_graph(self):
         validate(self.workflows)
+
+    def test_session_harness_cannot_replace_release_build(self):
+        self.mutate(lambda w: w["firebase-release.yml"]["jobs"]["candidates"]["steps"].append({"run": SESSION_HARNESS_BUILD}), "credential-free emulator quality")
+
+    def test_session_harness_requires_exact_target_output_and_emulator(self):
+        for original, replacement in [("integration_test/web_session_harness.dart", "lib/main.dart"), ("build/web-auth-session", "build/web")]:
+            def change(w):
+                for step in w["web-quality.yml"]["jobs"]["browser-journeys"]["steps"]:
+                    if step.get("run") == SESSION_HARNESS_BUILD:
+                        step["run"] = SESSION_HARNESS_BUILD.replace(original, replacement)
+            self.mutate(change, "Web build lacks environment configuration")
+        self.mutate(lambda w: w["web-quality.yml"]["jobs"]["browser-journeys"]["steps"].remove(next(step for step in w["web-quality.yml"]["jobs"]["browser-journeys"]["steps"] if step.get("run") == SESSION_HARNESS_RUN)), "credential-free emulator quality")
+
+    def test_session_harness_cannot_receive_cloud_credentials(self):
+        self.mutate(lambda w: w["web-quality.yml"]["jobs"]["browser-journeys"].update(environment="staging"), "credential-free emulator quality")
+        self.mutate(lambda w: w["web-quality.yml"]["jobs"]["browser-journeys"]["steps"].append({"uses": "google-github-actions/auth@v2"}), "credential-free emulator quality")
 
     def test_missing_same_source_quality(self):
         self.mutate(lambda w: w["firebase-release.yml"]["jobs"]["staging"].update(needs=[]), "bypasses same-source quality")
