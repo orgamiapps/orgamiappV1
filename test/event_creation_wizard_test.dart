@@ -29,6 +29,40 @@ EventWizardDraft _draft() =>
 
 void main() {
   testWidgets(
+    'step three defaults to RSVP only and enables attendance explicitly',
+    (tester) async {
+      tester.view.physicalSize = const Size(1440, 1400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final draft = _draft()..currentStage = EventWizardStage.experience;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AttendUsTheme.light,
+          home: EventCreationWizardScreen(
+            initialDraft: draft,
+            service: TestWizardRepository(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final none = find.text('RSVP only — no attendance tracking');
+      await tester.ensureVisible(none);
+      expect(none, findsOneWidget);
+      expect(find.text('Advanced check-in & security'), findsNothing);
+      await tester.tap(find.text('Hybrid'));
+      await tester.pumpAndSettle();
+      expect(find.text('Advanced check-in & security'), findsOneWidget);
+      await tester.tap(none);
+      await tester.pumpAndSettle();
+      expect(find.text('Advanced check-in & security'), findsNothing);
+      await tester.tap(find.text('Continue'));
+      await tester.pumpAndSettle();
+      expect(find.text('Publish event'), findsWidgets);
+    },
+  );
+
+  testWidgets(
     'autosave reports failure when both server and device storage fail',
     (tester) async {
       await tester.pumpWidget(

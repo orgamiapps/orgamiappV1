@@ -14,7 +14,7 @@ const digest = (value) => crypto.createHash("sha256").update(value).digest("hex"
 
 function arrivalPolicy(raw = {}) {
   const input = raw.smartArrival || {};
-  const enabled = raw.version >= 3 && input.enabled === true;
+  const enabled = raw.profile !== "none" && raw.version >= 3 && input.enabled === true;
   return {
     enabled,
     latitude: typeof input.latitude === "number" ? input.latitude : null,

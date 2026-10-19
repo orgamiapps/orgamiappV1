@@ -79,6 +79,7 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
   }
 
   Future<void> _loadSession() async {
+    if (!widget.event.checkInPolicy.attendanceEnabled) return;
     unawaited(_refreshStaffNames().catchError((Object _) {}));
     try {
       await _refreshControl();
@@ -365,6 +366,14 @@ class _CheckInConsoleScreenState extends State<CheckInConsoleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.event.checkInPolicy.attendanceEnabled) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Attendance tracking disabled')),
+        body: const Center(
+          child: Text('This event collects registrations only.'),
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('Check-in Console'),

@@ -412,3 +412,24 @@ test("explicit admission pair rejects cross-link selection and supports legacy u
   assert.equal(result.registration.id, `pair-reg-b-${suffix}`);
   assert.equal(result.ticket.id, `pair-ticket-b-${suffix}`);
 });
+
+
+test("disabled attendance rejects stale passes, every method, and offline replay without changing history", async () => {
+  const before = await db.collection("Attendance").where("eventId", "==", eventId).get();
+  await db.collection("Events").doc(eventId).update({"checkInPolicy.profile": "none"});
+  const disabled = (error) => error.code === "failed-precondition" && /disabled/.test(error.message);
+  await assert.rejects(() => arrival.issuePass(db, uid, {kind: "event", eventId, registrationId}), disabled);
+  await assert.rejects(() => v2.createStartCheckInSession(sdk).run(request(staff, {eventId})), disabled);
+  await assert.rejects(() => arrival.offlineKit(db, eventId, sessionId, staff), disabled);
+  for (const type of ["location", "attendance_pass", "venue_token", "personal_pass", "staff_roster", "staff_guest", "checkout"]) {
+    for (const offline of [false, true]) {
+      await assert.rejects(() => v2.createSubmitCheckIn(sdk).run(request(staff, {eventId, sessionId,
+        credential: {type, value: pass.qrData, position: position()}, offline, observedAt: new Date().toISOString(), offlineKitRevision: "old-kit",
+        answers: [], idempotencyKey: crypto.randomUUID()})), disabled);
+    }
+  }
+  await assert.rejects(() => arrival.commitAttendance(db, {input: {eventId}}), disabled);
+  const after = await db.collection("Attendance").where("eventId", "==", eventId).get();
+  assert.deepEqual(after.docs.map((doc) => doc.data()), before.docs.map((doc) => doc.data()));
+  assert.equal((await db.collection("RegisterAttendance").doc(registrationId).get()).exists, true);
+});

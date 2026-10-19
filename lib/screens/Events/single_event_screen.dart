@@ -1964,40 +1964,42 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                               ).then((_) => _showEventManagementModal());
                             },
                           ),
-                          _CompactAction(
-                            icon: Icons.qr_code_scanner,
-                            title: 'Scanner',
-                            subtitle: 'Scan Tickets',
-                            color: const Color(0xFF10B981),
-                            onTap: () {
-                              Navigator.pop(context);
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => TicketScannerScreen(
-                                    eventId: eventModel.id,
-                                    eventTitle: eventModel.title,
+                          if (eventModel.checkInPolicy.attendanceEnabled)
+                            _CompactAction(
+                              icon: Icons.qr_code_scanner,
+                              title: 'Scanner',
+                              subtitle: 'Scan Tickets',
+                              color: const Color(0xFF10B981),
+                              onTap: () {
+                                Navigator.pop(context);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => TicketScannerScreen(
+                                      eventId: eventModel.id,
+                                      eventTitle: eventModel.title,
+                                    ),
                                   ),
-                                ),
-                              ).then((_) => _showEventManagementModal());
-                            },
-                          ),
-                          _CompactAction(
-                            icon: Icons.people,
-                            title: 'Check-in',
-                            subtitle: 'Live Console',
-                            color: const Color(0xFFEC4899),
-                            onTap: () {
-                              Navigator.pop(context);
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      CheckInConsoleScreen(event: eventModel),
-                                ),
-                              ).then((_) => _showEventManagementModal());
-                            },
-                          ),
+                                ).then((_) => _showEventManagementModal());
+                              },
+                            ),
+                          if (eventModel.checkInPolicy.attendanceEnabled)
+                            _CompactAction(
+                              icon: Icons.people,
+                              title: 'Check-in',
+                              subtitle: 'Live Console',
+                              color: const Color(0xFFEC4899),
+                              onTap: () {
+                                Navigator.pop(context);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        CheckInConsoleScreen(event: eventModel),
+                                  ),
+                                ).then((_) => _showEventManagementModal());
+                              },
+                            ),
                           _CompactAction(
                             icon: Icons.qr_code,
                             title: 'Event Share QR',
@@ -2699,6 +2701,12 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   }
 
   void _handleSignIn() {
+    if (!eventModel.checkInPolicy.attendanceEnabled) {
+      ShowToast().showNormalToast(
+        msg: 'Attendance tracking is disabled for this event.',
+      );
+      return;
+    }
     if (signedIn == null) {
       ShowToast().showNormalToast(
         msg: 'Checking attendance. Please retry in a moment.',
@@ -3839,9 +3847,12 @@ class _SingleEventScreenState extends State<SingleEventScreen>
       selectedBottomNavIndex: 1, // Groups tab
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       floatingActionButton:
-          eventModel.hasCheckInPermissions(
-            (FirebaseAuth.instance.currentUser?.uid ?? ''),
-          )
+          (eventModel.hasManagementPermissions(
+                FirebaseAuth.instance.currentUser?.uid ?? '',
+              ) ||
+              eventModel.hasCheckInPermissions(
+                (FirebaseAuth.instance.currentUser?.uid ?? ''),
+              ))
           ? _buildFloatingActionButton()
           : null,
       body: SafeArea(
@@ -3932,7 +3943,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (!isManager)
+                if (!isManager && eventModel.checkInPolicy.attendanceEnabled)
                   IconButton(
                     tooltip:
                         signedIn == true &&
@@ -4278,22 +4289,24 @@ class _SingleEventScreenState extends State<SingleEventScreen>
               (FirebaseAuth.instance.currentUser?.uid ?? ''),
             )) ...[
               const SizedBox(height: 14),
-              _buildAttendancePrimaryAction(),
+              if (eventModel.checkInPolicy.attendanceEnabled)
+                _buildAttendancePrimaryAction(),
               if (eventModel.checkInPolicy.smartArrivalEnabled)
                 SmartArrivalCard(eventId: eventModel.id),
-              TextButton.icon(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => AttendanceWalletPassScreen(
-                      eventId: eventModel.id,
-                      registrationId: _selectedRegistrationId,
-                      ticketId: _selectedTicketId,
+              if (eventModel.checkInPolicy.attendanceEnabled)
+                TextButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => AttendanceWalletPassScreen(
+                        eventId: eventModel.id,
+                        registrationId: _selectedRegistrationId,
+                        ticketId: _selectedTicketId,
+                      ),
                     ),
                   ),
+                  icon: const Icon(Icons.wallet_outlined),
+                  label: const Text('My event pass'),
                 ),
-                icon: const Icon(Icons.wallet_outlined),
-                label: const Text('My event pass'),
-              ),
               const SizedBox(height: 14),
               _buildTabbedContentSection(),
             ],
@@ -5913,7 +5926,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          eventModel.signInMethods.isEmpty
+                          !eventModel.checkInPolicy.attendanceEnabled
                               ? 'No Attendance Tracking'
                               : 'Attendees ($actualAttendanceCount)',
                           style: const TextStyle(
@@ -5924,7 +5937,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                           ),
                         ),
                         Text(
-                          eventModel.signInMethods.isEmpty
+                          !eventModel.checkInPolicy.attendanceEnabled
                               ? 'No sign-in methods enabled'
                               : 'Tap to see attendees',
                           style: TextStyle(
@@ -5956,7 +5969,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
             child: _isAttendeesExpanded
                 ? Container(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                    child: eventModel.signInMethods.isEmpty
+                    child: !eventModel.checkInPolicy.attendanceEnabled
                         ? _buildNoAttendanceTrackingContent()
                         : _buildAttendeesContent(),
                   )
@@ -6116,7 +6129,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            'This event doesn\'t require attendees to sign in. Anyone can join without tracking their attendance.',
+            'Attendance tracking is disabled. Registrations and tickets do not indicate attendance.',
             style: TextStyle(
               color: Colors.grey[600],
               fontSize: 14,

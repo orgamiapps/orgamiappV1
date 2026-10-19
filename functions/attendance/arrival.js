@@ -32,6 +32,7 @@ async function requireRollout(db, feature, eventId, uid) {
 async function readEvent(reader, db, eventId) {
   const snapshot = await read(reader, db.collection("Events").doc(id(eventId)));
   if (!snapshot.exists || !core.activeEvent(snapshot.data())) core.fail("This event is not available.");
+  require("./policy").assertAttendanceEnabled(snapshot.data());
   return {...snapshot.data(), id: snapshot.id};
 }
 

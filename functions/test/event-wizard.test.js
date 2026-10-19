@@ -280,3 +280,54 @@ test("published event adapter preserves server counters and Attendance 2.0", () 
   assert.equal(event.checkInPolicy.profile, "hybrid");
   assert.deepEqual(signInMethods("staff_entry"), ["personal_pass", "staff_roster"]);
 });
+
+
+test("RSVP-only profile round trips without enabling legacy methods", () => {
+  const form = validForm();
+  form.experience.checkInPolicy = {version: 3, profile: "none", staffFallback: true,
+    checkoutEnabled: true, allowReentry: true, proximityAssist: true, passLockEnabled: true,
+    smartArrival: {enabled: true}};
+  const normalized = normalizeDraftForm(form);
+  const policy = normalized.experience.checkInPolicy;
+  assert.equal(policy.profile, "none");
+  for (const flag of ["staffFallback", "checkoutEnabled", "allowReentry", "proximityAssist", "passLockEnabled"]) {
+    assert.equal(policy[flag], false);
+  }
+  assert.equal(policy.smartArrival.enabled, false);
+  assert.deepEqual(signInMethods(policy.profile), []);
+  for (const template of TEMPLATE_CATALOG) {
+    assert.equal(template.registrationMode, "rsvp");
+    assert.equal(template.attendanceProfile, "none");
+  }
+  assert.equal(normalizeDraftForm(normalized).experience.checkInPolicy.profile, "none");
+});
+
+
+test("RSVP-only publication keeps registration and history counters independent", () => {
+  const form = validForm();
+  form.registration.mode = "rsvp";
+  form.experience.checkInPolicy.profile = "none";
+  const timestamp = {fromDate: (value) => value, serverTimestamp: () => "server"};
+  const event = eventDocument({firestore: {Timestamp: timestamp, FieldValue: timestamp}}, form, {
+    eventId: "event-none", uid: "owner", status: "scheduled", createdAt: new Date(),
+    authorName: "Owner", authorRole: "member", groupName: "Owner",
+    startAt: new Date(form.startAt), endAt: new Date(form.endAt), eventRevision: 2,
+    preserved: {confirmedRegistrationCount: 4, attendanceCount: 2, issuedTickets: 0, saveCount: 7},
+  });
+  assert.equal(event.registrationPolicy.mode, "rsvp");
+  assert.equal(Object.hasOwn(event, "confirmedRegistrationCount"), false); // Merge retains the stored counter.
+  assert.equal(event.attendanceCount, 2);
+  assert.equal(event.checkInPolicy.profile, "none");
+  assert.deepEqual(event.signInMethods, []);
+});
+
+test("RSVP-only events still accept organizer registration approvals", async () => {
+  const {admin, handler, request} = registrationDecisionFixture("pending");
+  const event = admin.db.values.get("Events/decision_event");
+  event.checkInPolicy = {version: 3, profile: "none"};
+  event.registrationPolicy = {mode: "rsvp", capacity: 10, waitlistEnabled: true};
+  const result = await handler.run(request("approve"));
+  assert.equal(result.status, "confirmed");
+  assert.equal(admin.db.values.get("RegisterAttendance/decision_registration").status, "confirmed");
+  assert.equal([...admin.db.values.keys()].some((key) => key.startsWith("Attendance/")), false);
+});

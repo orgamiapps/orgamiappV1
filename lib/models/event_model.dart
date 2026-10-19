@@ -309,11 +309,13 @@ class EventModel {
 
   /// Door staff can use attendance tools without receiving event-edit access.
   bool hasCheckInPermissions(String userId) {
-    return hasManagementPermissions(userId) || checkInStaff.contains(userId);
+    return checkInPolicy.attendanceEnabled &&
+        (hasManagementPermissions(userId) || checkInStaff.contains(userId));
   }
 
   /// Check if a specific sign-in method is enabled
   bool isSignInMethodEnabled(String method) {
+    if (!checkInPolicy.attendanceEnabled) return false;
     if (method == 'venue_token' ||
         method == 'qr_code' ||
         method == 'manual_code') {
@@ -353,6 +355,7 @@ class EventModel {
   List<String> getAvailableSignInMethods() {
     if (checkInPolicy.needsOrganizerReview) return const [];
     return switch (checkInPolicy.profile) {
+      CheckInProfile.none => const [],
       CheckInProfile.selfCheckIn => const ['venue_token'],
       CheckInProfile.staffEntry => const ['personal_pass', 'staff_roster'],
       CheckInProfile.hybrid => const [
@@ -406,7 +409,9 @@ class EventModel {
                 signInSecurityTier == 'all')
         ? 'regular'
         : signInSecurityTier;
-    final normalizedSignInMethods = isOnline
+    final normalizedSignInMethods = !checkInPolicy.attendanceEnabled
+        ? <String>[]
+        : isOnline
         ? signInMethods.where((method) => method != 'geofence').toList()
         : signInMethods;
 

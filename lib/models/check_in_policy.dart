@@ -1,4 +1,5 @@
 enum CheckInProfile {
+  none('none'),
   selfCheckIn('self_check_in'),
   staffEntry('staff_entry'),
   hybrid('hybrid');
@@ -7,6 +8,7 @@ enum CheckInProfile {
   final String value;
 
   static CheckInProfile fromValue(String? value) => switch (value) {
+    'none' => CheckInProfile.none,
     'self_check_in' => CheckInProfile.selfCheckIn,
     'staff_entry' => CheckInProfile.staffEntry,
     _ => CheckInProfile.hybrid,
@@ -59,18 +61,24 @@ class CheckInPolicy {
     this.eligibility = CheckInEligibility.open,
     this.opensBeforeMinutes = 60,
     this.closesAfterMinutes = 60,
-    this.allowReentry = false,
-    this.checkoutEnabled = false,
-    this.proximityAssist = false,
-    this.smartArrivalEnabled = false,
+    bool allowReentry = false,
+    bool checkoutEnabled = false,
+    bool proximityAssist = false,
+    bool smartArrivalEnabled = false,
     this.arrivalLatitude,
     this.arrivalLongitude,
     this.arrivalRadiusMeters = 150,
     this.openingMode = 'manual',
-    this.staffFallback = true,
-    this.passLockEnabled = false,
+    bool staffFallback = true,
+    bool passLockEnabled = false,
     this.needsOrganizerReview = false,
-  });
+  }) : allowReentry = profile != CheckInProfile.none && allowReentry,
+       checkoutEnabled = profile != CheckInProfile.none && checkoutEnabled,
+       proximityAssist = profile != CheckInProfile.none && proximityAssist,
+       smartArrivalEnabled =
+           profile != CheckInProfile.none && smartArrivalEnabled,
+       staffFallback = profile != CheckInProfile.none && staffFallback,
+       passLockEnabled = profile != CheckInProfile.none && passLockEnabled;
 
   factory CheckInPolicy.fromJson(
     Map<String, dynamic>? data, {
@@ -122,6 +130,8 @@ class CheckInPolicy {
     ),
     _ => const CheckInPolicy(),
   };
+
+  bool get attendanceEnabled => profile != CheckInProfile.none;
 
   bool get attendeeSelfCheckInEnabled =>
       profile == CheckInProfile.selfCheckIn || profile == CheckInProfile.hybrid;

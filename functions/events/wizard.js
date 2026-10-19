@@ -89,6 +89,7 @@ async function paidCheckoutEnabled(db) {
 }
 
 function signInMethods(profile) {
+  if (profile === "none") return [];
   if (profile === "self_check_in") return ["qr_code", "manual_code"];
   if (profile === "staff_entry") return ["personal_pass", "staff_roster"];
   return ["qr_code", "manual_code", "personal_pass", "staff_roster"];
@@ -341,6 +342,10 @@ function createDuplicateEventToDraft(admin) {
     const draftRef = db.collection("EventDrafts").doc();
     const form = sanitizedDuplicateForm(eventSnapshot.data(),
         questionsSnapshot.docs.map((doc) => doc.data()));
+    form.registration = {...form.registration, mode: "rsvp", priceUsd: 0, refundTerms: ""};
+    form.experience.checkInPolicy = require("./wizard-core").normalizeDraftForm({
+      experience: {checkInPolicy: {version: 3, profile: "none"}},
+    }).experience.checkInPolicy;
     await draftRef.set({id: draftRef.id, ownerUid: uid, organizationId: form.organizationId,
       mode: "duplicate", sourceEventId: eventId, sourceSeriesId: null, currentStage: 0,
       completedStages: [], formData: form, revision: 1, schemaVersion: WIZARD_SCHEMA_VERSION,

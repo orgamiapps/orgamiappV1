@@ -1208,6 +1208,7 @@ class _EditEventScreenState extends State<EditEventScreen>
         ? 'all'
         : 'regular';
     _selectedSignInMethods = switch (_checkInPolicy.profile) {
+      CheckInProfile.none => const [],
       CheckInProfile.selfCheckIn => ['qr_code', 'manual_code'],
       CheckInProfile.staffEntry => ['personal_pass', 'staff_roster'],
       CheckInProfile.hybrid => [

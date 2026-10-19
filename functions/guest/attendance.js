@@ -106,6 +106,7 @@ function createSubmitGuestAttendance(adminSdk) {
     const eventSnapshot = await eventRef.get();
     if (!eventSnapshot.exists) throw new HttpsError("not-found", "Event not found.");
     const event = eventSnapshot.data();
+    require("../attendance/policy").assertAttendanceEnabled(event);
     if (event.private === true) {
       throw new HttpsError("permission-denied", "Private events require an account.");
     }
@@ -139,6 +140,8 @@ function createSubmitGuestAttendance(adminSdk) {
         .update(`${input.eventId}:${uid}`).digest("hex").slice(0, 40);
     const attendanceRef = db.collection("Attendance").doc(`guest_${id}`);
     await db.runTransaction(async (transaction) => {
+      const freshEvent = await transaction.get(eventRef);
+      require("../attendance/policy").assertAttendanceEnabled(freshEvent.data());
       const existing = await transaction.get(attendanceRef);
       if (existing.exists) {
         throw new HttpsError("already-exists", "Guest is already checked in.");

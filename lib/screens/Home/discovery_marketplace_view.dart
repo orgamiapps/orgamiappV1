@@ -1,8 +1,6 @@
 import 'package:attendus/Services/discovery_history_coordinator.dart';
 import 'package:attendus/models/discovery_route_state.dart';
 import 'dart:async';
-import 'package:attendus/screens/MyProfile/my_profile_screen.dart';
-import 'package:attendus/screens/MyProfile/my_registrations_screen.dart';
 
 import 'package:attendus/Services/account_access_service.dart';
 import 'package:attendus/Services/discovery_location_service.dart';
@@ -146,47 +144,6 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
   bool _categoryModuleRecorded = false;
   bool _browseAll = false;
   bool _loadingMore = false;
-  Widget _shortcuts() => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-    child: Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        ActionChip(
-          avatar: const Icon(Icons.confirmation_number_outlined, size: 18),
-          label: const Text('Registrations and tickets'),
-          onPressed: () => _openShortcut(
-            const MyRegistrationsScreen(),
-            AccountFeature.tickets,
-          ),
-        ),
-        ActionChip(
-          avatar: const Icon(Icons.bookmark_outline, size: 18),
-          label: const Text('Saved events'),
-          onPressed: () => _openShortcut(
-            const MyProfileScreen(initialTab: 3),
-            AccountFeature.favorites,
-          ),
-        ),
-        ActionChip(
-          avatar: const Icon(Icons.event_note_outlined, size: 18),
-          label: const Text('Organizer workspace'),
-          onPressed: () => _openShortcut(
-            const MyProfileScreen(initialTab: 1),
-            AccountFeature.createEvent,
-          ),
-        ),
-      ],
-    ),
-  );
-  void _openShortcut(Widget screen, AccountFeature feature) {
-    if (AccountAccessService.isGuest && feature != AccountFeature.tickets) {
-      showAccountRequiredSheet(context: context, feature: feature);
-      return;
-    }
-    RouterClass.nextScreenNormal(context, screen);
-  }
-
   int get _activeExperienceVersion => resolveActiveDiscoveryExperience(
     widget.experienceVersion,
     _home?.schemaVersion,
@@ -845,7 +802,6 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
               ),
             ),
           ),
-          SliverToBoxAdapter(child: _shortcuts()),
           if (_loading)
             const SliverFillRemaining(
               hasScrollBody: false,
@@ -871,7 +827,6 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
         controller: _discoveryScroll,
         slivers: [
           SliverToBoxAdapter(child: _v2Header(context)),
-          SliverToBoxAdapter(child: _shortcuts()),
           if (_loading && _home == null)
             const SliverToBoxAdapter(child: _DiscoverySkeleton())
           else if (_error != null && _home == null)
@@ -895,18 +850,13 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
 
   Widget _v2Header(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              ActionChip(
-                avatar: const Icon(Icons.location_on_outlined, size: 18),
-                label: Text(_location?.label ?? 'Choose location'),
-                onPressed: _chooseCity,
-              ),
-              const Spacer(),
+              Expanded(child: _locationButton()),
               if (_showNotificationButton)
                 IconButton(
                   tooltip: 'Notifications',
@@ -939,7 +889,7 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
               icon: Icons.cloud_off_outlined,
             ),
           ],
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           TextField(
             controller: _searchController,
             onChanged: (_) => _scheduleSearch(),
@@ -960,30 +910,36 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
                     ),
             ),
           ),
-          const SizedBox(height: 22),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'What are you interested in?',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                ),
-              ),
-              TextButton(
-                onPressed: _showAllCategories,
-                child: const Text('View all'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          _categoryStrip(),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: InputChip(
+                    key: const ValueKey('discovery-category-filter'),
+                    avatar: const Icon(Icons.category_outlined, size: 18),
+                    label: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          DiscoveryCategory.fromId(
+                                _selectedCategoryId ?? '',
+                              )?.label ??
+                              'Categories',
+                        ),
+                        const Icon(Icons.arrow_drop_down, size: 18),
+                      ],
+                    ),
+                    selected: _selectedCategoryId != null,
+                    onPressed: _showAllCategories,
+                    onDeleted: _selectedCategoryId == null
+                        ? null
+                        : () => _selectCategory(null),
+                    deleteButtonTooltipMessage: 'Clear category',
+                  ),
+                ),
                 _choice('Today', _datePreset == 'today', () {
                   setState(
                     () => _datePreset = _datePreset == 'today' ? null : 'today',
@@ -1014,102 +970,27 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
     );
   }
 
-  List<DiscoveryCategoryFacet> get _visibleCategoryFacets {
-    final facets = _home?.categoryFacets ?? const <DiscoveryCategoryFacet>[];
-    final source = facets.isNotEmpty
-        ? facets
-        : DiscoveryCategory.all
-              .map(
-                (category) => DiscoveryCategoryFacet(
-                  id: category.id,
-                  label: category.label,
-                  count: 0,
-                ),
-              )
-              .toList();
-    final visible = source.take(6).toList();
-    final selected = source
-        .where((facet) => facet.id == _selectedCategoryId)
-        .firstOrNull;
-    if (selected != null && !visible.any((facet) => facet.id == selected.id)) {
-      visible[visible.length - 1] = selected;
-    }
-    return visible;
-  }
-
-  Widget _categoryStrip() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final tiles = _visibleCategoryFacets
-            .map(
-              (facet) => _categoryTile(
-                facet,
-                width: constraints.maxWidth < 700 ? 164 : 178,
-              ),
-            )
-            .toList();
-        if (constraints.maxWidth < 700) {
-          return SizedBox(
-            height: 82,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: tiles.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 10),
-              itemBuilder: (_, index) => tiles[index],
+  Widget _locationButton() {
+    final label = _location?.label ?? 'Choose location';
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton(
+        key: const ValueKey('discovery-location'),
+        style: TextButton.styleFrom(
+          minimumSize: const Size(48, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+        ),
+        onPressed: _chooseCity,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.location_on_outlined, size: 18),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
             ),
-          );
-        }
-        return Wrap(spacing: 10, runSpacing: 10, children: tiles);
-      },
-    );
-  }
-
-  Widget _categoryTile(DiscoveryCategoryFacet facet, {required double width}) {
-    final category = DiscoveryCategory.fromId(facet.id);
-    final selected = facet.id == _selectedCategoryId;
-    final colors = Theme.of(context).colorScheme;
-    return Semantics(
-      button: true,
-      selected: selected,
-      label:
-          '${facet.label}${facet.count > 0 ? ', ${facet.count} events' : ''}',
-      child: InkWell(
-        onTap: () => _selectCategory(facet.id),
-        borderRadius: BorderRadius.circular(16),
-        child: AnimatedContainer(
-          duration: MediaQuery.disableAnimationsOf(context)
-              ? Duration.zero
-              : const Duration(milliseconds: 180),
-          width: width,
-          height: 78,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: selected
-                ? colors.primaryContainer
-                : colors.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: selected ? colors.primary : colors.outlineVariant,
-              width: selected ? 1.5 : 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                category?.icon ?? Icons.local_activity_outlined,
-                color: colors.primary,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  facet.label,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-              ),
-            ],
-          ),
+            const Icon(Icons.arrow_drop_down, size: 18),
+          ],
         ),
       ),
     );
@@ -1197,19 +1078,30 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
         SliverFillRemaining(hasScrollBody: false, child: _v2EmptyState()),
       ];
     }
-    return sections
-        .map((section) => SliverToBoxAdapter(child: _sectionV2(section)))
-        .toList();
+    return [
+      for (var index = 0; index < sections.length; index++)
+        SliverToBoxAdapter(
+          child: _sectionV2(sections[index], first: index == 0),
+        ),
+    ];
   }
 
-  Widget _sectionV2(DiscoverySection section) {
+  // Keep the standard card dimensions, but allow enlarged text to remain readable.
+  double get _cardTextExpansion =>
+      (MediaQuery.textScalerOf(context).scale(14) - 14).clamp(
+        0,
+        double.infinity,
+      ) *
+      14;
+
+  Widget _sectionV2(DiscoverySection section, {bool first = false}) {
     _recordSectionImpression(section);
     final subtitle =
         section.id == 'recommended' && (_home?.expandedRadius ?? false)
         ? 'Expanded to ${_home!.radiusMiles} miles to find more events'
         : section.subtitle;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 6),
+      padding: EdgeInsets.fromLTRB(20, first ? 12 : 22, 20, 6),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final mobile = constraints.maxWidth < 700;
@@ -1252,7 +1144,7 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
               const SizedBox(height: 12),
               if (mobile)
                 SizedBox(
-                  height: 360,
+                  height: 360 + _cardTextExpansion,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: section.events.length,
@@ -1274,7 +1166,7 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
                   itemCount: visible,
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: columns,
-                    mainAxisExtent: 360,
+                    mainAxisExtent: 360 + _cardTextExpansion,
                     crossAxisSpacing: 14,
                   ),
                   itemBuilder: (_, index) =>
@@ -1589,7 +1481,7 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
                   physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: columns,
-                    mainAxisExtent: 356,
+                    mainAxisExtent: 356 + _cardTextExpansion,
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
                   ),
