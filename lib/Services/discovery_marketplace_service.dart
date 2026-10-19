@@ -34,6 +34,20 @@ class DiscoveryMarketplaceService {
     return user;
   }
 
+  Future<Map<String, dynamic>> feed(
+    Map<String, dynamic> filters, {
+    String? cursor,
+  }) async {
+    final response = await _functions
+        .httpsCallable('searchDiscoveryEventsV2')
+        .call({...filters, 'feedVersion': 1, 'cursor': ?cursor});
+    final data = Map<String, dynamic>.from(response.data as Map);
+    if (data['feedVersion'] != 1) {
+      throw StateError('Discovery is being updated. Please try again shortly.');
+    }
+    return data;
+  }
+
   Future<DiscoveryHomeResult> home({
     required double latitude,
     required double longitude,
@@ -50,6 +64,7 @@ class DiscoveryMarketplaceService {
     final prefs = await SharedPreferences.getInstance();
     final cacheKey = [
       'discovery_home_v$experienceVersion',
+      radiusMiles.toString(),
       nationwide
           ? 'us'
           : '${latitude.toStringAsFixed(2)}_${longitude.toStringAsFixed(2)}',

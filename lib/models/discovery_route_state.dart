@@ -69,6 +69,9 @@ class DiscoveryRouteState {
       output['lat'] = lat.toStringAsFixed(2);
       output['lng'] = lng.toStringAsFixed(2);
     }
+    if (['auto', 'fixed'].contains(input['distanceMode'])) {
+      output['distanceMode'] = input['distanceMode']!;
+    }
     final radius = double.tryParse(input['radius'] ?? '');
     if (radius != null && radius.isFinite && radius > 0 && radius <= 1000) {
       output['radius'] = radius.round().toString();

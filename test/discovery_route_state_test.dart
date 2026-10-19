@@ -42,6 +42,20 @@ class MemoryHistory implements DiscoveryHistoryPort {
 }
 
 void main() {
+  test('distance mode and fixed mileage survive shareable URL round trip', () {
+    for (final mode in ['auto', 'fixed']) {
+      final state = DiscoveryRouteState({
+        'distanceMode': mode,
+        if (mode == 'fixed') 'radius': '10',
+      });
+      expect(DiscoveryRouteState.fromUri(state.uri).values, state.values);
+    }
+    expect(
+      DiscoveryRouteState({'distanceMode': 'invalid'})['distanceMode'],
+      isNull,
+    );
+  });
+
   test(
     'background Discover initialization preserves the foreground event URL',
     () async {
