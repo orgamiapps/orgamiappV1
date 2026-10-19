@@ -62,6 +62,38 @@ void main() {
     },
   );
 
+  testWidgets('question editor survives save and cancel closing transitions', (
+    tester,
+  ) async {
+    final draft = _draft()..currentStage = EventWizardStage.registration;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AttendUsTheme.light,
+        home: EventCreationWizardScreen(
+          initialDraft: draft,
+          service: TestWizardRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    for (final action in ['Save question', 'Cancel']) {
+      await tester.ensureVisible(find.text('Add question'));
+      await tester.tap(find.text('Add question'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Question'),
+        'Accessibility needs',
+      );
+      await tester.tap(find.text(action));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(tester.takeException(), isNull);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
+    expect(find.text('Accessibility needs'), findsOneWidget);
+  });
+
   testWidgets(
     'autosave reports failure when both server and device storage fail',
     (tester) async {

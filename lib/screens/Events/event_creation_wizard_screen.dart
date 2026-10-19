@@ -1736,7 +1736,7 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
     var type = question.type;
     var timing = question.timing;
     var required = question.required;
-    final saved = await showDialog<bool>(
+    final route = DialogRoute<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
@@ -1822,7 +1822,10 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
         ),
       ),
     );
-    if (saved == true && prompt.text.trim().isNotEmpty) {
+    final saved = await Navigator.of(context, rootNavigator: true).push(route);
+    // The pop result arrives before the reverse transition removes text fields.
+    await route.completed;
+    if (mounted && saved == true && prompt.text.trim().isNotEmpty) {
       setState(() {
         question.prompt = prompt.text.trim();
         question.type = type;
