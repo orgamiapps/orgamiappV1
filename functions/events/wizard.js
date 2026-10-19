@@ -107,24 +107,33 @@ function draftStoragePath(imageUrl, uid, draftId) {
   return path.startsWith(`event-drafts/${uid}/${draftId}/`) ? path : null;
 }
 
-async function promoteDraftMedia(admin, {uid, draftId, imageUrl, eventIds}) {
+async function promoteDraftMedia(admin, {uid, draftId, imageUrl}) {
   const sourcePath = draftStoragePath(imageUrl, uid, draftId);
-  if (!sourcePath || eventIds.length === 0) return null;
-  const bucket = admin.storage().bucket();
-  const token = crypto.randomUUID();
-  const destinationPath = `events_images/wizard-${eventIds[0]}-cover.jpg`;
-  await bucket.file(sourcePath).copy(bucket.file(destinationPath));
-  await bucket.file(destinationPath).setMetadata({metadata: {firebaseStorageDownloadTokens: token},
-    cacheControl: "public,max-age=31536000,immutable"});
-  const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/` +
-    `${encodeURIComponent(destinationPath)}?alt=media&token=${token}`;
-  const batch = admin.firestore().batch();
-  for (const eventId of eventIds) {
-    batch.update(admin.firestore().collection("Events").doc(eventId), {imageUrl: publicUrl});
+  if (!sourcePath) {
+    if (String(imageUrl).includes("event-drafts")) throw new HttpsError("invalid-argument", "Select an image owned by this draft.");
+    return imageUrl;
   }
-  await batch.commit();
-  await bucket.deleteFiles({prefix: `event-drafts/${uid}/${draftId}/`});
-  return publicUrl;
+  const bucket = admin.storage().bucket();
+  const source = bucket.file(sourcePath);
+  const [metadata] = await source.getMetadata();
+  if (!/^image\/(jpeg|png|webp|gif)$/.test(metadata.contentType || "") ||
+      !(Number(metadata.size) > 0 && Number(metadata.size) <= 10 * 1024 * 1024)) {
+    throw new HttpsError("invalid-argument", "Select a supported image smaller than 10 MB.");
+  }
+  // Source generation binds retries to immutable bytes, including replacements.
+  const identity = crypto.createHash("sha256").update(JSON.stringify([uid, draftId, sourcePath, metadata.generation])).digest("hex");
+  const destinationPath = `events_images/wizard-${identity}`;
+  const destination = bucket.file(destinationPath);
+  const token = identity;
+  try {
+    await bucket.file(sourcePath, {generation: metadata.generation}).copy(destination, {preconditionOpts: {ifGenerationMatch: 0}});
+  } catch (error) {
+    if (Number(error.code) !== 412) throw error;
+  }
+  await destination.setMetadata({metadata: {firebaseStorageDownloadTokens: token},
+    cacheControl: "public,max-age=31536000,immutable"});
+  return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/` +
+    `${encodeURIComponent(destinationPath)}?alt=media&token=${token}`;
 }
 
 async function canManageEvent(db, uid, event) {
@@ -155,6 +164,8 @@ function eventDocument(admin, form, context) {
     status: context.status,
     private: form.private,
     locationType: form.locationType,
+    locationInputMode: form.locationInputMode,
+    locationCoordinatesEnabled: form.locationCoordinatesEnabled,
     location: form.location,
     locationName: form.locationName || null,
     placeId: form.placeId || null,
@@ -168,7 +179,7 @@ function eventDocument(admin, form, context) {
     longitude: form.locationType === "online" ? 0 : form.longitude,
     radius: form.locationType === "online" ? 0 : form.radius,
     radiusUnit: "meters",
-    getLocation: form.locationType === "in_person",
+    getLocation: form.locationType === "in_person" && (form.locationInputMode !== "text" || form.locationCoordinatesEnabled),
     eventDuration: Math.max(1, Math.ceil(durationMinutes / 60)),
     eventDurationMinutes: durationMinutes,
     launchScheduleNeedsReview: false,
@@ -604,6 +615,9 @@ function createPublishEventDraft(admin) {
       occurrences.map(() => db.collection("Events").doc().id);
     const existingQuestionSnapshots = isEdit ? await Promise.all(eventIds.map((eventId) =>
       db.collection("Events").doc(eventId).collection("EventQuestions").get())) : [];
+    const draftImageUrl = form.imageUrl;
+    const draftImagePath = draftStoragePath(draftImageUrl, uid, draftId);
+    form.imageUrl = await promoteDraftMedia(admin, {uid, draftId, imageUrl: draftImageUrl});
     const createdAt = admin.firestore.Timestamp.now();
     const publicationResult = {status, eventId: eventIds[0], eventIds, seriesId, occurrenceCount: eventIds.length};
     const replayed = await db.runTransaction(async (transaction) => {
@@ -636,7 +650,8 @@ function createPublishEventDraft(admin) {
         }
         if (!(await groupAccess(db, uid, form.organizationId, transaction)).allowed) throw new HttpsError("permission-denied", "Destination organization access denied.");
         const previous = existingSnapshot.data();
-        const material = timestampDate(previous.selectedDateTime)?.getTime() !== start.getTime() || require("./schedule").schedule(previous).end?.getTime() !== end.getTime() || previous.eventTimeZone !== form.eventTimeZone || previous.location !== form.location;
+        const material = timestampDate(previous.selectedDateTime)?.getTime() !== start.getTime() || require("./schedule").schedule(previous).end?.getTime() !== end.getTime() || previous.eventTimeZone !== form.eventTimeZone || previous.location !== form.location ||
+          Number(previous.latitude || 0) !== form.latitude || Number(previous.longitude || 0) !== form.longitude || (previous.locationType || "in_person") !== form.locationType;
         if (material && (!changePreviewToken || changeReason.length < 5)) throw new HttpsError("failed-precondition", "Update the app, save the edit and review affected attendees before changing the schedule or location.");
         const expectedEventRevision = requireRevision(draft.sourceEventRevision);
         if (Number(existingSnapshot.get("eventRevision") || 0) !== expectedEventRevision) {
@@ -704,9 +719,17 @@ function createPublishEventDraft(admin) {
     logger.info("Event wizard draft published", {draftId, uid, eventCount: eventIds.length,
       seriesId, mode: draft.mode, status});
     try {
-      await promoteDraftMedia(admin, {uid, draftId, imageUrl: form.imageUrl, eventIds});
+      if (draftImagePath) {
+        const source = admin.storage().bucket().file(draftImagePath);
+        const [metadata] = await source.getMetadata();
+        const identity = crypto.createHash("sha256").update(JSON.stringify([uid, draftId, draftImagePath, metadata.generation])).digest("hex");
+        // Never delete bytes replaced while publication was committing.
+        if (form.imageUrl.includes(`wizard-${identity}?`)) {
+          await source.delete({ignoreNotFound: true, ifGenerationMatch: metadata.generation});
+        }
+      }
     } catch (error) {
-      logger.warn("Event draft media promotion was deferred", {draftId, uid,
+      logger.warn("Published event draft image cleanup was deferred", {draftId, uid,
         error: String(error.message || error).slice(0, 300)});
     }
     return {status, eventId: eventIds[0], eventIds, seriesId, occurrenceCount: eventIds.length};
@@ -852,5 +875,6 @@ module.exports = {
   eventDocument,
   groupAccess,
   draftStoragePath,
+  promoteDraftMedia,
   signInMethods,
 };

@@ -9,6 +9,8 @@ class EventModel {
   String id, groupName, title, description, location, customerUid, imageUrl;
   String? locationName; // Optional display name for the venue/location
   String locationType; // 'in_person' or 'online'
+  String locationInputMode;
+  bool locationCoordinatesEnabled;
   String? placeId;
   String? geohash;
   String city;
@@ -93,6 +95,8 @@ class EventModel {
     required this.longitude,
     this.locationName,
     this.locationType = 'in_person',
+    this.locationInputMode = 'place',
+    this.locationCoordinatesEnabled = false,
     this.placeId,
     this.geohash,
     this.city = '',
@@ -155,6 +159,8 @@ class EventModel {
       location: data['location'],
       locationName: data['locationName'],
       locationType: data['locationType'] == 'online' ? 'online' : 'in_person',
+      locationInputMode: data['locationInputMode'] == 'text' ? 'text' : 'place',
+      locationCoordinatesEnabled: data['locationCoordinatesEnabled'] == true,
       placeId: data['placeId'],
       geohash: data['geohash'],
       city: data['city']?.toString() ?? '',
@@ -438,7 +444,12 @@ class EventModel {
     data['selectedDateTime'] = selectedDateTime;
     data['eventGenerateTime'] = eventGenerateTime;
     data['private'] = private;
-    data['getLocation'] = isOnline ? false : getLocation;
+    data['locationInputMode'] = locationInputMode;
+    data['locationCoordinatesEnabled'] = locationCoordinatesEnabled;
+    data['getLocation'] =
+        isOnline || (locationInputMode == 'text' && !locationCoordinatesEnabled)
+        ? false
+        : getLocation;
     data['radius'] = isOnline ? 0.0 : radius;
     data['radiusUnit'] = 'meters';
     data['longitude'] = isOnline ? 0.0 : longitude;

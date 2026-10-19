@@ -1,3 +1,4 @@
+import 'package:attendus/Services/event_cover_image.dart';
 import 'package:attendus/Services/event_draft_local_store.dart';
 import 'dart:typed_data';
 
@@ -106,8 +107,19 @@ class EventWizardService implements EventWizardRepository {
     return _localDrafts.clear(draft);
   }
 
+  Future<void> _saveTail = Future<void>.value();
+
   @override
-  Future<EventWizardDraft> saveDraft(EventWizardDraft draft) async {
+  Future<EventWizardDraft> saveDraft(EventWizardDraft draft) {
+    final saved = _saveTail.then((_) => _saveDraft(draft));
+    _saveTail = saved.then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stack) {},
+    );
+    return saved;
+  }
+
+  Future<EventWizardDraft> _saveDraft(EventWizardDraft draft) async {
     _checkSession();
     await saveLocalDraft(draft);
     final result = await _functions.httpsCallable('saveEventDraftV1').call({
@@ -202,11 +214,15 @@ class EventWizardService implements EventWizardRepository {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) throw StateError('A signed-in organizer is required.');
     if (draft.draftId == null) await saveDraft(draft);
+    contentType = eventCoverContentType(bytes);
     final reference = _storage.ref(
-      'event-drafts/$uid/${draft.draftId}/cover-${DateTime.now().millisecondsSinceEpoch}.jpg',
+      'event-drafts/$uid/${draft.draftId}/cover-${DateTime.now().microsecondsSinceEpoch}',
     );
     await reference.putData(bytes, SettableMetadata(contentType: contentType));
-    return reference.getDownloadURL();
+    _checkSession();
+    final url = await reference.getDownloadURL();
+    _checkSession();
+    return url;
   }
 
   @override

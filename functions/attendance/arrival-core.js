@@ -31,7 +31,7 @@ function validCoordinates(latitude, longitude) {
 
 function validateBoundary(event) {
   const policy = arrivalPolicy(event.checkInPolicy);
-  if (!policy.enabled || event.locationType === "online" ||
+  if (!policy.enabled || event.locationType === "online" || (event.locationInputMode === "text" && event.locationCoordinatesEnabled !== true) ||
       typeof event.location !== "string" || !event.location.trim() ||
       event.checkInPolicy?.profile === "staff_entry" ||
       !validCoordinates(policy.latitude, policy.longitude) ||

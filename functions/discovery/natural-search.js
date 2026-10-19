@@ -134,7 +134,7 @@ function createNaturalSearchHandler(admin) {
       [event.title, event.description, event.location].some((text) => text.toLowerCase().includes(word))));
     const near = intent.nearMe && input.coordinates;
     if (near) events = events.map((event) => ({...event, distanceMiles: kmDistance(input.lat, input.lng, event.latitude, event.longitude) / 1.609344}))
-        .filter((event) => event.locationType !== "online" && event.distanceMiles * 1.609344 <= intent.radiusKm);
+        .filter((event) => event.locationType !== "online" && (event.locationInputMode !== "text" || event.locationCoordinatesEnabled === true) && event.distanceMiles !== null && event.distanceMiles * 1.609344 <= intent.radiusKm);
     events.sort((left, right) => (near ? left.distanceMiles - right.distanceMiles : 0) ||
       new Date(left.selectedDateTime) - new Date(right.selectedDateTime) || left.id.localeCompare(right.id));
     return {events: events.slice(0, input.limit), intent};

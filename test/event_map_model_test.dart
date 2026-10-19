@@ -165,6 +165,14 @@ void main() {
       );
     });
 
+    test(
+      'text-only locations never appear as map pins even with stale coordinates',
+      () {
+        final event = eventAt(now)..locationInputMode = 'text';
+        expect(isEventEligibleForGlobalMap(event, now), isFalse);
+      },
+    );
+
     test('excludes events after the two-hour end buffer', () {
       final event = eventAt(now.subtract(const Duration(hours: 5)));
       expect(isEventEligibleForGlobalMap(event, now), isFalse);

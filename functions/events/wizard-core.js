@@ -192,6 +192,8 @@ function normalizeExperience(raw, registrationMode) {
 function normalizeDraftForm(raw) {
   const data = plainObject(raw);
   const registration = normalizeRegistration(data.registration);
+  const textLocation = data.locationType !== "online" && data.locationInputMode === "text";
+  const textOnly = textLocation && data.locationCoordinatesEnabled !== true;
   const startAt = optionalString(data.startAt, 80);
   const endAt = optionalString(data.endAt, 80);
   return {
@@ -202,17 +204,19 @@ function normalizeDraftForm(raw) {
     endAt,
     eventTimeZone: stringValue(data.eventTimeZone, 100) || "UTC",
     locationType: data.locationType === "online" ? "online" : "in_person",
+    locationInputMode: textLocation ? "text" : "place",
+    locationCoordinatesEnabled: textLocation && data.locationCoordinatesEnabled === true,
     location: stringValue(data.location, 1000),
-    locationName: stringValue(data.locationName, 300),
-    placeId: stringValue(data.placeId, 300),
-    city: stringValue(data.city, 160),
-    regionCode: stringValue(data.regionCode, 20).toUpperCase(),
-    countryCode: stringValue(data.countryCode, 10).toUpperCase() || "US",
-    streetAddress: stringValue(data.streetAddress, 300),
-    postalCode: stringValue(data.postalCode, 30),
-    latitude: Number.isFinite(Number(data.latitude)) ? Number(data.latitude) : 0,
-    longitude: Number.isFinite(Number(data.longitude)) ? Number(data.longitude) : 0,
-    radius: Math.max(0, Number(data.radius || 0)),
+    locationName: textLocation ? stringValue(data.location, 1000) : stringValue(data.locationName, 300),
+    placeId: textOnly ? "" : stringValue(data.placeId, 300),
+    city: textOnly ? "" : stringValue(data.city, 160),
+    regionCode: textOnly ? "" : stringValue(data.regionCode, 20).toUpperCase(),
+    countryCode: textOnly ? "" : stringValue(data.countryCode, 10).toUpperCase() || "US",
+    streetAddress: textOnly ? "" : stringValue(data.streetAddress, 300),
+    postalCode: textOnly ? "" : stringValue(data.postalCode, 30),
+    latitude: textOnly ? 0 : Number.isFinite(Number(data.latitude)) ? Number(data.latitude) : 0,
+    longitude: textOnly ? 0 : Number.isFinite(Number(data.longitude)) ? Number(data.longitude) : 0,
+    radius: textOnly ? 0 : Math.max(0, Number(data.radius || 0)),
     organizationId: optionalString(data.organizationId, 128),
     private: booleanValue(data.private),
     primaryDiscoveryCategoryId: optionalString(data.primaryDiscoveryCategoryId, 100),
@@ -239,10 +243,22 @@ function validatePublishable(form, {paidEnabled = false} = {}) {
   if (form.locationType === "online" && !form.location) {
     errors.push({stage: "basics", field: "location", message: "Add the online event location."});
   }
-  if (form.locationType === "in_person" &&
+  if (form.locationType === "in_person" && (form.locationInputMode !== "text" || form.locationCoordinatesEnabled) &&
       (!form.location || !Number.isFinite(form.latitude) || !Number.isFinite(form.longitude) ||
+       Math.abs(form.latitude) > 90 || Math.abs(form.longitude) > 180 ||
        (form.latitude === 0 && form.longitude === 0))) {
     errors.push({stage: "basics", field: "location", message: "Select a valid event location."});
+  }
+  try {
+    new Intl.DateTimeFormat("en-US", {timeZone: form.eventTimeZone}).format(new Date());
+  } catch (_) {
+    errors.push({stage: "basics", field: "eventTimeZone", message: "Enter a valid event timezone."});
+  }
+  if (form.locationInputMode === "text" && !form.location) {
+    errors.push({stage: "basics", field: "location", message: "Enter an event location."});
+  }
+  if (form.locationInputMode === "text" && !form.locationCoordinatesEnabled && (form.experience.checkInPolicy.smartArrival.enabled || form.experience.checkInPolicy.proximityAssist)) {
+    errors.push({stage: "experience", field: "smartArrival", message: "Select a mapped location before enabling GPS attendance."});
   }
   if (!form.private && !form.primaryDiscoveryCategoryId) {
     errors.push({stage: "publish", field: "primaryDiscoveryCategoryId",
@@ -256,7 +272,7 @@ function validatePublishable(form, {paidEnabled = false} = {}) {
   }
   if (form.experience.checkInPolicy.smartArrival?.enabled) {
     try {
-      require("../attendance/arrival-core").validateBoundary({locationType: form.locationType, location: form.location, checkInPolicy: form.experience.checkInPolicy});
+      require("../attendance/arrival-core").validateBoundary({locationInputMode: form.locationInputMode, locationCoordinatesEnabled: form.locationCoordinatesEnabled, locationType: form.locationType, location: form.location, checkInPolicy: form.experience.checkInPolicy});
     } catch (_) {
       errors.push({stage: "experience", field: "smartArrival", message: "Confirm a 50–500 meter Smart Arrival boundary for an in-person event with self check-in."});
     }
@@ -378,6 +394,7 @@ function sanitizedTemplateForm(form, {includeLocation = false, includeContact = 
     startAt: null,
     endAt: null,
     recurrence: {enabled: false},
+    locationCoordinatesEnabled: includeLocation && normalized.locationCoordinatesEnabled,
     location: includeLocation ? normalized.location : "",
     locationName: includeLocation ? normalized.locationName : "",
     placeId: includeLocation ? normalized.placeId : "",
@@ -406,6 +423,8 @@ function sanitizedDuplicateForm(event, questions = []) {
     startAt: null,
     endAt: null,
     imageUrl: raw.imageUrl,
+    locationInputMode: raw.locationInputMode === "text" ? "text" : "place",
+    locationCoordinatesEnabled: raw.locationCoordinatesEnabled === true,
     location: raw.locationType === "online" ? "" : raw.location,
     locationName: raw.locationType === "online" ? "" : raw.locationName,
     eventTimeZone: raw.eventTimeZone,

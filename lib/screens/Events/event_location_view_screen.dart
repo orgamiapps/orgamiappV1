@@ -27,6 +27,8 @@ class _EventLocationViewScreenState extends State<EventLocationViewScreen>
 
   GoogleMapController? mapController;
   bool get _hasCoordinates =>
+      (widget.eventModel.locationInputMode != 'text' ||
+          widget.eventModel.locationCoordinatesEnabled) &&
       widget.eventModel.latitude.isFinite &&
       widget.eventModel.longitude.isFinite &&
       widget.eventModel.latitude >= -90 &&

@@ -9,7 +9,7 @@ function desiredMetadata(data) {
   const latitude = Number(data.latitude || 0), longitude = Number(data.longitude || 0);
   const city = String(data.city || "").trim(), regionCode = String(data.regionCode || "").trim().toUpperCase();
   const countryCode = String(data.countryCode || "").trim().toUpperCase();
-  const valid = data.locationType !== "online" && Number.isFinite(latitude) && Number.isFinite(longitude) &&
+  const valid = data.locationType !== "online" && (data.locationInputMode !== "text" || data.locationCoordinatesEnabled === true) && Number.isFinite(latitude) && Number.isFinite(longitude) &&
     Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180 && !(latitude === 0 && longitude === 0) && city.length > 0 && regionCode.length > 0 && countryCode === "US";
   return {geohash: valid ? geohashForLocation([latitude, longitude]) : null, city: valid ? city : "",
     regionCode: valid ? regionCode : "", countryCode: valid ? countryCode : null,

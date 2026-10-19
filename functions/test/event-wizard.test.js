@@ -331,3 +331,94 @@ test("RSVP-only events still accept organizer registration approvals", async () 
   assert.equal(admin.db.values.get("RegisterAttendance/decision_registration").status, "confirmed");
   assert.equal([...admin.db.values.keys()].some((key) => key.startsWith("Attendance/")), false);
 });
+const {promoteDraftMedia} = require("../events/wizard");
+const {desiredMetadata} = require("../discovery/maintenance");
+const {eventDto} = require("../discovery/marketplace");
+const {nearbyInterest} = require("../discovery/notifications");
+
+test("text locations survive normalization, duplication and templates without coordinates", () => {
+  const form = normalizeDraftForm({...validForm(), locationInputMode: "text", location: "Community clubhouse"});
+  assert.equal(form.latitude, 0);
+  assert.equal(form.longitude, 0);
+  assert.equal(form.placeId, "");
+  assert.equal(form.city, "");
+  assert.equal(form.countryCode, "");
+  assert.deepEqual(validatePublishable(form), []);
+  assert.equal(sanitizedTemplateForm(form, {includeLocation: true}).location, "Community clubhouse");
+  assert.equal(sanitizedDuplicateForm({...form, selectedDateTime: new Date()}).locationInputMode, "text");
+  assert.equal(desiredMetadata({...form, latitude: 26, longitude: -81}).discoveryLocationValid, false);
+  assert.equal(eventDto({...form, id: "text"}, {latitude: 26, longitude: -81}).distanceMiles, null);
+  assert.equal(nearbyInterest(form, {nearbyInterestNotifications: true, latitude: 0, longitude: 0}), false);
+  form.location = "   ";
+  assert.ok(validatePublishable(normalizeDraftForm(form)).some((error) => error.field === "location"));
+});
+
+test("text location cannot retain GPS attendance even with a supplied boundary", () => {
+  const form = normalizeDraftForm({...validForm(), locationInputMode: "text"});
+  form.experience.checkInPolicy.smartArrival.enabled = true;
+  assert.ok(validatePublishable(form).some((error) => error.field === "smartArrival"));
+  form.experience.checkInPolicy.smartArrival.enabled = false;
+  form.experience.checkInPolicy.proximityAssist = true;
+  assert.ok(validatePublishable(form).some((error) => error.field === "smartArrival"));
+});
+
+function mediaFixture({copyFailure = false} = {}) {
+  const copies = [];
+  const metadataWrites = [];
+  const bucket = {name: "fixture-bucket", file: (path, options) => ({
+    getMetadata: async () => [{generation: "17", contentType: "image/png", size: "1024"}],
+    copy: async (destination, copyOptions) => {
+      if (copyFailure) throw new Error("storage unavailable");
+      copies.push({path, options, destination: destination.path, copyOptions});
+    },
+    setMetadata: async (metadata) => metadataWrites.push(metadata), path,
+  })};
+  return {admin: {storage: () => ({bucket: () => bucket})}, copies, metadataWrites};
+}
+
+test("image preparation is immutable, retry-safe and does not mutate event records", async () => {
+  const fixture = mediaFixture();
+  const args = {uid: "owner", draftId: "draft", imageUrl: "https://firebasestorage.googleapis.com/v0/b/fixture-bucket/o/event-drafts%2Fowner%2Fdraft%2Fcover.png?alt=media"};
+  const first = await promoteDraftMedia(fixture.admin, args);
+  assert.equal(await promoteDraftMedia(fixture.admin, args), first);
+  assert.ok(first.includes("/events_images%2Fwizard-"));
+  assert.equal(fixture.copies[0].options.generation, "17");
+  assert.equal(fixture.copies[0].copyOptions.preconditionOpts.ifGenerationMatch, 0);
+  assert.notEqual(await promoteDraftMedia(fixture.admin, {...args, imageUrl: args.imageUrl.replace("cover.png", "new.png")}), first);
+  assert.equal(await promoteDraftMedia(fixture.admin, {...args, imageUrl: "https://example.test/existing.png"}), "https://example.test/existing.png");
+});
+
+test("image preparation failures propagate instead of reporting a published image", async () => {
+  const {admin} = mediaFixture({copyFailure: true});
+  const args = {uid: "owner", draftId: "draft", imageUrl: "https://firebasestorage.googleapis.com/v0/b/fixture-bucket/o/event-drafts%2Fowner%2Fdraft%2Fcover.png"};
+  await assert.rejects(promoteDraftMedia(admin, args), /storage unavailable/);
+  await assert.rejects(promoteDraftMedia(admin, {...args, uid: "another"}), /owned by this draft/);
+});
+
+
+test("typed labels can explicitly attach a valid map pin without losing their text", () => {
+  const form = normalizeDraftForm({...validForm(), locationInputMode: "text", locationCoordinatesEnabled: true,
+    location: "Upstairs lounge", locationName: "Old map venue"});
+  assert.equal(form.locationName, "Upstairs lounge");
+  assert.equal(form.latitude, 26.64);
+  assert.equal(form.locationCoordinatesEnabled, true);
+  assert.deepEqual(validatePublishable(form), []);
+  assert.equal(desiredMetadata(form).discoveryLocationValid, true);
+  assert.notEqual(eventDto({...form, id: "pinned"}, {latitude: 26.64, longitude: -81.87}).distanceMiles, null);
+  assert.equal(sanitizedTemplateForm(form, {includeLocation: true}).locationCoordinatesEnabled, true);
+  assert.equal(sanitizedTemplateForm(form).locationCoordinatesEnabled, false);
+  const invalid = normalizeDraftForm({...form, latitude: 95});
+  assert.ok(validatePublishable(invalid).some((error) => error.field === "location"));
+  const removed = normalizeDraftForm({...form, locationCoordinatesEnabled: false});
+  assert.equal(removed.latitude, 0);
+  assert.equal(removed.location, "Upstairs lounge");
+});
+
+
+test("GPS attendance requires an explicit map pin when using a typed label", () => {
+  const {validateBoundary} = require("../attendance/arrival-core");
+  const event = {locationType: "in_person", locationInputMode: "text", locationCoordinatesEnabled: true, location: "Upstairs lounge",
+    checkInPolicy: {version: 3, profile: "hybrid", smartArrival: {enabled: true, latitude: 26.64, longitude: -81.87, radiusMeters: 150}}};
+  assert.equal(validateBoundary(event).enabled, true);
+  assert.throws(() => validateBoundary({...event, locationCoordinatesEnabled: false}), /confirm its venue boundary/);
+});

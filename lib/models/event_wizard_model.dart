@@ -236,6 +236,8 @@ class EventWizardDraft {
     required this.endAt,
     this.eventTimeZone = 'UTC',
     this.locationType = 'in_person',
+    this.locationInputMode = 'place',
+    this.locationCoordinatesEnabled = false,
     this.location = '',
     this.locationName = '',
     this.placeId = '',
@@ -294,6 +296,31 @@ class EventWizardDraft {
   DateTime endAt;
   String eventTimeZone;
   String locationType;
+  String locationInputMode;
+  bool locationCoordinatesEnabled;
+
+  bool get hasMappedLocation =>
+      locationType == 'in_person' &&
+      (locationInputMode == 'place' || locationCoordinatesEnabled);
+
+  void clearMappedLocation() {
+    locationCoordinatesEnabled = false;
+    latitude = 0;
+    longitude = 0;
+    radius = 0;
+    placeId = '';
+    city = '';
+    regionCode = '';
+    countryCode = '';
+    streetAddress = '';
+    postalCode = '';
+    locationName = '';
+    checkInPolicy = checkInPolicy.copyWith(
+      smartArrivalEnabled: false,
+      proximityAssist: false,
+    );
+  }
+
   String location;
   String locationName;
   String placeId;
@@ -373,6 +400,8 @@ class EventWizardDraft {
     endAt: event.eventEndTime,
     eventTimeZone: event.eventTimeZone,
     locationType: event.locationType,
+    locationInputMode: event.locationInputMode,
+    locationCoordinatesEnabled: event.locationCoordinatesEnabled,
     location: event.location,
     locationName: event.locationName ?? '',
     placeId: event.placeId ?? '',
@@ -436,6 +465,8 @@ class EventWizardDraft {
       endAt: end,
       eventTimeZone: form['eventTimeZone']?.toString() ?? 'UTC',
       locationType: form['locationType'] == 'online' ? 'online' : 'in_person',
+      locationInputMode: form['locationInputMode'] == 'text' ? 'text' : 'place',
+      locationCoordinatesEnabled: form['locationCoordinatesEnabled'] == true,
       location: form['location']?.toString() ?? '',
       locationName: form['locationName']?.toString() ?? '',
       placeId: form['placeId']?.toString() ?? '',
@@ -543,6 +574,8 @@ class EventWizardDraft {
     'endAt': endAt.toUtc().toIso8601String(),
     'eventTimeZone': eventTimeZone,
     'locationType': locationType,
+    'locationInputMode': locationInputMode,
+    'locationCoordinatesEnabled': locationCoordinatesEnabled,
     'location': location.trim(),
     'locationName': locationName.trim(),
     'placeId': placeId,

@@ -76,3 +76,34 @@ support must be deployed before the client; no existing-event migration is neede
   timed out before port 8180 became available. The added emulator regression is
   retained in `functions/test/arrival-emulator.test.js` for the next successful run.
 - No deployment or production data migration was performed.
+
+## Typed locations and durable covers (2026-10-19)
+
+In-person events support `locationInputMode: place|text` (legacy/default: `place`).
+A typed label can optionally use a map pin, recorded by
+`locationCoordinatesEnabled: true`. Without that explicit flag, text locations
+have their geographic metadata cleared and do not participate in maps, nearby
+results, proximity assistance, or Smart Arrival. Adding/removing a pin preserves
+the typed label. Online events keep their existing behavior. Templates that omit
+location also omit the optional pin. Backend support must precede client release;
+no bulk migration is required.
+
+Cover selection validates the encoded image format, size, and client decoding.
+Uploads and final draft saves complete before an image is marked saved or the
+wizard publishes. Failed uploads retain the selection for retry within the editor;
+only saved images survive reopening. Navigation and browser unload warn about
+unsaved selections. Draft saves are serialized, and superseded/account-stale
+upload completions cannot update the editor.
+
+Publication prepares an immutable permanent image before the event transaction,
+using the uploaded object's generation to identify the destination. A copy
+failure does not publish an event or consume an event allowance. Retried
+publication returns its original result. Cleanup removes only the matching source
+generation after commit, preserving newer uploads.
+
+Validation includes `test/event_cover_wizard_test.dart`,
+`test/event_cover_image_test.dart`, `functions/test/event-cover-emulator.test.js`,
+and the isolated `integration_test/event_location_cover_harness.dart` browser
+fixture. The browser fixture uses local storage and never writes production;
+Firebase image publication is independently verified against Firestore/Storage
+emulators. Physical-device pickers and live Maps services remain release checks.
