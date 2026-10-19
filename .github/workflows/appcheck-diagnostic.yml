@@ -1,6 +1,9 @@
 name: Diagnose staging App Check connection
 on:
   workflow_dispatch:
+  push:
+    branches: [codex/discover-distance-release-20261019]
+    paths: ['.github/workflows/appcheck-diagnostic.yml', 'tests/browser/appcheck-live-diagnostic.cjs']
 permissions:
   contents: read
 jobs:
