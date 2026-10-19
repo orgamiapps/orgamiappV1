@@ -1,9 +1,7 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:attendus/widgets/attendus_design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'support/discovery_fixture.dart';
 import 'support/load_discovery_fonts.dart';
 
@@ -121,9 +119,9 @@ void main() {
       await settleDiscovery(tester);
       expect(
         fixture.functions.requests
-            .where((r) => r.$1 == 'getDiscoveryHomeV2')
+            .where((r) => r.$1 == 'searchDiscoveryEventsV2')
             .last
-            .$2['selectedCategoryId'],
+            .$2['categoryId'],
         'food-drink',
       );
       await tester.ensureVisible(find.text('Today'));
@@ -133,10 +131,10 @@ void main() {
       await tester.tap(find.widgetWithText(FilterChip, 'Free'));
       await settleDiscovery(tester);
       var request = fixture.functions.requests
-          .where((r) => r.$1 == 'getDiscoveryHomeV2')
+          .where((r) => r.$1 == 'searchDiscoveryEventsV2')
           .last
           .$2;
-      expect(request['selectedCategoryId'], 'food-drink');
+      expect(request['categoryId'], 'food-drink');
       expect(request['datePreset'], 'today');
       expect(request['freeOnly'], true);
       await tester.enterText(find.byType(TextField).first, 'garden');
@@ -179,18 +177,18 @@ void main() {
     final fixture = await mount(
       tester,
       handler: (name, data) async {
-        if (name.startsWith('getDiscoveryHome')) return response.future;
+        if (name.startsWith('searchDiscoveryEvents')) return response.future;
         return <String, dynamic>{};
       },
     );
     expect(find.text('Categories'), findsOneWidget);
     expect(find.byType(AttendUsEventSummaryCard), findsNothing);
-    response.complete(discoveryHomeFixture(empty: true));
+    response.complete({'feedVersion': 1, 'events': []});
     await settleDiscovery(tester);
     expect(find.textContaining('There are no upcoming'), findsOneWidget);
     // A fresh request without a cached response must expose a recoverable error.
     fixture.functions.handler = (name, data) async {
-      if (name.startsWith('getDiscoveryHome')) {
+      if (name.startsWith('searchDiscoveryEvents')) {
         throw StateError('offline fixture');
       }
       return <String, dynamic>{};
@@ -200,38 +198,5 @@ void main() {
     // With existing home data, a refresh error keeps the previous content.
     expect(find.text('Categories'), findsOneWidget);
     expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('stale cached results retain status and events', (tester) async {
-    tester.view.physicalSize = const Size(390, 740);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    final fixture = DiscoveryFixture();
-    await fixture.install();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      'discovery_home_v2_26.34_-81.78_all_any_paid_all-modes_',
-      jsonEncode({
-        ...discoveryHomeFixture(),
-        '_cachedAt': '2000-01-01T00:00:00Z',
-      }),
-    );
-    fixture.functions.handler = (name, data) async {
-      if (name.startsWith('getDiscoveryHome')) {
-        throw StateError('offline fixture');
-      }
-      return <String, dynamic>{};
-    };
-    await tester.pumpWidget(fixture.app());
-    await settleDiscovery(tester);
-    expect(
-      find.text('Showing saved results — reconnect to refresh'),
-      findsOneWidget,
-    );
-    expect(find.text('Community garden evening'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump(const Duration(seconds: 30));
   });
 }

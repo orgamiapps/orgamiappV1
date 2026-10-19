@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 
 import 'package:attendus/Services/discovery_location_service.dart';
@@ -14,6 +15,7 @@ class PendingLocation extends DiscoveryLocationService {
 }
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
   for (final covered in [true, false]) {
     testWidgets(
       'location onboarding waits for visible Discover (covered=$covered)',

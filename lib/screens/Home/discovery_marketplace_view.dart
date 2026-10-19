@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:attendus/Services/discovery_history_coordinator.dart';
 import 'package:attendus/models/discovery_route_state.dart';
 import 'dart:async';
@@ -44,10 +45,12 @@ class DiscoveryMarketplaceView extends StatefulWidget {
 class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
   DiscoveryHistoryCoordinator? _history;
   final _discoveryScroll = ScrollController(keepScrollOffset: false);
-  final Map<String, (DiscoveryHomeResult?, DiscoverySearchResult?)>
-  _routeResults = {};
+  final _feedCache =
+      <String, (List<DiscoveryEvent>, String?, int?, DiscoveryHomeResult?)>{};
 
   DiscoveryRouteState _routeSnapshot() => DiscoveryRouteState({
+    'distanceMode': _fixedMiles == null ? 'auto' : 'fixed',
+    if (_fixedMiles != null) 'radius': _fixedMiles.toString(),
     'q': _searchController.text,
     'date': _datePreset ?? '',
     'free': _freeOnly ? '1' : '',
@@ -68,6 +71,12 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
     _debounce?.cancel();
     _requestGeneration++;
     setState(() {
+      if (route['distanceMode'] != null || route['radius'] != null) {
+        _fixedMiles = route['distanceMode'] == 'auto'
+            ? null
+            : int.tryParse(route['radius'] ?? '25');
+        if (![5, 10, 25, 50, 100].contains(_fixedMiles)) _fixedMiles = null;
+      }
       _searchController.text = route['q'] ?? '';
       _datePreset = route['date'];
       _freeOnly = route.enabled('free');
@@ -93,18 +102,17 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
         nationwide: true,
       );
     });
-    final cached = _routeResults[route.uri.toString()];
+    final cached = _feedCache[route.uri.toString()];
     if (cached != null) {
       setState(() {
-        _home = cached.$1;
-        _search = cached.$2;
+        _feedEvents = cached.$1;
+        _feedCursor = cached.$2;
+        _resolvedMiles = cached.$3;
+        _home = cached.$4;
         _loading = false;
+        _loadingMore = false;
         _error = null;
       });
-      return;
-    }
-    if (_searchMode) {
-      await _runSearch();
     } else {
       await _loadHome();
     }
@@ -125,10 +133,10 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
       mounted &&
       (ModalRoute.isCurrentOf(context) ?? false) &&
       TickerMode.valuesOf(context).enabled;
+
   final _searchController = TextEditingController();
   DiscoveryLocation? _location;
   DiscoveryHomeResult? _home;
-  DiscoverySearchResult? _search;
   Set<String> _savedIds = {};
   bool _loading = true;
   String? _error;
@@ -139,9 +147,7 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
   List<String> _interests = const [];
   Timer? _debounce;
   int _requestGeneration = 0;
-  final Set<String> _recordedSectionImpressions = {};
   final Set<String> _recordedCategoryNoResults = {};
-  bool _categoryModuleRecorded = false;
   bool _browseAll = false;
   bool _loadingMore = false;
   int get _activeExperienceVersion => resolveActiveDiscoveryExperience(
@@ -218,12 +224,16 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
   void dispose() {
     _history?.dispose();
     _discoveryScroll.dispose();
+    _carouselScroll.dispose();
     _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
   Future<void> _initialize() async {
+    final preferences = await SharedPreferences.getInstance();
+    _fixedMiles = preferences.getInt('discovery_fixed_miles');
+    if (![5, 10, 25, 50, 100].contains(_fixedMiles)) _fixedMiles = null;
     _interests = await _locations.loadInterests();
     final cached = await _locations.load();
     if (!mounted) return;
@@ -236,7 +246,7 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
     );
     _discoveryScroll.addListener(() => _history?.scheduleScroll());
     await _history!.initialize();
-    if (_home != null || _search != null) return;
+    if (_home != null) return;
     if (_location == null) {
       setState(() => _loading = false);
       _locationOnboardingPending = true;
@@ -346,62 +356,120 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
     }
   }
 
+  int? _fixedMiles;
+  int? _resolvedMiles;
+  String? _feedCursor;
+  List<DiscoveryEvent> _feedEvents = [];
+  final _carouselScroll = ScrollController();
+
+  Map<String, dynamic> get _feedFilters => {
+    // Match shareable URL precision so restored cursors keep their identity.
+    'latitude': double.parse((_location?.latitude ?? 0).toStringAsFixed(2)),
+    'longitude': double.parse((_location?.longitude ?? 0).toStringAsFixed(2)),
+    'nationwide': _location == null || _location!.nationwide,
+    'distanceMode': _fixedMiles == null ? 'auto' : 'fixed',
+    'radiusMiles': _fixedMiles ?? 25,
+    'query': _searchController.text.trim(),
+    'categoryId': ?_selectedCategoryId,
+    'datePreset': ?_datePreset,
+    'freeOnly': _freeOnly,
+    'onlineOnly': _onlineOnly,
+  };
+
+  void _rememberFeed() {
+    if (_feedCache.length >= 12) _feedCache.remove(_feedCache.keys.first);
+    _feedCache[_routeSnapshot().uri.toString()] = (
+      _feedEvents,
+      _feedCursor,
+      _resolvedMiles,
+      _home,
+    );
+  }
+
+  Future<Map<String, dynamic>> _readFeedPage(
+    Map<String, dynamic> filters,
+    int generation, {
+    String? cursor,
+  }) async {
+    final events = <dynamic>[];
+    Map<String, dynamic> result;
+    do {
+      result = await _marketplace.feed({
+        ...filters,
+        'limit': 20 - events.length,
+      }, cursor: cursor);
+      if (!mounted || generation != _requestGeneration) return result;
+      events.addAll(result['events'] as List? ?? const []);
+      cursor = result['nextCursor'] as String?;
+      if (cursor != null && events.length < 20) {
+        // Sparse scans can require many calls. Stay below the anonymous rate
+        // limit while keeping the operation cancellable when filters change.
+        await Future<void>.delayed(const Duration(seconds: 3));
+        if (!mounted || generation != _requestGeneration) return result;
+      }
+    } while (cursor != null && events.length < 20);
+    return {...result, 'events': events};
+  }
+
   Future<void> _loadHome() async {
-    final location = _location;
-    if (location == null) return;
     final generation = ++_requestGeneration;
+    if (_location == null || _location!.nationwide) _fixedMiles = null;
+    final filters = _feedFilters;
     setState(() {
       _loading = true;
+      _loadingMore = false;
       _error = null;
-      _search = null;
+      _feedEvents = [];
+      _feedCursor = null;
+      _home = null;
     });
     try {
-      final values = await Future.wait([
-        _marketplace.home(
-          latitude: location.latitude,
-          longitude: location.longitude,
-          nationwide: location.nationwide,
-          preferredCategories: _interests,
-          regionCode: location.regionCode,
-          experienceVersion: _activeExperienceVersion,
-          selectedCategoryId: _selectedCategoryId,
-          datePreset: _activeExperienceVersion == 2 ? _datePreset : null,
-          freeOnly: _activeExperienceVersion == 2 && _freeOnly,
-          onlineOnly: _activeExperienceVersion == 2 && _onlineOnly,
-        ),
-        _marketplace.savedEventIds(),
-      ]);
+      final result = await _readFeedPage(filters, generation);
       if (!mounted || generation != _requestGeneration) return;
+      final cursor = result['nextCursor'] as String?;
+      final saved = await _marketplace.savedEventIds();
+      if (!mounted || generation != _requestGeneration) return;
+      final ids = <String>{};
+      final events = DiscoverySearchResult.fromMap(
+        result,
+      ).events.where((e) => ids.add(e.event.id)).toList();
+      final recommendations = [...events]
+        ..sort((a, b) {
+          int relevance(DiscoveryEvent item) => item.event.categories
+              .where(
+                (c) => _interests.any(
+                  (interest) => interest.toLowerCase() == c.toLowerCase(),
+                ),
+              )
+              .length;
+          final compared = relevance(b).compareTo(relevance(a));
+          return compared != 0
+              ? compared
+              : events.indexOf(a).compareTo(events.indexOf(b));
+        });
       setState(() {
-        _home = values[0] as DiscoveryHomeResult;
-        _savedIds = values[1] as Set<String>;
+        _feedEvents = events;
+        _feedCursor = cursor;
+        _resolvedMiles = (result['radiusMiles'] as num?)?.toInt();
+        _savedIds = saved;
         _loading = false;
+        _home = DiscoveryHomeResult(
+          sections: [
+            DiscoverySection(
+              id: 'recommended',
+              title: 'For you',
+              subtitle: '',
+              featured: false,
+              events: recommendations.take(12).toList(),
+            ),
+          ],
+          radiusMiles: _resolvedMiles ?? 25,
+          expandedRadius: (_resolvedMiles ?? 25) > 25,
+          localResultCount: events.length,
+          schemaVersion: 2,
+        );
       });
-      if (_activeExperienceVersion == 2 && !_categoryModuleRecorded) {
-        _categoryModuleRecorded = true;
-        ProductFunnelService().record(
-          'discovery_category_module_impression',
-          dimensions: {'experienceVersion': '2'},
-        );
-      }
-      _routeResults[_routeSnapshot().uri.toString()] = (_home, _search);
-      final result = _home!;
-      ProductFunnelService().record(
-        'discovery_view',
-        dimensions: {
-          'locationSource': location.source,
-          'radiusBand': result.radiusMiles.toString(),
-          'resultCount': result.localResultCount.toString(),
-          'metro': _metroDimension(location),
-          'experienceVersion': _activeExperienceVersion.toString(),
-        },
-      );
-      if (result.expandedRadius) {
-        ProductFunnelService().record(
-          'discovery_radius_expansion',
-          dimensions: {'radiusBand': result.radiusMiles.toString()},
-        );
-      }
+      _rememberFeed();
     } catch (error) {
       if (mounted && generation == _requestGeneration) {
         setState(() {
@@ -409,6 +477,41 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
           _error = error.toString();
         });
       }
+    }
+  }
+
+  Future<void> _loadMoreSearchResults() async {
+    if (_feedCursor == null || _loadingMore) return;
+    final generation = _requestGeneration;
+    final cursor = _feedCursor!;
+    setState(() => _loadingMore = true);
+    try {
+      final result = await _readFeedPage(
+        _feedFilters,
+        generation,
+        cursor: cursor,
+      );
+      if (!mounted || generation != _requestGeneration) return;
+      final ids = _feedEvents.map((e) => e.event.id).toSet();
+      setState(() {
+        _feedEvents = [
+          ..._feedEvents,
+          ...DiscoverySearchResult.fromMap(
+            result,
+          ).events.where((e) => ids.add(e.event.id)),
+        ];
+        _feedCursor = result['nextCursor'] as String?;
+        _loadingMore = false;
+      });
+      _rememberFeed();
+    } catch (_) {
+      if (!mounted || generation != _requestGeneration) return;
+      setState(() => _loadingMore = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not load more events. Please try again.'),
+        ),
+      );
     }
   }
 
@@ -480,124 +583,13 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
   }
 
   void _scheduleSearch() {
+    _requestGeneration++;
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 350), _runSearch);
     setState(() {});
   }
 
-  Future<void> _runSearch() async {
-    final location = _location;
-    if (location == null || !_searchMode) {
-      setState(() => _search = null);
-      return;
-    }
-    final generation = ++_requestGeneration;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final result = await _marketplace.search(
-        latitude: location.latitude,
-        longitude: location.longitude,
-        radiusMiles: _home?.radiusMiles ?? 100,
-        query: _searchController.text.trim(),
-        datePreset: _datePreset,
-        freeOnly: _freeOnly,
-        onlineOnly: _onlineOnly,
-        nationwide: location.nationwide,
-        category: _selectedCategoryId,
-        experienceVersion: _activeExperienceVersion,
-      );
-      if (!mounted || generation != _requestGeneration) return;
-      setState(() {
-        _search = result;
-        _loading = false;
-      });
-      _routeResults[_routeSnapshot().uri.toString()] = (_home, _search);
-      ProductFunnelService().record(
-        result.events.isEmpty
-            ? 'discovery_search_no_result'
-            : 'discovery_search_results',
-        dimensions: {
-          'resultCount': result.total.toString(),
-          'accessMode': _onlineOnly ? 'online' : 'local',
-          'radiusBand': (_home?.radiusMiles ?? 100).toString(),
-          'metro': _metroDimension(location),
-          'categoryId': _selectedCategoryId ?? 'all',
-          'experienceVersion': _activeExperienceVersion.toString(),
-        },
-      );
-    } catch (error) {
-      if (mounted && generation == _requestGeneration) {
-        setState(() {
-          _loading = false;
-          _error = error.toString();
-        });
-      }
-    }
-  }
-
-  Future<void> _loadMoreSearchResults() async {
-    final location = _location;
-    final current = _search;
-    final cursor = current?.nextCursor;
-    if (location == null || current == null || cursor == null || _loadingMore) {
-      return;
-    }
-    final generation = _requestGeneration;
-    setState(() => _loadingMore = true);
-    try {
-      final next = await _marketplace.search(
-        latitude: location.latitude,
-        longitude: location.longitude,
-        radiusMiles: _home?.radiusMiles ?? 100,
-        query: _searchController.text.trim(),
-        datePreset: _datePreset,
-        freeOnly: _freeOnly,
-        onlineOnly: _onlineOnly,
-        nationwide: location.nationwide,
-        category: _selectedCategoryId,
-        cursor: cursor,
-        experienceVersion: _activeExperienceVersion,
-      );
-      if (!mounted || generation != _requestGeneration) return;
-      final existingIds = current.events.map((item) => item.event.id).toSet();
-      setState(() {
-        _search = DiscoverySearchResult(
-          events: [
-            ...current.events,
-            ...next.events.where((item) => existingIds.add(item.event.id)),
-          ],
-          nextCursor: next.nextCursor,
-          total: next.total,
-        );
-        _loadingMore = false;
-      });
-      _routeResults[_routeSnapshot().uri.toString()] = (_home, _search);
-      ProductFunnelService().record(
-        'discovery_search_page_loaded',
-        dimensions: {
-          'resultCount': next.events.length.toString(),
-          'categoryId': _selectedCategoryId ?? 'all',
-          'experienceVersion': _activeExperienceVersion.toString(),
-        },
-      );
-    } catch (error) {
-      if (mounted && generation == _requestGeneration) {
-        setState(() {
-          _loadingMore = false;
-          _error = error.toString();
-        });
-      }
-    }
-  }
-
-  String _metroDimension(DiscoveryLocation location) =>
-      '${location.city}-${location.regionCode}'.toLowerCase().replaceAll(
-        RegExp('[^a-z0-9-]'),
-        '-',
-      );
+  Future<void> _runSearch() => _loadHome();
 
   Future<void> _toggleSave(DiscoveryEvent item) async {
     if (AccountAccessService.isGuest) {
@@ -669,155 +661,7 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    if (_activeExperienceVersion == 2) return _buildV2(context);
-    final theme = Theme.of(context);
-    return RefreshIndicator(
-      onRefresh: _searchMode ? _runSearch : _loadHome,
-      child: CustomScrollView(
-        key: const PageStorageKey('discovery-marketplace'),
-        controller: _discoveryScroll,
-        slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Discover',
-                          style: theme.textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      if (_showNotificationButton)
-                        IconButton(
-                          tooltip: 'Notifications',
-                          constraints: const BoxConstraints(
-                            minWidth: 44,
-                            minHeight: 44,
-                          ),
-                          onPressed: () {
-                            if (AccountAccessService.isGuest) {
-                              showAccountRequiredSheet(
-                                context: context,
-                                feature: AccountFeature.notifications,
-                              );
-                            } else {
-                              RouterClass.nextScreenNormal(
-                                context,
-                                const NotificationsScreen(),
-                              );
-                            }
-                          },
-                          icon: const Icon(Icons.notifications_none),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: ActionChip(
-                      avatar: const Icon(Icons.location_on_outlined, size: 18),
-                      label: Text(_location?.label ?? 'Choose location'),
-                      onPressed: _chooseCity,
-                    ),
-                  ),
-                  if (_home?.cacheState == 'stale') ...[
-                    const SizedBox(height: 8),
-                    const AttendUsStatusBadge(
-                      label: 'Showing saved results — reconnect to refresh',
-                      tone: AttendUsStatusTone.warning,
-                      icon: Icons.cloud_off_outlined,
-                    ),
-                  ],
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _searchController,
-                    onChanged: (_) => _scheduleSearch(),
-                    textInputAction: TextInputAction.search,
-                    onSubmitted: (_) => _runSearch(),
-                    decoration: InputDecoration(
-                      hintText:
-                          'Search events near ${_location?.city ?? 'you'}',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _searchController.text.isEmpty
-                          ? null
-                          : IconButton(
-                              tooltip: 'Clear search',
-                              onPressed: () {
-                                _searchController.clear();
-                                _scheduleSearch();
-                              },
-                              icon: const Icon(Icons.close),
-                            ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _choice('Today', _datePreset == 'today', () {
-                          setState(
-                            () => _datePreset = _datePreset == 'today'
-                                ? null
-                                : 'today',
-                          );
-                          _refreshForQuickChoice('today');
-                        }),
-                        _choice('This weekend', _datePreset == 'weekend', () {
-                          setState(
-                            () => _datePreset = _datePreset == 'weekend'
-                                ? null
-                                : 'weekend',
-                          );
-                          _refreshForQuickChoice('weekend');
-                        }),
-                        _choice('Free', _freeOnly, () {
-                          setState(() => _freeOnly = !_freeOnly);
-                          _refreshForQuickChoice('free');
-                        }),
-                        _choice('Online', _onlineOnly, () {
-                          setState(() => _onlineOnly = !_onlineOnly);
-                          _refreshForQuickChoice('online');
-                        }),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: _createEvent,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Create event'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (_loading)
-            const SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (_error != null)
-            SliverFillRemaining(hasScrollBody: false, child: _errorState())
-          else if (_searchMode)
-            _searchResults()
-          else
-            ..._homeSections(),
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => _buildV2(context);
 
   Widget _buildV2(BuildContext context) {
     return RefreshIndicator(
@@ -827,21 +671,58 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
         controller: _discoveryScroll,
         slivers: [
           SliverToBoxAdapter(child: _v2Header(context)),
-          if (_loading && _home == null)
-            const SliverToBoxAdapter(child: _DiscoverySkeleton())
-          else if (_error != null && _home == null)
-            SliverFillRemaining(hasScrollBody: false, child: _errorState())
-          else if (_searchMode)
-            _searchResults()
+          SliverToBoxAdapter(child: _distanceHeading()),
+          if (_loading)
+            const SliverToBoxAdapter(
+              child: LinearProgressIndicator(minHeight: 2),
+            )
+          else if (_error != null)
+            SliverToBoxAdapter(child: _errorState())
           else ...[
-            if (_loading)
-              const SliverToBoxAdapter(
-                child: LinearProgressIndicator(minHeight: 2),
+            if (_feedEvents.isNotEmpty)
+              SliverToBoxAdapter(child: _recommendations()),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 16,
+                  children: [
+                    Text(
+                      'Upcoming events',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    TextButton(
+                      onPressed: _createEvent,
+                      child: const Text('+ Create event'),
+                    ),
+                  ],
+                ),
               ),
-            ..._v2Sections(),
+            ),
+            if (_feedEvents.isEmpty && _feedCursor == null)
+              SliverToBoxAdapter(child: _v2EmptyState()),
+            SliverList.builder(
+              itemCount: _feedEvents.length,
+              itemBuilder: (_, index) =>
+                  _upcomingCard(_feedEvents[index], index),
+            ),
+            if (_feedCursor != null)
+              SliverToBoxAdapter(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: OutlinedButton(
+                      onPressed: _loadingMore ? null : _loadMoreSearchResults,
+                      child: Text(
+                        _loadingMore ? 'Loading events' : 'Load more',
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
-          SliverToBoxAdapter(child: _hostFooter()),
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
       ),
@@ -1071,22 +952,6 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
     }
   }
 
-  List<Widget> _v2Sections() {
-    final sections = _home?.sections ?? const <DiscoverySection>[];
-    if (sections.isEmpty) {
-      return [
-        SliverFillRemaining(hasScrollBody: false, child: _v2EmptyState()),
-      ];
-    }
-    return [
-      for (var index = 0; index < sections.length; index++)
-        SliverToBoxAdapter(
-          child: _sectionV2(sections[index], first: index == 0),
-        ),
-    ];
-  }
-
-  // Keep the standard card dimensions, but allow enlarged text to remain readable.
   double get _cardTextExpansion =>
       (MediaQuery.textScalerOf(context).scale(14) - 14).clamp(
         0,
@@ -1094,98 +959,241 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
       ) *
       14;
 
-  Widget _sectionV2(DiscoverySection section, {bool first = false}) {
-    _recordSectionImpression(section);
-    final subtitle =
-        section.id == 'recommended' && (_home?.expandedRadius ?? false)
-        ? 'Expanded to ${_home!.radiusMiles} miles to find more events'
-        : section.subtitle;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, first ? 12 : 22, 20, 6),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final mobile = constraints.maxWidth < 700;
-          final columns = mobile
-              ? 1
-              : (constraints.maxWidth / 300).floor().clamp(2, 4).toInt();
-          final visible = mobile
-              ? section.events.length
-              : section.events.take(columns).length;
-          return Column(
+  Widget _distanceHeading() => Padding(
+    padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          section.title,
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          subtitle,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (section.totalAvailable > visible)
-                    TextButton(
-                      onPressed: () => _showSectionResults(section),
-                      child: const Text('See all'),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              if (mobile)
-                SizedBox(
-                  height: 360 + _cardTextExpansion,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: section.events.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 12),
-                    itemBuilder: (_, index) => SizedBox(
-                      width: 280,
-                      child: _eventCardV2(
-                        section.events[index],
-                        section.id,
-                        index,
-                      ),
-                    ),
-                  ),
-                )
-              else
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: visible,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: columns,
-                    mainAxisExtent: 360 + _cardTextExpansion,
-                    crossAxisSpacing: 14,
-                  ),
-                  itemBuilder: (_, index) =>
-                      _eventCardV2(section.events[index], section.id, index),
+              Text('For you', style: Theme.of(context).textTheme.titleLarge),
+              if (!_loading)
+                Text(
+                  _resolvedMiles == null
+                      ? 'Showing events nationwide'
+                      : _fixedMiles != null || _resolvedMiles == 25
+                      ? 'Within $_resolvedMiles miles'
+                      : 'Expanded to $_resolvedMiles miles',
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
             ],
-          );
-        },
+          ),
+        ),
+        TextButton.icon(
+          onPressed: _chooseDistance,
+          icon: const Icon(Icons.radar, size: 20),
+          label: Text(_fixedMiles == null ? 'Auto' : '$_fixedMiles mi'),
+        ),
+      ],
+    ),
+  );
+
+  Future<void> _chooseDistance() async {
+    int selected = _fixedMiles ?? 0;
+    final hasLocation = _location != null && !_location!.nationwide;
+    Widget content(BuildContext sheetContext) => StatefulBuilder(
+      builder: (context, update) => SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Event distance',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Distance applies to in-person events. Online events are included.',
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final miles in [0, 5, 10, 25, 50, 100])
+                      ChoiceChip(
+                        label: Text(miles == 0 ? 'Auto' : '$miles miles'),
+                        selected: selected == miles,
+                        onSelected: (_) => update(() => selected = miles),
+                      ),
+                  ],
+                ),
+                if (!hasLocation) ...[
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Choose a location to use a fixed distance. Auto shows events nationwide.',
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(sheetContext, -1),
+                    child: const Text('Choose location'),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: selected != 0 && !hasLocation
+                          ? null
+                          : () => Navigator.pop(sheetContext, selected),
+                      child: const Text('Apply'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
+    final int? result = MediaQuery.sizeOf(context).width < 700
+        ? await showModalBottomSheet<int>(
+            context: context,
+            isScrollControlled: true,
+            showDragHandle: true,
+            builder: content,
+          )
+        : await showDialog<int>(
+            context: context,
+            builder: (context) =>
+                Dialog(child: SizedBox(width: 440, child: content(context))),
+          );
+    if (!mounted || result == null) return;
+    if (result == -1) {
+      await _chooseCity();
+      return;
+    }
+    _requestGeneration++;
+    setState(() => _fixedMiles = result == 0 ? null : result);
+    final preferences = await SharedPreferences.getInstance();
+    if (result == 0) {
+      await preferences.remove('discovery_fixed_miles');
+    } else {
+      await preferences.setInt('discovery_fixed_miles', result);
+    }
+    if (mounted) await _loadHome();
   }
 
-  void _showSectionResults(DiscoverySection section) {
-    ProductFunnelService().record(
-      'discovery_section_view_all',
-      dimensions: {'section': section.id, 'experienceVersion': '2'},
+  Widget _recommendations() => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    child: Column(
+      children: [
+        if (MediaQuery.sizeOf(context).width >= 700)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              for (final forward in [false, true])
+                IconButton(
+                  tooltip: forward
+                      ? 'Next recommendations'
+                      : 'Previous recommendations',
+                  onPressed: () => _carouselScroll.animateTo(
+                    (_carouselScroll.offset + (forward ? 292 : -292)).clamp(
+                      0,
+                      _carouselScroll.position.maxScrollExtent,
+                    ),
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOut,
+                  ),
+                  icon: Icon(
+                    forward ? Icons.chevron_right : Icons.chevron_left,
+                  ),
+                ),
+            ],
+          ),
+        SizedBox(
+          height: 360 + _cardTextExpansion,
+          child: ListView.separated(
+            controller: _carouselScroll,
+            scrollDirection: Axis.horizontal,
+            itemCount: (_home?.sections.first.events.length ?? 0),
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            itemBuilder: (_, index) => SizedBox(
+              width: 280,
+              child: _eventCardV2(
+                _home!.sections.first.events[index],
+                'recommended',
+                index,
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _upcomingCard(DiscoveryEvent item, int index) {
+    final event = item.event;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => _openEvent(item, 'upcoming', index),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 76,
+                  height: 76,
+                  child: event.imageUrl.isEmpty
+                      ? const Icon(Icons.event, size: 32)
+                      : Image.network(
+                          event.imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => const Icon(Icons.event),
+                        ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        event.schedule.cardLabel,
+                        style: Theme.of(context).textTheme.labelMedium,
+                      ),
+                      Text(
+                        event.title,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      Text(
+                        event.locationType == 'online'
+                            ? 'Online'
+                            : event.locationName?.isNotEmpty == true
+                            ? event.locationName!
+                            : event.location,
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: _savedIds.contains(event.id)
+                      ? 'Unsave event'
+                      : 'Save event',
+                  onPressed: () => _toggleSave(item),
+                  icon: Icon(
+                    _savedIds.contains(event.id)
+                        ? Icons.bookmark
+                        : Icons.bookmark_border,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
-    setState(() => _browseAll = true);
-    _runSearch();
   }
 
   Widget _eventCardV2(DiscoveryEvent item, String section, int index) {
@@ -1285,264 +1293,12 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
     );
   }
 
-  Widget _hostFooter() => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 20),
-    child: DecoratedBox(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        child: Row(
-          children: [
-            const Icon(Icons.add_circle_outline),
-            const SizedBox(width: 12),
-            const Expanded(child: Text('Hosting something? Create an event.')),
-            TextButton(onPressed: _createEvent, child: const Text('Create')),
-          ],
-        ),
-      ),
-    ),
-  );
-
-  void _recordSectionImpression(DiscoverySection section) {
-    if (!_recordedSectionImpressions.add(section.id)) return;
-    ProductFunnelService().record(
-      'discovery_section_impression',
-      dimensions: {
-        'section': section.id,
-        'resultCount': section.events.length.toString(),
-        'experienceVersion': _activeExperienceVersion.toString(),
-      },
-    );
-  }
-
   Widget _choice(String label, bool selected, VoidCallback onTap) => Padding(
     padding: const EdgeInsets.only(right: 8),
     child: FilterChip(
       label: Text(label),
       selected: selected,
       onSelected: (_) => onTap(),
-    ),
-  );
-
-  List<Widget> _homeSections() {
-    final sections = _home?.sections ?? const <DiscoverySection>[];
-    if (sections.isEmpty) {
-      return [SliverFillRemaining(hasScrollBody: false, child: _emptyState())];
-    }
-    final widgets = <Widget>[];
-    var categoriesAdded = false;
-    for (final section in sections) {
-      if (section.id == 'online' && !categoriesAdded) {
-        widgets.add(SliverToBoxAdapter(child: _categories()));
-        categoriesAdded = true;
-      }
-      widgets.add(SliverToBoxAdapter(child: _section(section)));
-    }
-    if (!categoriesAdded) widgets.add(SliverToBoxAdapter(child: _categories()));
-    return widgets;
-  }
-
-  Widget _section(DiscoverySection section) {
-    _recordSectionImpression(section);
-    final subtitle =
-        section.id == 'recommended' && (_home?.expandedRadius ?? false)
-        ? 'Expanded to ${_home!.radiusMiles} miles to find more events'
-        : section.subtitle;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            section.title,
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 3),
-          Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 356,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: section.events.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 12),
-              itemBuilder: (_, index) => SizedBox(
-                width: 310,
-                child: _eventCard(section.events[index], section.id, index),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _eventCard(DiscoveryEvent item, String section, int index) {
-    final event = item.event;
-    final remaining = event.maxTickets > 0
-        ? event.maxTickets -
-              (event.ticketsEnabled
-                  ? event.issuedTickets
-                  : event.confirmedRegistrationCount)
-        : null;
-    return AttendUsEventSummaryCard(
-      title: event.title,
-      subtitle: event.description,
-      imageUrl: event.imageUrl,
-      dateLabel: event.schedule.cardLabel,
-      locationLabel: event.locationType == 'online'
-          ? 'Online'
-          : (event.city.isNotEmpty ? event.city : event.location),
-      organizerLabel: event.groupName,
-      distanceLabel: item.distanceMiles == null
-          ? null
-          : '${item.distanceMiles!.toStringAsFixed(1)} mi',
-      priceLabel: !event.ticketsEnabled || (event.ticketPrice ?? 0) <= 0
-          ? 'Free'
-          : 'From \$${event.ticketPrice!.toStringAsFixed(0)}',
-      availabilityLabel: remaining == null
-          ? null
-          : remaining <= 0
-          ? 'Sold out'
-          : '$remaining ${event.ticketsEnabled ? 'tickets' : 'spots'} remaining',
-      statusLabel: event.isFeatured ? 'Featured' : null,
-      isSaved: _savedIds.contains(event.id),
-      onSave: () => _toggleSave(item),
-      onTap: () => _openEvent(item, section, index),
-    );
-  }
-
-  Widget _categories() {
-    final categories = (_home?.sections ?? const <DiscoverySection>[])
-        .expand((section) => section.events)
-        .expand((item) => item.event.categories)
-        .where((value) => value.trim().isNotEmpty)
-        .toSet()
-        .take(8)
-        .toList();
-    if (categories.length < 3) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Explore by category',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: categories
-                .map(
-                  (category) => ActionChip(
-                    avatar: const Icon(Icons.local_activity_outlined, size: 17),
-                    label: Text(category),
-                    onPressed: () {
-                      _searchController.text = category;
-                      _runSearch();
-                    },
-                  ),
-                )
-                .toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _searchResults() {
-    final results = _search?.events ?? const <DiscoveryEvent>[];
-    if (results.isEmpty) {
-      return SliverFillRemaining(hasScrollBody: false, child: _emptySearch());
-    }
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final columns = constraints.maxWidth >= 980
-                ? 3
-                : constraints.maxWidth >= 620
-                ? 2
-                : 1;
-            return Column(
-              children: [
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: columns,
-                    mainAxisExtent: 356 + _cardTextExpansion,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                  ),
-                  itemCount: results.length,
-                  itemBuilder: (_, index) =>
-                      _eventCard(results[index], 'search', index),
-                ),
-                if (_search?.nextCursor != null) ...[
-                  const SizedBox(height: 20),
-                  OutlinedButton.icon(
-                    onPressed: _loadingMore ? null : _loadMoreSearchResults,
-                    icon: _loadingMore
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.expand_more),
-                    label: Text(_loadingMore ? 'Loading events' : 'Load more'),
-                  ),
-                ],
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _emptySearch() => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(28),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.search_off, size: 48),
-          const SizedBox(height: 12),
-          Text(
-            'No matching events yet',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Try a broader search, clear a quick choice, or explore online events.',
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: () {
-              setState(() {
-                _searchController.clear();
-                _datePreset = null;
-                _freeOnly = false;
-                _onlineOnly = false;
-                _search = null;
-                _browseAll = false;
-              });
-            },
-            child: const Text('Clear search'),
-          ),
-        ],
-      ),
     ),
   );
 
@@ -1606,54 +1362,6 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
       ),
     ),
   );
-}
-
-class _DiscoverySkeleton extends StatelessWidget {
-  const _DiscoverySkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
-    Widget block(double height, {double? width}) => Container(
-      height: height,
-      width: width,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(14),
-      ),
-    );
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          block(22, width: 190),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 78,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: 4,
-              separatorBuilder: (_, _) => const SizedBox(width: 10),
-              itemBuilder: (_, _) => block(78, width: 164),
-            ),
-          ),
-          const SizedBox(height: 28),
-          block(22, width: 150),
-          const SizedBox(height: 14),
-          SizedBox(
-            height: 340,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: 3,
-              separatorBuilder: (_, _) => const SizedBox(width: 12),
-              itemBuilder: (_, _) => block(340, width: 280),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _DiscoveryCityDialog extends StatefulWidget {

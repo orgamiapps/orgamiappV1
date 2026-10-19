@@ -292,6 +292,10 @@ class _Callable extends HttpsCallablePlatform {
     if (name.startsWith('getDiscoveryHome')) return discoveryHomeFixture();
     if (name.startsWith('searchDiscoveryEvents')) {
       return {
+        'feedVersion': 1,
+        'radiusMiles': data['distanceMode'] == 'fixed'
+            ? data['radiusMiles']
+            : 25,
         'events': [discoveryEventFixture],
         'total': 1,
       };

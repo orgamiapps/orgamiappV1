@@ -647,6 +647,11 @@ function createSearchDiscoveryEventsV2(admin) {
     timeoutSeconds: 30, memory: "512MiB", maxInstances: 30}, async (request) => {
     requireCaller(request);
     await enforceDiscoveryRateLimit(db, request);
+    if (request.data?.feedVersion === 1) {
+      return require("./feed").discoveryFeed(db, request.data, {
+        validateCenter, activePublicEvent, eventDto, applyV2Filters, includesQuery,
+      });
+    }
     const center = validateCenter(request.data);
     const radiusMiles = boundedNumber(request.data?.radiusMiles, 25, 1, 100);
     const limit = boundedNumber(request.data?.limit, 24, 1, MAX_SEARCH_RESULTS, true);
