@@ -53,7 +53,7 @@ function normalizePolicy(event) {
       ),
       allowReentry: supplied.profile !== "none" && supplied.allowReentry === true,
       checkoutEnabled: supplied.profile !== "none" && supplied.checkoutEnabled === true,
-      proximityAssist: supplied.profile !== "none" && supplied.proximityAssist === true,
+      proximityAssist: (event.locationInputMode !== "text" || event.locationCoordinatesEnabled === true) && supplied.profile !== "none" && supplied.proximityAssist === true,
       staffFallback: supplied.profile !== "none" && supplied.staffFallback !== false,
       passLockEnabled: supplied.profile !== "none" && supplied.passLockEnabled === true,
       needsOrganizerReview: supplied.needsOrganizerReview === true,

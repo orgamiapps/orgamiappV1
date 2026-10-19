@@ -29,6 +29,7 @@ bool isEventEligibleForGlobalMap(EventModel event, DateTime now) {
   return validStatus &&
       !event.private &&
       event.locationType != 'online' &&
+      (event.locationInputMode != 'text' || event.locationCoordinatesEnabled) &&
       validCoordinates &&
       now.isBefore(event.eventEndTime.add(const Duration(hours: 2)));
 }

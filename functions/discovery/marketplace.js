@@ -128,7 +128,7 @@ function eventDto(document, center = null) {
   const latitude = Number(data.latitude || 0);
   const longitude = Number(data.longitude || 0);
   let distanceMiles = null;
-  if (center && Number.isFinite(latitude) && Number.isFinite(longitude) &&
+  if ((data.locationInputMode !== "text" || data.locationCoordinatesEnabled === true) && center && Number.isFinite(latitude) && Number.isFinite(longitude) &&
       !(latitude === 0 && longitude === 0)) {
     distanceMiles = distanceBetween(
         [center.latitude, center.longitude], [latitude, longitude],
@@ -146,6 +146,8 @@ function eventDto(document, center = null) {
     location: String(data.location || ""),
     locationName: data.locationName || null,
     locationType: data.locationType === "online" ? "online" : "in_person",
+    locationInputMode: data.locationInputMode === "text" ? "text" : "place",
+    locationCoordinatesEnabled: data.locationCoordinatesEnabled === true,
     placeId: data.placeId || null,
     city: String(data.city || ""),
     regionCode: String(data.regionCode || ""),

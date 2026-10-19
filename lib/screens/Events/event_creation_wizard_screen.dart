@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
+import 'dart:ui' as ui;
+import 'package:attendus/Services/event_cover_unload_guard.dart';
 import 'package:attendus/models/check_in_policy.dart';
 import 'package:attendus/models/discovery_category.dart';
 import 'package:attendus/models/event_model.dart';
@@ -15,6 +17,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:attendus/Services/event_cover_image.dart';
 import 'package:intl/intl.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -28,6 +31,7 @@ class EventCreationWizardScreen extends StatefulWidget {
     this.event,
     this.initialDraft,
     this.service,
+    this.pickCoverBytes,
   });
 
   final DateTime? selectedDateTime;
@@ -37,6 +41,7 @@ class EventCreationWizardScreen extends StatefulWidget {
   final EventModel? event;
   final EventWizardDraft? initialDraft;
   final EventWizardRepository? service;
+  final Future<Uint8List?> Function()? pickCoverBytes;
 
   @override
   State<EventCreationWizardScreen> createState() =>
@@ -63,7 +68,13 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
   List<EventWizardDraft> _availableDrafts = const [];
   List<Map<String, String>> _organizations = const [];
   List<Map<String, dynamic>> _savedTemplates = const [];
+  final _coverUnloadGuard = EventCoverUnloadGuard();
   Uint8List? _pendingImage;
+  Future<void>? _imageUpload;
+  int _imageSelection = 0;
+  bool _imageUploading = false;
+  String? _imageError;
+  bool _allowClose = false;
 
   late final TextEditingController _titleController;
   late final TextEditingController _descriptionController;
@@ -189,6 +200,12 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
   }
 
   void _applySavedTemplate(Map<String, dynamic> template) {
+    if (_pendingImage != null || _imageUploading) {
+      _showError(
+        'Save or remove the selected image before changing templates.',
+      );
+      return;
+    }
     final form = Map<String, dynamic>.from(
       template['formData'] as Map? ?? const {},
     );
@@ -207,6 +224,7 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
       ..endAt = _draft.endAt
       ..organizationId = _draft.organizationId;
     _draft = replacement;
+    _replaceControllersFromDraft();
     _titleController.text = _draft.title;
     _descriptionController.text = _draft.description;
     _onlineLocationController.text = _draft.locationType == 'online'
@@ -236,6 +254,7 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
 
   @override
   void dispose() {
+    _coverUnloadGuard.dispose();
     _authSubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _autosaveTimer?.cancel();
@@ -385,7 +404,8 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
         _showError('The event must end after it starts.');
         return false;
       }
-      final validLocation = _draft.locationType == 'online'
+      final validLocation =
+          _draft.locationType == 'online' || !_draft.hasMappedLocation
           ? _draft.location.trim().isNotEmpty
           : _draft.location.trim().isNotEmpty &&
                 !(_draft.latitude == 0 && _draft.longitude == 0);
@@ -480,6 +500,30 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
   }
 
   Future<void> _close() async {
+    if (_publishing) return;
+    if (_pendingImage != null || _imageUploading) {
+      final leave = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Leave with an unsaved image?'),
+          content: const Text(
+            'The selected image has not been saved. You will need to select it again when reopening this draft.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Keep editing'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Leave'),
+            ),
+          ],
+        ),
+      );
+      if (leave != true || !mounted) return;
+      _imageSelection++;
+    }
     await _saveNow();
     unawaited(
       _funnel.record(
@@ -487,7 +531,12 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
         dimensions: {'stage': _draft.currentStage.name, 'mode': _draft.mode},
       ),
     );
-    if (mounted) Navigator.maybePop(context);
+    if (mounted) {
+      setState(() => _allowClose = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.pop(context);
+      });
+    }
   }
 
   Future<void> _publish() async {
@@ -506,6 +555,20 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
       ),
     );
     try {
+      await _imageUpload;
+      if (_imageError != null || _pendingImage != null || _imageUploading) {
+        if (mounted) {
+          setState(() => _draft.currentStage = EventWizardStage.basics);
+          _showError(
+            'Save the selected image using Retry, or remove it before publishing.',
+          );
+        }
+        return;
+      }
+      if (_accountChanged || !mounted) return;
+      _autosaveTimer?.cancel();
+      _syncControllersToDraft();
+      _draft = await _service.saveDraft(_draft);
       String? changeReason;
       String? changePreviewToken;
       if (_draft.mode == 'edit' && _draft.sourceEventId != null) {
@@ -667,29 +730,129 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
   }
 
   Future<void> _pickImage() async {
-    final image = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1800,
-      imageQuality: 88,
-    );
-    if (image == null) return;
-    final bytes = await image.readAsBytes();
-    setState(() => _pendingImage = bytes);
+    if (_publishing || _accountChanged) return;
+    var selection = _imageSelection;
     try {
-      final url = await _service.uploadDraftImage(draft: _draft, bytes: bytes);
-      if (!mounted) return;
-      setState(() => _draft.imageUrl = url);
-      _scheduleAutosave();
-    } catch (_) {
-      if (mounted) {
+      final Uint8List? selectedBytes;
+      if (widget.pickCoverBytes != null) {
+        selectedBytes = await widget.pickCoverBytes!();
+      } else {
+        final image = await ImagePicker().pickImage(
+          source: ImageSource.gallery,
+          maxWidth: 1800,
+          imageQuality: 88,
+        );
+        selectedBytes = await image?.readAsBytes();
+      }
+      if (selectedBytes == null ||
+          !mounted ||
+          selection != _imageSelection ||
+          _accountChanged ||
+          _publishing) {
+        return;
+      }
+      final bytes = selectedBytes;
+      eventCoverContentType(bytes);
+      final codec = await ui.instantiateImageCodec(bytes);
+      codec.dispose();
+      if (!mounted || selection != _imageSelection || _accountChanged) return;
+      selection = ++_imageSelection;
+      _coverUnloadGuard.setUnsaved(true);
+      setState(() {
+        _pendingImage = bytes;
+        _imageError = null;
+      });
+      _imageUpload = _uploadSelectedImage(selection, bytes);
+      await _imageUpload;
+    } catch (error) {
+      if (mounted && selection == _imageSelection && !_accountChanged) {
         _showError(
-          'The image is saved locally and will upload when you retry.',
+          error is FormatException
+              ? error.message
+              : 'Unable to open this image. Please select it again.',
         );
       }
     }
   }
 
+  Future<void> _uploadSelectedImage(int selection, Uint8List bytes) async {
+    final draft = _draft;
+    final previousImageUrl = draft.imageUrl;
+    String? uploadedUrl;
+    setState(() {
+      _imageUploading = true;
+      _imageError = null;
+    });
+    try {
+      final url = await _service.uploadDraftImage(
+        draft: draft,
+        bytes: bytes,
+        contentType: eventCoverContentType(bytes),
+      );
+      if (!mounted ||
+          _accountChanged ||
+          selection != _imageSelection ||
+          !identical(draft, _draft)) {
+        return;
+      }
+      uploadedUrl = url;
+      draft.imageUrl = url;
+      _autosaveTimer?.cancel();
+      await _service.saveDraft(draft);
+      if (!mounted ||
+          _accountChanged ||
+          selection != _imageSelection ||
+          !identical(draft, _draft)) {
+        return;
+      }
+      _coverUnloadGuard.setUnsaved(false);
+      setState(() {
+        _pendingImage = null;
+        _saveState = EventWizardSaveState.saved;
+      });
+    } catch (_) {
+      if (mounted && !_accountChanged && selection == _imageSelection) {
+        if (uploadedUrl != null && draft.imageUrl == uploadedUrl) {
+          draft.imageUrl = previousImageUrl;
+        }
+        setState(
+          () => _imageError =
+              'Image not saved. Retry before publishing. Closing the editor will lose this selection.',
+        );
+      }
+    } finally {
+      if (mounted && selection == _imageSelection) {
+        setState(() => _imageUploading = false);
+      }
+    }
+  }
+
+  void _retryImage() {
+    final bytes = _pendingImage;
+    if (bytes == null || _imageUploading || _publishing || _accountChanged) {
+      return;
+    }
+    _imageUpload = _uploadSelectedImage(++_imageSelection, bytes);
+  }
+
+  void _removeImage() {
+    if (_publishing) return;
+    _coverUnloadGuard.setUnsaved(false);
+    setState(() {
+      _imageSelection++;
+      _pendingImage = null;
+      _imageUploading = false;
+      _imageError = null;
+      _draft.imageUrl = '';
+      _imageUpload = null;
+    });
+    _scheduleAutosave();
+  }
+
   Future<void> _pickLocation() async {
+    final typedLabel = _draft.locationInputMode == 'text'
+        ? _draft.location
+        : null;
     final result = await Navigator.push<LocationPickerResult>(
       context,
       MaterialPageRoute(
@@ -710,14 +873,15 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
         ),
       ),
     );
-    if (result == null) return;
+    if (result == null || !mounted) return;
     setState(() {
+      _draft.locationCoordinatesEnabled = typedLabel != null;
       _draft.latitude = result.location.latitude;
       _draft.longitude = result.location.longitude;
       _draft.radius = result.radius;
       _draft.placeId = result.placeId ?? '';
-      _draft.locationName = result.displayName;
-      _draft.location = result.formattedAddress;
+      _draft.locationName = typedLabel ?? result.displayName;
+      _draft.location = typedLabel ?? result.formattedAddress;
       _draft.city = result.city;
       _draft.regionCode = result.regionCode;
       _draft.countryCode = result.countryCode;
@@ -766,6 +930,12 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
   }
 
   Future<void> _showDrafts() async {
+    if (_pendingImage != null || _imageUploading) {
+      _showError(
+        'Save or remove the selected image before opening another draft.',
+      );
+      return;
+    }
     setState(() => _loadingDrafts = true);
     try {
       _availableDrafts = await _service.listDrafts();
@@ -840,6 +1010,12 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
   }
 
   void _replaceControllersFromDraft() {
+    _coverUnloadGuard.setUnsaved(false);
+    _imageSelection++;
+    _pendingImage = null;
+    _imageError = null;
+    _imageUploading = false;
+    _imageUpload = null;
     _titleController.text = _draft.title;
     _descriptionController.text = _draft.description;
     _onlineLocationController.text = _draft.locationType == 'online'
@@ -875,7 +1051,7 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
     final desktop = width >= 1050;
     final showPreview = desktop && _showPreview;
     return PopScope(
-      canPop: false,
+      canPop: _allowClose,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) unawaited(_close());
       },
@@ -1226,6 +1402,27 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
               imageUrl: _draft.imageUrl,
               onTap: _pickImage,
             ),
+            if (_imageUploading) const LinearProgressIndicator(),
+            if (_imageUploading) const Text('Uploading image...'),
+            if (_imageError != null)
+              Text(
+                _imageError!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            if (!_imageUploading &&
+                _imageError == null &&
+                _draft.imageUrl.isNotEmpty)
+              const Text('Image uploaded'),
+            if (_imageError != null)
+              TextButton(
+                onPressed: _retryImage,
+                child: const Text('Retry image upload'),
+              ),
+            if (_pendingImage != null || _draft.imageUrl.isNotEmpty)
+              TextButton(
+                onPressed: _publishing ? null : _removeImage,
+                child: const Text('Remove image'),
+              ),
           ],
         ),
       ),
@@ -1263,6 +1460,22 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
               'Event recurrence timezone: ${_draft.eventTimeZone}.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
+            if (_draft.locationInputMode == 'text') const SizedBox(height: 12),
+            if (_draft.locationInputMode == 'text')
+              TextFormField(
+                key: ValueKey(('timezone', _draft)),
+                initialValue: _draft.eventTimeZone,
+                decoration: const InputDecoration(
+                  labelText: 'Event timezone',
+                  hintText: 'America/New_York',
+                  helperText:
+                      'Use an IANA timezone name, such as America/New_York or UTC.',
+                ),
+                onChanged: (value) {
+                  _draft.eventTimeZone = value.trim();
+                  _scheduleAutosave();
+                },
+              ),
             const Divider(height: 32),
             SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
@@ -1320,15 +1533,58 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
                   _draft.locationType = value.first;
                   if (value.first == 'online') {
                     _draft.location = _onlineLocationController.text;
-                    _draft.latitude = 0;
-                    _draft.longitude = 0;
+                    _draft.clearMappedLocation();
                   }
                 });
                 _scheduleAutosave();
               },
             ),
             const SizedBox(height: 16),
-            if (_draft.locationType == 'online')
+            if (_draft.locationType == 'in_person') ...[
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(
+                    value: 'place',
+                    label: Text('Select a location'),
+                  ),
+                  ButtonSegment(
+                    value: 'text',
+                    label: Text('Enter location text'),
+                  ),
+                ],
+                selected: {_draft.locationInputMode},
+                onSelectionChanged: (values) {
+                  setState(() {
+                    _draft.locationInputMode = values.first;
+                    _draft.clearMappedLocation();
+                    _draft.location = '';
+                  });
+                  _scheduleAutosave();
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (_draft.locationType == 'in_person' &&
+                _draft.locationInputMode == 'text')
+              TextFormField(
+                key: ValueKey(('text-location', _draft)),
+                initialValue: _draft.location,
+                focusNode: _locationFocus,
+                maxLength: 1000,
+                decoration: const InputDecoration(
+                  labelText: 'Location description',
+                  helperMaxLines: 3,
+                  hintText: 'Community clubhouse',
+                  helperText:
+                      'Keep your own label. Add a map pin below to enable directions and GPS features.',
+                ),
+                onChanged: (value) {
+                  _draft.location = value;
+                  _draft.locationName = value;
+                  _scheduleAutosave();
+                },
+              )
+            else if (_draft.locationType == 'online')
               TextFormField(
                 controller: _onlineLocationController,
                 focusNode: _locationFocus,
@@ -1362,6 +1618,36 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
                   onTap: _pickLocation,
                 ),
               ),
+            if (_draft.locationType == 'in_person' &&
+                _draft.locationInputMode == 'text') ...[
+              TextButton.icon(
+                onPressed: _pickLocation,
+                icon: const Icon(Icons.map_outlined),
+                label: Text(
+                  _draft.locationCoordinatesEnabled
+                      ? 'Change map pin'
+                      : 'Add map pin (optional)',
+                ),
+              ),
+              if (_draft.locationCoordinatesEnabled) ...[
+                Text(
+                  'Map pin: ${_draft.latitude.toStringAsFixed(5)}, ${_draft.longitude.toStringAsFixed(5)}',
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _draft.clearMappedLocation();
+                      _draft.locationName = _draft.location;
+                    });
+                    _scheduleAutosave();
+                  },
+                  child: const Text('Remove map pin'),
+                ),
+              ] else
+                const Text(
+                  'Without a pin, maps, nearby results, and GPS check-in are unavailable.',
+                ),
+            ],
           ],
         ),
       ),
@@ -2287,52 +2573,54 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
           _draft.checkInPolicy.copyWith(staffFallback: value),
         ),
       ),
-      SwitchListTile.adaptive(
-        contentPadding: EdgeInsets.zero,
-        value: _draft.checkInPolicy.smartArrivalEnabled,
-        title: const Text('Smart Arrival'),
-        subtitle: const Text(
-          'Attendees confirm arrival using a fresh location check.',
-        ),
-        onChanged:
-            _draft.locationType == 'online' ||
-                !_draft.checkInPolicy.attendeeSelfCheckInEnabled
-            ? null
-            : (value) async {
-                if (!value) {
-                  _setCheckInPolicy(
-                    _draft.checkInPolicy.copyWith(smartArrivalEnabled: false),
-                  );
-                  return;
-                }
-                final result = await Navigator.of(context)
-                    .push<LocationPickerResult>(
-                      MaterialPageRoute(
-                        builder: (_) => LocationPickerScreen(
-                          initialLocation: LatLng(
-                            _draft.latitude,
-                            _draft.longitude,
-                          ),
-                          initialRadius:
-                              _draft.checkInPolicy.arrivalRadiusMeters,
-                          initialDisplayName: _draft.locationName,
-                          initialAddress: _draft.location,
-                        ),
-                      ),
+      if (_draft.hasMappedLocation)
+        SwitchListTile.adaptive(
+          contentPadding: EdgeInsets.zero,
+          value: _draft.checkInPolicy.smartArrivalEnabled,
+          title: const Text('Smart Arrival'),
+          subtitle: const Text(
+            'Attendees confirm arrival using a fresh location check.',
+          ),
+          onChanged:
+              !_draft.hasMappedLocation ||
+                  !_draft.checkInPolicy.attendeeSelfCheckInEnabled
+              ? null
+              : (value) async {
+                  if (!value) {
+                    _setCheckInPolicy(
+                      _draft.checkInPolicy.copyWith(smartArrivalEnabled: false),
                     );
-                if (result == null || !mounted) return;
-                _setCheckInPolicy(
-                  _draft.checkInPolicy.copyWith(
-                    smartArrivalEnabled: true,
-                    openingMode: 'scheduled',
-                    arrivalLatitude: result.location.latitude,
-                    arrivalLongitude: result.location.longitude,
-                    arrivalRadiusMeters: result.radius.clamp(50, 500),
-                  ),
-                );
-              },
-      ),
-      if (_draft.checkInPolicy.smartArrivalEnabled) ...[
+                    return;
+                  }
+                  final result = await Navigator.of(context)
+                      .push<LocationPickerResult>(
+                        MaterialPageRoute(
+                          builder: (_) => LocationPickerScreen(
+                            initialLocation: LatLng(
+                              _draft.latitude,
+                              _draft.longitude,
+                            ),
+                            initialRadius:
+                                _draft.checkInPolicy.arrivalRadiusMeters,
+                            initialDisplayName: _draft.locationName,
+                            initialAddress: _draft.location,
+                          ),
+                        ),
+                      );
+                  if (result == null || !mounted) return;
+                  _setCheckInPolicy(
+                    _draft.checkInPolicy.copyWith(
+                      smartArrivalEnabled: true,
+                      openingMode: 'scheduled',
+                      arrivalLatitude: result.location.latitude,
+                      arrivalLongitude: result.location.longitude,
+                      arrivalRadiusMeters: result.radius.clamp(50, 500),
+                    ),
+                  );
+                },
+        ),
+      if (_draft.hasMappedLocation &&
+          _draft.checkInPolicy.smartArrivalEnabled) ...[
         ListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('Confirmed check-in boundary'),

@@ -19,7 +19,7 @@ function eligible(data, now = new Date()) {
     data.deleted !== true && data.isHidden !== true && activePublicEvent(data, now);
 }
 function nearbyInterest(data, preference) {
-  if (preference?.nearbyInterestNotifications !== true || data.locationType === "online") return false;
+  if (preference?.nearbyInterestNotifications !== true || data.locationType === "online" || (data.locationInputMode === "text" && data.locationCoordinatesEnabled !== true)) return false;
   const coordinates = [data.latitude, data.longitude, preference.latitude, preference.longitude];
   if (coordinates.some((value) => value === null || value === undefined || value === "" || !Number.isFinite(Number(value)))) return false;
   const [latitude, longitude, userLatitude, userLongitude] = coordinates.map(Number);

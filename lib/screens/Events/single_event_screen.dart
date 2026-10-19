@@ -5081,7 +5081,10 @@ class _SingleEventScreenState extends State<SingleEventScreen>
             ),
           ),
           // Hyper-realistic globe button for map view - with better spacing
-          if (eventModel.latitude != 0 && eventModel.longitude != 0) ...[
+          if ((eventModel.locationInputMode != 'text' ||
+                  eventModel.locationCoordinatesEnabled) &&
+              eventModel.latitude != 0 &&
+              eventModel.longitude != 0) ...[
             const SizedBox(width: 8),
             SizedBox(
               width: 48, // Constraining the button size to prevent overflow
