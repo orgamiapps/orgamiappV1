@@ -6,9 +6,9 @@ const {chromium} = require('@playwright/test');
   try {
     const page = await browser.newPage();
     const report = {origin: 'https://attendus-staging.web.app', exchanges: [], calls: [], failures: [], appCheckErrors: []};
-    page.on('response', r => {
+    page.on('response', async r => {
       const u = new URL(r.url());
-      if (u.hostname.endsWith('firebaseappcheck.googleapis.com')) report.exchanges.push({path: u.pathname, status: r.status()});
+      if (u.hostname.endsWith('firebaseappcheck.googleapis.com')) { const entry={path:u.pathname,status:r.status()}; report.exchanges.push(entry); if(r.status()>=400) {try {const body=await r.json(); entry.error={status:body.error?.status,message:body.error?.message};} catch {} } }
       if (u.hostname === 'us-central1-attendus-staging.cloudfunctions.net') report.calls.push({path: u.pathname, status: r.status()});
       if (u.hostname === 'www.google.com' && u.pathname.startsWith('/recaptcha/')) console.log(JSON.stringify({providerPath: u.pathname, status: r.status()}));
     });
