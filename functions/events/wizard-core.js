@@ -12,27 +12,27 @@ const REGISTRATION_MODES = new Set(["rsvp", "free_ticket", "paid_ticket"]);
 const APPROVAL_MODES = new Set(["automatic", "manual"]);
 const RECURRENCE_FREQUENCIES = new Set(["daily", "weekly", "weekdays", "monthly"]);
 const REMINDER_PRESETS = new Set(["off", "24h", "1h", "24h_1h"]);
-const CHECK_IN_PROFILES = new Set(["self_check_in", "staff_entry", "hybrid"]);
+const CHECK_IN_PROFILES = new Set(["none", "self_check_in", "staff_entry", "hybrid"]);
 const CHECK_IN_ELIGIBILITY = new Set(["open", "registered_only", "ticket_required"]);
 
 const TEMPLATE_CATALOG = Object.freeze([
   {id: "community_meetup", label: "Community meetup", categoryId: "community-causes",
-    durationMinutes: 120, registrationMode: "rsvp", attendanceProfile: "hybrid"},
+    durationMinutes: 120, registrationMode: "rsvp", attendanceProfile: "none"},
   {id: "networking", label: "Networking event", categoryId: "business-networking",
-    durationMinutes: 120, registrationMode: "rsvp", attendanceProfile: "hybrid"},
+    durationMinutes: 120, registrationMode: "rsvp", attendanceProfile: "none"},
   {id: "workshop", label: "Class or workshop", categoryId: "classes-workshops",
-    durationMinutes: 120, registrationMode: "free_ticket", attendanceProfile: "hybrid"},
+    durationMinutes: 120, registrationMode: "rsvp", attendanceProfile: "none"},
   {id: "conference", label: "Conference or panel", categoryId: "business-networking",
-    durationMinutes: 240, registrationMode: "free_ticket", attendanceProfile: "staff_entry"},
+    durationMinutes: 240, registrationMode: "rsvp", attendanceProfile: "none"},
   {id: "webinar", label: "Online webinar", categoryId: "technology-innovation",
-    durationMinutes: 60, registrationMode: "rsvp", attendanceProfile: "self_check_in",
+    durationMinutes: 60, registrationMode: "rsvp", attendanceProfile: "none",
     locationType: "online"},
   {id: "music_social", label: "Music or social event", categoryId: "music-nightlife",
-    durationMinutes: 180, registrationMode: "free_ticket", attendanceProfile: "hybrid"},
+    durationMinutes: 180, registrationMode: "rsvp", attendanceProfile: "none"},
   {id: "fitness_outdoor", label: "Fitness or outdoor activity", categoryId: "sports-fitness",
-    durationMinutes: 90, registrationMode: "rsvp", attendanceProfile: "hybrid"},
+    durationMinutes: 90, registrationMode: "rsvp", attendanceProfile: "none"},
   {id: "fundraiser", label: "Fundraiser or volunteer event", categoryId: "community-causes",
-    durationMinutes: 180, registrationMode: "rsvp", attendanceProfile: "hybrid"},
+    durationMinutes: 180, registrationMode: "rsvp", attendanceProfile: "none"},
 ]);
 
 function plainObject(value) {
@@ -128,11 +128,11 @@ function normalizeCheckInPolicy(raw, registrationMode) {
     eligibility: enumValue(data.eligibility, CHECK_IN_ELIGIBILITY, defaultEligibility),
     opensBeforeMinutes: boundedInteger(data.opensBeforeMinutes, 0, 1440, 60),
     closesAfterMinutes: boundedInteger(data.closesAfterMinutes, 0, 1440, 60),
-    allowReentry: booleanValue(data.allowReentry),
-    checkoutEnabled: booleanValue(data.checkoutEnabled),
-    proximityAssist: booleanValue(data.proximityAssist),
-    staffFallback: booleanValue(data.staffFallback, true),
-    passLockEnabled: booleanValue(data.passLockEnabled),
+    allowReentry: data.profile !== "none" && booleanValue(data.allowReentry),
+    checkoutEnabled: data.profile !== "none" && booleanValue(data.checkoutEnabled),
+    proximityAssist: data.profile !== "none" && booleanValue(data.proximityAssist),
+    staffFallback: data.profile !== "none" && booleanValue(data.staffFallback, true),
+    passLockEnabled: data.profile !== "none" && booleanValue(data.passLockEnabled),
     needsOrganizerReview: false,
   };
 }

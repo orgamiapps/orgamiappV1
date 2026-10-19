@@ -205,7 +205,8 @@ class _PublicRegistrationCardState extends State<PublicRegistrationCard> {
                   ),
                 ),
                 actions: [
-                  if (_status['status'] == 'confirmed' &&
+                  if (widget.event.checkInPolicy.attendanceEnabled &&
+                      _status['status'] == 'confirmed' &&
                       !_needsSelection &&
                       widget.onViewPass != null)
                     TextButton(
@@ -281,7 +282,9 @@ class _PublicRegistrationCardState extends State<PublicRegistrationCard> {
       action = _load;
     } else if (_needsSelection) {
       label = 'Choose a registration or ticket below';
-    } else if (confirmed && checkInTime) {
+    } else if (confirmed &&
+        checkInTime &&
+        event.checkInPolicy.attendanceEnabled) {
       label = 'Check in';
       action = widget.onCheckIn;
     } else if ([
@@ -347,7 +350,7 @@ class _PublicRegistrationCardState extends State<PublicRegistrationCard> {
             child: Text(label),
           ),
         ),
-        if (confirmed && checkInTime)
+        if (confirmed && checkInTime && event.checkInPolicy.attendanceEnabled)
           TextButton(
             onPressed: _view,
             child: const Text('View registration or ticket'),

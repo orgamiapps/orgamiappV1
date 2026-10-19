@@ -4,6 +4,31 @@ import 'package:attendus/models/event_wizard_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test(
+    'new events and every curated template default to RSVP without attendance',
+    () {
+      final draft = EventWizardDraft.blank();
+      expect(draft.registrationMode, EventRegistrationMode.rsvp);
+      expect(draft.checkInPolicy.profile, CheckInProfile.none);
+      for (final template in EventWizardTemplate.curated) {
+        draft.applyTemplate(template);
+        expect(draft.registrationMode, EventRegistrationMode.rsvp);
+        expect(draft.checkInPolicy.profile, CheckInProfile.none);
+        final restored = EventWizardDraft.fromJson(draft.toFormJson());
+        expect(restored.checkInPolicy.profile, CheckInProfile.none);
+      }
+      draft.registrationMode = EventRegistrationMode.freeTicket;
+      expect(
+        EventWizardDraft.fromJson(draft.toFormJson()).registrationMode,
+        EventRegistrationMode.freeTicket,
+      );
+      expect(
+        EventWizardDraft.fromJson({}).checkInPolicy.profile,
+        CheckInProfile.hybrid,
+      );
+    },
+  );
+
   test('local picker instants cross the server boundary with explicit UTC', () {
     final start = DateTime(2027, 7, 14, 9, 30);
     final end = start.add(const Duration(hours: 2));
@@ -114,6 +139,6 @@ void main() {
     );
     expect(draft.startAt, start);
     expect(draft.locationType, 'online');
-    expect(draft.checkInPolicy.profile, CheckInProfile.selfCheckIn);
+    expect(draft.checkInPolicy.profile, CheckInProfile.none);
   });
 }

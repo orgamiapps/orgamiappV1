@@ -426,7 +426,6 @@ void main() {
         find.widgetWithText(TextField, 'Question'),
         'Accessibility needs',
       );
-      await tapText(tester, 'Registration');
       await tapText(tester, 'Save question');
       await tapText(tester, 'Continue');
       await until(
@@ -434,6 +433,7 @@ void main() {
         () => find.text('Step 3 of 4').evaluate().isNotEmpty,
         'Attendance stage',
       );
+      await tapText(tester, 'Hybrid');
       await tapText(tester, 'Continue');
       await until(
         tester,

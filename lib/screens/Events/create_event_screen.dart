@@ -1630,6 +1630,7 @@ class _CreateEventScreenState extends State<CreateEventScreen>
   }
 
   List<String> _methodsForPolicy(CheckInProfile profile) => switch (profile) {
+    CheckInProfile.none => const [],
     CheckInProfile.selfCheckIn => ['qr_code', 'manual_code'],
     CheckInProfile.staffEntry => ['personal_pass', 'staff_roster'],
     CheckInProfile.hybrid => [

@@ -16,7 +16,7 @@ configuration keeps the existing create and edit screens active.
 - `startPublicRegistrationV3` adds versioned registration-question answers plus pending,
   confirmed, and waitlisted outcomes. V2 remains deployed for rollback.
 
-Attendance settings map only to Attendance 2.0 profiles (`self_check_in`, `staff_entry`, and
+Attendance settings map only to Attendance 2.0 profiles (`none`, `self_check_in`, `staff_entry`, and
 `hybrid`) and eligibility values. The wizard never enables facial recognition, legacy geofencing,
 or background attendance tracking.
 
@@ -49,3 +49,30 @@ The tool refuses unknown projects and versions.
 - Roll back immediately for any duplicate occurrence or ticket, private draft exposure, or
   publish/autosave error threshold breach.
 - Keep V1 callables and screens for one full release cycle.
+
+
+New events (blank, curated/saved templates, and duplicates) start with RSVP registration
+and the explicit `none` attendance profile. Existing events and restored drafts retain
+their saved policies; missing legacy policies keep their historical defaults.
+`none` keeps registration, capacity, waitlists, and registration questions available,
+but disables attendance methods, advanced controls, attendance passes, Smart Arrival,
+manual entry, and offline replay. Ticket registration can be selected independently.
+Historical attendance and saved check-in questions are retained. Backend attendance
+support must be deployed before the client; no existing-event migration is needed.
+
+### RSVP-only validation (2026-10-18)
+
+- 18 targeted Flutter tests passed (policy, draft model, wizard widgets, check-in service).
+- 44 targeted Node tests passed, including actual callable handlers with in-memory
+  transactions rejecting all credential types and offline submissions for `none`,
+  preserving historical attendance, and retaining RSVP approval behavior.
+- Analysis of the 14 changed Dart files passed; changed backend files passed ESLint.
+- The isolated `integration_test/rsvp_only_harness.dart` web build passed. An Edge
+  walkthrough reached all four steps, verified RSVP registration, toggled Hybrid
+  and RSVP-only with advanced settings visibility, and verified the ticket-specific
+  no-attendance label. The harness uses a fake repository, not production publication.
+- Screenshot: `build/rsvp-only-browser/step-3-rsvp-only.png`.
+- Real Firestore attendance integration remains unverified: two emulator starts
+  timed out before port 8180 became available. The added emulator regression is
+  retained in `functions/test/arrival-emulator.test.js` for the next successful run.
+- No deployment or production data migration was performed.

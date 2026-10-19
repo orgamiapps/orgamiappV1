@@ -192,7 +192,9 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
     final form = Map<String, dynamic>.from(
       template['formData'] as Map? ?? const {},
     );
-    final replacement = EventWizardDraft.fromJson({'formData': form});
+    final replacement = EventWizardDraft.fromJson({'formData': form})
+      ..registrationMode = EventRegistrationMode.rsvp
+      ..checkInPolicy = const CheckInPolicy(profile: CheckInProfile.none);
     replacement
       ..draftId = _draft.draftId
       ..revision = _draft.revision
@@ -1674,6 +1676,10 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
                 },
                 itemBuilder: (_, index) {
                   final question = _draft.questions[index];
+                  if (!_draft.checkInPolicy.attendanceEnabled &&
+                      question.timing == EventQuestionTiming.checkIn) {
+                    return SizedBox.shrink(key: ValueKey(question.id));
+                  }
                   return ListTile(
                     key: ValueKey(question.id),
                     leading: const Icon(Icons.drag_handle),
@@ -1713,6 +1719,7 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
     final question = EventWizardQuestion(
       id: 'question-${DateTime.now().microsecondsSinceEpoch}',
       prompt: '',
+      timing: EventQuestionTiming.registration,
     );
     await _showQuestionEditor(question, isNew: true);
   }
@@ -1729,7 +1736,7 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
     var type = question.type;
     var timing = question.timing;
     var required = question.required;
-    final saved = await showDialog<bool>(
+    final route = DialogRoute<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
@@ -1775,21 +1782,22 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
                     ),
                   ],
                   const SizedBox(height: 14),
-                  SegmentedButton<EventQuestionTiming>(
-                    segments: const [
-                      ButtonSegment(
-                        value: EventQuestionTiming.registration,
-                        label: Text('Registration'),
-                      ),
-                      ButtonSegment(
-                        value: EventQuestionTiming.checkIn,
-                        label: Text('Check-in'),
-                      ),
-                    ],
-                    selected: {timing},
-                    onSelectionChanged: (value) =>
-                        setDialogState(() => timing = value.first),
-                  ),
+                  if (_draft.checkInPolicy.attendanceEnabled)
+                    SegmentedButton<EventQuestionTiming>(
+                      segments: const [
+                        ButtonSegment(
+                          value: EventQuestionTiming.registration,
+                          label: Text('Registration'),
+                        ),
+                        ButtonSegment(
+                          value: EventQuestionTiming.checkIn,
+                          label: Text('Check-in'),
+                        ),
+                      ],
+                      selected: {timing},
+                      onSelectionChanged: (value) =>
+                          setDialogState(() => timing = value.first),
+                    ),
                   SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('Required'),
@@ -1814,7 +1822,10 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
         ),
       ),
     );
-    if (saved == true && prompt.text.trim().isNotEmpty) {
+    final saved = await Navigator.of(context, rootNavigator: true).push(route);
+    // The pop result arrives before the reverse transition removes text fields.
+    await route.completed;
+    if (mounted && saved == true && prompt.text.trim().isNotEmpty) {
       setState(() {
         question.prompt = prompt.text.trim();
         question.type = type;
@@ -2063,11 +2074,13 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
             const _SectionTitle(
               icon: Icons.how_to_reg,
               title: 'Arrival and attendance',
-              subtitle: 'Hybrid is the most flexible setup for most events.',
+              subtitle:
+                  'Attendance tracking is optional. Start with RSVP only.',
             ),
             const SizedBox(height: 14),
             for (final profile in CheckInProfile.values)
               _AttendancePresetTile(
+                rsvpOnly: _draft.registrationMode == EventRegistrationMode.rsvp,
                 profile: profile,
                 selected: _draft.checkInPolicy.profile == profile,
                 onTap: () {
@@ -2089,30 +2102,31 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
                 },
               ),
             const SizedBox(height: 8),
-            ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              initiallyExpanded: _advancedAttendance,
-              onExpansionChanged: (value) {
-                setState(() => _advancedAttendance = value);
-                if (value) {
-                  unawaited(
-                    _funnel.record(
-                      'event_wizard_advanced_attendance_opened',
-                      dimensions: {'mode': _draft.mode},
-                    ),
-                  );
-                }
-              },
-              leading: const Icon(Icons.security_outlined),
-              title: const Text(
-                'Advanced check-in & security',
-                style: TextStyle(fontWeight: FontWeight.w700),
+            if (_draft.checkInPolicy.attendanceEnabled)
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                initiallyExpanded: _advancedAttendance,
+                onExpansionChanged: (value) {
+                  setState(() => _advancedAttendance = value);
+                  if (value) {
+                    unawaited(
+                      _funnel.record(
+                        'event_wizard_advanced_attendance_opened',
+                        dimensions: {'mode': _draft.mode},
+                      ),
+                    );
+                  }
+                },
+                leading: const Icon(Icons.security_outlined),
+                title: const Text(
+                  'Advanced check-in & security',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: const Text(
+                  'Timing, re-entry, checkout, proximity, and pass protection',
+                ),
+                children: [_buildAdvancedAttendance()],
               ),
-              subtitle: const Text(
-                'Timing, re-entry, checkout, proximity, and pass protection',
-              ),
-              children: [_buildAdvancedAttendance()],
-            ),
           ],
         ),
       ),
@@ -3205,16 +3219,25 @@ class _CoverPicker extends StatelessWidget {
 
 class _AttendancePresetTile extends StatelessWidget {
   const _AttendancePresetTile({
+    required this.rsvpOnly,
     required this.profile,
     required this.selected,
     required this.onTap,
   });
+  final bool rsvpOnly;
   final CheckInProfile profile;
   final bool selected;
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) {
     final (title, description, icon) = switch (profile) {
+      CheckInProfile.none => (
+        rsvpOnly
+            ? 'RSVP only — no attendance tracking'
+            : 'No attendance tracking',
+        'Keep registrations without recording attendance.',
+        Icons.event_available_outlined,
+      ),
       CheckInProfile.selfCheckIn => (
         'Self check-in',
         'Guests use the rotating venue QR or short code.',
@@ -3226,7 +3249,7 @@ class _AttendancePresetTile extends StatelessWidget {
         Icons.badge_outlined,
       ),
       CheckInProfile.hybrid => (
-        'Hybrid — Recommended',
+        'Hybrid',
         'Both arrival paths stay available with staff fallback.',
         Icons.sync_alt,
       ),

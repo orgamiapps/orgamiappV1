@@ -2,6 +2,36 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:attendus/models/check_in_policy.dart';
 
 void main() {
+  test('none suppresses every attendance feature and survives round trips', () {
+    final policy = const CheckInPolicy(
+      smartArrivalEnabled: true,
+      staffFallback: true,
+      checkoutEnabled: true,
+      allowReentry: true,
+      proximityAssist: true,
+      passLockEnabled: true,
+    ).copyWith(profile: CheckInProfile.none);
+    final restored = CheckInPolicy.fromJson(policy.toJson());
+    expect(restored.profile, CheckInProfile.none);
+    expect(restored.attendanceEnabled, isFalse);
+    expect(restored.attendeeSelfCheckInEnabled, isFalse);
+    expect(restored.staffEntryEnabled, isFalse);
+    for (final value in [
+      restored.smartArrivalEnabled,
+      restored.staffFallback,
+      restored.checkoutEnabled,
+      restored.allowReentry,
+      restored.proximityAssist,
+      restored.passLockEnabled,
+    ]) {
+      expect(value, isFalse);
+    }
+    expect(
+      restored.copyWith(profile: CheckInProfile.hybrid).attendanceEnabled,
+      isTrue,
+    );
+  });
+
   test('Attendance 2.0 defaults to Hybrid with a one-hour window', () {
     const policy = CheckInPolicy();
     expect(policy.profile, CheckInProfile.hybrid);

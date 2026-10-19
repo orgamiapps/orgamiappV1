@@ -145,7 +145,7 @@ class EventWizardTemplate {
     this.locationType = 'in_person',
     this.durationMinutes = 120,
     this.registrationMode = EventRegistrationMode.rsvp,
-    this.attendanceProfile = CheckInProfile.hybrid,
+    this.attendanceProfile = CheckInProfile.none,
   });
 
   final String id;
@@ -175,7 +175,7 @@ class EventWizardTemplate {
       label: 'Class or workshop',
       categoryId: 'classes-workshops',
       iconName: 'school',
-      registrationMode: EventRegistrationMode.freeTicket,
+      registrationMode: EventRegistrationMode.rsvp,
     ),
     EventWizardTemplate(
       id: 'conference',
@@ -183,8 +183,8 @@ class EventWizardTemplate {
       categoryId: 'business-networking',
       iconName: 'podium',
       durationMinutes: 240,
-      registrationMode: EventRegistrationMode.freeTicket,
-      attendanceProfile: CheckInProfile.staffEntry,
+      registrationMode: EventRegistrationMode.rsvp,
+      attendanceProfile: CheckInProfile.none,
     ),
     EventWizardTemplate(
       id: 'webinar',
@@ -193,7 +193,7 @@ class EventWizardTemplate {
       iconName: 'videocam',
       locationType: 'online',
       durationMinutes: 60,
-      attendanceProfile: CheckInProfile.selfCheckIn,
+      attendanceProfile: CheckInProfile.none,
     ),
     EventWizardTemplate(
       id: 'music_social',
@@ -201,7 +201,7 @@ class EventWizardTemplate {
       categoryId: 'music-nightlife',
       iconName: 'music',
       durationMinutes: 180,
-      registrationMode: EventRegistrationMode.freeTicket,
+      registrationMode: EventRegistrationMode.rsvp,
     ),
     EventWizardTemplate(
       id: 'fitness_outdoor',
@@ -269,7 +269,7 @@ class EventWizardDraft {
     this.publicContactVisible = false,
     this.coHosts = const [],
     this.checkInStaff = const [],
-    this.checkInPolicy = const CheckInPolicy(),
+    this.checkInPolicy = const CheckInPolicy(profile: CheckInProfile.none),
     this.recurrenceEnabled = false,
     this.recurrenceFrequency = EventRecurrenceFrequency.weekly,
     this.recurrenceInterval = 1,

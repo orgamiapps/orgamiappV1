@@ -1,3 +1,4 @@
+import 'package:attendus/models/check_in_policy.dart';
 import 'fixture_harness.dart';
 import 'roster_readiness.dart';
 import 'dart:convert';
@@ -229,6 +230,7 @@ void main() {
         startAt: start,
         endAt: start.add(const Duration(hours: 2)),
         title: 'Flutter organizer fixture',
+        checkInPolicy: const CheckInPolicy(profile: CheckInProfile.hybrid),
         description: 'Local multi-account verification.',
         locationType: 'online',
         location: 'https://example.test/fixture',

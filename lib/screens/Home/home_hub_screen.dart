@@ -286,29 +286,41 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
             ),
             child: Column(
               children: [
-                if (!isGuestMode) _buildSegmentedTabs(),
-                if (_tabIndex == 0 || isGuestMode)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: Semantics(
-                        label: 'View events map',
-                        button: true,
-                        child: Tooltip(
-                          message: 'View events map',
-                          excludeFromSemantics: true,
-                          child: IconButton(
-                            onPressed: () => RouterClass.nextScreenNormal(
-                              context,
-                              const GlobalEventsMapScreen(),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    key: const ValueKey('discover-mode-toolbar'),
+                    children: [
+                      Expanded(
+                        child: isGuestMode
+                            ? const SizedBox.shrink()
+                            : _buildSegmentedTabs(),
+                      ),
+                      if (_tabIndex == 0 || isGuestMode) ...[
+                        const SizedBox(width: 8),
+                        Semantics(
+                          label: 'View events map',
+                          button: true,
+                          child: Tooltip(
+                            message: 'View events map',
+                            excludeFromSemantics: true,
+                            child: IconButton(
+                              constraints: const BoxConstraints.tightFor(
+                                width: 48,
+                                height: 48,
+                              ),
+                              onPressed: () => RouterClass.nextScreenNormal(
+                                context,
+                                const GlobalEventsMapScreen(),
+                              ),
+                              icon: const Icon(Icons.map_outlined),
                             ),
-                            icon: const Icon(Icons.map_outlined),
                           ),
                         ),
-                      ),
-                    ),
+                      ],
+                    ],
                   ),
+                ),
                 if ((_tabIndex == 0 || isGuestMode) &&
                     widget._publicContentOverride == null)
                   const SmartArrivalCard(),
@@ -454,8 +466,15 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
       widget._guestModeOverride ?? GuestModeService().isGuestMode;
 
   Widget _buildSegmentedTabs() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+    final theme = Theme.of(context);
+    return Theme(
+      data: theme.copyWith(
+        chipTheme: theme.chipTheme.copyWith(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+          labelStyle: theme.textTheme.labelLarge,
+        ),
+      ),
       child: AttendUsFilterChipGroup<int>(
         multiSelect: false,
         selectedValues: {_tabIndex},

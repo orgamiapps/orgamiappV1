@@ -4,7 +4,7 @@ const crypto = require("node:crypto");
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {FieldValue, Timestamp} = require("firebase-admin/firestore");
 
-const PROFILES = new Set(["self_check_in", "staff_entry", "hybrid"]);
+const PROFILES = new Set(["none", "self_check_in", "staff_entry", "hybrid"]);
 const ELIGIBILITY = new Set(["open", "registered_only", "ticket_required"]);
 const CREDENTIAL_TYPES = new Set([
   "location",
@@ -51,11 +51,11 @@ function normalizePolicy(event) {
       closesAfterMinutes: boundedInteger(
           supplied.closesAfterMinutes, 60, 0, 1440,
       ),
-      allowReentry: supplied.allowReentry === true,
-      checkoutEnabled: supplied.checkoutEnabled === true,
-      proximityAssist: supplied.proximityAssist === true,
-      staffFallback: supplied.staffFallback !== false,
-      passLockEnabled: supplied.passLockEnabled === true,
+      allowReentry: supplied.profile !== "none" && supplied.allowReentry === true,
+      checkoutEnabled: supplied.profile !== "none" && supplied.checkoutEnabled === true,
+      proximityAssist: supplied.profile !== "none" && supplied.proximityAssist === true,
+      staffFallback: supplied.profile !== "none" && supplied.staffFallback !== false,
+      passLockEnabled: supplied.profile !== "none" && supplied.passLockEnabled === true,
       needsOrganizerReview: supplied.needsOrganizerReview === true,
     };
   }
@@ -314,6 +314,7 @@ async function enforceRateLimit(
 async function getEvent(db, eventId) {
   const snapshot = await db.collection("Events").doc(eventId).get();
   if (!snapshot.exists) throw new HttpsError("not-found", "Event not found.");
+  require("./policy").assertAttendanceEnabled(snapshot.data());
   return {ref: snapshot.ref, data: {...snapshot.data(), id: snapshot.id}};
 }
 

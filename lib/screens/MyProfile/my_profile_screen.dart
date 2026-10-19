@@ -11,6 +11,7 @@ import 'package:attendus/Utils/toast.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:attendus/screens/MyProfile/my_tickets_screen.dart';
+import 'package:attendus/screens/MyProfile/my_registrations_screen.dart';
 import 'package:attendus/screens/MyProfile/user_profile_screen.dart';
 import 'package:attendus/screens/MyProfile/Widgets/professional_badge_widget.dart';
 import 'package:attendus/models/badge_model.dart';
@@ -55,6 +56,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   bool isLoading = true;
   int selectedTab = 1; // 1 = Created, 2 = Attended, 3 = Saved
   bool isDiscoverable = true; // User discoverability setting
+  final _profileEventsKey = GlobalKey();
 
   // Pagination state for each tab
   Map<int, DocumentSnapshot?> _lastDocuments = {};
@@ -372,6 +374,22 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     }
   }
 
+  void _openActivityTab(int index) {
+    _onTabChanged(index);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final target = _profileEventsKey.currentContext;
+      if (target == null) return;
+      Scrollable.ensureVisible(
+        target,
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = CustomerController.logeInCustomer;
@@ -530,10 +548,16 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           child: CustomScrollView(
             slivers: [
               SliverToBoxAdapter(child: _buildProfileHeader(user)),
+              SliverToBoxAdapter(child: _buildActivityLinks()),
               SliverToBoxAdapter(child: _buildBadgeSection()),
               SliverToBoxAdapter(child: _buildDiscoverabilitySection()),
               SliverToBoxAdapter(child: _buildMyTicketsSection()),
-              SliverToBoxAdapter(child: _buildTabBar()),
+              SliverToBoxAdapter(
+                child: KeyedSubtree(
+                  key: _profileEventsKey,
+                  child: _buildTabBar(),
+                ),
+              ),
               SliverToBoxAdapter(child: _buildTabContent()),
             ],
           ),
@@ -541,6 +565,36 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       ),
     );
   }
+
+  Widget _buildActivityLinks() => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+    child: Wrap(
+      key: const ValueKey('profile-activity-links'),
+      spacing: 8,
+      runSpacing: 4,
+      children: [
+        ActionChip(
+          avatar: const Icon(Icons.confirmation_number_outlined, size: 18),
+          label: const Text('Registrations and tickets'),
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const MyRegistrationsScreen(),
+            ),
+          ),
+        ),
+        ActionChip(
+          avatar: const Icon(Icons.bookmark_outline, size: 18),
+          label: const Text('Saved events'),
+          onPressed: () => _openActivityTab(3),
+        ),
+        ActionChip(
+          avatar: const Icon(Icons.event_note_outlined, size: 18),
+          label: const Text('Organizer workspace'),
+          onPressed: () => _openActivityTab(1),
+        ),
+      ],
+    ),
+  );
 
   Widget _buildProfileHeader(CustomerModel? user) {
     return Container(
