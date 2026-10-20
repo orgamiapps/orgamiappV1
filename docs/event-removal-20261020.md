@@ -127,3 +127,28 @@ The actual receipt/manifests were independently reconciled, and 64 focused
 rollback, retired-fixture, and release-contract tests passed. This is release
 preparation evidence; no staging deployment or production qualification follows
 from these checks alone.
+
+## Fresh staging prerequisite after the held activation
+
+Candidate `39477954816`, source
+`7bf56a800ef295a40cba234a77c1d217d0ebc2cb`, successfully deployed staging
+at `2026-10-20T19:24:09.583Z`. Both local activation attempts stopped before
+seed-intent. The first failed during Windows long-path extraction; the second
+passed extraction but failed during read-only preseed snapshots. Its exact
+cause was not retained and remains unknown. Subsequent read-only checks passed,
+but the first-write window expired. This candidate remains held, with both
+journals and deployment artifacts preserved; no qualification clock is reset.
+
+The owner approved a fresh staging attempt. At
+`2026-10-20T21:56:02.424Z`, all 152 current staging source generations were
+retained using new create-only private backups and verified by byte hash.
+Their identities match the held candidate's immutable deployment receipt.
+All 152 production manifest entries and earlier archive objects are preserved.
+The new manifest SHA-256 is
+`c3459b670de775509fcc44a4c7701a73ebce5cde5bf0b7e0739793b9d62277e2`.
+No fixture or account cleanup was repeated.
+
+This update changes only the predecessor archive prerequisite and evidence.
+The fresh candidate still requires protected CI, a new first-attempt deployment,
+timely activation and first observation, all 13 qualification gates, separate
+live event-removal and physical iPhone acceptance, and production verification.
