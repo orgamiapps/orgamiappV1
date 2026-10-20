@@ -47,6 +47,14 @@ class EventShareService {
     ].join('\n');
   }
 
+  /// Maps trusted website QRs to the existing details-only scanner flow.
+  static String? scannerCodeFromUrl(String value) {
+    final uri = Uri.tryParse(value);
+    if (uri == null || !uri.hasScheme || !uri.hasAuthority) return null;
+    final id = eventIdFromUri(uri);
+    return id == null ? null : 'attendus_event:v1:$id';
+  }
+
   static Future<ShareResult> shareLink(EventModel event) {
     return SharePlus.instance.share(
       ShareParams(
