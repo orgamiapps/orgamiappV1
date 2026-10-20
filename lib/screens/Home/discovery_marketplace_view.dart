@@ -974,13 +974,9 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('For you', style: Theme.of(context).textTheme.titleLarge),
-              if (!_loading)
+              if (_fixedMiles != null)
                 Text(
-                  _resolvedMiles == null
-                      ? 'Showing events nationwide'
-                      : _fixedMiles != null || _resolvedMiles == 25
-                      ? 'Within $_resolvedMiles miles'
-                      : 'Expanded to $_resolvedMiles miles',
+                  'Showing events within $_fixedMiles miles',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
             ],

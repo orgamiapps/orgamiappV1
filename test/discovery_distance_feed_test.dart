@@ -19,6 +19,7 @@ void main() {
   Future<DiscoveryFixture> mount(
     WidgetTester tester, {
     double width = 390,
+    double scale = 1,
     bool nationwide = false,
     Future<dynamic> Function(String, Map<String, dynamic>)? handler,
   }) async {
@@ -43,13 +44,36 @@ void main() {
       );
     }
     fixture.functions.handler = handler;
-    await tester.pumpWidget(fixture.app());
+    await tester.pumpWidget(fixture.app(textScale: scale));
     await settle(tester);
     addTearDown(() async {
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump(const Duration(seconds: 30));
     });
     return fixture;
+  }
+
+  for (final radius in <int?>[25, 100, null]) {
+    testWidgets('Auto has no subtitle at radius $radius with enlarged text', (
+      tester,
+    ) async {
+      await mount(
+        tester,
+        scale: 2,
+        nationwide: radius == null,
+        handler: (name, data) async => {
+          'feedVersion': 1,
+          'radiusMiles': radius,
+          'events': <dynamic>[],
+        },
+      );
+      expect(find.text('For you'), findsOneWidget);
+      expect(find.text('Auto'), findsOneWidget);
+      expect(find.textContaining('Showing events'), findsNothing);
+      expect(find.textContaining('Expanded to'), findsNothing);
+      expect(find.textContaining('Within '), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testWidgets(
@@ -102,7 +126,7 @@ void main() {
         await tester.tap(find.text('10 miles'));
         await tester.tap(find.text('Apply'));
         await settle(tester);
-        expect(find.text('Within 10 miles'), findsOneWidget);
+        expect(find.text('Showing events within 10 miles'), findsOneWidget);
         expect(
           (await SharedPreferences.getInstance()).getInt(
             'discovery_fixed_miles',
@@ -116,6 +140,25 @@ void main() {
         await tester.tap(find.text('Cancel'));
         await settle(tester);
         expect(find.text('10 mi'), findsOneWidget);
+        expect(find.text('Showing events within 10 miles'), findsOneWidget);
+        for (final miles in [5, 25, 50, 100]) {
+          await tester.tap(find.byIcon(Icons.radar));
+          await settle(tester);
+          await tester.tap(find.text('$miles miles'));
+          await tester.tap(find.text('Apply'));
+          await settle(tester);
+          expect(
+            find.text('Showing events within $miles miles'),
+            findsOneWidget,
+          );
+        }
+        await tester.tap(find.byIcon(Icons.radar));
+        await settle(tester);
+        await tester.tap(find.text('Auto'));
+        await tester.tap(find.text('Apply'));
+        await settle(tester);
+        expect(find.textContaining('Showing events'), findsNothing);
+        expect(find.textContaining('Expanded to'), findsNothing);
         expect(tester.takeException(), isNull);
       },
     );
@@ -134,6 +177,7 @@ void main() {
       await tester.pumpWidget(fixture.app());
       await settle(tester);
       expect(find.text('50 mi'), findsOneWidget);
+      expect(find.text('Showing events within 50 miles'), findsOneWidget);
       await GuestModeService().initialize();
       await tester.ensureVisible(find.text('+ Create event'));
       await tester.tap(find.text('+ Create event'));
@@ -159,7 +203,7 @@ void main() {
       await settle(tester);
       await tester.tapAt(const Offset(5, 5));
       await settle(tester);
-      expect(find.text('Within 5 miles'), findsOneWidget);
+      expect(find.text('Showing events within 5 miles'), findsOneWidget);
       await tester.tap(find.text('Bonita Springs, FL'));
       await settle(tester);
       await tester.tap(find.text('Browse online and nationwide'));
