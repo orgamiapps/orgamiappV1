@@ -37,6 +37,7 @@ import 'package:attendus/Utils/images.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
 import 'package:attendus/Services/guest_mode_service.dart';
 import 'package:attendus/Services/public_events_repository.dart';
+import 'package:attendus/Services/event_lifecycle_store.dart';
 import 'package:attendus/widgets/public_events_error_state.dart';
 
 // Enum for sort options
@@ -134,6 +135,41 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   late final PublicEventsDataSource _publicEventsDataSource;
   final PublicEventsFeedState _publicEventsFeedState = PublicEventsFeedState();
+  final _lifecycle = EventLifecycleStore.instance;
+  late final EventLifecycleLease _lifecycleLease;
+  List<EventModel> _lifecycleFeedEvents = const [];
+  String _lifecycleSuppression = '';
+
+  void _syncLifecycleIds() {
+    _lifecycleLease.update([
+      ..._lifecycleFeedEvents.map((event) => event.id),
+      ..._searchEvents.map((event) => event.id),
+      ..._defaultEvents.map((event) => event.id),
+    ]);
+  }
+
+  void _onLifecycleChanged() {
+    if (!mounted) return;
+    final removed = {
+      for (final event in [
+        ..._lifecycleFeedEvents,
+        ..._searchEvents,
+        ..._defaultEvents,
+      ])
+        if (!_lifecycle.allowsDiscovery(event.id)) event.id,
+    }.toList()..sort();
+    final signature = removed.join('|');
+    if (signature == _lifecycleSuppression) return;
+    _lifecycleSuppression = signature;
+    setState(() {
+      _searchEvents.removeWhere(
+        (event) => !_lifecycle.allowsDiscovery(event.id),
+      );
+      _defaultEvents.removeWhere(
+        (event) => !_lifecycle.allowsDiscovery(event.id),
+      );
+    });
+  }
 
   double radiusInMiles = 0;
   // Slider control value in range 0..1 for non-linear distance mapping
@@ -295,6 +331,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    _lifecycleLease = _lifecycle.retain(const []);
+    _lifecycle.addListener(_onLifecycleChanged);
     _publicEventsDataSource =
         widget.publicEventsDataSource ?? PublicEventsRepository();
     selectedCategories =
@@ -383,6 +421,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _lifecycle.removeListener(_onLifecycleChanged);
+    _lifecycleLease.dispose();
     _history?.dispose();
     _scrollController?.dispose();
     _pulseController.dispose();
@@ -615,7 +655,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   List<EventModel> filterEvents(List<EventModel> events) {
-    List<EventModel> filteredEvents = events;
+    List<EventModel> filteredEvents = events
+        .where((event) => _lifecycle.allowsDiscovery(event.id))
+        .toList();
 
     // Filter by categories (excluding Featured - Featured filter only controls carousel visibility)
     List<String> nonFeaturedCategories = selectedCategories
@@ -1197,6 +1239,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         final availableEvents = snapshot.hasData && !snapshot.hasError
             ? snapshot.data!
             : _publicEventsFeedState.lastSuccessfulEvents;
+        _lifecycleFeedEvents = availableEvents;
+        _syncLifecycleIds();
 
         if (availableEvents.isEmpty) {
           return _buildEmptyState();
@@ -1499,6 +1543,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // Search results methods
   Widget _buildEventsSearchResults() {
+    _searchEvents = _searchEvents
+        .where((event) => _lifecycle.allowsDiscovery(event.id))
+        .toList();
+    _syncLifecycleIds();
     if (_isSearchingEvents) {
       return _buildSearchLoadingState();
     }
@@ -1808,6 +1856,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // Build default events content
   Widget _buildDefaultEventsContent() {
+    _defaultEvents = _defaultEvents
+        .where((event) => _lifecycle.allowsDiscovery(event.id))
+        .toList();
+    _syncLifecycleIds();
     if (_isLoadingDefaultEvents) {
       return const Center(
         child: CircularProgressIndicator(color: Color(0xFF667EEA)),

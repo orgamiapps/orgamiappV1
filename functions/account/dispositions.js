@@ -10,6 +10,7 @@ const DELETE_QUERIES = Object.freeze([
   ["Messages", "senderId", "=="],
   ["notifications", "userId", "=="],
   ["EventDrafts", "ownerUid", "=="],
+  ["EventDeletionReceipts", "actorUid", "=="],
   ["GuestManageSessions", "ownerUid", "=="],
   ["TicketReservations", "customerUid", "=="],
   ["Comments", "userId", "=="],

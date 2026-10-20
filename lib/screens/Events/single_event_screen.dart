@@ -1,3 +1,7 @@
+import 'package:attendus/Services/event_availability_service.dart';
+import 'package:attendus/Services/event_lifecycle_store.dart';
+import 'package:attendus/Services/event_removal_navigation.dart';
+import 'package:attendus/widgets/deferred_shared_event_screen.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:attendus/widgets/event_practical_details.dart';
 import 'dart:convert';
@@ -137,19 +141,26 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   Future<void> _loadCapabilities() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
+    final eventId = eventModel.id;
     try {
       final result = await FirebaseFunctions.instance
           .httpsCallable('getEventCapabilitiesV1')
-          .call({'eventId': eventModel.id})
+          .call({'eventId': eventId})
           .timeout(const Duration(seconds: 15));
-      if (mounted && FirebaseAuth.instance.currentUser?.uid == uid) {
+      if (mounted &&
+          FirebaseAuth.instance.currentUser?.uid == uid &&
+          eventModel.id == eventId &&
+          EventLifecycleStore.instance.allowsHistory(eventId)) {
         setState(() {
           _capabilityUid = uid;
           _serverManager = result.data['permissions']['manageEvent'] == true;
         });
       }
     } catch (_) {
-      if (mounted && FirebaseAuth.instance.currentUser?.uid == uid) {
+      if (mounted &&
+          FirebaseAuth.instance.currentUser?.uid == uid &&
+          eventModel.id == eventId &&
+          EventLifecycleStore.instance.allowsHistory(eventId)) {
         setState(() {
           _capabilityUid = uid;
           _serverManager = false;
@@ -158,8 +169,13 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     }
   }
 
-  StreamSubscription<DocumentSnapshot>? _eventSubscription;
-  Timer? _streamDebounceTimer;
+  EventLifecycleLease? _eventLease;
+  EventLifecycleState? _lastLifecycle;
+  Route<dynamic>? _eventRoute;
+  bool? _restrictedEvent;
+  bool _resolvingAvailability = false;
+  int _availabilityGeneration = 0;
+  int _observedLifecycleSession = -1;
 
   // Live Quiz related state
   LiveQuizModel? _liveQuiz;
@@ -1279,6 +1295,9 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     _selectionUid = FirebaseAuth.instance.currentUser?.uid;
     _selectionAuth = FirebaseAuth.instance.authStateChanges().listen((user) {
       if (user?.uid != _selectionUid && mounted) {
+        _availabilityGeneration++;
+        _resolvingAvailability = false;
+        _restrictedEvent = null;
         setState(() {
           _selectionUid = user?.uid;
           _selectedRegistrationId = null;
@@ -1287,6 +1306,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
           _isRsvpStatusLoading = true;
         });
         _checkRsvpStatus();
+        _lastLifecycle = null;
+        _onEventLifecycleChanged();
       }
     });
 
@@ -1371,24 +1392,89 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   }
 
   void _setupEventStreamListener() {
-    _eventSubscription = FirebaseFirestore.instance
-        .collection(EventModel.firebaseKey)
-        .doc(widget.eventModel.id)
-        .snapshots()
-        .listen((snapshot) {
-          if (!snapshot.exists || !mounted) return;
-
-          // Debounce rapid stream updates to prevent UI blocking
-          _streamDebounceTimer?.cancel();
-          _streamDebounceTimer = Timer(const Duration(milliseconds: 300), () {
-            if (!mounted) return;
-            _processEventUpdate(snapshot);
-          });
-        });
+    EventLifecycleStore.instance.removeListener(_onEventLifecycleChanged);
+    _eventLease?.dispose();
+    _lastLifecycle = null;
+    _eventLease = EventLifecycleStore.instance.retain([eventModel.id]);
+    EventLifecycleStore.instance.addListener(_onEventLifecycleChanged);
+    _onEventLifecycleChanged();
   }
 
-  void _processEventUpdate(DocumentSnapshot snapshot) {
-    final newEventModel = EventModel.fromJson(snapshot.data()!);
+  void _onEventLifecycleChanged() {
+    if (!mounted) return;
+    final session = EventLifecycleStore.instance.sessionGeneration;
+    if (session != _observedLifecycleSession) {
+      _observedLifecycleSession = session;
+      _availabilityGeneration++;
+      _resolvingAvailability = false;
+      _restrictedEvent = null;
+    }
+    final lifecycle = EventLifecycleStore.instance.stateFor(eventModel.id);
+    if (identical(lifecycle, _lastLifecycle)) return;
+    _lastLifecycle = lifecycle;
+    if (lifecycle.status == EventLifecycleStatus.deleted ||
+        lifecycle.status == EventLifecycleStatus.unavailable) {
+      setState(() {
+        _capabilityUid = null;
+        _serverManager = false;
+      });
+      if (lifecycle.status == EventLifecycleStatus.unavailable &&
+          !_resolvingAvailability) {
+        unawaited(_resolveUnavailableEvent());
+      }
+      return;
+    }
+    _availabilityGeneration++;
+    _restrictedEvent = null;
+    _resolvingAvailability = false;
+    if (_capabilityUid != FirebaseAuth.instance.currentUser?.uid) {
+      unawaited(_loadCapabilities());
+    }
+    if (lifecycle.data != null) {
+      _processEventUpdate(lifecycle.data!);
+    } else if (lifecycle.status == EventLifecycleStatus.cancelled) {
+      setState(() => eventModel.status = 'cancelled');
+    }
+  }
+
+  Future<void> _resolveUnavailableEvent() async {
+    final generation = ++_availabilityGeneration;
+    final eventId = eventModel.id;
+    final sessionGeneration = EventLifecycleStore.instance.sessionGeneration;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    setState(() {
+      _resolvingAvailability = true;
+      _restrictedEvent = null;
+    });
+    final availability = await resolveDeniedEventRead(eventId);
+    if (!mounted ||
+        generation != _availabilityGeneration ||
+        eventId != eventModel.id ||
+        sessionGeneration != EventLifecycleStore.instance.sessionGeneration ||
+        uid != FirebaseAuth.instance.currentUser?.uid) {
+      return;
+    }
+    setState(() {
+      _resolvingAvailability = false;
+      _restrictedEvent = availability == DeniedEventRead.restricted;
+    });
+    if (availability == DeniedEventRead.notFound) {
+      EventLifecycleStore.instance.applyConfirmed(
+        eventIds: [eventId],
+        status: EventLifecycleStatus.deleted,
+      );
+    }
+  }
+
+  Future<void> _removeEvent() async {
+    final result = await showEventRemovalDialog(context, eventModel);
+    if (mounted && result != null) {
+      EventRemovalNavigation.complete(context, result);
+    }
+  }
+
+  void _processEventUpdate(Map<String, dynamic> data) {
+    final newEventModel = EventModel.fromJson(data);
     final coordinatesChanged =
         newEventModel.latitude != eventModel.latitude ||
         newEventModel.longitude != eventModel.longitude;
@@ -1426,6 +1512,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
   /// Progressive data loading to prevent UI blocking
   Future<void> _loadDataProgressively() async {
+    if (!EventLifecycleStore.instance.allowsHistory(eventModel.id)) return;
     try {
       // Phase 1: Load critical user-facing data first
       await _loadCriticalData();
@@ -1725,10 +1812,30 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   }
 
   @override
+  void didUpdateWidget(covariant SingleEventScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.eventModel.id != eventModel.id) {
+      _availabilityGeneration++;
+      _resolvingAvailability = false;
+      _restrictedEvent = null;
+      eventModel = widget.eventModel;
+      _selectedRegistrationId = widget.registrationId;
+      _selectedTicketId = widget.ticketId;
+      _capabilityUid = null;
+      _serverManager = false;
+      EventRemovalNavigation.register(_eventRoute, eventModel.id);
+      _setupEventStreamListener();
+      unawaited(_loadCapabilities());
+    }
+  }
+
+  @override
   void dispose() {
     _selectionAuth?.cancel();
-    // Cancel debounce timer
-    _streamDebounceTimer?.cancel();
+    _availabilityGeneration++;
+    EventLifecycleStore.instance.removeListener(_onEventLifecycleChanged);
+    _eventLease?.dispose();
+    EventRemovalNavigation.unregister(_eventRoute);
 
     // Remove lifecycle observer
     WidgetsBinding.instance.removeObserver(this);
@@ -1737,7 +1844,6 @@ class _SingleEventScreenState extends State<SingleEventScreen>
     _slideController.dispose();
     _pulseController.dispose();
     _glowController.dispose();
-    _eventSubscription?.cancel();
 
     super.dispose();
   }
@@ -1756,6 +1862,8 @@ class _SingleEventScreenState extends State<SingleEventScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _eventRoute = ModalRoute.of(context);
+    EventRemovalNavigation.register(_eventRoute, eventModel.id);
     // Refresh data when dependencies change (e.g., when navigating back to this screen)
     // Only refresh if the screen is mounted and visible
     if (mounted) {
@@ -2300,12 +2408,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                               color: Colors.transparent,
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(16),
-                                onTap: () => showDialog(
-                                  context: context,
-                                  builder: (context) => DeleteEventDialoge(
-                                    singleEvent: eventModel,
-                                  ),
-                                ),
+                                onTap: _removeEvent,
                                 child: const Center(
                                   child: Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
@@ -2317,7 +2420,7 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                                       ),
                                       SizedBox(width: 8),
                                       Text(
-                                        'Delete Event',
+                                        'Delete or cancel event',
                                         style: TextStyle(
                                           color: Color(0xFFFF5722),
                                           fontWeight: FontWeight.bold,
@@ -3841,6 +3944,71 @@ class _SingleEventScreenState extends State<SingleEventScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (!EventLifecycleStore.instance.allowsHistory(eventModel.id)) {
+      final deleted =
+          EventLifecycleStore.instance.stateFor(eventModel.id).status ==
+          EventLifecycleStatus.deleted;
+      return Scaffold(
+        appBar: AppBar(title: const Text('Event')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  deleted ? Icons.event_busy_outlined : Icons.lock_outline,
+                  size: 56,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  deleted
+                      ? 'Event unavailable'
+                      : _resolvingAvailability
+                      ? 'Checking event…'
+                      : _restrictedEvent == true
+                      ? 'This event requires access'
+                      : 'Could not open event',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  deleted
+                      ? 'This event has been removed.'
+                      : _restrictedEvent == true
+                      ? 'Review access to this event.'
+                      : 'Check your connection and try again.',
+                ),
+                const SizedBox(height: 16),
+                if (!deleted && !_resolvingAvailability)
+                  OutlinedButton(
+                    onPressed: _restrictedEvent == true
+                        ? () => Navigator.of(context).pushReplacement(
+                            MaterialPageRoute<void>(
+                              builder: (_) => DeferredSharedEventScreen(
+                                eventId: eventModel.id,
+                              ),
+                            ),
+                          )
+                        : () {
+                            EventLifecycleStore.instance.reconcile();
+                            _resolveUnavailableEvent();
+                          },
+                    child: Text(
+                      _restrictedEvent == true ? 'Review access' : 'Try again',
+                    ),
+                  ),
+                FilledButton(
+                  onPressed: () => EventRemovalNavigation.backToList(context),
+                  child: const Text('Back to events'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     return AppScaffoldWrapper(
       selectedBottomNavIndex: 1, // Groups tab
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,

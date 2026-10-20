@@ -1,6 +1,13 @@
+import 'dart:async';
+
 import 'package:attendus/Utils/app_constants.dart';
 import 'package:attendus/widgets/profile_safety_dialog.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:attendus/Services/event_lifecycle_store.dart';
+import 'package:attendus/Utils/event_lifecycle_visibility.dart';
+import 'package:attendus/widgets/event_lifecycle_scope.dart';
+import 'package:attendus/widgets/cancelled_event_history.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:attendus/models/customer_model.dart';
@@ -44,6 +51,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   int _followersCount = 0;
   int _followingCount = 0;
   bool _isFollowUpdating = false;
+  StreamSubscription<User?>? _profileAuth;
+  String? _viewerUid;
+  int _loadGeneration = 0;
 
   void _handleTabChange() {
     if (mounted && _tabController.indexIsChanging) {
@@ -58,13 +68,41 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
     // Add listener to handle tab changes safely
     _tabController.addListener(_handleTabChange);
+    _viewerUid = FirebaseAuth.instance.currentUser?.uid;
+    _profileAuth = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (!mounted || user?.uid == _viewerUid) return;
+      _viewerUid = user?.uid;
+      _resetUserDataAndReload();
+    });
 
     _loadUserData();
     _refreshUserDataFromFirestore();
   }
 
+  void _resetUserDataAndReload() {
+    final generation = ++_loadGeneration;
+    setState(() {
+      _createdEvents = [];
+      _attendedEvents = [];
+      _followersCount = 0;
+      _followingCount = 0;
+      _isFollowing = false;
+      _isFollowUpdating = false;
+      _isLoading = true;
+    });
+    // Allow the shared lifecycle store to reset its account generation first.
+    Future<void>.delayed(Duration.zero, () {
+      if (mounted &&
+          generation == _loadGeneration &&
+          FirebaseAuth.instance.currentUser?.uid == _viewerUid) {
+        _loadUserData();
+      }
+    });
+  }
+
   @override
   void dispose() {
+    _profileAuth?.cancel();
     // Dispose of the tab controller safely
     try {
       // Remove all listeners before disposing
@@ -78,6 +116,16 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
   Future<void> _loadUserData() async {
     if (!mounted) return;
+    final loadGeneration = ++_loadGeneration;
+    final viewerUid = FirebaseAuth.instance.currentUser?.uid;
+    final profileUid = widget.user.uid;
+    final generation = EventLifecycleStore.instance.sessionGeneration;
+    bool currentRequest() =>
+        mounted &&
+        _loadGeneration == loadGeneration &&
+        widget.user.uid == profileUid &&
+        FirebaseAuth.instance.currentUser?.uid == viewerUid &&
+        EventLifecycleStore.instance.sessionGeneration == generation;
 
     if (mounted) {
       setState(() => _isLoading = true);
@@ -94,9 +142,10 @@ class _UserProfileScreenState extends State<UserProfileScreen>
 
         final createdResult = await FirebaseFirestoreHelper()
             .getEventsCreatedByUser(
-              widget.user.uid,
+              profileUid,
               limit: 50,
             ); // Consistent with My Profile screen
+        if (!currentRequest()) return;
 
         debugPrint('?? Raw createdResult: $createdResult');
         debugPrint('?? createdResult type: ${createdResult.runtimeType}');
@@ -117,7 +166,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           debugPrint('    ?? Creator: ${event.customerUid}');
         }
         // Save created events immediately
-        if (mounted) {
+        if (currentRequest()) {
           setState(() {
             _createdEvents = createdEvents;
           });
@@ -129,12 +178,13 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         debugPrint('? Error loading created events: $e');
         debugPrint('? Stack trace: $stackTrace');
         createdEvents = [];
-        if (mounted) {
+        if (currentRequest()) {
           setState(() {
             _createdEvents = [];
           });
         }
       }
+      if (!currentRequest()) return;
 
       // Load user's attended events
       List<EventModel> attendedEvents = [];
@@ -142,9 +192,10 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         debugPrint('?? Loading attended events for user: ${widget.user.uid}');
         final attendedResult = await FirebaseFirestoreHelper()
             .getEventsAttendedByUser(
-              widget.user.uid,
+              profileUid,
               limit: 50,
             ); // Consistent with My Profile screen
+        if (!currentRequest()) return;
         attendedEvents = attendedResult['events'] as List<EventModel>;
         // Sort attended events by event date (most recent first) to match my_profile_screen
         attendedEvents.sort(
@@ -155,7 +206,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
           debugPrint('?? Attended Event $i: ${attendedEvents[i].title}');
         }
         // Save attended events immediately
-        if (mounted) {
+        if (currentRequest()) {
           setState(() {
             _attendedEvents = attendedEvents;
           });
@@ -163,23 +214,26 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       } catch (e) {
         debugPrint('? Error loading attended events: $e');
         attendedEvents = [];
-        if (mounted) {
+        if (currentRequest()) {
           setState(() {
             _attendedEvents = [];
           });
         }
       }
+      if (!currentRequest()) return;
 
       // Load follower/following counts
       int followersCount = 0;
       int followingCount = 0;
       try {
         followersCount = await FirebaseFirestoreHelper().getFollowersCount(
-          userId: widget.user.uid,
+          userId: profileUid,
         );
+        if (!currentRequest()) return;
         followingCount = await FirebaseFirestoreHelper().getFollowingCount(
-          userId: widget.user.uid,
+          userId: profileUid,
         );
+        if (!currentRequest()) return;
         debugPrint(
           'Loaded followers: $followersCount, following: $followingCount',
         );
@@ -188,15 +242,18 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         followersCount = 0;
         followingCount = 0;
       }
+      if (!currentRequest()) return;
 
       // Check if current user is following this user (only if not own profile or same user)
       bool isFollowing = false;
       try {
         final currentUserId = CustomerController.logeInCustomer?.uid;
-        if (currentUserId != null && currentUserId != widget.user.uid) {
+        if (currentUserId != null &&
+            currentUserId == viewerUid &&
+            currentUserId != profileUid) {
           isFollowing = await FirebaseFirestoreHelper().isFollowingUser(
             followerId: currentUserId,
-            followingId: widget.user.uid,
+            followingId: profileUid,
           );
           debugPrint('Follow status: $isFollowing');
         }
@@ -205,7 +262,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         isFollowing = false;
       }
 
-      if (mounted) {
+      if (currentRequest()) {
         setState(() {
           // Events are already set individually above
           _followersCount = followersCount;
@@ -217,7 +274,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       }
     } catch (e) {
       debugPrint('? Error loading user data: $e');
-      if (mounted) {
+      if (currentRequest()) {
         setState(() {
           _isLoading = false;
           // Don't reset events here as they are handled individually above
@@ -234,7 +291,28 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => EventLifecycleScope(
+    eventIds: [
+      ..._createdEvents.map((event) => event.id),
+      ..._attendedEvents.map((event) => event.id),
+    ],
+    builder: (context, lifecycle) => _buildLifecycleContent(context),
+  );
+
+  List<EventModel> get _visibleCreatedEvents => _createdEvents
+      .where(
+        (event) => isActiveLifecycleEvent(event, EventLifecycleStore.instance),
+      )
+      .toList();
+
+  List<EventModel> get _visibleAttendedEvents => _attendedEvents
+      .where(
+        (event) =>
+            isHistoricalLifecycleEvent(event, EventLifecycleStore.instance),
+      )
+      .toList();
+
+  Widget _buildLifecycleContent(BuildContext context) {
     // Reduced build logging to prevent main thread blocking
     if (_isLoading && _createdEvents.isEmpty) {
       debugPrint('UserProfileScreen: Loading profile ${widget.user.uid}');
@@ -1212,7 +1290,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         phone: Row(
           children: [
             _buildTabButton(
-              label: 'Created (${_createdEvents.length})',
+              label: 'Created (${_visibleCreatedEvents.length})',
               index: 0,
             ),
             Container(
@@ -1221,7 +1299,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               color: AppThemeColor.borderColor,
             ),
             _buildTabButton(
-              label: 'Attended (${_attendedEvents.length})',
+              label: 'Attended (${_visibleAttendedEvents.length})',
               index: 1,
             ),
           ],
@@ -1229,7 +1307,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         tablet: Row(
           children: [
             _buildTabButton(
-              label: 'Created Events (${_createdEvents.length})',
+              label: 'Created Events (${_visibleCreatedEvents.length})',
               index: 0,
             ),
             Container(
@@ -1238,7 +1316,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               color: AppThemeColor.borderColor,
             ),
             _buildTabButton(
-              label: 'Attended Events (${_attendedEvents.length})',
+              label: 'Attended Events (${_visibleAttendedEvents.length})',
               index: 1,
             ),
           ],
@@ -1246,7 +1324,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
         desktop: Row(
           children: [
             _buildTabButton(
-              label: 'Created Events (${_createdEvents.length})',
+              label: 'Created Events (${_visibleCreatedEvents.length})',
               index: 0,
             ),
             Container(
@@ -1255,7 +1333,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
               color: AppThemeColor.borderColor,
             ),
             _buildTabButton(
-              label: 'Attended Events (${_attendedEvents.length})',
+              label: 'Attended Events (${_visibleAttendedEvents.length})',
               index: 1,
             ),
           ],
@@ -1328,6 +1406,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
   Widget _buildCreatedEventsTab() {
+    final events = _visibleCreatedEvents;
     debugPrint(
       '?? Building created events tab with ${_createdEvents.length} events',
     );
@@ -1341,7 +1420,7 @@ class _UserProfileScreenState extends State<UserProfileScreen>
       }
     }
 
-    if (_createdEvents.isEmpty) {
+    if (events.isEmpty) {
       debugPrint('?? Created events list is empty - showing empty state');
       return Column(
         children: [
@@ -1389,9 +1468,9 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: _createdEvents.length,
+      itemCount: events.length,
       itemBuilder: (context, index) {
-        final event = _createdEvents[index];
+        final event = events[index];
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),
           child: SingleEventListViewItem(eventModel: event),
@@ -1401,11 +1480,12 @@ class _UserProfileScreenState extends State<UserProfileScreen>
   }
 
   Widget _buildAttendedEventsTab() {
+    final events = _visibleAttendedEvents;
     debugPrint(
       'Building attended events tab with ${_attendedEvents.length} events',
     );
 
-    if (_attendedEvents.isEmpty) {
+    if (events.isEmpty) {
       return Column(
         children: [
           _buildEmptyState(
@@ -1444,12 +1524,15 @@ class _UserProfileScreenState extends State<UserProfileScreen>
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: _attendedEvents.length,
+      itemCount: events.length,
       itemBuilder: (context, index) {
-        final event = _attendedEvents[index];
+        final event = events[index];
         return Padding(
           padding: const EdgeInsets.only(bottom: 16),
-          child: SingleEventListViewItem(eventModel: event),
+          child: CancelledEventHistory(
+            cancelled: isCancelledEvent(event, EventLifecycleStore.instance),
+            child: SingleEventListViewItem(eventModel: event),
+          ),
         );
       },
     );

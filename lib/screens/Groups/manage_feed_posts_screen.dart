@@ -1,5 +1,7 @@
 import 'package:attendus/screens/Events/Widget/delete_event_dialogue.dart';
 import 'package:attendus/Services/community_service.dart';
+import 'package:attendus/Utils/event_lifecycle_visibility.dart';
+import 'package:attendus/widgets/event_lifecycle_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -167,145 +169,154 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
                   ? (eventsSnapshot.data?.docs.toList() ?? [])
                   : <QueryDocumentSnapshot>[];
 
-              final List<_ModerationItem> items = [];
+              return EventLifecycleScope(
+                eventIds: eventDocs.map((doc) => doc.id),
+                builder: (context, lifecycle) {
+                  final List<_ModerationItem> items = [];
 
-              for (final doc in feedDocs) {
-                final data = doc.data() as Map<String, dynamic>;
-                if (data['deleted'] == true) continue;
-                final type = (data['type'] ?? 'announcement').toString();
-                final isHidden = data['isHidden'] == true;
-                final isPinned = data['isPinned'] == true;
+                  for (final doc in feedDocs) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    if (data['deleted'] == true) continue;
+                    final type = (data['type'] ?? 'announcement').toString();
+                    final isHidden = data['isHidden'] == true;
+                    final isPinned = data['isPinned'] == true;
 
-                if (_selectedFilter == 'announcement' &&
-                    type != 'announcement') {
-                  continue;
-                }
-                if (_selectedFilter == 'poll' && type != 'poll') continue;
-                if (_selectedFilter == 'photo' && type != 'photo') continue;
-                if (_selectedFilter == 'pinned' && !isPinned) continue;
-                if (_selectedFilter == 'hidden' && !isHidden) continue;
-                if (_selectedFilter == 'event') continue; // handled below
+                    if (_selectedFilter == 'announcement' &&
+                        type != 'announcement') {
+                      continue;
+                    }
+                    if (_selectedFilter == 'poll' && type != 'poll') continue;
+                    if (_selectedFilter == 'photo' && type != 'photo') continue;
+                    if (_selectedFilter == 'pinned' && !isPinned) continue;
+                    if (_selectedFilter == 'hidden' && !isHidden) continue;
+                    if (_selectedFilter == 'event') continue; // handled below
 
-                // Search filter
-                if (_searchQuery.trim().isNotEmpty) {
-                  final q = _searchQuery.trim().toLowerCase();
-                  final text =
-                      (data['title'] ??
-                              data['content'] ??
-                              data['caption'] ??
-                              data['question'] ??
-                              '')
+                    // Search filter
+                    if (_searchQuery.trim().isNotEmpty) {
+                      final q = _searchQuery.trim().toLowerCase();
+                      final text =
+                          (data['title'] ??
+                                  data['content'] ??
+                                  data['caption'] ??
+                                  data['question'] ??
+                                  '')
+                              .toString()
+                              .toLowerCase();
+                      if (!text.contains(q)) continue;
+                    }
+
+                    items.add(
+                      _ModerationItem(
+                        id: doc.id,
+                        type: type,
+                        isPinned: isPinned,
+                        isHidden: isHidden,
+                        createdAt: data['createdAt'] as Timestamp?,
+                        source: _ModerationSource.feed,
+                        data: data,
+                      ),
+                    );
+                  }
+
+                  for (final doc in eventDocs) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    if (!isActiveLifecycleData(doc.id, data, lifecycle)) {
+                      continue;
+                    }
+                    final isPinned = data['isPinned'] == true;
+                    final isHidden = data['isHidden'] == true;
+
+                    if (_selectedFilter == 'pinned' && !isPinned) continue;
+                    if (_selectedFilter == 'hidden' && !isHidden) continue;
+                    if (_selectedFilter != 'all' &&
+                        _selectedFilter != 'event' &&
+                        _selectedFilter != 'pinned' &&
+                        _selectedFilter != 'hidden') {
+                      // other filters are feed-only
+                      continue;
+                    }
+
+                    if (_searchQuery.trim().isNotEmpty) {
+                      final q = _searchQuery.trim().toLowerCase();
+                      final text = (data['title'] ?? data['description'] ?? '')
                           .toString()
                           .toLowerCase();
-                  if (!text.contains(q)) continue;
-                }
+                      if (!text.contains(q)) continue;
+                    }
 
-                items.add(
-                  _ModerationItem(
-                    id: doc.id,
-                    type: type,
-                    isPinned: isPinned,
-                    isHidden: isHidden,
-                    createdAt: data['createdAt'] as Timestamp?,
-                    source: _ModerationSource.feed,
-                    data: data,
-                  ),
-                );
-              }
-
-              for (final doc in eventDocs) {
-                final data = doc.data() as Map<String, dynamic>;
-                final isPinned = data['isPinned'] == true;
-                final isHidden = data['isHidden'] == true;
-
-                if (_selectedFilter == 'pinned' && !isPinned) continue;
-                if (_selectedFilter == 'hidden' && !isHidden) continue;
-                if (_selectedFilter != 'all' &&
-                    _selectedFilter != 'event' &&
-                    _selectedFilter != 'pinned' &&
-                    _selectedFilter != 'hidden') {
-                  // other filters are feed-only
-                  continue;
-                }
-
-                if (_searchQuery.trim().isNotEmpty) {
-                  final q = _searchQuery.trim().toLowerCase();
-                  final text = (data['title'] ?? data['description'] ?? '')
-                      .toString()
-                      .toLowerCase();
-                  if (!text.contains(q)) continue;
-                }
-
-                items.add(
-                  _ModerationItem(
-                    id: doc.id,
-                    type: 'event',
-                    isPinned: isPinned,
-                    isHidden: isHidden,
-                    createdAt:
-                        (data['selectedDateTime'] ?? data['eventGenerateTime'])
-                            as Timestamp?,
-                    source: _ModerationSource.event,
-                    data: data,
-                  ),
-                );
-              }
-
-              if (items.isEmpty) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.inbox_outlined,
-                          size: 80,
-                          color: Colors.grey.shade300,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No matching content',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Try a different filter or search query',
-                          style: TextStyle(color: Colors.grey.shade600),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
-
-              // Sort: pinned first by order, then by date desc
-              items.sort((a, b) {
-                if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
-                if (a.isPinned && b.isPinned) {
-                  final ap = (a.data['pinnedOrder'] ?? 0) as int;
-                  final bp = (b.data['pinnedOrder'] ?? 0) as int;
-                  if (ap != bp) return ap.compareTo(bp);
-                }
-                final at = a.createdAt?.toDate();
-                final bt = b.createdAt?.toDate();
-                if (at == null || bt == null) return 0;
-                return bt.compareTo(at);
-              });
-
-              return ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: items.length,
-                itemBuilder: (context, index) {
-                  final item = items[index];
-                  if (item.source == _ModerationSource.feed) {
-                    return _buildPostCard(item.id, item.data);
-                  } else {
-                    return _buildEventCard(item.id, item.data);
+                    items.add(
+                      _ModerationItem(
+                        id: doc.id,
+                        type: 'event',
+                        isPinned: isPinned,
+                        isHidden: isHidden,
+                        createdAt:
+                            (data['selectedDateTime'] ??
+                                    data['eventGenerateTime'])
+                                as Timestamp?,
+                        source: _ModerationSource.event,
+                        data: data,
+                      ),
+                    );
                   }
+
+                  if (items.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.inbox_outlined,
+                              size: 80,
+                              color: Colors.grey.shade300,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No matching content',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Try a different filter or search query',
+                              style: TextStyle(color: Colors.grey.shade600),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  // Sort: pinned first by order, then by date desc
+                  items.sort((a, b) {
+                    if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
+                    if (a.isPinned && b.isPinned) {
+                      final ap = (a.data['pinnedOrder'] ?? 0) as int;
+                      final bp = (b.data['pinnedOrder'] ?? 0) as int;
+                      if (ap != bp) return ap.compareTo(bp);
+                    }
+                    final at = a.createdAt?.toDate();
+                    final bt = b.createdAt?.toDate();
+                    if (at == null || bt == null) return 0;
+                    return bt.compareTo(at);
+                  });
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: items.length,
+                    itemBuilder: (context, index) {
+                      final item = items[index];
+                      if (item.source == _ModerationSource.feed) {
+                        return _buildPostCard(item.id, item.data);
+                      } else {
+                        return _buildEventCard(item.id, item.data);
+                      }
+                    },
+                  );
                 },
               );
             },
@@ -1132,6 +1143,7 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
                       ),
                       PopupMenuItem(
                         value: 'cancel',
+                        enabled: status != 'cancelled',
                         child: Row(
                           children: [
                             Icon(
@@ -1143,7 +1155,11 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
                                   : Colors.orange,
                             ),
                             const SizedBox(width: 12),
-                            Text('Cancel / delete empty event'),
+                            Text(
+                              status == 'cancelled'
+                                  ? 'Event cancelled'
+                                  : 'Cancel event',
+                            ),
                           ],
                         ),
                       ),
@@ -1252,16 +1268,23 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
     }
   }
 
-  Future<void> _showEventLifecycleDialog(String eventId) async {
+  Future<void> _showEventLifecycleDialog(
+    String eventId, {
+    bool preferCancellation = false,
+  }) async {
     try {
       final doc = await _db.collection('Events').doc(eventId).get();
       if (!mounted || !doc.exists) return;
-      await showDialog<bool>(
-        context: context,
-        builder: (_) => DeleteEventDialoge(
-          singleEvent: EventModel.fromJson({...doc.data()!, 'id': doc.id}),
-        ),
+      final result = await showEventRemovalDialog(
+        context,
+        EventModel.fromJson({...doc.data()!, 'id': doc.id}),
+        preferCancellation: preferCancellation,
       );
+      if (mounted && result != null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(result.message)));
+      }
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1272,7 +1295,7 @@ class _ManageFeedPostsScreenState extends State<ManageFeedPostsScreen> {
   }
 
   Future<void> _toggleCancelEvent(String eventId, String status) =>
-      _showEventLifecycleDialog(eventId);
+      _showEventLifecycleDialog(eventId, preferCancellation: true);
   void _showDeleteEventConfirmation(String eventId, String title) {
     _showEventLifecycleDialog(eventId);
   }

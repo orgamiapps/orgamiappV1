@@ -1,12 +1,62 @@
 import 'dart:convert';
 
 import 'package:attendus/models/discovery_marketplace.dart';
+import 'package:attendus/Services/event_lifecycle_store.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class DiscoveryMarketplaceService {
+  static Future<void> invalidateCachedHome() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (final key in prefs.getKeys().where(
+        (key) => key.startsWith('discovery_home_'),
+      )) {
+        await prefs.remove(key);
+      }
+    } catch (_) {
+      // Local cache cleanup must not turn a completed mutation into failure.
+    }
+  }
+
+  static Map<String, dynamic> _withoutRemovedEvents(
+    Map<String, dynamic> result,
+  ) {
+    List<dynamic> filter(dynamic events) => (events as List? ?? const [])
+        .where((event) {
+          if (event is! Map) return false;
+          return EventLifecycleStore.instance.allowsDiscovery(
+            event['id']?.toString() ?? '',
+          );
+        })
+        .toList(growable: false);
+    return {
+      ...result,
+      if (result.containsKey('events')) 'events': filter(result['events']),
+      if (result.containsKey('sections'))
+        'sections': [
+          for (final section in result['sections'] as List? ?? const [])
+            if (section is Map)
+              {...section, 'events': filter(section['events'])},
+        ],
+    };
+  }
+
+  static bool _hasRevalidatedEvents(Map<String, dynamic> cached) =>
+      (cached['sections'] as List? ?? const []).every(
+        (section) =>
+            section is Map &&
+            (section['events'] as List? ?? const []).every(
+              (event) =>
+                  event is Map &&
+                  EventLifecycleStore.instance
+                      .stateFor(event['id']?.toString() ?? '')
+                      .isServerConfirmed,
+            ),
+      );
+
   DiscoveryMarketplaceService({
     FirebaseFunctions? functions,
     FirebaseFirestore? firestore,
@@ -45,7 +95,7 @@ class DiscoveryMarketplaceService {
     if (data['feedVersion'] != 1) {
       throw StateError('Discovery is being updated. Please try again shortly.');
     }
-    return data;
+    return _withoutRemovedEvents(data);
   }
 
   Future<DiscoveryHomeResult> home({
@@ -84,9 +134,10 @@ class DiscoveryMarketplaceService {
     final cachedAt = DateTime.tryParse(cached?['_cachedAt']?.toString() ?? '');
     if (cached != null &&
         cachedAt != null &&
-        DateTime.now().difference(cachedAt) < const Duration(minutes: 10)) {
+        DateTime.now().difference(cachedAt) < const Duration(minutes: 10) &&
+        _hasRevalidatedEvents(cached)) {
       cached['_cacheState'] = 'warm';
-      return DiscoveryHomeResult.fromMap(cached);
+      return DiscoveryHomeResult.fromMap(_withoutRemovedEvents(cached));
     }
     try {
       Future<Map<String, dynamic>> requestVersion(int version) async {
@@ -118,11 +169,13 @@ class DiscoveryMarketplaceService {
       }
       data['_cachedAt'] = DateTime.now().toIso8601String();
       await prefs.setString(cacheKey, jsonEncode(data));
-      return DiscoveryHomeResult.fromMap(data);
+      return DiscoveryHomeResult.fromMap(_withoutRemovedEvents(data));
     } catch (_) {
-      if (cached != null) {
+      // Recheck after the request: the account or event may have changed
+      // while offline. A saved response cannot establish current read access.
+      if (cached != null && _hasRevalidatedEvents(cached)) {
         cached['_cacheState'] = 'stale';
-        return DiscoveryHomeResult.fromMap(cached);
+        return DiscoveryHomeResult.fromMap(_withoutRemovedEvents(cached));
       }
       rethrow;
     }
@@ -160,7 +213,7 @@ class DiscoveryMarketplaceService {
             'limit': limit,
           });
       return DiscoverySearchResult.fromMap(
-        Map<String, dynamic>.from(response.data as Map),
+        _withoutRemovedEvents(Map<String, dynamic>.from(response.data as Map)),
       );
     }
 

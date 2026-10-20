@@ -19,6 +19,8 @@ import 'package:attendus/models/customer_model.dart';
 import 'package:attendus/models/event_model.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:attendus/Services/event_search_service.dart';
+import 'package:attendus/Services/event_lifecycle_store.dart';
+import 'package:attendus/widgets/event_lifecycle_scope.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -609,6 +611,23 @@ class _EventsListState extends State<EventsList>
   Widget build(BuildContext context) {
     super.build(context);
 
+    return EventLifecycleScope(
+      eventIds: {..._allEvents, ..._filteredEvents}.map((event) => event.id),
+      builder: _buildLifecycleContent,
+    );
+  }
+
+  Widget _buildLifecycleContent(
+    BuildContext context,
+    EventLifecycleStore lifecycle,
+  ) {
+    final visibleEvents = _filteredEvents
+        .where(
+          (event) =>
+              lifecycle.allowsDiscovery(event.id) &&
+              !const ['cancelled', 'canceled'].contains(event.status),
+        )
+        .toList(growable: false);
     if (_loadError != null && _allEvents.isEmpty) {
       return Center(
         child: Padding(
@@ -632,7 +651,7 @@ class _EventsListState extends State<EventsList>
       return _buildLoadingState();
     }
 
-    if (_filteredEvents.isEmpty && !_isLoading) {
+    if (visibleEvents.isEmpty && !_isLoading) {
       return _buildEmptyState();
     }
 
@@ -644,20 +663,20 @@ class _EventsListState extends State<EventsList>
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         itemCount:
-            _filteredEvents.length +
+            visibleEvents.length +
             (_hasMore && widget.searchQuery.isEmpty ? 1 : 0),
         itemBuilder: (context, index) {
-          if (index >= _filteredEvents.length) {
+          if (index >= visibleEvents.length) {
             return _buildLoadingItem();
           }
 
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: _SearchEventCard(
-              event: _filteredEvents[index],
+              event: visibleEvents[index],
               onTap: () {
                 EngagementPredictor.trackInteraction(
-                  _filteredEvents[index].id,
+                  visibleEvents[index].id,
                   'view',
                 ).catchError((e) {
                   if (kDebugMode) {
@@ -665,7 +684,7 @@ class _EventsListState extends State<EventsList>
                   }
                 });
                 RecommendationAnalytics.trackRecommendationInteraction(
-                  eventId: _filteredEvents[index].id,
+                  eventId: visibleEvents[index].id,
                   interactionType: 'view',
                   position: index + 1,
                 ).catchError((e) {
@@ -676,7 +695,7 @@ class _EventsListState extends State<EventsList>
                 Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) =>
-                        SingleEventScreen(eventModel: _filteredEvents[index]),
+                        SingleEventScreen(eventModel: visibleEvents[index]),
                   ),
                 );
               },
@@ -1053,6 +1072,23 @@ class _OrgEventsListState extends State<OrgEventsList>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    return EventLifecycleScope(
+      eventIds: {..._allEvents, ..._filteredEvents}.map((event) => event.id),
+      builder: _buildLifecycleContent,
+    );
+  }
+
+  Widget _buildLifecycleContent(
+    BuildContext context,
+    EventLifecycleStore lifecycle,
+  ) {
+    final visibleEvents = _filteredEvents
+        .where(
+          (event) =>
+              lifecycle.allowsActive(event.id) &&
+              !const ['cancelled', 'canceled'].contains(event.status),
+        )
+        .toList(growable: false);
     if (_loadError != null) {
       return Center(
         child: Column(
@@ -1074,7 +1110,7 @@ class _OrgEventsListState extends State<OrgEventsList>
       );
     }
 
-    if (_filteredEvents.isEmpty && !_isLoading) {
+    if (visibleEvents.isEmpty && !_isLoading) {
       return _buildEmptyState();
     }
 
@@ -1085,9 +1121,9 @@ class _OrgEventsListState extends State<OrgEventsList>
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
-        itemCount: _filteredEvents.length,
+        itemCount: visibleEvents.length,
         itemBuilder: (context, index) {
-          final event = _filteredEvents[index];
+          final event = visibleEvents[index];
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: _SearchEventCard(

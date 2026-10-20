@@ -1,5 +1,9 @@
 import 'package:attendus/screens/Events/Attendance/attendance_wallet_pass_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:attendus/Services/event_lifecycle_store.dart';
+import 'package:attendus/widgets/event_lifecycle_scope.dart';
+import 'package:attendus/widgets/deferred_shared_event_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:attendus/controller/customer_controller.dart';
 import 'package:attendus/firebase/firebase_firestore_helper.dart';
@@ -40,6 +44,8 @@ class _MyTicketsScreenState extends State<MyTicketsScreen>
 
   // Stats dashboard
   bool _showStats = true;
+  StreamSubscription<User?>? _ticketAuth;
+  String? _ticketUid;
 
   @override
   void initState() {
@@ -52,12 +58,33 @@ class _MyTicketsScreenState extends State<MyTicketsScreen>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
+    _ticketUid = FirebaseAuth.instance.currentUser?.uid;
+    _ticketAuth = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (!mounted || user?.uid == _ticketUid) return;
+      _ticketUid = user?.uid;
+      setState(() {
+        userTickets.clear();
+        _eventCache.clear();
+        isLoading = false;
+      });
+      unawaited(
+        Future<void>.delayed(Duration.zero, () async {
+          if (mounted &&
+              user?.uid != null &&
+              _ticketUid == user?.uid &&
+              CustomerController.logeInCustomer?.uid == _ticketUid) {
+            await _loadUserTickets();
+          }
+        }),
+      );
+    });
     _loadUserTickets();
     _loadSortPreference();
   }
 
   @override
   void dispose() {
+    _ticketAuth?.cancel();
     _searchController.dispose();
     _debounce?.cancel();
     _tabAnimationController.dispose();
@@ -81,41 +108,52 @@ class _MyTicketsScreenState extends State<MyTicketsScreen>
   }
 
   Future<void> _loadUserTickets() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final generation = EventLifecycleStore.instance.sessionGeneration;
+    bool current() =>
+        mounted &&
+        FirebaseAuth.instance.currentUser?.uid == uid &&
+        CustomerController.logeInCustomer?.uid == uid &&
+        EventLifecycleStore.instance.sessionGeneration == generation;
     setState(() {
       isLoading = true;
     });
 
     try {
-      if (CustomerController.logeInCustomer == null) {
+      if (uid == null || CustomerController.logeInCustomer?.uid != uid) {
         ShowToast().showNormalToast(msg: 'Please log in to view your tickets');
         return;
       }
 
       final tickets = await FirebaseFirestoreHelper().getUserTickets(
-        customerUid: CustomerController.logeInCustomer!.uid,
+        customerUid: uid,
       );
 
       // Fetch event data for each unique event
       final uniqueEventIds = tickets.map((t) => t.eventId).toSet();
+      final eventCache = <String, EventModel>{};
       for (final eventId in uniqueEventIds) {
         try {
           final event = await FirebaseFirestoreHelper().getSingleEvent(eventId);
           if (event != null) {
-            _eventCache[eventId] = event;
+            eventCache[eventId] = event;
           }
         } catch (e) {
           // Continue loading even if one event fails
         }
       }
 
-      if (mounted) {
+      if (current()) {
         setState(() {
+          _eventCache
+            ..clear()
+            ..addAll(eventCache);
           userTickets = tickets;
           isLoading = false;
         });
       }
     } catch (e) {
-      if (mounted) {
+      if (current()) {
         setState(() {
           isLoading = false;
         });
@@ -125,15 +163,29 @@ class _MyTicketsScreenState extends State<MyTicketsScreen>
   }
 
   List<TicketModel> get filteredTickets {
+    final visible = _visibleTickets;
     switch (selectedTab) {
       case 1: // Active
-        return userTickets.where((ticket) => !ticket.isUsed).toList();
+        return visible
+            .where((ticket) => !ticket.isUsed && !_isCancelledTicket(ticket))
+            .toList();
       case 2: // Used
-        return userTickets.where((ticket) => ticket.isUsed).toList();
+        return visible.where((ticket) => ticket.isUsed).toList();
       default: // All
-        return userTickets;
+        return visible.toList();
     }
   }
+
+  List<TicketModel> get _visibleTickets => userTickets
+      .where(
+        (ticket) => EventLifecycleStore.instance.allowsHistory(ticket.eventId),
+      )
+      .toList();
+
+  bool _isCancelledTicket(TicketModel ticket) =>
+      EventLifecycleStore.instance.stateFor(ticket.eventId).status ==
+          EventLifecycleStatus.cancelled ||
+      _eventCache[ticket.eventId]?.status == 'cancelled';
 
   List<TicketModel> get filteredAndSortedTickets {
     var tickets = filteredTickets;
@@ -298,7 +350,12 @@ class _MyTicketsScreenState extends State<MyTicketsScreen>
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => EventLifecycleScope(
+    eventIds: userTickets.map((ticket) => ticket.eventId),
+    builder: (context, lifecycle) => _buildLifecycleContent(context),
+  );
+
+  Widget _buildLifecycleContent(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
@@ -450,7 +507,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen>
           Expanded(
             child: _buildTabButton(
               title: 'All',
-              count: userTickets.length,
+              count: _visibleTickets.length,
               isSelected: selectedTab == 0,
               onTap: () => setState(() => selectedTab = 0),
             ),
@@ -458,7 +515,9 @@ class _MyTicketsScreenState extends State<MyTicketsScreen>
           Expanded(
             child: _buildTabButton(
               title: 'Active',
-              count: userTickets.where((t) => !t.isUsed).length,
+              count: _visibleTickets
+                  .where((t) => !t.isUsed && !_isCancelledTicket(t))
+                  .length,
               isSelected: selectedTab == 1,
               onTap: () => setState(() => selectedTab = 1),
             ),
@@ -466,7 +525,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen>
           Expanded(
             child: _buildTabButton(
               title: 'Used',
-              count: userTickets.where((t) => t.isUsed).length,
+              count: _visibleTickets.where((t) => t.isUsed).length,
               isSelected: selectedTab == 2,
               onTap: () => setState(() => selectedTab = 2),
             ),
@@ -536,7 +595,11 @@ class _MyTicketsScreenState extends State<MyTicketsScreen>
         if (_showStats && userTickets.isNotEmpty)
           SliverToBoxAdapter(
             child: TicketStatsDashboard(
-              allTickets: userTickets,
+              allTickets: _visibleTickets,
+              cancelledEventIds: userTickets
+                  .where(_isCancelledTicket)
+                  .map((ticket) => ticket.eventId)
+                  .toSet(),
               onTap: () {
                 HapticFeedback.lightImpact();
                 setState(() => _showStats = !_showStats);
@@ -570,7 +633,11 @@ class _MyTicketsScreenState extends State<MyTicketsScreen>
                     return AttendUsTicketPassCard(
                       eventTitle: ticket.eventTitle,
                       dateLabel: _formatTicketDate(ticket.eventDateTime),
-                      ticketLabel: ticket.isUsed ? 'Used' : 'Active',
+                      ticketLabel: _isCancelledTicket(ticket)
+                          ? 'Cancelled'
+                          : ticket.isUsed
+                          ? 'Used'
+                          : 'Active',
                       onTap: () => _showTicketModal(ticket),
                     );
                   }, childCount: tickets.length),
@@ -651,30 +718,86 @@ class _MyTicketsScreenState extends State<MyTicketsScreen>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Column(
-        children: [
-          SafeArea(
-            bottom: false,
-            child: FilledButton.icon(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => AttendanceWalletPassScreen(
-                    eventId: ticket.eventId,
-                    ticketId: ticket.id,
+      builder: (context) => EventLifecycleScope(
+        eventIds: [ticket.eventId],
+        builder: (context, lifecycle) {
+          if (_isCancelledTicket(ticket) ||
+              !lifecycle.allowsHistory(ticket.eventId)) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Material(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _isCancelledTicket(ticket)
+                              ? 'Cancelled event'
+                              : 'Event unavailable',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(ticket.eventTitle),
+                        Text(_formatTicketDate(ticket.eventDateTime)),
+                        if (_isCancelledTicket(ticket)) ...[
+                          const SizedBox(height: 12),
+                          const Text(
+                            'This ticket is retained for your records. Check-in is no longer available.',
+                          ),
+                          Text('Ticket: ${ticket.ticketCode}'),
+                          TextButton(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => DeferredSharedEventScreen(
+                                  eventId: ticket.eventId,
+                                  ticketId: ticket.id,
+                                ),
+                              ),
+                            ),
+                            child: const Text('View event history'),
+                          ),
+                        ],
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Close'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-              icon: const Icon(Icons.wallet_outlined),
-              label: const Text('My event pass'),
-            ),
-          ),
-          Expanded(
-            child: _TicketModalView(
-              ticket: ticket,
-              event: _eventCache[ticket.eventId],
-            ),
-          ),
-        ],
+            );
+          }
+          return Column(
+            children: [
+              SafeArea(
+                bottom: false,
+                child: FilledButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => AttendanceWalletPassScreen(
+                        eventId: ticket.eventId,
+                        ticketId: ticket.id,
+                      ),
+                    ),
+                  ),
+                  icon: const Icon(Icons.wallet_outlined),
+                  label: const Text('My event pass'),
+                ),
+              ),
+              Expanded(
+                child: _TicketModalView(
+                  ticket: ticket,
+                  event: _eventCache[ticket.eventId],
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

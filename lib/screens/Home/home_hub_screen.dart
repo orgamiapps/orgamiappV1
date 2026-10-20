@@ -25,6 +25,7 @@ import 'package:attendus/Services/product_funnel_service.dart';
 import 'package:attendus/Utils/attendus_theme.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
 import 'package:attendus/screens/Home/discovery_marketplace_view.dart';
+import 'package:attendus/widgets/event_lifecycle_scope.dart';
 
 class HomeHubScreen extends StatefulWidget {
   final bool? _guestModeOverride;
@@ -618,12 +619,25 @@ class _HomeHubScreenState extends State<HomeHubScreen> {
             .map((doc) => _eventFromMap(doc.id, doc.data()))
             .toList(growable: false);
 
-        return _PrivateEventsGrid(
-          events: events,
-          onOpenEvent: (model) {
-            RouterClass.nextScreenNormal(
-              context,
-              SingleEventScreen(eventModel: model),
+        return EventLifecycleScope(
+          eventIds: events.map((event) => event.id),
+          builder: (context, lifecycle) {
+            final visible = events
+                .where(
+                  (event) =>
+                      lifecycle.allowsActive(event.id) &&
+                      !const ['cancelled', 'canceled'].contains(event.status),
+                )
+                .toList(growable: false);
+            if (visible.isEmpty) return _buildNoEventsYet();
+            return _PrivateEventsGrid(
+              events: visible,
+              onOpenEvent: (model) {
+                RouterClass.nextScreenNormal(
+                  context,
+                  SingleEventScreen(eventModel: model),
+                );
+              },
             );
           },
         );

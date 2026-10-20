@@ -5,7 +5,7 @@ const crypto = require("node:crypto");
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {onDocumentWritten, onDocumentCreated} = require("firebase-functions/v2/firestore");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
-const {requireEvent, capabilities} = require("./access");
+const {requireEvent, capabilities, actor} = require("./access");
 const {buildRoster, metrics, allDocuments, normalized, key} = require("./roster");
 const {CONTACT_HMAC_KEY, CONTACT_KMS_KEY_NAME, emailHash, csvCell, decryptEmail,
   encryptEmail, enforceRateLimit} = require("../public-web/accountless");
@@ -16,6 +16,14 @@ const callOptions = {region: "us-central1", enforceAppCheck: process.env.FUNCTIO
 function createLaunchOperations(admin) {
   const db = admin.firestore();
   const stamp = () => admin.firestore.FieldValue.serverTimestamp();
+  async function hasEventRecords(eventId, transaction = null) {
+    const dependents = await Promise.all(["RegisterAttendance", "Tickets", "Attendance", "HistoricalAttendance",
+      "TicketPayments", "TicketUpgradePayments", "EventFeaturePayments", "FeaturePayments", "Payments"].map((name) => {
+      const query = db.collection(name).where("eventId", "==", eventId).limit(1);
+      return transaction ? transaction.get(query) : query.get();
+    }));
+    return dependents.some((result) => !result.empty);
+  }
   async function rebuild(eventId) {
     const stateRef = db.collection("EventRosters").doc(eventId);
     const [event, before] = await Promise.all([db.collection("Events").doc(eventId).get(), stateRef.get()]);
@@ -107,7 +115,11 @@ function createLaunchOperations(admin) {
         staff.push({uid: staffId, name: profile.get("name") || profile.get("fullName") || "Unavailable account", role: staffId === event.get("customerUid") || (event.get("coHosts") || []).includes(staffId) ? "Event manager" : "Door staff", available: profile.exists});
       }
     }
-    return {permissions, staff};
+    const result = {permissions, staff};
+    if (permissions.manageEvent && request.data?.includeRemovalEligibility === true) {
+      result.removalEligibility = {canDelete: !(await hasEventRecords(id)), eventRevision: Number(event.get("eventRevision") || 0)};
+    }
+    return result;
   });
   const setEventStaffV1 = onCall(callOptions, async (request) => {
     const access = await requireEvent(db, request);
@@ -404,12 +416,13 @@ function createLaunchOperations(admin) {
     const previewId = String(request.data.previewToken || "");
     if (!reason || !/^[A-Za-z0-9_-]+$/.test(previewId)) throw new HttpsError("invalid-argument", "Review affected attendees and enter a cancellation reason.");
     const previewRef = db.collection("EventCancellationPreviews").doc(previewId);
-    await db.runTransaction(async (tx) => {
+    return db.runTransaction(async (tx) => {
       const preview = await tx.get(previewRef);
       if (!preview.exists || preview.get("actorUid") !== access.uid || preview.get("eventId") !== access.eventId) throw new HttpsError("not-found", "Cancellation preview not found.");
-      if (preview.get("applied")) return;
-      if (preview.get("expiresAt").toMillis() < Date.now()) throw new HttpsError("failed-precondition", "Preview expired. Review recipients again.");
       const targets = preview.get("targets");
+      const result = {status: "cancelled", affectedEventIds: targets.map((target) => target.eventId)};
+      if (preview.get("applied")) return result;
+      if (preview.get("expiresAt").toMillis() < Date.now()) throw new HttpsError("failed-precondition", "Preview expired. Review recipients again.");
       const events = await Promise.all(targets.map((target) => tx.get(db.collection("Events").doc(target.eventId))));
       for (let index = 0; index < events.length; index++) {
         const current = events[index];
@@ -427,20 +440,51 @@ function createLaunchOperations(admin) {
         });
       }
       tx.update(previewRef, {applied: true, appliedAt: stamp()});
+      return result;
     });
-    return {status: "cancelled"};
   });
   const deleteEmptyEventV1 = onCall(callOptions, async (request) => {
-    const access = await requireEvent(db, request);
-    await db.runTransaction(async (tx) => {
-      const event = await tx.get(access.document.ref);
-      if (!event.exists || !(await capabilities(db, access.uid, event.data(), tx)).manageEvent) throw new HttpsError("permission-denied", "Event access changed.");
-      const dependents = await Promise.all(["RegisterAttendance", "Tickets", "Attendance", "HistoricalAttendance", "TicketPayments", "TicketUpgradePayments", "EventFeaturePayments", "FeaturePayments", "Payments"]
-          .map((name) => tx.get(db.collection(name).where("eventId", "==", access.eventId).limit(1))));
-      if (dependents.some((result) => !result.empty)) throw new HttpsError("failed-precondition", "This event has records. Cancel it to preserve its history.");
-      if (event.exists) tx.delete(event.ref);
+    const uid = actor(request);
+    const eventId = String(request.data?.eventId || "");
+    if (!/^[A-Za-z0-9._:-]{1,500}$/.test(eventId)) throw new HttpsError("invalid-argument", "A valid event is required.");
+    const expectedRevision = request.data?.expectedEventRevision ?? null;
+    if (expectedRevision !== null && (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0)) {
+      throw new HttpsError("invalid-argument", "Refresh the event before deleting it.");
+    }
+    const requestId = request.data?.requestId;
+    if (requestId !== undefined && (typeof requestId !== "string" || !/^[A-Za-z0-9._:-]{8,128}$/.test(requestId))) {
+      throw new HttpsError("invalid-argument", "A valid deletion request is required.");
+    }
+    // Explicit request IDs remain bound to one actor and one immutable request.
+    // Legacy callers get a stable receipt from the event/revision they supplied.
+    const fingerprint = key(JSON.stringify([eventId, expectedRevision]));
+    const receiptId = key(JSON.stringify(requestId === undefined ? [uid, "legacy", fingerprint] : [uid, "request", requestId]));
+    const receiptRef = db.collection("EventDeletionReceipts").doc(receiptId);
+    const eventRef = db.collection("Events").doc(eventId);
+    return db.runTransaction(async (tx) => {
+      const [receipt, event, deleting] = await Promise.all([
+        tx.get(receiptRef), tx.get(eventRef), tx.get(db.collection("account_deletion_jobs").doc(uid)),
+      ]);
+      if (deleting.exists) throw new HttpsError("failed-precondition", "Account deletion is in progress.");
+      const result = {status: "deleted", affectedEventIds: [eventId]};
+      // Resolve committed retries before checking the now-absent source event.
+      if (receipt.exists) {
+        if (receipt.get("actorUid") !== uid || receipt.get("eventId") !== eventId || receipt.get("fingerprint") !== fingerprint) {
+          throw new HttpsError("failed-precondition", "This deletion request was already used. Refresh and try again.");
+        }
+        return result;
+      }
+      if (!event.exists) throw new HttpsError("not-found", "Event not found.");
+      if (!(await capabilities(db, uid, event.data(), tx)).manageEvent) throw new HttpsError("permission-denied", "Event access changed.");
+      if (expectedRevision !== null && Number(event.get("eventRevision") || 0) !== expectedRevision) {
+        throw new HttpsError("aborted", "The event changed. Refresh and review again.");
+      }
+      if (await hasEventRecords(eventId, tx)) throw new HttpsError("failed-precondition", "This event has records. Cancel it to preserve its history.");
+      tx.delete(event.ref);
+      tx.delete(db.collection("PublicWebEvents").doc(eventId));
+      tx.create(receiptRef, {actorUid: uid, eventId, fingerprint, status: result.status, createdAt: stamp()});
+      return result;
     });
-    return {status: "deleted"};
   });
 
   const createEventExportV2 = onCall(callOptions, async (request) => {

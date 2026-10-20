@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:attendus/Services/account_access_service.dart';
 import 'package:attendus/Services/discovery_location_service.dart';
 import 'package:attendus/Services/discovery_marketplace_service.dart';
+import 'package:attendus/Services/event_lifecycle_store.dart';
 import 'package:attendus/Services/places_service.dart';
 import 'package:attendus/Services/product_funnel_service.dart';
 import 'package:attendus/Utils/router.dart';
@@ -43,6 +44,9 @@ class DiscoveryMarketplaceView extends StatefulWidget {
 }
 
 class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
+  final _lifecycle = EventLifecycleStore.instance;
+  late final EventLifecycleLease _lifecycleLease;
+  int _lifecycleSession = 0;
   DiscoveryHistoryCoordinator? _history;
   final _discoveryScroll = ScrollController(keepScrollOffset: false);
   final _feedCache =
@@ -103,16 +107,22 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
       );
     });
     final cached = _feedCache[route.uri.toString()];
-    if (cached != null) {
+    // Only restore cards whose current subscription has authoritative state.
+    // Offscreen route caches must revalidate before becoming actionable.
+    if (cached != null &&
+        cached.$1.every(
+          (item) => _lifecycle.stateFor(item.event.id).isServerConfirmed,
+        )) {
       setState(() {
-        _feedEvents = cached.$1;
+        _feedEvents = _visibleEvents(cached.$1);
         _feedCursor = cached.$2;
         _resolvedMiles = cached.$3;
-        _home = cached.$4;
+        _home = _visibleHome(cached.$4);
         _loading = false;
         _loadingMore = false;
         _error = null;
       });
+      _lifecycleLease.update(_feedEvents.map((item) => item.event.id));
     } else {
       await _loadHome();
     }
@@ -189,6 +199,9 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
   @override
   void initState() {
     super.initState();
+    _lifecycleLease = _lifecycle.retain(const []);
+    _lifecycleSession = _lifecycle.sessionGeneration;
+    _lifecycle.addListener(_onLifecycleChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _initialize());
   }
 
@@ -222,6 +235,8 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
 
   @override
   void dispose() {
+    _lifecycle.removeListener(_onLifecycleChanged);
+    _lifecycleLease.dispose();
     _history?.dispose();
     _discoveryScroll.dispose();
     _carouselScroll.dispose();
@@ -390,6 +405,68 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
       _resolvedMiles,
       _home,
     );
+    _lifecycleLease.update(_feedEvents.map((item) => item.event.id));
+  }
+
+  List<DiscoveryEvent> _visibleEvents(Iterable<DiscoveryEvent> events) => events
+      .where((item) => _lifecycle.allowsDiscovery(item.event.id))
+      .toList(growable: false);
+
+  DiscoveryHomeResult? _visibleHome(DiscoveryHomeResult? home) {
+    if (home == null) return null;
+    return DiscoveryHomeResult(
+      sections: [
+        for (final section in home.sections)
+          DiscoverySection(
+            id: section.id,
+            title: section.title,
+            subtitle: section.subtitle,
+            featured: section.featured,
+            events: _visibleEvents(section.events),
+            totalAvailable: _visibleEvents(section.events).length,
+          ),
+      ],
+      radiusMiles: home.radiusMiles,
+      expandedRadius: home.expandedRadius,
+      localResultCount: _visibleEvents(_feedEvents).length,
+      cacheState: home.cacheState,
+      categoryFacets: home.categoryFacets,
+      selectedCategoryId: home.selectedCategoryId,
+      schemaVersion: home.schemaVersion,
+    );
+  }
+
+  void _onLifecycleChanged() {
+    if (!mounted) return;
+    if (_lifecycleSession != _lifecycle.sessionGeneration) {
+      _lifecycleSession = _lifecycle.sessionGeneration;
+      ++_requestGeneration;
+      _feedCache.clear();
+      _lifecycleLease.update(const []);
+      setState(() {
+        _feedEvents = [];
+        _home = null;
+        _savedIds = {};
+      });
+      unawaited(_loadHome());
+      return;
+    }
+    final visible = _visibleEvents(_feedEvents);
+    var changed = visible.length != _feedEvents.length;
+    for (final key in _feedCache.keys.toList()) {
+      final cached = _feedCache[key]!;
+      final events = _visibleEvents(cached.$1);
+      changed = changed || events.length != cached.$1.length;
+      _feedCache[key] = (events, cached.$2, cached.$3, _visibleHome(cached.$4));
+    }
+    if (!changed) return;
+    setState(() {
+      _feedEvents = visible;
+      _home = _visibleHome(_home);
+      _savedIds = _savedIds.where(_lifecycle.allowsActive).toSet();
+    });
+    unawaited(DiscoveryMarketplaceService.invalidateCachedHome());
+    _lifecycleLease.update(_feedEvents.map((item) => item.event.id));
   }
 
   Future<Map<String, dynamic>> _readFeedPage(
@@ -436,9 +513,11 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
       final saved = await _marketplace.savedEventIds();
       if (!mounted || generation != _requestGeneration) return;
       final ids = <String>{};
-      final events = DiscoverySearchResult.fromMap(
-        result,
-      ).events.where((e) => ids.add(e.event.id)).toList();
+      final events = _visibleEvents(
+        DiscoverySearchResult.fromMap(
+          result,
+        ).events.where((e) => ids.add(e.event.id)),
+      );
       final recommendations = [...events]
         ..sort((a, b) {
           int relevance(DiscoveryEvent item) => item.event.categories
@@ -457,7 +536,7 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
         _feedEvents = events;
         _feedCursor = cursor;
         _resolvedMiles = (result['radiusMiles'] as num?)?.toInt();
-        _savedIds = saved;
+        _savedIds = {...saved};
         _loading = false;
         _home = DiscoveryHomeResult(
           sections: [
@@ -500,12 +579,12 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
       if (!mounted || generation != _requestGeneration) return;
       final ids = _feedEvents.map((e) => e.event.id).toSet();
       setState(() {
-        _feedEvents = [
+        _feedEvents = _visibleEvents([
           ..._feedEvents,
           ...DiscoverySearchResult.fromMap(
             result,
           ).events.where((e) => ids.add(e.event.id)),
-        ];
+        ]);
         _feedCursor = result['nextCursor'] as String?;
         _loadingMore = false;
       });

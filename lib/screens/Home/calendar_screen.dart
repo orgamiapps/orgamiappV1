@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:attendus/Services/event_lifecycle_store.dart';
+import 'package:attendus/Utils/event_lifecycle_visibility.dart';
+import 'package:attendus/widgets/event_lifecycle_scope.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:attendus/Services/calendar_events_repository.dart';
@@ -174,6 +177,9 @@ class _CalendarScreenState extends State<CalendarScreen>
 
   List<EventModel> _getEventsForDay(DateTime day) {
     final dayEvents = _filteredEvents.where((event) {
+      if (!isActiveLifecycleEvent(event, EventLifecycleStore.instance)) {
+        return false;
+      }
       final eventDate = event.selectedDateTime;
       final isSameDay =
           eventDate.year == day.year &&
@@ -295,7 +301,12 @@ class _CalendarScreenState extends State<CalendarScreen>
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => EventLifecycleScope(
+    eventIds: _allEvents.map((event) => event.id),
+    builder: (context, lifecycle) => _buildLifecycleContent(context),
+  );
+
+  Widget _buildLifecycleContent(BuildContext context) {
     return AppScaffoldWrapper(
       selectedBottomNavIndex: 0, // Home tab
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,

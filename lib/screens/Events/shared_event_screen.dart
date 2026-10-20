@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:attendus/Services/account_access_service.dart';
+import 'package:attendus/Services/event_availability_service.dart';
+import 'package:attendus/Services/event_lifecycle_store.dart';
+import 'package:attendus/Services/event_removal_navigation.dart';
 import 'package:attendus/Services/firebase_initializer.dart';
 import 'package:attendus/Services/guest_mode_service.dart';
 import 'package:attendus/Utils/logger.dart';
@@ -19,6 +22,7 @@ class SharedEventScreen extends StatefulWidget {
   final String? initialAction;
   final String? registrationId;
   final String? ticketId;
+  final Future<void> Function()? _initializeSessionOverride;
 
   const SharedEventScreen({
     super.key,
@@ -26,7 +30,17 @@ class SharedEventScreen extends StatefulWidget {
     this.initialAction,
     this.registrationId,
     this.ticketId,
-  });
+  }) : _initializeSessionOverride = null;
+
+  @visibleForTesting
+  const SharedEventScreen.test({
+    super.key,
+    required this.eventId,
+    required Future<void> Function() initializeSession,
+  }) : initialAction = null,
+       registrationId = null,
+       ticketId = null,
+       _initializeSessionOverride = initializeSession;
 
   @override
   State<SharedEventScreen> createState() => _SharedEventScreenState();
@@ -67,6 +81,19 @@ class _SharedEventScreenState extends State<SharedEventScreen> {
   }
 
   @override
+  void didUpdateWidget(covariant SharedEventScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.eventId == oldWidget.eventId) return;
+    _loadGeneration++;
+    _requestSubscription?.cancel();
+    _event = null;
+    _requestStatus = null;
+    _approvalReloadScheduled = false;
+    _selectionOwnerUid = FirebaseAuth.instance.currentUser?.uid;
+    _load();
+  }
+
+  @override
   void dispose() {
     _loadGeneration++;
     _auth?.cancel();
@@ -76,26 +103,44 @@ class _SharedEventScreenState extends State<SharedEventScreen> {
 
   Future<void> _load() async {
     final generation = ++_loadGeneration;
+    final eventId = widget.eventId;
     if (mounted) {
       setState(() => _state = SharedEventLoadState.loading);
     }
     try {
-      await FirebaseInitializer.initializeOnce();
-      await GuestModeService().initialize();
-      await GuestModeService().ensureGuestSession();
-      if (!mounted || generation != _loadGeneration) return;
+      if (widget._initializeSessionOverride != null) {
+        await widget._initializeSessionOverride!();
+      } else {
+        await FirebaseInitializer.initializeOnce();
+        await GuestModeService().initialize();
+        await GuestModeService().ensureGuestSession();
+      }
+      if (!mounted ||
+          generation != _loadGeneration ||
+          eventId != widget.eventId) {
+        return;
+      }
       final uid = FirebaseAuth.instance.currentUser?.uid;
       final snapshot = await FirebaseFirestore.instance
           .collection(EventModel.firebaseKey)
-          .doc(widget.eventId)
-          .get();
+          .doc(eventId)
+          .get(const GetOptions(source: Source.server));
       if (!mounted ||
           generation != _loadGeneration ||
+          eventId != widget.eventId ||
           FirebaseAuth.instance.currentUser?.uid != uid) {
         return;
       }
       if (!snapshot.exists || snapshot.data() == null) {
-        setState(() => _state = SharedEventLoadState.notFound);
+        if (snapshot.metadata.isFromCache) {
+          setState(() => _state = SharedEventLoadState.error);
+        } else {
+          EventLifecycleStore.instance.applyConfirmed(
+            eventIds: [eventId],
+            status: EventLifecycleStatus.deleted,
+          );
+          setState(() => _state = SharedEventLoadState.notFound);
+        }
         return;
       }
       final event = EventModel.fromJson({
@@ -106,18 +151,44 @@ class _SharedEventScreenState extends State<SharedEventScreen> {
         _event = event;
         _state = SharedEventLoadState.event;
       });
+      EventLifecycleStore.instance.reconcile();
     } on FirebaseException catch (error) {
-      Logger.warning('Shared event ${widget.eventId} failed to load: $error');
-      if (!mounted || generation != _loadGeneration) return;
+      Logger.warning('Shared event $eventId failed to load: $error');
+      if (!mounted ||
+          generation != _loadGeneration ||
+          eventId != widget.eventId) {
+        return;
+      }
       if (error.code == 'permission-denied') {
-        setState(() => _state = SharedEventLoadState.restricted);
-        _watchAccessRequest();
+        final availability = await resolveDeniedEventRead(eventId);
+        if (!mounted ||
+            generation != _loadGeneration ||
+            eventId != widget.eventId) {
+          return;
+        }
+        setState(
+          () => _state = switch (availability) {
+            DeniedEventRead.notFound => SharedEventLoadState.notFound,
+            DeniedEventRead.restricted => SharedEventLoadState.restricted,
+            DeniedEventRead.connectionError => SharedEventLoadState.error,
+          },
+        );
+        if (availability == DeniedEventRead.notFound) {
+          EventLifecycleStore.instance.applyConfirmed(
+            eventIds: [eventId],
+            status: EventLifecycleStatus.deleted,
+          );
+        } else if (availability == DeniedEventRead.restricted) {
+          _watchAccessRequest();
+        }
       } else {
         setState(() => _state = SharedEventLoadState.error);
       }
     } catch (error) {
-      Logger.warning('Shared event ${widget.eventId} failed to load: $error');
-      if (mounted && generation == _loadGeneration) {
+      Logger.warning('Shared event $eventId failed to load: $error');
+      if (mounted &&
+          generation == _loadGeneration &&
+          eventId == widget.eventId) {
         setState(() => _state = SharedEventLoadState.error);
       }
     }
@@ -125,17 +196,19 @@ class _SharedEventScreenState extends State<SharedEventScreen> {
 
   void _watchAccessRequest() {
     final user = FirebaseAuth.instance.currentUser;
+    final eventId = widget.eventId;
     if (user == null || user.isAnonymous) return;
     _requestSubscription?.cancel();
     _requestSubscription = FirebaseFirestore.instance
         .collection(EventModel.firebaseKey)
-        .doc(widget.eventId)
+        .doc(eventId)
         .collection('AccessRequests')
         .doc(user.uid)
         .snapshots()
         .listen(
           (snapshot) {
             if (!mounted ||
+                widget.eventId != eventId ||
                 FirebaseAuth.instance.currentUser?.uid != user.uid) {
               return;
             }
@@ -154,6 +227,7 @@ class _SharedEventScreenState extends State<SharedEventScreen> {
 
   Future<void> _requestAccess() async {
     final user = FirebaseAuth.instance.currentUser;
+    final eventId = widget.eventId;
     if (user == null || user.isAnonymous || AccountAccessService.isGuest) {
       await showAccountRequiredSheet(
         context: context,
@@ -164,10 +238,13 @@ class _SharedEventScreenState extends State<SharedEventScreen> {
     }
     setState(() => _submittingRequest = true);
     try {
-      await FirebaseFirestoreHelper().requestEventAccess(
-        eventId: widget.eventId,
-      );
-      if (mounted) setState(() => _requestStatus = 'pending');
+      await FirebaseFirestoreHelper().requestEventAccess(eventId: eventId);
+      if (!mounted ||
+          widget.eventId != eventId ||
+          FirebaseAuth.instance.currentUser?.uid != user.uid) {
+        return;
+      }
+      setState(() => _requestStatus = 'pending');
       _watchAccessRequest();
     } catch (error) {
       Logger.warning('Unable to request access to ${widget.eventId}: $error');
@@ -257,10 +334,20 @@ class _SharedEventScreenState extends State<SharedEventScreen> {
           ],
         );
       case SharedEventLoadState.notFound:
-        return _message(
-          Icons.event_busy_outlined,
-          'Event unavailable',
-          'This event may have been removed or the link may be incorrect.',
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _message(
+              Icons.event_busy_outlined,
+              'Event unavailable',
+              'This event may have been removed or the link may be incorrect.',
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: () => EventRemovalNavigation.backToList(context),
+              child: const Text('Back to events'),
+            ),
+          ],
         );
       case SharedEventLoadState.error:
         return Column(

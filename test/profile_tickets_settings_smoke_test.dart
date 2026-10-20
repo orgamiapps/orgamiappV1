@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'support/discovery_fixture.dart';
 
 void main() {
   setUp(() {
@@ -14,6 +15,7 @@ void main() {
   });
 
   testWidgets('tickets screen renders modern wallet shell', (tester) async {
+    await DiscoveryFixture().install(guest: true);
     await tester.pumpWidget(
       MaterialApp(theme: AttendUsTheme.light, home: const MyTicketsScreen()),
     );

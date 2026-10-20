@@ -1,6 +1,8 @@
 import 'package:attendus/Services/public_profile_service.dart';
 import 'package:attendus/Services/community_service.dart';
 import 'package:flutter/material.dart';
+import 'package:attendus/Utils/event_lifecycle_visibility.dart';
+import 'package:attendus/widgets/event_lifecycle_scope.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:share_plus/share_plus.dart';
@@ -2010,85 +2012,104 @@ class _AboutTabState extends State<_AboutTab> {
           );
         }
 
-        final orgSnapshot = snapshot.data![0] as DocumentSnapshot;
-        final membersSnapshot = snapshot.data![1] as QuerySnapshot;
-        final eventsSnapshot = snapshot.data![2] as QuerySnapshot;
-        final totalAttendees = snapshot.data![3] as int;
-        final upcomingEvents = snapshot.data![4] as List<Map<String, dynamic>>;
+        return EventLifecycleScope(
+          eventIds: (snapshot.data![2] as QuerySnapshot).docs.map(
+            (doc) => doc.id,
+          ),
+          builder: (context, lifecycle) {
+            final orgSnapshot = snapshot.data![0] as DocumentSnapshot;
+            final membersSnapshot = snapshot.data![1] as QuerySnapshot;
+            final eventsSnapshot = snapshot.data![2] as QuerySnapshot;
+            final totalAttendees = snapshot.data![3] as int;
+            final upcomingEvents =
+                (snapshot.data![4] as List<Map<String, dynamic>>)
+                    .where(
+                      (event) => isActiveLifecycleData(
+                        event['id'] as String,
+                        event,
+                        lifecycle,
+                      ),
+                    )
+                    .toList();
 
-        final data = orgSnapshot.data() as Map<String, dynamic>?;
-        final description = (data?['description'] ?? '').toString();
-        final category = (data?['category'] ?? 'Group').toString();
-        final website = (data?['website'] ?? '').toString();
-        final locationAddress = (data?['locationAddress'] ?? '').toString();
-        final createdAt = (data?['createdAt'] as Timestamp?)?.toDate();
-        final createdBy = (data?['createdBy'] ?? '').toString();
-        final defaultEventVisibility =
-            (data?['defaultEventVisibility'] ?? 'public').toString();
+            final data = orgSnapshot.data() as Map<String, dynamic>?;
+            final description = (data?['description'] ?? '').toString();
+            final category = (data?['category'] ?? 'Group').toString();
+            final website = (data?['website'] ?? '').toString();
+            final locationAddress = (data?['locationAddress'] ?? '').toString();
+            final createdAt = (data?['createdAt'] as Timestamp?)?.toDate();
+            final createdBy = (data?['createdBy'] ?? '').toString();
+            final defaultEventVisibility =
+                (data?['defaultEventVisibility'] ?? 'public').toString();
 
-        final memberCount = membersSnapshot.docs.length;
-        final eventCount = eventsSnapshot.docs.length;
-        final activeEvents = eventsSnapshot.docs.where((doc) {
-          final eventData = doc.data() as Map<String, dynamic>;
-          final endDateTime = (eventData['endDateTime'] as Timestamp?)
-              ?.toDate();
-          return endDateTime?.isAfter(DateTime.now()) ?? false;
-        }).length;
+            final memberCount = membersSnapshot.docs.length;
+            final eventCount = eventsSnapshot.docs
+                .where((doc) => lifecycle.allowsHistory(doc.id))
+                .length;
+            final activeEvents = eventsSnapshot.docs.where((doc) {
+              final eventData = doc.data() as Map<String, dynamic>;
+              final endDateTime = (eventData['endDateTime'] as Timestamp?)
+                  ?.toDate();
+              return isActiveLifecycleData(doc.id, eventData, lifecycle) &&
+                  (endDateTime?.isAfter(DateTime.now()) ?? false);
+            }).length;
 
-        return ListView(
-          primary: true,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          children: [
-            // Hero Stats Card - Eye-catching overview
-            _buildHeroStatsCard(
-              context,
-              memberCount,
-              eventCount,
-              activeEvents,
-              totalAttendees,
-            ),
+            return ListView(
+              primary: true,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              children: [
+                // Hero Stats Card - Eye-catching overview
+                _buildHeroStatsCard(
+                  context,
+                  memberCount,
+                  eventCount,
+                  activeEvents,
+                  totalAttendees,
+                ),
 
-            const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-            // Description Section
-            if (description.isNotEmpty) ...[
-              _buildDescriptionCard(context, description, category),
-              const SizedBox(height: 20),
-            ],
+                // Description Section
+                if (description.isNotEmpty) ...[
+                  _buildDescriptionCard(context, description, category),
+                  const SizedBox(height: 20),
+                ],
 
-            // Key Information Grid
-            _buildKeyInfoGrid(
-              context,
-              category,
-              defaultEventVisibility,
-              createdAt,
-              locationAddress,
-            ),
+                // Key Information Grid
+                _buildKeyInfoGrid(
+                  context,
+                  category,
+                  defaultEventVisibility,
+                  createdAt,
+                  locationAddress,
+                ),
 
-            const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-            // Upcoming Events Section
-            if (upcomingEvents.isNotEmpty) ...[
-              _buildUpcomingEventsSection(context, upcomingEvents),
-              const SizedBox(height: 20),
-            ],
+                // Upcoming Events Section
+                if (upcomingEvents.isNotEmpty) ...[
+                  _buildUpcomingEventsSection(context, upcomingEvents),
+                  const SizedBox(height: 20),
+                ],
 
-            // Quick Actions Section
-            _buildQuickActionsSection(
-              context,
-              website,
-              locationAddress,
-              widget.organizationId,
-            ),
+                // Quick Actions Section
+                _buildQuickActionsSection(
+                  context,
+                  website,
+                  locationAddress,
+                  widget.organizationId,
+                ),
 
-            const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-            // Admin Information Section
-            _buildAdminSection(context, createdBy),
+                // Admin Information Section
+                _buildAdminSection(context, createdBy),
 
-            // Extra bottom padding to allow scrolling past the FAB
-            const SizedBox(height: 120),
-          ],
+                // Extra bottom padding to allow scrolling past the FAB
+                const SizedBox(height: 120),
+              ],
+            );
+          },
         );
       },
     );
@@ -2161,7 +2182,10 @@ class _AboutTabState extends State<_AboutTab> {
         final data = doc.data();
         return {
           'id': doc.id,
-          'name': data['name'] ?? '',
+          'name': data['name'] ?? data['title'] ?? '',
+          'status': data['status'],
+          'cancelled': data['cancelled'],
+          'deleted': data['deleted'],
           'startDateTime': data['startDateTime'] as Timestamp?,
           'imageUrl': data['imageUrl'] ?? data['eventImageUrl'],
         };
