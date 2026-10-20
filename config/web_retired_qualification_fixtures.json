@@ -355,6 +355,154 @@
           "sha256": "f2ad74735cb54f2427922ea160e4c7663392377e3da9429b2bd6b4b2b06512cb"
         }
       ]
+    },
+    {
+      "runId": "webqa-20261019-485cfa1c1a",
+      "sourceSha": "4383a6f947a6240703fe4769f93d6b7c5eaca2b2",
+      "candidateRunId": "39338678475",
+      "cleanupEvidenceSha256": "e51ff11bdc186c23eb9e7368c6eeaa21d510d7b80cebb95cd66039f1ec6977c9",
+      "documents": [
+        {
+          "path": "QualificationBindings/account_2671757e2691442b35eabd7ace1207884e6a40e92cd75d7e9b18d723ab3ec6bc",
+          "sha256": "6f50fc876965df7c9462f51efc6483ad7ed26d30fa40322d734e925f77a73e40"
+        },
+        {
+          "path": "QualificationBindings/event_03ba51bbcac258a2fecae20727ba739a06080a651c39f593780b2913a70e1479",
+          "sha256": "a263827612610dcb96a9eb46bd9e97e391b98583a67dc3ee1767afae48117569"
+        },
+        {
+          "path": "QualificationBindings/event_04515b7578e3b01d0ba3a8cdf4ff36d6c8d337ef26f975411c1a74baa2b40d6f",
+          "sha256": "dd49fbbf3aaf5408f0d7ae673a232820baf06ef190a54110cc27d514e443e0fd"
+        },
+        {
+          "path": "QualificationBindings/event_07533496ddd3ba69eaf96364ee6f509c580158f4ea290222d17515699e8cab04",
+          "sha256": "f4555058626f47d04d608fea2458d016e0c1cbd9058a5e663ebfd262301ee384"
+        },
+        {
+          "path": "QualificationBindings/event_1ac114485738956f2fe5309e887c503266f1708136930ae8cd5005fc43aa205c",
+          "sha256": "1eec10792af31e2e9b9f941f4280be4fbf719de92573dac9bcd4ceafcbe63a95"
+        },
+        {
+          "path": "QualificationBindings/event_22119af60b3004d267f060097d9cc3b6e21778dd08e13fcf2e9653f08fccacdc",
+          "sha256": "cfdec38f079dd45bfa7c9f74d305fbe31934980baf5e20899d66e453f777850e"
+        },
+        {
+          "path": "QualificationBindings/event_2aed7fc67cea87013dcef21d1aa3f642588137d4022b1f0dbfe1c10502b7e228",
+          "sha256": "2592f233a97e40933cef6527be6d4e66f630ce0fd926f057d974a14de0b3c46a"
+        },
+        {
+          "path": "QualificationBindings/event_2eef4ecdddf0c1a0ae16c159228ad8beb12bf0131f19cab63911168606fca532",
+          "sha256": "91a2b4257d5c508249382898e25ec2a4e5a70a71d597f61249f77acdbabf17b5"
+        },
+        {
+          "path": "QualificationBindings/event_4179d188c787d4fb782959aa3fc09b6a5d389a46bee5d564dd35bc5f74553501",
+          "sha256": "efbda9598f36492da4221542e34ab96b21d84e80ea191a44a71093db65961ef4"
+        },
+        {
+          "path": "QualificationBindings/event_5367b8fb7d3e3fba88f5af42c619f96bd5bd2c957b0dcd2399991bd438130c6c",
+          "sha256": "de8bbe27ea958ce36736266abc3e7a3d09367a222d7ddba9eb969ce9041b7387"
+        },
+        {
+          "path": "QualificationBindings/event_553aa30aa81aa6044b655cb0a589bc9fd8602f400cb005e82b5e20c173d4bc5d",
+          "sha256": "d224601b8ec892616d0a2535967922fb30eb84102811a69a37f879b85380e801"
+        },
+        {
+          "path": "QualificationBindings/event_593e59dbd5ed0242b6fa7dbdbbbf016a4f25a6c82a92b1eae0c0171f53e46fb2",
+          "sha256": "b17700e86b12bd1785f459eeb6ab625f0ffe3d71f4e04b1eea1a10fab49291f0"
+        },
+        {
+          "path": "QualificationBindings/event_59fb56f84d4129e075c287eb54a525b2b36e737b4607f105c7be2fbfbf080023",
+          "sha256": "bcac50cd31908b65256a87835b2c4de4f15fb7c7bd0f13e81d26134a9eff37f9"
+        },
+        {
+          "path": "QualificationBindings/event_65d5293d33c80396e309192eb252eb0a059800d61fe0103f44714eea7db23792",
+          "sha256": "6e8b9e4db0d440b9a8f609039c9e8f2b755af498927b1a86d3c9cfadffce6f8d"
+        },
+        {
+          "path": "QualificationBindings/event_679b754a78a5d7abe02d8d3d3860c529689f3e2452cd04f8ac7bf6570bfb6f8e",
+          "sha256": "fa6c50f513c2c8e85f7855ac0c4bbe1d80905437593488a27c57f1d4459bbf0e"
+        },
+        {
+          "path": "QualificationBindings/event_6b393d5048dfa0de1db7ff6540e311e3b7a752a8291f0e035f60cad739e2265b",
+          "sha256": "526b220b01eb9d6fd7d32ba3e5d2dffaa025c352793d37cc76e6f1d3ea7b1033"
+        },
+        {
+          "path": "QualificationBindings/event_743ce640192f4476f6651cb727efb7e9ce6f9dcb3cd5369b491fa59cee529347",
+          "sha256": "32de0e467ce19d5e0c5ff86b505447e890e9ffc0d8efae4a160fd9c4bece6431"
+        },
+        {
+          "path": "QualificationBindings/event_75f32a3c0f58c025207d5f1a4a149a00b4121343a309de28f56d44d737bb172c",
+          "sha256": "25711fbb98103deee3794759e1d0b3a0c24a86807b7b13e330848ac4ada251b6"
+        },
+        {
+          "path": "QualificationBindings/event_8b65dd4cedc853e5820fd53bdae90e62e6a1b5f1c8202b33cbcc476c8815a37a",
+          "sha256": "568d9d9018dd76b23e1f842f557947b0e80e262b22e56cac0ee72b80496ca120"
+        },
+        {
+          "path": "QualificationBindings/event_9281e468ed8af8e0c98627b6f32086c13c7622d42e895aeaf802d72aeebb5874",
+          "sha256": "e8e168bc6f08d040f42479d1a26d8321780191cf8838654ded7f2413cf9fc947"
+        },
+        {
+          "path": "QualificationBindings/event_a44297b9c596818ab1fa57c8252a2695922018dc1f431dc01e735e13dfbd50bd",
+          "sha256": "bddbc2951918c678ec31543c0f6f0d7a46c4d09f5f23f0533a022bd6090be622"
+        },
+        {
+          "path": "QualificationBindings/event_a5250d7574747b7bac44ae93eafdec4a2d13d60bcc62f5d3d81f898fb4e1c94b",
+          "sha256": "dc6f7df064dcfd2727b6c6d521ba331ec7fc57a1b46d6dd004b8067593906aa7"
+        },
+        {
+          "path": "QualificationBindings/event_a6afe227e62fe8aa1a05f58d9fa8eb9c56b07b7ff4904fffce56b66915c9a99e",
+          "sha256": "ba59f759d8f5d06e39b3df1911ed82f50b1d7f197f7f85e18211e564a03362fc"
+        },
+        {
+          "path": "QualificationBindings/event_aafa9477e613f54d2101cb9c02f5a7a82c9851dc92276b9aa642548453c749b1",
+          "sha256": "fc4ad569de3535540994e188b1a0d274e308fdaf3972e1b22fc319e30cbc50c9"
+        },
+        {
+          "path": "QualificationBindings/event_ab3f986bdc45a4c75b9c34ff0562f90201b6105a1259fb3261e2c72c95339ff5",
+          "sha256": "346ad1ac1f492d00fc53e8d3e9ad040753eae3bd4be5d840980ab3c51a45ab85"
+        },
+        {
+          "path": "QualificationBindings/event_b28c162f31bfd6f90fcda9442b5d830cd0ceefd5734726b2621911f431d8c0b9",
+          "sha256": "a8ea0d21f11b05cd1d7d77419f78c2894cd5842dcd6971d67351c1b555c9d735"
+        },
+        {
+          "path": "QualificationBindings/event_c39a3295f7ea99cecb227eab34044d2f8f67bfac0a51ce0e24b7371a8a0481b8",
+          "sha256": "e7caa1ad8383c85e82bc29f9c5b5d8afae7877babefab350dbe16259e71013f5"
+        },
+        {
+          "path": "QualificationBindings/event_c7afd10dbad81edf73a0f653af06f7217738e49521b675504e83635ad821f85c",
+          "sha256": "f091461b04c62c56c3ddd2344e1ec5afcb4ca6c8939082f330b07ad1a9cf4c43"
+        },
+        {
+          "path": "QualificationBindings/event_dcd2a76a5e765ef818888a2dc71622a98ea022cf95a0823e8e7268e2ae15dc6a",
+          "sha256": "6a27426efccb2f349154440efc48b540927e17ecc93279a62f929c9d99dc637a"
+        },
+        {
+          "path": "QualificationBindings/event_ddab4ccf4b63d4982d9f3797ac1f55a2d864531f044436b7e373232ada859d82",
+          "sha256": "750594edadc8fcc2f4292590d4853460e7e20008e6308b14afa6bd5951a37626"
+        },
+        {
+          "path": "QualificationBindings/event_e15525e142f74c4e7632828099b23710ac25e11cfa7505750fe4e20da274b215",
+          "sha256": "7fb0fd0aeff1bbe4178ee85edf350860825fcbc077e23e29d1c29a2996232fdc"
+        },
+        {
+          "path": "QualificationBindings/event_e20edb00e7dc3e35c058d4565d4220f9db928772b48f2b17d97059a16e382ffb",
+          "sha256": "dee9ac0899fc54675a1bc6485e9ef1a4b9d5ebbfa1cda331b44d6cbdcef71409"
+        },
+        {
+          "path": "QualificationBindings/event_e343153254e747c10d792004d3e76cc5c4f05c11aa2867351651628b7f9fd929",
+          "sha256": "8001f1cce5a5d162ba5e239b36104f31a5267d140b105336108825b9c77c006d"
+        },
+        {
+          "path": "QualificationScopes/webqa-20261019-485cfa1c1a",
+          "sha256": "99df9284c637e5327fe2120d87cb6561244a2a5073d651be41635989ada1b225"
+        },
+        {
+          "path": "QualificationSetup/webqa-20261019-485cfa1c1a",
+          "sha256": "2dcd002cbfeb59a014c82762fc814e33c44df5e46f04999a544f6f210723013c"
+        }
+      ]
     }
   ]
 }
