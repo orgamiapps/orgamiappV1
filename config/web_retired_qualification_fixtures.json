@@ -651,6 +651,154 @@
           "sha256": "3d22ce105e018517759b9d022b8f4f9e8a541148bf1aea737514c747d8853b0d"
         }
       ]
+    },
+    {
+      "runId": "webqa-20261020-675992333e",
+      "sourceSha": "3bdc3b8d4dbb4c8543f99c8619ff2ea7f31f3578",
+      "candidateRunId": "39353123209",
+      "cleanupEvidenceSha256": "37da0043576b41ff79429309075f8420cec1efd3c36cab8017ce367cb4f86c43",
+      "documents": [
+        {
+          "path": "QualificationBindings/account_1140a4c84dac01282a33095702e88a635e4c988d2615f99415adec4dd41817ce",
+          "sha256": "dbe7a0114f8c7afba817dc9be817d6658f5d93aa8f6ef12df776eb2d787488af"
+        },
+        {
+          "path": "QualificationBindings/event_0118f2d76afbc6350ac47e85979e6b6f8149ef1906121cd12b095cd2f32cb0b7",
+          "sha256": "b3cbe048d0de8e2e0e836922aeb8b5f80d32737d156d0fddb28b26f16b6af2b6"
+        },
+        {
+          "path": "QualificationBindings/event_1ff6c9ecd97f794a7350d7dbe0eeaa204feee7a1880ab6c9e992d18c45984856",
+          "sha256": "2d9cae0f3240d74453c3e0d68f44eedcbc15e7007207f9ca46996135878ff0bc"
+        },
+        {
+          "path": "QualificationBindings/event_217cca8b04d3a855e68865aefe4fc5dcfbd101b5770daa4175dafc72418026d1",
+          "sha256": "40ce0fb652173b64b83c28b3fd077780e1bdcf4c15f7cd58aa00364d15b65fcf"
+        },
+        {
+          "path": "QualificationBindings/event_2925d125bde95ffbe61193c763a314fac3559d9be141bd6a0a5284ad284864cd",
+          "sha256": "122ef5c7adc027a6f1af73c24898bee81ea9e6548fb4ff11db5e905c31db7b48"
+        },
+        {
+          "path": "QualificationBindings/event_3985e9690dd120d7ecf5e8dfee3c07077e2e1c4ba921c8f027362e782b9f89d9",
+          "sha256": "9918b011bfd30377a2401af21df69940e3633073685ae54744282eed2f6ba7d1"
+        },
+        {
+          "path": "QualificationBindings/event_3bf8874a2a57a3c4ec5cc5aaf2f30ee35412b5076ba84aeacae400e5f3e9ded5",
+          "sha256": "03ad4831ddf934accfb5156acfc501c8a7723aea2813bf8fa699b0581a0fcb14"
+        },
+        {
+          "path": "QualificationBindings/event_4ce24b14fc9c330acc85850739e316bfb4b7c348c2457f12f05effc147f1b768",
+          "sha256": "df9f9b18790787d929cac7fbd06aeb0d8e1dd79213a6aaf2d5c6f636960cb8b7"
+        },
+        {
+          "path": "QualificationBindings/event_513ae1dca4d80b9f44c7e92b940a816a133e9ef531a71c83a84a9be8cee2d8ab",
+          "sha256": "6e702cabbe72514dfbb647b1bc3cbea3b5f9d0131051543f091e42fcc2f558b0"
+        },
+        {
+          "path": "QualificationBindings/event_64d22fb8550ca23eb148b146d00a1bf30eee41dd1d3af9580e9352278a4a848e",
+          "sha256": "e624c3aca255e4597cadf0db3959fafed3e65cb515a22fcfc83d51406d04e1e6"
+        },
+        {
+          "path": "QualificationBindings/event_838d2c106151d7d99a5d3d2bca5f52cb71b7a3bf13b1d68552f7f5be3ad244a0",
+          "sha256": "44053baf37222c0941c64ba3b1d24b684cb2b8b57decdfdc76ae99da2d96f403"
+        },
+        {
+          "path": "QualificationBindings/event_88d4c4a66193cd08e79ad7ac78e96563f573c97ecada8452d05d20221737a21a",
+          "sha256": "fa631d2289a3d8a892f09aaceefbe8b96cb7b0fb1cca8896eaef03536ff2ebf1"
+        },
+        {
+          "path": "QualificationBindings/event_95dfc908fa1dcd16e521257ba55d2f9d25541c3506e7928a3a2055537ceea87a",
+          "sha256": "98d88bff50580ff1afc0d61ca6636d1b9447054590cc06220aab42186501b07e"
+        },
+        {
+          "path": "QualificationBindings/event_962082dbf519dcb652b6a0aeec9bd15058de17a56eaa2664eaab5f29df6c6113",
+          "sha256": "435eb3046c345696180c3dc71a66eae6f8e76ee2aa5084cad418902362a972e0"
+        },
+        {
+          "path": "QualificationBindings/event_9983a4b737533e1f792523e49bf0bbdfef8af5fa177d8fb77a1a4714f50025cd",
+          "sha256": "ca66f383e16889f2b2a36e019a6e96ec4d0bcf70a074359f63b5a594a2fb9831"
+        },
+        {
+          "path": "QualificationBindings/event_9a0da36836595266de38bb6253db57a63953a694184ac3354763ca98e86d2786",
+          "sha256": "090fd7ae1b98cb38d49d71d12eae6da60383e43b4fddcf890d3c508fd4dd220f"
+        },
+        {
+          "path": "QualificationBindings/event_a0b64d1415ecb8d40521ecb38220feac1698995af5b313a45fd6cb2099759728",
+          "sha256": "e72e9a83fa28dde42c2247ae8580832e352846027922c1cbe7d845890a0a58df"
+        },
+        {
+          "path": "QualificationBindings/event_a52e68fd212a471e8ceb08fe1da977877db7b6bb9394d6da69ef5faff898c7c1",
+          "sha256": "0b318cd1215a92f89aa4445d13205d6a44d2db639abf8d34bc251e9398e3c35e"
+        },
+        {
+          "path": "QualificationBindings/event_afd969a259c8adf2b521d2be3d7cc5b348515ceea2a2d5d48dbb92867a39688a",
+          "sha256": "49139566922f9893e57d6e697d8acf2b3fd5479096bbad6f91462bd106dd6636"
+        },
+        {
+          "path": "QualificationBindings/event_b32f141a5c08aa869526b927f9de6ade271bffb0e6ca633b15bd98893ffa90c7",
+          "sha256": "11e14c8c6d7c01493971d977e6853eb2977cfea0adfd96e51ff748b3d01570d1"
+        },
+        {
+          "path": "QualificationBindings/event_b8ff1178ee8bf666117b8b9ca2fbe460f2e2f5aecfc58536481febcd0160710d",
+          "sha256": "a009d0aee5f5807c7b87b266aca1fc07f7edb8566c79b50c75e22cb9835219b0"
+        },
+        {
+          "path": "QualificationBindings/event_bad06b5308f6667882ec2c07262e58568cf485ebe4666a9771b5d496125115c6",
+          "sha256": "372079e8526f42b5b99be044b7236e1bb36f4a0073c28a017933bd2192dd7f2a"
+        },
+        {
+          "path": "QualificationBindings/event_bce04c4874880f6ab7bcf97cd6e5cba6de349a5c708f3e47bf0590cd854d9676",
+          "sha256": "ea27bd7a7b22baaaacfee7cf454a4013d8b70cba87e02c0b07551cecbfd2480d"
+        },
+        {
+          "path": "QualificationBindings/event_bce1de183b2cac6c86f64333f5ef769d9f01d3f8b2a53cd61f7195eab645a354",
+          "sha256": "ece2b83afc8ca28856e5b75727184ae01522967aa4308d6d7864d9e2d2ee803d"
+        },
+        {
+          "path": "QualificationBindings/event_bcfc3f8d2fa74baff9945c528fc46aff8a9f3c478c3a8fec0c0094a440b6e2fb",
+          "sha256": "c9750f627a37213e58b18edfd6397ef24be9b8d174b62bad8f73c244197357e2"
+        },
+        {
+          "path": "QualificationBindings/event_c25ce72330501b7560d1a5370f215dd926856d622eb7d13418c089d616b52082",
+          "sha256": "de170a27c18f77129631e7f062585bc23b5d90c494343f443c19629f0ccbbe2b"
+        },
+        {
+          "path": "QualificationBindings/event_c56a97f45be0a2eefab3715d646425bfbb5582f6a46711e8eb5220a1d3f4bad5",
+          "sha256": "cbc79a9f3df0446ad454f9dfe355b98049f5e523b6dbc3797a82a8e6bcd97959"
+        },
+        {
+          "path": "QualificationBindings/event_d07f77ad9468340fe68d31e381c8402be59ab87350f05ff4f0e8ab595524fd80",
+          "sha256": "754b6d7178d34083b9a80f55ca2c63d95b5c82f51343edf62fff440a20750a9e"
+        },
+        {
+          "path": "QualificationBindings/event_d6ba7093ab8b05120390a655a50c7e9bf8fc33cb7b059db9ed17c82102889c99",
+          "sha256": "4c2bb09f897bb61fe3f0ae913d3dbb5a9731143c860d2c7dd531142073483a7d"
+        },
+        {
+          "path": "QualificationBindings/event_dc1ed8c19038a8e3f5171d24b8d7f2525378fc3422ed191d163e9be342ac4dd3",
+          "sha256": "5e6f7175f3a0a2e6bded0f9262f7df5f46051b2874bc6b89f4c72f03a670c288"
+        },
+        {
+          "path": "QualificationBindings/event_ddb7f3cf029e227253db3dda9c863cb11afc8c6dc08e6d0e794462ac7d3edddf",
+          "sha256": "d235f3f2ca05bd2de4684dcb01ee8159bb15a63c9f240fc35e2792644712552f"
+        },
+        {
+          "path": "QualificationBindings/event_eed830762641af2fec759d4eaa0860467275960870cd9d15a65f720fda4c2bbb",
+          "sha256": "fe01511b16764071e29f29f28ec7bf64f4d05cacd5f46f4e9266992ce7cd7e12"
+        },
+        {
+          "path": "QualificationBindings/event_fa705a328cee1cf37ea51bf541a6be50496194b1b05ea83a5e99ba9e0a47008a",
+          "sha256": "76db297bdd7640d6c8b28e5212900eb2c9fb39bc930738eadb017cb519cb6ba2"
+        },
+        {
+          "path": "QualificationScopes/webqa-20261020-675992333e",
+          "sha256": "d59ea8028a98545905d3e54bbe404e57defd0972308eaa5fc911252a3dcce5d1"
+        },
+        {
+          "path": "QualificationSetup/webqa-20261020-675992333e",
+          "sha256": "d602b2fb55d59ec43cb94558df5d6336e2f8f856b5586633276e4f2b2176798b"
+        }
+      ]
     }
   ]
 }

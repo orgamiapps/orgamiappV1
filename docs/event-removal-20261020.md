@@ -101,3 +101,29 @@ existing cancellation delivery jobs, and retain two-session UI evidence of
 list updates. Unexpected stale cards, false access prompts, duplicate mutation
 effects, or lost history block acceptance. Local tests alone cannot close these
 release gates.
+
+## Staging preparation evidence
+
+The prior pilot `webqa-20261020-675992333e` (candidate `39353123209`) was
+archived and retired with explicit owner approval on 2026-10-20. Its exact
+196 source and derived documents and four approved Auth identities were
+removed using version/identity guards and a one-shot journal. The verified
+baseline anonymous identity, 32 captures, 150 earlier retirement pins, and all
+prior evidence were preserved. The 35 newly retired isolation records were
+pinned from read-back; the existing empty-staging check passed with all 185
+retained pins. Private document and identity archives remain outside Git.
+
+The current 152 staging Functions source generations were copied into the
+existing private recovery bucket with create-only destination preconditions.
+Every copied archive was verified by byte hash; the 152 production archive
+entries remain unchanged. These updates refresh the two frozen prerequisite
+manifests without weakening the empty-staging or rollback checks.
+
+The cleanup receipt SHA-256 is
+`89d0287eaf351b15d4f231204839d889194bb1793d1efba09611ec8983025d66`.
+The verified source-archive manifest SHA-256 is
+`382a105729b8419144d0218e7e443a2575d41a5db533d180bddc6a1426d7b00d`.
+The actual receipt/manifests were independently reconciled, and 64 focused
+rollback, retired-fixture, and release-contract tests passed. This is release
+preparation evidence; no staging deployment or production qualification follows
+from these checks alone.
