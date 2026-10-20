@@ -203,7 +203,7 @@ void main() {
       await settle(tester);
       await tester.tapAt(const Offset(5, 5));
       await settle(tester);
-      expect(find.text('Within 5 miles'), findsOneWidget);
+      expect(find.text('Showing events within 5 miles'), findsOneWidget);
       await tester.tap(find.text('Bonita Springs, FL'));
       await settle(tester);
       await tester.tap(find.text('Browse online and nationwide'));
