@@ -14,6 +14,7 @@ const {
   createPublicWeb,
   escapeHtml,
   eventEligibility,
+  eventProjectionEligibility,
   eventDescription,
   eventJsonLd,
   eventState,
@@ -165,6 +166,16 @@ test("completed and cancelled public events remain eligible archives", () => {
   assert.equal(eventEligibility({...future, status: "completed"}), true);
   assert.equal(eventEligibility({...future, status: "cancelled"}), true);
   assert.equal(eventState({...future, status: "cancelled"}), "cancelled");
+});
+
+test("cancelled archive pages are excluded from public listing and sitemap projections", () => {
+  assert.equal(eventProjectionEligibility(future), true);
+  assert.equal(eventProjectionEligibility({...future, status: "completed"}), true);
+  for (const patch of [{status: "cancelled"}, {status: "canceled"}, {cancelled: true}]) {
+    assert.equal(eventEligibility({...future, ...patch}), true);
+    assert.equal(eventProjectionEligibility({...future, ...patch}), false);
+  }
+  assert.equal(eventProjectionEligibility({...future, private: true}), false);
 });
 
 test("ticket state accounts for reservations and server price", () => {

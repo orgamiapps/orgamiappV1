@@ -9,7 +9,55 @@ process.env.FUNCTIONS_EMULATOR = "true";
 const admin = require("../firebase-admin-compat");
 const db = admin.firestore();
 const {createMaintainPublicEventPage, createMaintainPublicCommunityPage} = require("../public-web/renderer");
+const {applyEventBackfill} = require("../tools/backfill-public-web");
 test.after(async () => db.terminate());
+
+test("event backfill cannot recreate a source or projection cancelled or deleted after its scan", async () => {
+  for (const removed of ["cancelled", "deleted"]) {
+    const id = `backfill-${removed}-${crypto.randomUUID()}`;
+    const source = db.doc(`Events/${id}`), projection = db.doc(`PublicWebEvents/${id}`);
+    try {
+      await source.set({title: "Scanned public event", private: false, status: "active",
+        selectedDateTime: "2030-01-01T12:00:00Z", eventDuration: 1});
+      const scanned = await source.get();
+      await projection.set({title: "Old listing"});
+      if (removed === "deleted") await source.delete();
+      else await source.update({status: "cancelled"});
+      assert.deepEqual(await applyEventBackfill(db, scanned, {
+        eventTimeZone: "UTC", streetAddress: "Scanned location", postalCode: "00000",
+      }), {metadataChanged: false, projectionWritten: false});
+      assert.equal((await projection.get()).exists, false);
+      const current = await source.get();
+      assert.equal(current.exists, removed !== "deleted");
+      if (current.exists) {
+        assert.equal(current.get("status"), "cancelled");
+        assert.equal(current.get("streetAddress"), undefined);
+      }
+    } finally {
+      await Promise.all([source.delete(), projection.delete()]);
+    }
+  }
+});
+
+test("event backfill skips stale metadata and projects only its current unchanged source", async () => {
+  const id = `backfill-edited-${crypto.randomUUID()}`;
+  const source = db.doc(`Events/${id}`), projection = db.doc(`PublicWebEvents/${id}`);
+  const metadata = {eventTimeZone: "UTC", streetAddress: "Current location", postalCode: "00000"};
+  try {
+    await source.set({title: "Scanned event", private: false, status: "active",
+      selectedDateTime: "2030-01-01T12:00:00Z", eventDuration: 1});
+    const scanned = await source.get();
+    await source.update({title: "Current event", location: "New location"});
+    assert.deepEqual(await applyEventBackfill(db, scanned, metadata), {metadataChanged: false, projectionWritten: false});
+    assert.equal((await source.get()).get("streetAddress"), undefined);
+    assert.equal((await projection.get()).exists, false);
+    assert.deepEqual(await applyEventBackfill(db, await source.get(), metadata), {metadataChanged: true, projectionWritten: true});
+    assert.equal((await source.get()).get("streetAddress"), metadata.streetAddress);
+    assert.equal((await projection.get()).get("title"), "Current event");
+  } finally {
+    await Promise.all([source.delete(), projection.delete()]);
+  }
+});
 
 for (const item of [
   {name: "event", source: "Events", mirror: "PublicWebEvents", param: "eventId",

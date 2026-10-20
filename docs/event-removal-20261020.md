@@ -7,7 +7,9 @@ controls, event pages, and event listings.
 
 - Opening removal controls requests manager-only eligibility. Empty events can
   be deleted; dependent registrations, tickets, payments, or attendance records
-  require cancellation. Cancellation retains its attendee preview and reason.
+  require cancellation. Pending ticket reservations also prevent deletion,
+  including the interval before a payment record exists. Cancellation retains
+  its attendee preview and reason.
 - Confirmed results update the shared lifecycle store before the dialog and
   affected event routes close. The previous list keeps its filters and scroll
   position. A direct event root falls back to Discover.
@@ -38,7 +40,10 @@ Legacy callers retain their existing response fields.
 
 Both removal mutations return `status` and `affectedEventIds`. Cancellation
 includes every affected recurrence occurrence and removes public projections in
-the same transaction. Notification jobs and historical records are preserved.
+the same transaction. It checks an optional expected revision while preserving
+successful preview replay. Projection maintenance and backfill exclude cancelled
+events without removing their direct historical pages. Notification jobs and
+historical records are preserved.
 Deletion receipts are included in the existing account-deletion disposition.
 Firestore access rules have not been broadened.
 
