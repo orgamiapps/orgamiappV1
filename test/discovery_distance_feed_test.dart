@@ -146,6 +146,38 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+  testWidgets(
+    'city can switch to nationwide while dismissal preserves its fixed limit',
+    (tester) async {
+      final fixture = await mount(tester);
+      await tester.tap(find.text('Auto'));
+      await settle(tester);
+      await tester.tap(find.text('5 miles'));
+      await tester.tap(find.text('Apply'));
+      await settle(tester);
+      await tester.tap(find.text('Bonita Springs, FL'));
+      await settle(tester);
+      await tester.tapAt(const Offset(5, 5));
+      await settle(tester);
+      expect(find.text('Within 5 miles'), findsOneWidget);
+      await tester.tap(find.text('Bonita Springs, FL'));
+      await settle(tester);
+      await tester.tap(find.text('Browse online and nationwide'));
+      await settle(tester);
+      await tester.tap(find.text('Skip for now'));
+      await settle(tester);
+      expect(find.text('Auto'), findsOneWidget);
+      expect(fixture.functions.requests.last.$2['nationwide'], isTrue);
+      expect(fixture.functions.requests.last.$2['distanceMode'], 'auto');
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getInt('discovery_fixed_miles'), isNull);
+      expect(
+        jsonDecode(prefs.getString('discovery_location_v1')!)['nationwide'],
+        isTrue,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets('nationwide blocks fixed Apply and retains distance controls', (
     tester,
   ) async {

@@ -330,13 +330,15 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
   }
 
   Future<void> _chooseCity() async {
-    final selection = await showDialog<PlaceDetails>(
+    final selection = await showDialog<_DiscoveryCitySelection>(
       context: context,
       barrierDismissible: _location != null,
       builder: (_) => const _DiscoveryCityDialog(),
     );
-    if (selection != null) {
-      _location = await _locations.usePlace(selection);
+    if (!mounted) return;
+    final place = selection?.place;
+    if (place != null) {
+      _location = await _locations.usePlace(place);
       ProductFunnelService().record(
         'discovery_location_result',
         dimensions: {'result': 'selected', 'source': 'search'},
@@ -345,8 +347,12 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
       await _loadHome();
       return;
     }
-    if (_location == null) {
+    if (selection != null || _location == null) {
       _location = await _locations.useNationwide();
+      _fixedMiles = null;
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.remove('discovery_fixed_miles');
+      if (!mounted) return;
       ProductFunnelService().record(
         'discovery_location_result',
         dimensions: {'result': 'nationwide', 'source': 'nationwide'},
@@ -1364,6 +1370,13 @@ class _DiscoveryMarketplaceViewState extends State<DiscoveryMarketplaceView> {
   );
 }
 
+/// A null dialog result means dismissal; a selection without a place means nationwide.
+class _DiscoveryCitySelection {
+  const _DiscoveryCitySelection([this.place]);
+
+  final PlaceDetails? place;
+}
+
 class _DiscoveryCityDialog extends StatefulWidget {
   const _DiscoveryCityDialog();
 
@@ -1440,7 +1453,7 @@ class _DiscoveryCityDialogState extends State<_DiscoveryCityDialog> {
         discoveryOnly: true,
       );
       if (mounted) {
-        Navigator.pop(context, details);
+        Navigator.pop(context, _DiscoveryCitySelection(details));
       }
     } catch (error) {
       if (mounted) {
@@ -1498,7 +1511,8 @@ class _DiscoveryCityDialogState extends State<_DiscoveryCityDialog> {
     ),
     actions: [
       TextButton(
-        onPressed: () => Navigator.pop(context),
+        onPressed: () =>
+            Navigator.pop(context, const _DiscoveryCitySelection()),
         child: const Text('Browse online and nationwide'),
       ),
     ],
