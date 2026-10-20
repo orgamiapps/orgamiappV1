@@ -1,5 +1,6 @@
 // In-memory services for production-widget layout tests and the local preview.
 // No Firebase server, live account, or provider map tiles are used.
+import 'dart:async';
 import 'dart:convert';
 import 'package:attendus/Services/guest_mode_service.dart';
 import 'package:attendus/Utils/attendus_theme.dart';
@@ -67,6 +68,10 @@ class DiscoveryFixture {
   }) async {
     functions.requests.clear();
     functions.handler = null;
+    firestore.collectionDocuments.clear();
+    firestore.documentReads.clear();
+    firestore.documentGet = null;
+    firestore.collectionGet = null;
     FirebasePlatform.instance = _Core();
     FirebaseAuthPlatform.instance = auth;
     FirebaseFirestorePlatform.instance = firestore;
@@ -78,6 +83,7 @@ class DiscoveryFixture {
       'marketplaceExperienceVersion': 2,
     };
     auth.signedIn = !guest;
+    auth.userId = 'map-widget-owner';
     SharedPreferences.setMockInitialValues({
       'discovery_location_v1': jsonEncode({
         'latitude': 26.34,
@@ -153,13 +159,13 @@ class _Core extends FirebasePlatform {
 }
 
 class _User extends UserPlatform {
-  _User(FirebaseAuthPlatform auth)
+  _User(FirebaseAuthPlatform auth, String uid)
     : super(
         auth,
         _MultiFactor(auth),
         InternalUserDetails(
           userInfo: InternalUserInfo(
-            uid: 'map-widget-owner',
+            uid: uid,
             displayName: 'Preview Member',
             isAnonymous: false,
             isEmailVerified: true,
@@ -175,6 +181,15 @@ class _MultiFactor extends MultiFactorPlatform {
 
 class _Auth extends FirebaseAuthPlatform {
   bool signedIn = true;
+  String userId = 'map-widget-owner';
+  final _changes = StreamController<UserPlatform?>.broadcast();
+
+  void changeUser(String? uid) {
+    signedIn = uid != null;
+    if (uid != null) userId = uid;
+    _changes.add(currentUser);
+  }
+
   @override
   FirebaseAuthPlatform delegateFor({required FirebaseApp app}) => this;
   @override
@@ -183,13 +198,21 @@ class _Auth extends FirebaseAuthPlatform {
     String? languageCode,
   }) => this;
   @override
-  UserPlatform? get currentUser => signedIn ? _User(this) : null;
+  UserPlatform? get currentUser => signedIn ? _User(this, userId) : null;
   @override
-  Stream<UserPlatform?> authStateChanges() => Stream.value(currentUser);
+  Stream<UserPlatform?> authStateChanges() => Stream.multi((controller) {
+    controller.add(currentUser);
+    final subscription = _changes.stream.listen(controller.add);
+    controller.onCancel = subscription.cancel;
+  });
 }
 
 class _Firestore extends FirebaseFirestorePlatform {
   Map<String, dynamic>? discovery;
+  final collectionDocuments = <String, List<Map<String, dynamic>>>{};
+  final documentReads = <(String, GetOptions)>[];
+  Future<Map<String, dynamic>?> Function(String, GetOptions)? documentGet;
+  Future<List<Map<String, dynamic>>> Function(String)? collectionGet;
   @override
   FirebaseFirestorePlatform delegateFor({
     required FirebaseApp app,
@@ -212,25 +235,41 @@ class _Document extends DocumentReferencePlatform {
   @override
   Future<DocumentSnapshotPlatform> get([
     GetOptions options = const GetOptions(),
-  ]) async => DocumentSnapshotPlatform(
-    firestore,
-    path,
-    path == 'AppConfig/discovery'
-        ? (firestore as _Firestore).discovery
-        : path == 'Customers/map-widget-owner'
-        ? {
-            'uid': 'map-widget-owner',
-            'name': 'Preview Member',
-            'email': '',
-            'createdAt': '2026-01-01T00:00:00Z',
-            'favorites': <String>[],
-          }
-        : null,
-    InternalSnapshotMetadata(hasPendingWrites: false, isFromCache: false),
-  );
+  ]) async {
+    final fixture = firestore as _Firestore;
+    fixture.documentReads.add((path, options));
+    if (fixture.documentGet != null) {
+      return DocumentSnapshotPlatform(
+        firestore,
+        path,
+        await fixture.documentGet!(path, options),
+        InternalSnapshotMetadata(hasPendingWrites: false, isFromCache: false),
+      );
+    }
+    return DocumentSnapshotPlatform(
+      firestore,
+      path,
+      path == 'AppConfig/discovery'
+          ? (firestore as _Firestore).discovery
+          : path == 'Customers/map-widget-owner'
+          ? {
+              'uid': 'map-widget-owner',
+              'name': 'Preview Member',
+              'email': '',
+              'createdAt': '2026-01-01T00:00:00Z',
+              'favorites': <String>[],
+            }
+          : (firestore as _Firestore)
+                .collectionDocuments[path.substring(0, path.lastIndexOf('/'))]
+                ?.where((data) => data['id'] == path.split('/').last)
+                .firstOrNull,
+      InternalSnapshotMetadata(hasPendingWrites: false, isFromCache: false),
+    );
+  }
 }
 
 class _Collection extends CollectionReferencePlatform {
+  final List<List<dynamic>> _conditions = [];
   _Collection(super.firestore, super.path) {
     parameters.addAll({
       'where': <List<dynamic>>[],
@@ -244,12 +283,51 @@ class _Collection extends CollectionReferencePlatform {
   @override
   QueryPlatform orderBy(Iterable<List<dynamic>> orders) => this;
   @override
-  QueryPlatform where(List<List<dynamic>> conditions) => this;
+  QueryPlatform where(List<List<dynamic>> conditions) {
+    _conditions
+      ..clear()
+      ..addAll(conditions);
+    return this;
+  }
+
   @override
   Future<QuerySnapshotPlatform> get([
     GetOptions options = const GetOptions(),
-  ]) async =>
-      QuerySnapshotPlatform([], [], SnapshotMetadataPlatform(false, false));
+  ]) async {
+    final fixture = firestore as _Firestore;
+    final documents = fixture.collectionGet != null
+        ? await fixture.collectionGet!(path)
+        : fixture.collectionDocuments[path] ?? <Map<String, dynamic>>[];
+    return QuerySnapshotPlatform(
+      [
+        for (final data in documents)
+          if (_conditions.every((condition) {
+            final field = condition[0];
+            final value =
+                data[field is FieldPath
+                    ? field.components.join('.')
+                    : field.toString()];
+            if (condition[1] == '==') return value == condition[2];
+            if (condition[1] == 'array-contains') {
+              return value is List && value.contains(condition[2]);
+            }
+            return true;
+          }))
+            DocumentSnapshotPlatform(
+              firestore,
+              '$path/${data['id']}',
+              data,
+              InternalSnapshotMetadata(
+                hasPendingWrites: false,
+                isFromCache: false,
+              ),
+            ),
+      ],
+      [],
+      SnapshotMetadataPlatform(false, false),
+    );
+  }
+
   @override
   Stream<QuerySnapshotPlatform> snapshots({
     bool includeMetadataChanges = false,

@@ -1,3 +1,7 @@
+import 'package:attendus/Services/event_bulk_removal_service.dart';
+import 'package:attendus/screens/Events/Widget/delete_event_dialogue.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/screens/Events/Attendance/attendance_wallet_pass_screen.dart';
 import 'package:flutter/material.dart';
@@ -22,6 +26,10 @@ import 'package:attendus/screens/Home/settings_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/Utils/attendus_theme.dart';
 import 'package:attendus/widgets/attendus_design_system.dart';
+import 'package:attendus/Services/event_lifecycle_store.dart';
+import 'package:attendus/Utils/event_lifecycle_visibility.dart';
+import 'package:attendus/widgets/event_lifecycle_scope.dart';
+import 'package:attendus/widgets/cancelled_event_history.dart';
 
 // Enum for sort options
 enum SortOption {
@@ -57,6 +65,9 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   int selectedTab = 1; // 1 = Created, 2 = Attended, 3 = Saved
   bool isDiscoverable = true; // User discoverability setting
   final _profileEventsKey = GlobalKey();
+  bool _showCancelledEvents = false;
+  StreamSubscription<User?>? _profileAuth;
+  String? _profileUid;
 
   // Pagination state for each tab
   Map<int, DocumentSnapshot?> _lastDocuments = {};
@@ -72,6 +83,8 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   // Selection state
   bool isSelectionMode = false;
   Set<String> selectedEventIds = <String>{};
+  bool _deletingEvents = false;
+  EventBulkRemovalResult? _bulkRemovalResult;
 
   // Filter/Sort state
   SortOption currentSortOption = SortOption.none;
@@ -99,6 +112,34 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     selectedTab = widget.initialTab.clamp(1, 3);
     debugPrint('MY_PROFILE_SCREEN: initState called');
     _initializeAnimations();
+    _profileUid = FirebaseAuth.instance.currentUser?.uid;
+    _profileAuth = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (!mounted || user?.uid == _profileUid) return;
+      _profileUid = user?.uid;
+      setState(() {
+        createdEvents.clear();
+        attendedEvents.clear();
+        savedEvents.clear();
+        selectedEventIds.clear();
+        isSelectionMode = false;
+        _bulkRemovalResult = null;
+        _lastDocuments.clear();
+        _hasMore = {1: true, 2: true, 3: true};
+        _isFetchingMore.updateAll((_, _) => false);
+        _userBadge = null;
+        isLoading = false;
+      });
+      final nextUid = _profileUid;
+      Future<void>.delayed(Duration.zero, () {
+        if (mounted &&
+            nextUid != null &&
+            _profileUid == nextUid &&
+            FirebaseAuth.instance.currentUser?.uid == nextUid &&
+            CustomerController.logeInCustomer?.uid == nextUid) {
+          _loadProfileData(isRefresh: true);
+        }
+      });
+    });
 
     // Defer data loading to prevent blocking app startup
     // Load data only when widget is actually visible
@@ -144,6 +185,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
 
   @override
   void dispose() {
+    _profileAuth?.cancel();
     _fadeController.dispose();
     _slideController.dispose();
     super.dispose();
@@ -229,6 +271,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   }
 
   Future<void> _fetchMoreEvents(int tabIndex) async {
+    final generation = EventLifecycleStore.instance.sessionGeneration;
     debugPrint("🔍 _fetchMoreEvents called for tab $tabIndex");
     debugPrint(
       "🔍 _isFetchingMore[$tabIndex]: ${_isFetchingMore[tabIndex]}, _hasMore[$tabIndex]: ${_hasMore[tabIndex]}",
@@ -287,6 +330,12 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           newEvents = [];
       }
 
+      if (!mounted ||
+          FirebaseAuth.instance.currentUser?.uid != userId ||
+          CustomerController.logeInCustomer?.uid != userId ||
+          EventLifecycleStore.instance.sessionGeneration != generation) {
+        return;
+      }
       // Only log if significant number of events or if there's an issue
       if (newEvents.length > 10 || newEvents.isEmpty) {
         debugPrint("📊 Received ${newEvents.length} events for tab $tabIndex");
@@ -391,7 +440,16 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => EventLifecycleScope(
+    eventIds: [
+      ...createdEvents.map((event) => event.id),
+      ...attendedEvents.map((event) => event.id),
+      ...savedEvents.map((event) => event.id),
+    ],
+    builder: (context, lifecycle) => _buildLifecycleContent(context),
+  );
+
+  Widget _buildLifecycleContent(BuildContext context) {
     final user = CustomerController.logeInCustomer;
 
     // Reduced build logging to prevent main thread blocking
@@ -1175,14 +1233,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
 
   Widget _buildTabButton({required String label, required int index}) {
     bool isSelected = selectedTab == index;
-    int eventCount;
-    if (index == 1) {
-      eventCount = createdEvents.length;
-    } else if (index == 2) {
-      eventCount = attendedEvents.length;
-    } else {
-      eventCount = savedEvents.length;
-    }
+    final eventCount = _visibleProfileEvents(index).length;
 
     return Expanded(
       child: GestureDetector(
@@ -1209,15 +1260,51 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     );
   }
 
-  Widget _buildTabContent() {
-    final events = selectedTab == 1
+  List<EventModel> _visibleProfileEvents(int tab) {
+    final lifecycle = EventLifecycleStore.instance;
+    final events = tab == 1
         ? createdEvents
-        : selectedTab == 2
+        : tab == 2
         ? attendedEvents
         : savedEvents;
+    return events.where((event) {
+      if (tab == 2) return isHistoricalLifecycleEvent(event, lifecycle);
+      if (tab == 1 && _showCancelledEvents) {
+        return isHistoricalLifecycleEvent(event, lifecycle) &&
+            isCancelledEvent(event, lifecycle);
+      }
+      return isActiveLifecycleEvent(event, lifecycle);
+    }).toList();
+  }
+
+  Widget _buildTabContent() => Column(
+    children: [
+      if (_deletingEvents) const LinearProgressIndicator(),
+      if (_bulkRemovalResult != null) _buildBulkRemovalResult(),
+      if (selectedTab == 1)
+        SwitchListTile(
+          title: const Text('Cancelled events'),
+          subtitle: const Text('Keep registrations and attendance history.'),
+          value: _showCancelledEvents,
+          onChanged: _deletingEvents
+              ? null
+              : (value) => setState(() {
+                  _showCancelledEvents = value;
+                  selectedEventIds.clear();
+                  isSelectionMode = false;
+                }),
+        ),
+      _buildEventTabContent(),
+    ],
+  );
+
+  Widget _buildEventTabContent() {
+    final events = _visibleProfileEvents(selectedTab);
     final hasMore = _hasMore[selectedTab] ?? false;
     final emptyMessage = selectedTab == 1
-        ? 'You haven\'t created any events yet'
+        ? _showCancelledEvents
+              ? 'No cancelled events'
+              : 'You haven\'t created any events yet'
         : selectedTab == 2
         ? 'You haven\'t attended any events yet'
         : 'You haven\'t saved any events yet';
@@ -1250,10 +1337,17 @@ class _MyProfileScreenState extends State<MyProfileScreen>
 
     // Apply sorting
     final sortedEvents = _sortEvents(filteredEvents);
+    final selectedVisibleCount = sortedEvents
+        .where((event) => selectedEventIds.contains(event.id))
+        .length;
+    final unconfirmedCount = _bulkRemovalResult?.unconfirmedIds.length ?? 0;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-      child: (sortedEvents.isEmpty && !(_isFetchingMore[selectedTab] ?? false))
+      child:
+          (sortedEvents.isEmpty &&
+              !hasMore &&
+              !(_isFetchingMore[selectedTab] ?? false))
           ? _buildEmptyState(emptyMessage, emptyIcon)
           : Column(
               children: [
@@ -1280,7 +1374,8 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                           children: [
                             Expanded(
                               child: Text(
-                                '${selectedEventIds.length} of ${sortedEvents.length} selected',
+                                '$selectedVisibleCount of ${sortedEvents.length} selected'
+                                '${unconfirmedCount > 0 ? ' • $unconfirmedCount awaiting confirmation' : ''}',
                                 style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
@@ -1309,7 +1404,14 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton.icon(
-                              onPressed: _deleteSelectedEvents,
+                              onPressed:
+                                  _deletingEvents ||
+                                      (_bulkRemovalResult
+                                              ?.unconfirmedIds
+                                              .isNotEmpty ??
+                                          false)
+                                  ? null
+                                  : _deleteSelectedEvents,
                               icon: const Icon(Icons.delete, size: 18),
                               label: Text(
                                 'Delete ${selectedEventIds.length} Event${selectedEventIds.length == 1 ? '' : 's'}',
@@ -1356,7 +1458,13 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                     // Remove excessive logging for performance
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
-                      child: _buildSelectableEventItem(sortedEvents[index]),
+                      child: CancelledEventHistory(
+                        cancelled: isCancelledEvent(
+                          sortedEvents[index],
+                          EventLifecycleStore.instance,
+                        ),
+                        child: _buildSelectableEventItem(sortedEvents[index]),
+                      ),
                     );
                   },
                 ),
@@ -1596,6 +1704,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
 
   // Selection methods
   void _toggleSelectionMode() {
+    if (_deletingEvents) return;
     setState(() {
       isSelectionMode = !isSelectionMode;
       if (!isSelectionMode) {
@@ -1605,6 +1714,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   }
 
   void _toggleEventSelection(String eventId) {
+    if (_deletingEvents) return;
     setState(() {
       if (selectedEventIds.contains(eventId)) {
         selectedEventIds.remove(eventId);
@@ -1615,6 +1725,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   }
 
   void _toggleSelectAll(List<EventModel> events) {
+    if (_deletingEvents) return;
     setState(() {
       if (selectedEventIds.length == events.length) {
         // If all are selected, deselect all
@@ -1627,11 +1738,25 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   }
 
   Future<void> _deleteSelectedEvents() async {
+    if (_deletingEvents) return;
+    setState(() => _deletingEvents = true);
+    try {
+      await _performDeleteSelectedEvents();
+    } finally {
+      if (mounted) setState(() => _deletingEvents = false);
+    }
+  }
+
+  Future<void> _performDeleteSelectedEvents() async {
+    final deletionUid = FirebaseAuth.instance.currentUser?.uid;
+    if (deletionUid == null) return;
     if (selectedEventIds.isEmpty) {
       ShowToast().showNormalToast(msg: 'Please select events to delete');
       return;
     }
 
+    final deletionSession = EventLifecycleStore.instance.sessionGeneration;
+    final eventIds = selectedEventIds.toList();
     // Show confirmation dialog
     final bool? confirm = await showDialog<bool>(
       context: context,
@@ -1646,7 +1771,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           ),
         ),
         content: Text(
-          'Are you sure you want to delete ${selectedEventIds.length} selected event${selectedEventIds.length == 1 ? '' : 's'}? Only empty events can be deleted. Events with registrations must be cancelled from their event page.',
+          'Delete ${eventIds.length} selected event${eventIds.length == 1 ? '' : 's'}? Only empty events can be deleted. Events with registrations, tickets, payments, or attendance history will be kept for cancellation review.',
           style: const TextStyle(fontSize: 16, fontFamily: 'Roboto'),
         ),
         actions: [
@@ -1682,46 +1807,161 @@ class _MyProfileScreenState extends State<MyProfileScreen>
       ),
     );
 
-    if (!mounted || confirm != true) return;
-    final eventIds = selectedEventIds.toList();
-    var deletedCount = 0;
-
-    setState(() {
-      isLoading = true;
-    });
-
-    try {
-      // Delete events from Firebase
-      for (String eventId in eventIds) {
-        await FirebaseFirestoreHelper().deleteEvent(eventId);
-        deletedCount += 1;
-        if (mounted) setState(() => selectedEventIds.remove(eventId));
-      }
-
-      if (mounted) {
-        setState(() {
-          selectedEventIds.clear();
-          isSelectionMode = false;
-          isLoading = false;
-        });
-        ShowToast().showNormalToast(
-          msg:
-              '$deletedCount event${deletedCount == 1 ? '' : 's'} deleted successfully',
-        );
-        // Reload profile data to refresh the lists
-        _loadProfileData();
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-        ShowToast().showNormalToast(
-          msg: '$deletedCount deleted. Remaining events were kept: $e',
-        );
-        _loadProfileData();
-      }
+    if (!mounted ||
+        confirm != true ||
+        deletionUid != FirebaseAuth.instance.currentUser?.uid ||
+        deletionSession != EventLifecycleStore.instance.sessionGeneration) {
+      return;
     }
+    await _runBulkDeletion(eventIds, deletionUid, deletionSession);
+  }
+
+  Future<void> _runBulkDeletion(
+    List<String> eventIds,
+    String uid,
+    int session, {
+    bool reconcilePrevious = false,
+  }) async {
+    bool current() =>
+        mounted &&
+        FirebaseAuth.instance.currentUser?.uid == uid &&
+        EventLifecycleStore.instance.sessionGeneration == session;
+    final result =
+        await EventBulkRemovalService(
+          deleteEvent: FirebaseFirestoreHelper().deleteEvent,
+        ).remove(
+          eventIds: eventIds,
+          isCurrentAccount: current,
+          onDeleted: (eventId) {
+            if (!current()) return;
+            setState(() {
+              selectedEventIds.remove(eventId);
+              createdEvents.removeWhere((event) => event.id == eventId);
+              savedEvents.removeWhere((event) => event.id == eventId);
+              attendedEvents.removeWhere((event) => event.id == eventId);
+            });
+          },
+        );
+    if (!current() || result.accountChanged) return;
+    setState(() {
+      final previous = reconcilePrevious ? _bulkRemovalResult : null;
+      _bulkRemovalResult = previous == null
+          ? result
+          : EventBulkRemovalResult(
+              deletedIds: {
+                ...previous.deletedIds,
+                ...result.deletedIds,
+              }.toList(),
+              keptErrors: {
+                for (final entry in previous.keptErrors.entries)
+                  if (!eventIds.contains(entry.key)) entry.key: entry.value,
+                ...result.keptErrors,
+              },
+              unconfirmedIds: {
+                ...previous.unconfirmedIds.where(
+                  (id) => !eventIds.contains(id),
+                ),
+                ...result.unconfirmedIds,
+              }.toList(),
+              unattemptedIds: {
+                ...previous.unattemptedIds.where(
+                  (id) => !eventIds.contains(id),
+                ),
+                ...result.unattemptedIds,
+              }.toList(),
+            );
+      if (selectedEventIds.isEmpty) isSelectionMode = false;
+    });
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(_bulkRemovalResult!.summary)));
+  }
+
+  Future<void> _retryUnconfirmedDeletions(List<String> eventIds) async {
+    if (_deletingEvents) return;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    final session = EventLifecycleStore.instance.sessionGeneration;
+    setState(() => _deletingEvents = true);
+    try {
+      // The helper retains actor-bound receipt IDs when the prior outcome is
+      // uncertain. Do not preflight a new operation or assume rollback here.
+      await _runBulkDeletion(eventIds, uid, session, reconcilePrevious: true);
+    } finally {
+      if (mounted) setState(() => _deletingEvents = false);
+    }
+  }
+
+  Future<void> _reviewBulkEvent(EventModel event) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final session = EventLifecycleStore.instance.sessionGeneration;
+    final result = await showEventRemovalDialog(
+      context,
+      event,
+      preferCancellation: true,
+    );
+    if (!mounted ||
+        result == null ||
+        FirebaseAuth.instance.currentUser?.uid != uid ||
+        EventLifecycleStore.instance.sessionGeneration != session) {
+      return;
+    }
+    setState(() {
+      selectedEventIds.removeAll(result.affectedEventIds);
+      _bulkRemovalResult = null;
+      if (selectedEventIds.isEmpty) isSelectionMode = false;
+    });
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(result.message)));
+  }
+
+  Widget _buildBulkRemovalResult() {
+    final result = _bulkRemovalResult!;
+    return Card(
+      key: const ValueKey('profile-event-removal-result'),
+      margin: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Semantics(liveRegion: true, child: Text(result.summary)),
+            if (result.unconfirmedIds.isNotEmpty)
+              TextButton.icon(
+                onPressed: _deletingEvents
+                    ? null
+                    : () => _retryUnconfirmedDeletions(result.unconfirmedIds),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry unconfirmed deletion'),
+              ),
+            for (final failure in result.keptErrors.entries) ...[
+              const SizedBox(height: 8),
+              Text(
+                failure.value is FirebaseFunctionsException
+                    ? (failure.value as FirebaseFunctionsException).message ??
+                          'Could not delete this event. Open it to review your options.'
+                    : 'Could not delete this event. Open it to review your options.',
+              ),
+              if (createdEvents.any((event) => event.id == failure.key))
+                TextButton(
+                  onPressed: _deletingEvents || result.unconfirmedIds.isNotEmpty
+                      ? null
+                      : () => _reviewBulkEvent(
+                          createdEvents.firstWhere(
+                            (event) => event.id == failure.key,
+                          ),
+                        ),
+                  child: Text(
+                    'Review ${createdEvents.firstWhere((event) => event.id == failure.key).title}',
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   // Bio section and related state removed to avoid duplication with UserProfileScreen

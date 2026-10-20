@@ -4,11 +4,13 @@ import 'package:attendus/models/ticket_model.dart';
 class TicketStatsDashboard extends StatefulWidget {
   final List<TicketModel> allTickets;
   final VoidCallback onTap;
+  final Set<String> cancelledEventIds;
 
   const TicketStatsDashboard({
     super.key,
     required this.allTickets,
     required this.onTap,
+    this.cancelledEventIds = const {},
   });
 
   @override
@@ -50,7 +52,12 @@ class _TicketStatsDashboardState extends State<TicketStatsDashboard>
 
   int get totalEvents => widget.allTickets.length;
   int get upcomingEvents => widget.allTickets
-      .where((t) => !t.isUsed && t.eventDateTime.isAfter(DateTime.now()))
+      .where(
+        (t) =>
+            !t.isUsed &&
+            !widget.cancelledEventIds.contains(t.eventId) &&
+            t.eventDateTime.isAfter(DateTime.now()),
+      )
       .length;
   int get attendedEvents => widget.allTickets.where((t) => t.isUsed).length;
   int get vipTickets => widget.allTickets.where((t) => t.isSkipTheLine).length;

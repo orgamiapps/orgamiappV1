@@ -17,6 +17,8 @@ import 'package:attendus/models/event_feedback_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:attendus/Services/event_removal_service.dart';
+import 'package:attendus/Services/event_lifecycle_store.dart';
 import 'package:attendus/firebase/firebase_messaging_helper.dart';
 import 'package:attendus/Services/on_device_nlp_service.dart';
 
@@ -1659,24 +1661,60 @@ class FirebaseFirestoreHelper {
         );
   }
 
-  /// Deletes an event from Firestore
-  ///
-  /// This method deletes the event document and all related data
-  /// Only an empty event may be deleted; populated events use the cancellation preview flow.
+  static final _deletionAttempts =
+      <String, ({String requestId, int eventRevision})>{};
+
+  /// Empty-event deletion shares the same retry receipt and lifecycle update
+  /// as the organizer dialog. Populated events require cancellation.
   Future<void> deleteEvent(String eventId) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    final document = await _firestore
-        .collection(EventModel.firebaseKey)
-        .doc(eventId)
-        .get();
-    if (!document.exists) return;
-    if (uid == null || FirebaseAuth.instance.currentUser?.uid != uid) {
+    if (uid == null) {
       throw StateError('Account changed. Reload events.');
     }
-    await FirebaseFunctions.instance.httpsCallable('deleteEmptyEventV1').call({
-      'eventId': eventId,
-      'expectedEventRevision': document.data()?['eventRevision'] ?? 0,
-    });
+    final key = '$uid:$eventId';
+    final service = EventRemovalService();
+    try {
+      var attempt = _deletionAttempts[key];
+      if (attempt == null) {
+        final eligibility = await service.eligibility(eventId);
+        if (!eligibility.canDelete) {
+          throw FirebaseFunctionsException(
+            code: 'failed-precondition',
+            message:
+                'This event has records. Cancel it from its event page to preserve its history.',
+          );
+        }
+        attempt = (
+          requestId: EventRemovalService.newRequestId(),
+          eventRevision: eligibility.eventRevision,
+        );
+        _deletionAttempts[key] = attempt;
+      }
+      if (FirebaseAuth.instance.currentUser?.uid != uid) {
+        throw StateError('Account changed. Reload events.');
+      }
+      await service.delete(
+        eventId: eventId,
+        expectedEventRevision: attempt.eventRevision,
+        requestId: attempt.requestId,
+      );
+      _deletionAttempts.remove(key);
+    } on FirebaseFunctionsException catch (error) {
+      if (error.code == 'not-found' &&
+          error.message == 'Event not found.' &&
+          FirebaseAuth.instance.currentUser?.uid == uid) {
+        EventLifecycleStore.instance.applyConfirmed(
+          eventIds: [eventId],
+          status: EventLifecycleStatus.deleted,
+        );
+        _deletionAttempts.remove(key);
+        return;
+      }
+      if (!EventRemovalService.isUncertain(error)) {
+        _deletionAttempts.remove(key);
+      }
+      rethrow;
+    }
   }
 
   // Event Feedback Methods

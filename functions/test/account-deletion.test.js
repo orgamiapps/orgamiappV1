@@ -19,6 +19,7 @@ test("account deletion contract covers sensitive user data", () => {
     "Messages",
     "RegisterAttendance",
     "Tickets",
+    "EventDeletionReceipts",
   ]) {
     assert.equal(deletedCollections.has(required), true, `${required} is covered`);
   }

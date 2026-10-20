@@ -5,6 +5,8 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:attendus/models/event_schedule.dart';
 import 'package:attendus/widgets/deferred_shared_event_screen.dart';
+import 'package:attendus/Services/event_lifecycle_store.dart';
+import 'package:attendus/widgets/event_lifecycle_scope.dart';
 
 class MyRegistrationsScreen extends StatefulWidget {
   const MyRegistrationsScreen({super.key});
@@ -87,7 +89,15 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => EventLifecycleScope(
+    eventIds: _rows.map((row) => row['eventId'] as String),
+    builder: (context, lifecycle) => _buildLifecycleContent(context, lifecycle),
+  );
+
+  Widget _buildLifecycleContent(
+    BuildContext context,
+    EventLifecycleStore lifecycle,
+  ) => Scaffold(
     appBar: AppBar(title: const Text('Registrations and tickets')),
     body: RefreshIndicator(
       onRefresh: _load,
@@ -120,12 +130,14 @@ class _MyRegistrationsScreenState extends State<MyRegistrationsScreen> {
                 'RSVPs, tickets, pending requests and waitlist places will appear here.',
               ),
             ),
-          for (final row in _rows)
+          for (final row in _rows.where(
+            (row) => lifecycle.allowsHistory(row['eventId'] as String),
+          ))
             Card(
               child: ListTile(
                 title: Text(row['title'] as String),
                 subtitle: Text(
-                  '${row['ticketId'] == null ? 'RSVP' : 'Ticket'} · ${row['status']} · ${row['start'] == null ? 'Schedule needs confirmation' : EventSchedule(DateTime.parse(row['start']), null, row['timeZone']).cardLabel}',
+                  '${lifecycle.stateFor(row['eventId'] as String).status == EventLifecycleStatus.cancelled || row['eventStatus'] == 'cancelled' ? 'Cancelled event · ' : ''}${row['ticketId'] == null ? 'RSVP' : 'Ticket'} · ${row['status']} · ${row['start'] == null ? 'Schedule needs confirmation' : EventSchedule(DateTime.parse(row['start']), null, row['timeZone']).cardLabel}',
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.of(context).push(

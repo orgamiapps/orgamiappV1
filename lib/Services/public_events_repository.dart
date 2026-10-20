@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:attendus/Utils/event_discovery_visibility.dart';
+import 'package:attendus/Services/event_lifecycle_store.dart';
 
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/models/event_model.dart';
@@ -117,7 +118,10 @@ class PublicEventsRepository implements PublicEventsDataSource {
     for (final document in snapshot.docs.take(maximumDocuments)) {
       try {
         final data = Map<String, dynamic>.from(document.data());
-        if (!isDiscoverableEventData(data)) continue;
+        if (!isDiscoverableEventData(data) ||
+            !EventLifecycleStore.instance.allowsDiscovery(document.id)) {
+          continue;
+        }
         data['id'] = document.id;
         events.add(EventModel.fromJson(data));
       } catch (error, stackTrace) {
@@ -198,9 +202,11 @@ class PublicEventsFeedState {
   PublicEventsFailure? _failure;
   String? _lastReportedFailure;
 
-  List<EventModel> get lastSuccessfulEvents => _lastSuccessfulEvents;
+  List<EventModel> get lastSuccessfulEvents => _lastSuccessfulEvents
+      .where((event) => EventLifecycleStore.instance.allowsDiscovery(event.id))
+      .toList(growable: false);
   PublicEventsFailure? get failure => _failure;
-  bool get hasLastSuccessfulEvents => _lastSuccessfulEvents.isNotEmpty;
+  bool get hasLastSuccessfulEvents => lastSuccessfulEvents.isNotEmpty;
 
   void recordSuccess(List<EventModel> events) {
     _lastSuccessfulEvents = List<EventModel>.unmodifiable(events);

@@ -41,6 +41,10 @@ test("non-shared fixture deletion clears registry and preserves cumulative count
   await db.collection("Customers").doc(uid).set({name: "Fixture"});
   await db.collection("notifications").doc(uid).set({userId: uid});
   await db.collection("EventDrafts").doc(uid).set({ownerUid: uid});
+  const deletionReceipt = db.collection("EventDeletionReceipts").doc(uid);
+  const otherReceipt = db.collection("EventDeletionReceipts").doc(`other-${uid}`);
+  await deletionReceipt.set({actorUid: uid, eventId: `removed-${uid}`, status: "deleted"});
+  await otherReceipt.set({actorUid: `other-${uid}`, eventId: `other-removed-${uid}`, status: "deleted"});
   const analytics = db.collection("user_analytics").doc(uid);
   const recompute = db.collection("_user_analytics_recompute").doc(uid);
   await analytics.set({totalEvents: 0});
@@ -49,11 +53,13 @@ test("non-shared fixture deletion clears registry and preserves cumulative count
   const auth = {deleteUser: async () => {
     assert.equal((await analytics.get()).exists, false, "Analytics must be removed before Auth");
     assert.equal((await recompute.get()).exists, false, "Recompute identity must be removed before Auth");
+    assert.equal((await deletionReceipt.get()).exists, false, "Deletion receipts must be removed before Auth");
+    assert.equal((await otherReceipt.get()).exists, true, "Another actor's receipt must remain");
     calls++;
   }};
   const result = await runAccountDeletion({uid, db, bucket, auth});
   assert.equal(result.status, "complete");
-  assert.equal(result.documentsDeleted, 2);
+  assert.equal(result.documentsDeleted, 3);
   assert.equal(calls, 1);
   assert.deepEqual(await runAccountDeletion({uid, db, bucket, auth}), result);
   assert.equal(calls, 1);

@@ -47,6 +47,8 @@ class _Auth extends FirebaseAuthPlatform {
   }) => this;
   @override
   UserPlatform? get currentUser => signedIn ? _User() : null;
+  @override
+  Stream<UserPlatform?> authStateChanges() => Stream.value(currentUser);
 }
 
 // Real Firestore/Auth wrappers and real helper/screen; only platform I/O is fake.

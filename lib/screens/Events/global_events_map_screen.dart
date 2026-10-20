@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:attendus/Utils/event_discovery_visibility.dart';
 
 import 'package:attendus/Services/guest_mode_service.dart';
+import 'package:attendus/Services/event_lifecycle_store.dart';
 import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Utils/google_maps_bootstrap.dart';
 import 'package:attendus/Utils/router.dart';
@@ -64,6 +65,9 @@ class GlobalEventsMapScreen extends StatefulWidget {
 }
 
 class _GlobalEventsMapScreenState extends State<GlobalEventsMapScreen> {
+  final _lifecycle = EventLifecycleStore.instance;
+  late final EventLifecycleLease _lifecycleLease;
+  List<EventModel> _sourceEvents = const [];
   final TextEditingController _searchController = TextEditingController();
   final List<EventModel> _allEvents = [];
   final Set<Marker> _markers = {};
@@ -83,12 +87,16 @@ class _GlobalEventsMapScreenState extends State<GlobalEventsMapScreen> {
   @override
   void initState() {
     super.initState();
+    _lifecycleLease = _lifecycle.retain(const []);
+    _lifecycle.addListener(_onLifecycleChanged);
     _subscribeToEvents();
     if (widget.requestUserLocation) _loadUserLocation();
   }
 
   @override
   void dispose() {
+    _lifecycle.removeListener(_onLifecycleChanged);
+    _lifecycleLease.dispose();
     _subscription?.cancel();
     _mapController?.dispose();
     _searchController.dispose();
@@ -146,10 +154,16 @@ class _GlobalEventsMapScreenState extends State<GlobalEventsMapScreen> {
   }
 
   Future<void> _processEvents(List<EventModel> sourceEvents) async {
+    _sourceEvents = sourceEvents;
+    _lifecycleLease.update(sourceEvents.map((event) => event.id));
     final generation = ++_snapshotGeneration;
     final now = DateTime.now();
     final events = sourceEvents
-        .where((event) => isEventEligibleForGlobalMap(event, now))
+        .where(
+          (event) =>
+              _lifecycle.allowsDiscovery(event.id) &&
+              isEventEligibleForGlobalMap(event, now),
+        )
         .toList(growable: false);
     final markers = events.map(_markerFor).toSet();
 
@@ -167,6 +181,22 @@ class _GlobalEventsMapScreenState extends State<GlobalEventsMapScreen> {
       _loadError = null;
     });
     if (mounted) _frameEvents();
+  }
+
+  void _onLifecycleChanged() {
+    if (!mounted) return;
+    final nextIds = _sourceEvents
+        .where(
+          (event) =>
+              _lifecycle.allowsDiscovery(event.id) &&
+              isEventEligibleForGlobalMap(event, DateTime.now()),
+        )
+        .map((event) => event.id)
+        .toSet();
+    if (nextIds.length != _allEvents.length ||
+        _allEvents.any((event) => !nextIds.contains(event.id))) {
+      unawaited(_processEvents(_sourceEvents));
+    }
   }
 
   Marker _markerFor(EventModel event) {

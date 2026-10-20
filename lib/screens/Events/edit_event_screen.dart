@@ -1,3 +1,4 @@
+import 'package:attendus/Services/event_removal_navigation.dart';
 import 'package:attendus/screens/Events/premium_event_creation_wrapper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -35,6 +36,22 @@ class EditEventScreen extends StatefulWidget {
 class _EditEventScreenState extends State<EditEventScreen>
     with TickerProviderStateMixin {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  Route<dynamic>? _eventRoute;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _eventRoute = ModalRoute.of(context);
+    EventRemovalNavigation.register(_eventRoute, widget.eventModel.id);
+  }
+
+  Future<void> _removeEvent() async {
+    final result = await showEventRemovalDialog(context, widget.eventModel);
+    if (mounted && result != null) {
+      EventRemovalNavigation.complete(context, result);
+    }
+  }
 
   bool successMessage = false;
   final _btnCtlr = RoundedLoadingButtonController();
@@ -181,6 +198,7 @@ class _EditEventScreenState extends State<EditEventScreen>
 
   @override
   void dispose() {
+    EventRemovalNavigation.unregister(_eventRoute);
     groupNameEdtController.dispose();
     titleEdtController.dispose();
     locationEdtController.dispose();
@@ -1392,11 +1410,7 @@ class _EditEventScreenState extends State<EditEventScreen>
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () => showDialog(
-            context: context,
-            builder: (context) =>
-                DeleteEventDialoge(singleEvent: widget.eventModel),
-          ),
+          onTap: _removeEvent,
           child: const Center(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1404,7 +1418,7 @@ class _EditEventScreenState extends State<EditEventScreen>
                 Icon(Icons.delete_forever, color: Color(0xFFFF5722), size: 20),
                 SizedBox(width: 8),
                 Text(
-                  'Delete Event',
+                  'Delete or cancel event',
                   style: TextStyle(
                     color: Color(0xFFFF5722),
                     fontWeight: FontWeight.bold,

@@ -1,3 +1,7 @@
+import 'package:attendus/Services/event_lifecycle_store.dart';
+import 'package:attendus/Services/event_removal_navigation.dart';
+import 'package:attendus/screens/Events/Widget/delete_event_dialogue.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
@@ -75,6 +79,58 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
   bool _imageUploading = false;
   String? _imageError;
   bool _allowClose = false;
+  bool _openingRemoval = false;
+  Route<dynamic>? _eventRoute;
+  EventLifecycleLease? _eventLease;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _eventRoute = ModalRoute.of(context);
+    final eventId = _draft.sourceEventId;
+    if (_draft.mode == 'edit' && eventId != null) {
+      EventRemovalNavigation.register(_eventRoute, eventId);
+      _eventLease ??= EventLifecycleStore.instance.retain([eventId]);
+      _eventLease!.update([eventId]);
+    }
+  }
+
+  Future<void> _removeEvent() async {
+    final eventId = _draft.sourceEventId;
+    if (_openingRemoval || _publishing || _accountChanged || eventId == null) {
+      return;
+    }
+    setState(() => _openingRemoval = true);
+    _autosaveTimer?.cancel();
+    try {
+      EventModel? event = widget.event;
+      if (event?.id != eventId) {
+        final document = await FirebaseFirestore.instance
+            .collection('Events')
+            .doc(eventId)
+            .get(const GetOptions(source: Source.server));
+        if (!mounted) return;
+        if (!document.exists) {
+          _showError('This event is no longer available.');
+          return;
+        }
+        event = EventModel.fromJson({...document.data()!, 'id': document.id});
+      }
+      if (!mounted) return;
+      final result = await showEventRemovalDialog(context, event!);
+      if (mounted && result != null) {
+        setState(() => _allowClose = true);
+        _coverUnloadGuard.setUnsaved(false);
+        EventRemovalNavigation.complete(context, result);
+      }
+    } catch (_) {
+      if (mounted) {
+        _showError('Could not open event actions. Please try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _openingRemoval = false);
+    }
+  }
 
   late final TextEditingController _titleController;
   late final TextEditingController _descriptionController;
@@ -254,6 +310,8 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
 
   @override
   void dispose() {
+    EventRemovalNavigation.unregister(_eventRoute);
+    _eventLease?.dispose();
     _coverUnloadGuard.dispose();
     _authSubscription?.cancel();
     WidgetsBinding.instance.removeObserver(this);
@@ -1034,6 +1092,47 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
 
   @override
   Widget build(BuildContext context) {
+    final eventId = _draft.mode == 'edit' ? _draft.sourceEventId : null;
+    if (eventId != null) {
+      EventRemovalNavigation.register(_eventRoute, eventId);
+      _eventLease ??= EventLifecycleStore.instance.retain([eventId]);
+      _eventLease!.update([eventId]);
+    } else {
+      EventRemovalNavigation.unregister(_eventRoute);
+      _eventLease?.update(const []);
+    }
+    return ListenableBuilder(
+      listenable: EventLifecycleStore.instance,
+      builder: (context, _) {
+        if (eventId != null &&
+            !EventLifecycleStore.instance.allowsActive(eventId)) {
+          _autosaveTimer?.cancel();
+          final cancelled =
+              EventLifecycleStore.instance.stateFor(eventId).status ==
+              EventLifecycleStatus.cancelled;
+          return Scaffold(
+            appBar: AppBar(title: const Text('Event editor')),
+            body: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(cancelled ? 'Event cancelled' : 'Event unavailable'),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () => EventRemovalNavigation.backToList(context),
+                    child: const Text('Back to events'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        return _buildEditor(context);
+      },
+    );
+  }
+
+  Widget _buildEditor(BuildContext context) {
     if (_accountChanged) {
       return Scaffold(
         appBar: AppBar(title: const Text('Event editor')),
@@ -1154,6 +1253,12 @@ class _EventCreationWizardScreenState extends State<EventCreationWizardScreen>
       ],
     ),
     actions: [
+      if (_draft.mode == 'edit' && _draft.sourceEventId != null)
+        IconButton(
+          tooltip: 'Delete or cancel event',
+          onPressed: _openingRemoval || _publishing ? null : _removeEvent,
+          icon: const Icon(Icons.delete_outline),
+        ),
       TextButton.icon(
         onPressed: _loadingDrafts ? null : _showDrafts,
         icon: _loadingDrafts

@@ -1,6 +1,9 @@
 import 'package:attendus/Services/community_service.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:attendus/Services/event_lifecycle_store.dart';
+import 'package:attendus/Utils/event_lifecycle_visibility.dart';
+import 'package:attendus/widgets/event_lifecycle_scope.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
@@ -54,6 +57,8 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
   String? _error;
   bool _isAdmin = false;
   bool _isMember = false;
+  StreamSubscription<User?>? _authChanges;
+  String? _viewerUid;
 
   // Refresh controller for pull-to-refresh
   final RefreshController _refreshController = RefreshController(
@@ -63,11 +68,30 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
   @override
   void initState() {
     super.initState();
+    _viewerUid = _currentUser?.uid;
+    _authChanges = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (!mounted || user?.uid == _viewerUid) return;
+      _viewerUid = user?.uid;
+      setState(() {
+        _posts = [];
+        _isAdmin = false;
+        _isMember = false;
+        _error = null;
+      });
+      unawaited(
+        Future<void>.delayed(Duration.zero, () async {
+          if (mounted && user?.uid == _viewerUid) {
+            await _loadInitialData();
+          }
+        }),
+      );
+    });
     _loadInitialData();
   }
 
   @override
   void dispose() {
+    unawaited(_authChanges?.cancel());
     _refreshController.dispose();
     super.dispose();
   }
@@ -78,16 +102,23 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
   }
 
   Future<void> _checkIfAdmin() async {
-    if (_currentUser == null) return;
+    final viewerUid = _currentUser?.uid;
+    if (viewerUid == null) return;
+    final generation = EventLifecycleStore.instance.sessionGeneration;
+    bool currentRequest() =>
+        mounted &&
+        _currentUser?.uid == viewerUid &&
+        EventLifecycleStore.instance.sessionGeneration == generation;
 
     try {
       final orgDoc = await _db
           .collection('Organizations')
           .doc(widget.organizationId)
           .get();
+      if (!currentRequest()) return;
 
       final createdBy = orgDoc.data()?['createdBy'];
-      if (createdBy == _currentUser!.uid) {
+      if (createdBy == viewerUid) {
         if (!mounted) return;
         setState(() {
           _isAdmin = true;
@@ -100,8 +131,9 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
           .collection('Organizations')
           .doc(widget.organizationId)
           .collection('Members')
-          .doc(_currentUser!.uid)
+          .doc(viewerUid)
           .get();
+      if (!currentRequest()) return;
 
       if (memberDoc.data()?['status'] == 'approved') {
         final role = memberDoc.data()?['role'];
@@ -118,6 +150,13 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
 
   // Load posts from Firestore (one-time fetch)
   Future<void> _loadPosts({bool isRefresh = false}) async {
+    if (!mounted) return;
+    final viewerUid = _currentUser?.uid;
+    final generation = EventLifecycleStore.instance.sessionGeneration;
+    bool currentRequest() =>
+        mounted &&
+        _currentUser?.uid == viewerUid &&
+        EventLifecycleStore.instance.sessionGeneration == generation;
     if (isRefresh) {
       setState(() => _isRefreshing = true);
     } else {
@@ -132,12 +171,14 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
           .collection('Feed')
           .orderBy('createdAt', descending: true)
           .get();
+      if (!currentRequest()) return;
 
       // Load events
       final eventsSnapshot = await _db
           .collection('Events')
           .where('organizationId', isEqualTo: widget.organizationId)
           .get();
+      if (!currentRequest()) return;
 
       final List<Map<String, dynamic>> combinedPosts = [];
 
@@ -185,7 +226,7 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
         return bTime.compareTo(aTime);
       });
 
-      if (mounted) {
+      if (currentRequest()) {
         setState(() {
           _posts = combinedPosts;
           _isLoading = false;
@@ -198,6 +239,7 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
         _refreshController.refreshCompleted();
       }
     } catch (e) {
+      if (!currentRequest()) return;
       if (mounted) {
         setState(() {
           _error = e.toString();
@@ -525,7 +567,14 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => EventLifecycleScope(
+    eventIds: _posts
+        .where((post) => post['type'] == 'event')
+        .map((post) => post['id'] as String),
+    builder: (context, lifecycle) => _buildLifecycleContent(context),
+  );
+
+  Widget _buildLifecycleContent(BuildContext context) {
     if (_isLoading && !_isRefreshing) {
       return ListView.builder(
         padding: EdgeInsets.only(
@@ -569,6 +618,14 @@ class _EnhancedFeedTabState extends State<EnhancedFeedTab> {
 
     // Filter posts based on selected filter
     final filteredPosts = _posts.where((post) {
+      if (post['type'] == 'event' &&
+          !isActiveLifecycleData(
+            post['id'] as String,
+            Map<String, dynamic>.from(post['data'] as Map),
+            EventLifecycleStore.instance,
+          )) {
+        return false;
+      }
       if (_selectedFilter == 'All') return true;
 
       if (post['type'] == 'event') {
