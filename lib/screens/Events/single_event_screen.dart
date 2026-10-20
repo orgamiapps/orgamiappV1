@@ -2002,16 +2002,14 @@ class _SingleEventScreenState extends State<SingleEventScreen>
                             ),
                           _CompactAction(
                             icon: Icons.qr_code,
-                            title: 'Event Share QR',
+                            title: 'Share event QR',
                             subtitle: 'Event Page',
                             color: const Color(0xFFFF9800),
                             onTap: () {
                               Navigator.pop(context);
-                              showDialog(
-                                context: context,
-                                barrierDismissible: true,
-                                builder: (context) =>
-                                    ShareQRDialog(singleEvent: eventModel),
+                              showEventQrShare(
+                                context,
+                                eventModel,
                               ).then((_) => _showEventManagementModal());
                             },
                           ),

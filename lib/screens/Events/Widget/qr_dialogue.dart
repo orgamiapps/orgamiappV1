@@ -1,543 +1,384 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:attendus/models/event_model.dart';
-import 'package:attendus/Utils/colors.dart';
-import 'package:attendus/Utils/toast.dart';
-import 'package:attendus/Utils/logger.dart';
 import 'package:attendus/Services/artifact_download_service.dart';
-import 'package:qr_flutter/qr_flutter.dart';
-import 'package:rounded_loading_button_plus/rounded_loading_button.dart';
-import 'package:screenshot/screenshot.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:attendus/Services/event_share_service.dart';
+import 'package:attendus/Services/event_qr_image.dart';
+import 'package:attendus/Services/event_qr_actions.dart' as actions;
+
+Future<void> showEventQrShare(BuildContext context, EventModel event) {
+  final animation = MediaQuery.disableAnimationsOf(context)
+      ? AnimationStyle.noAnimation
+      : null;
+  if (MediaQuery.sizeOf(context).width < 600) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      sheetAnimationStyle: animation,
+      backgroundColor: Colors.transparent,
+      builder: (_) => ShareQRDialog(singleEvent: event),
+    );
+  }
+  return showDialog<void>(
+    context: context,
+    animationStyle: animation,
+    builder: (_) => Dialog(
+      backgroundColor: Colors.transparent,
+      child: ShareQRDialog(singleEvent: event),
+    ),
+  );
+}
 
 class ShareQRDialog extends StatefulWidget {
   final EventModel singleEvent;
-
-  const ShareQRDialog({super.key, required this.singleEvent});
-
+  final Future<Uint8List> Function(EventModel, EventQrFormat) imageRenderer;
+  const ShareQRDialog({
+    super.key,
+    required this.singleEvent,
+    this.imageRenderer = EventQrImage.render,
+  });
   @override
   State<ShareQRDialog> createState() => _ShareQRDialogState();
 }
 
-class _ShareQRDialogState extends State<ShareQRDialog>
-    with TickerProviderStateMixin {
-  late final EventModel singleEvent = widget.singleEvent;
-  late double _screenWidth;
-  late double _screenHeight;
-  final _btnCtlr = RoundedLoadingButtonController();
-  final _downloadBtnCtlr = RoundedLoadingButtonController();
-  final _copyBtnCtlr = RoundedLoadingButtonController();
-
-  ScreenshotController screenshotController = ScreenshotController();
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _fadeAnimation;
-
-  String get qrData => 'attendus_event:v1:${singleEvent.id}';
-  String get uniqueId => singleEvent.displayId;
-  String get rawUniqueId => singleEvent.rawId;
-  String get eventTitle => singleEvent.title;
-  String get eventLocation => singleEvent.location;
+class _ShareQRDialogState extends State<ShareQRDialog> {
+  final Map<EventQrFormat, Uint8List> _images = {};
+  EventQrFormat _format = EventQrFormat.card;
+  bool _preparing = true;
+  bool _busy = false;
+  String? _message;
+  bool _fallback = false;
+  Uint8List? get _bytes => _images[_format];
+  String get _filename => EventQrImage.filename(widget.singleEvent, _format);
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeOutBack),
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
-    );
-    _animationController.forward();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _prepare());
   }
 
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    _screenHeight = MediaQuery.of(context).size.height;
-    _screenWidth = MediaQuery.of(context).size.width;
-
-    return Scaffold(
-      backgroundColor: Colors.black.withValues(alpha: 0.5),
-      body: SafeArea(child: _bodyView(context: context)),
-    );
-  }
-
-  Widget _bodyView({required BuildContext context}) {
-    return AnimatedBuilder(
-      animation: _animationController,
-      builder: (context, child) {
-        return FadeTransition(
-          opacity: _fadeAnimation,
-          child: ScaleTransition(
-            scale: _scaleAnimation,
-            child: Center(
-              child: Container(
-                width: _screenWidth * 0.9,
-                constraints: BoxConstraints(maxHeight: _screenHeight * 0.85),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildHeader(),
-                      _buildQRContent(),
-                      _buildActionButtons(),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppThemeColor.darkBlueColor, AppThemeColor.darkGreenColor],
-        ),
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Event Share QR',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  eventTitle,
-                  style: const TextStyle(fontSize: 13, color: Colors.white70),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.close, color: Colors.white, size: 22),
-            style: IconButton.styleFrom(
-              backgroundColor: Colors.white.withValues(alpha: 0.2),
-              shape: const CircleBorder(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQRContent() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          // QR Code Container
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey[200]!),
-            ),
-            child: Screenshot(
-              controller: screenshotController,
-              child: Column(
-                children: [
-                  // Event Info
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[200]!),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          eventTitle,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: AppThemeColor.darkBlueColor,
-                          ),
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.location_on,
-                              size: 12,
-                              color: AppThemeColor.dullFontColor,
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                eventLocation,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppThemeColor.dullFontColor,
-                                ),
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  // QR Code
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[200]!),
-                    ),
-                    child: QrImageView(
-                      data: qrData,
-                      version: QrVersions.auto,
-                      size: 160,
-                      gapless: false,
-                      backgroundColor: Colors.white,
-                      eyeStyle: QrEyeStyle(
-                        eyeShape: QrEyeShape.square,
-                        color: AppThemeColor.darkBlueColor,
-                      ),
-                      dataModuleStyle: QrDataModuleStyle(
-                        dataModuleShape: QrDataModuleShape.square,
-                        color: AppThemeColor.darkBlueColor,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Unique ID
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppThemeColor.lightBlueColor,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: AppThemeColor.darkBlueColor.withValues(
-                          alpha: 0.3,
-                        ),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.fingerprint,
-                          size: 14,
-                          color: AppThemeColor.darkBlueColor,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'ID: $uniqueId',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppThemeColor.darkBlueColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Instructions
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppThemeColor.lightBlueColor.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.info_outline,
-                  color: AppThemeColor.darkBlueColor,
-                  size: 18,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'This permanent QR opens event details. It never records attendance.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppThemeColor.darkBlueColor.withValues(alpha: 0.8),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButtons() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-      child: Column(
-        children: [
-          // Primary Share Button
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: RoundedLoadingButton(
-              animateOnTap: false,
-              borderRadius: 16,
-              controller: _btnCtlr,
-              onPressed: _shareQRCode,
-              color: AppThemeColor.darkGreenColor,
-              elevation: 0,
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.share_rounded, color: Colors.white, size: 18),
-                  SizedBox(width: 8),
-                  Text(
-                    'Share QR & ID',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          // Secondary Actions Row
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 44,
-                  child: RoundedLoadingButton(
-                    animateOnTap: false,
-                    borderRadius: 12,
-                    controller: _downloadBtnCtlr,
-                    onPressed: _downloadQRCode,
-                    color: Colors.grey[100]!,
-                    elevation: 0,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.download_rounded,
-                          color: AppThemeColor.darkBlueColor,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Save',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppThemeColor.darkBlueColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: SizedBox(
-                  height: 44,
-                  child: RoundedLoadingButton(
-                    animateOnTap: false,
-                    borderRadius: 12,
-                    controller: _copyBtnCtlr,
-                    onPressed: _copyEventData,
-                    color: Colors.grey[100]!,
-                    elevation: 0,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.copy_rounded,
-                          color: AppThemeColor.darkBlueColor,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Copy ID',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppThemeColor.darkBlueColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _shareQRCode() async {
-    final origin = artifactShareOrigin(context);
+  Future<void> _prepare() async {
+    if (!mounted) return;
+    setState(() {
+      _preparing = true;
+      _message = null;
+    });
     try {
-      HapticFeedback.lightImpact();
-      _btnCtlr.start();
-
-      final capturedQR = await screenshotController.capture();
-      if (capturedQR == null) {
-        if (mounted) _btnCtlr.reset();
-        return;
+      final images = <EventQrFormat, Uint8List>{};
+      for (final format in EventQrFormat.values) {
+        images[format] = await widget.imageRenderer(widget.singleEvent, format);
       }
-
-      if (!mounted) return;
-      final file = XFile.fromData(
-        capturedQR,
-        mimeType: 'image/png',
-        name: 'event_qr_$uniqueId.png',
-      );
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [file],
-          text:
-              'Join my event: $eventTitle\nLocation: $eventLocation\nEvent ID: $uniqueId',
-          subject: 'Event QR Code - $eventTitle',
-          sharePositionOrigin: origin,
-        ),
-      );
-
-      if (mounted) _btnCtlr.reset();
-    } catch (e) {
-      Logger.error('Error sharing QR code: $e');
-      if (mounted) _btnCtlr.reset();
-    }
-  }
-
-  Future<void> _downloadQRCode() async {
-    final origin = artifactShareOrigin(context);
-    try {
-      HapticFeedback.lightImpact();
-      _downloadBtnCtlr.start();
-      final capturedQR = await screenshotController.capture();
-      if (capturedQR == null || !mounted) return;
-      final result = await downloadArtifact(
-        capturedQR,
-        'event_qr_$uniqueId.png',
-        'image/png',
-        sharePositionOrigin: origin,
-      );
-      if (mounted) ShowToast().showSnackBar(result.message, context);
-    } catch (e) {
-      Logger.error('Error downloading QR code: $e');
+      if (mounted) setState(() => _images.addAll(images));
+    } catch (_) {
       if (mounted) {
-        ShowToast().showSnackBar(
-          'Could not open the download or share action. Please retry.',
-          context,
+        setState(
+          () => _message = 'Could not prepare the images. Please retry.',
         );
       }
     } finally {
-      if (mounted) _downloadBtnCtlr.reset();
+      if (mounted) setState(() => _preparing = false);
     }
   }
 
-  Future<void> _copyEventData() async {
-    try {
-      HapticFeedback.lightImpact();
-      _copyBtnCtlr.start();
-
-      final eventData =
-          '''
-Event: $eventTitle
-Location: $eventLocation
-Event ID: $rawUniqueId
-QR Data: $qrData
-      '''
-              .trim();
-
-      await Clipboard.setData(ClipboardData(text: eventData));
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                const Text('Event details copied to clipboard'),
-              ],
-            ),
-            backgroundColor: AppThemeColor.darkBlueColor,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-
-      _copyBtnCtlr.reset();
-    } catch (e) {
-      Logger.error('Error copying event data: $e');
-      _copyBtnCtlr.reset();
+  void _feedback(String message, {bool fallback = false}) {
+    if (mounted) {
+      setState(() {
+        _message = message;
+        _fallback = fallback;
+      });
     }
+  }
+
+  Future<void> _run(Future<void> Function() action) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await action();
+    } catch (_) {
+      _feedback(
+        'Could not complete that action. Please retry, or save the image instead.',
+        fallback: true,
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _copy() => _run(() async {
+    final result = await actions.copyQrImage(_bytes!);
+    if (result == actions.EventQrActionResult.completed) {
+      _feedback('Image copied. Paste it into your message or document.');
+    } else {
+      _feedback(
+        'Image copying is unavailable or was blocked. Save the image to attach it instead.',
+        fallback: true,
+      );
+    }
+  });
+
+  Future<void> _share() => _run(() async {
+    final result = await actions.shareQrImage(
+      _bytes!,
+      _filename,
+      'You’re invited: ${widget.singleEvent.title}',
+      EventShareService.shareText(widget.singleEvent),
+      artifactShareOrigin(context),
+    );
+    switch (result) {
+      case actions.EventQrActionResult.completed:
+      case actions.EventQrActionResult.unavailable:
+        _feedback('Finish sharing in your selected app.');
+      case actions.EventQrActionResult.dismissed:
+        break;
+      case actions.EventQrActionResult.unsupported:
+        _feedback(
+          'Image sharing is unavailable in this browser. Save the image and attach it to a text or email. You can also copy the link.',
+          fallback: true,
+        );
+      case actions.EventQrActionResult.failed:
+        _feedback(
+          'Could not share the image. Try again, or save it to attach to your message.',
+          fallback: true,
+        );
+    }
+  });
+
+  Future<void> _save() => _run(() async {
+    final result = await downloadArtifact(
+      _bytes!,
+      _filename,
+      'image/png',
+      sharePositionOrigin: artifactShareOrigin(context),
+    );
+    if (result.status != ArtifactDownloadStatus.dismissed) {
+      _feedback(result.message, fallback: true);
+    }
+  });
+
+  Future<void> _copyLink() => _run(() async {
+    try {
+      await EventShareService.copyLink(widget.singleEvent);
+      _feedback('Event link copied.');
+    } catch (_) {
+      _feedback(
+        'Could not copy the link. Select the link below and copy it manually.',
+      );
+    }
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = !_preparing && _bytes != null && !_busy;
+    final url = EventShareService.eventUri(widget.singleEvent.id).toString();
+    final mobile = MediaQuery.sizeOf(context).width < 600;
+    return Align(
+      alignment: mobile ? Alignment.bottomCenter : Alignment.center,
+      heightFactor: 1,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 520,
+          maxHeight: MediaQuery.sizeOf(context).height * .92,
+        ),
+        child: Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          clipBehavior: Clip.antiAlias,
+          child: SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Share event',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF142C40),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close sharing',
+                        constraints: const BoxConstraints(
+                          minWidth: 48,
+                          minHeight: 48,
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                  const Text(
+                    'Invite people with a QR image that opens your event details.',
+                    style: TextStyle(color: Color(0xFF526171), height: 1.5),
+                  ),
+                  const SizedBox(height: 20),
+                  SegmentedButton<EventQrFormat>(
+                    style: const ButtonStyle(
+                      minimumSize: WidgetStatePropertyAll(Size(48, 48)),
+                    ),
+                    segments: const [
+                      ButtonSegment(
+                        value: EventQrFormat.card,
+                        label: Text('Event card'),
+                      ),
+                      ButtonSegment(
+                        value: EventQrFormat.qrOnly,
+                        label: Text('QR only'),
+                      ),
+                    ],
+                    selected: {_format},
+                    onSelectionChanged: _busy
+                        ? null
+                        : (selection) => setState(() {
+                            _format = selection.single;
+                            _message = null;
+                            _fallback = false;
+                          }),
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF2F6F7),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: _preparing
+                        ? const SizedBox(
+                            height: 220,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                semanticsLabel: 'Preparing QR images',
+                              ),
+                            ),
+                          )
+                        : _bytes == null
+                        ? TextButton.icon(
+                            onPressed: _prepare,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Retry image preparation'),
+                          )
+                        : Semantics(
+                            label:
+                                '${_format == EventQrFormat.card ? 'Event card' : 'QR code'} for ${widget.singleEvent.title}. Opens $url',
+                            image: true,
+                            child: ExcludeSemantics(
+                              child: Image.memory(
+                                _bytes!,
+                                height: 280,
+                                fit: BoxFit.contain,
+                                gaplessPlayback: true,
+                              ),
+                            ),
+                          ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Scan to view event • Does not check anyone in',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: Color(0xFF526171)),
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton.icon(
+                    onPressed: ready ? _share : null,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(48, 52),
+                      backgroundColor: const Color(0xFF13776C),
+                    ),
+                    icon: const Icon(Icons.ios_share),
+                    label: const Text('Share image'),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 12,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: ready ? _save : null,
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(48, 48),
+                        ),
+                        icon: const Icon(Icons.download_outlined),
+                        label: const Text('Save image'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: ready ? _copy : null,
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(48, 48),
+                        ),
+                        icon: const Icon(Icons.copy_outlined),
+                        label: const Text('Copy image'),
+                      ),
+                    ],
+                  ),
+                  if (_busy)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 12),
+                      child: LinearProgressIndicator(semanticsLabel: 'Working'),
+                    ),
+                  if (_message != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: Semantics(
+                        liveRegion: true,
+                        child: Text(
+                          _message!,
+                          style: const TextStyle(height: 1.4),
+                        ),
+                      ),
+                    ),
+                  if (_fallback && _bytes != null && actions.canPreviewQrImage)
+                    TextButton(
+                      onPressed: _busy
+                          ? null
+                          : () {
+                              if (actions.previewQrImage(_bytes!, _filename)) {
+                                _feedback(
+                                  'In the image tab, touch and hold the image to save it, or right-click on a computer.',
+                                  fallback: true,
+                                );
+                              } else {
+                                _feedback(
+                                  'The image tab was blocked. Allow pop-ups for this site and try again.',
+                                  fallback: true,
+                                );
+                              }
+                            },
+                      child: const Text('Open image to save manually'),
+                    ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Divider(),
+                  ),
+                  SelectableText(
+                    url,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF526171),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: _busy ? null : _copyLink,
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(48, 48),
+                    ),
+                    icon: const Icon(Icons.link),
+                    label: const Text('Copy link'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

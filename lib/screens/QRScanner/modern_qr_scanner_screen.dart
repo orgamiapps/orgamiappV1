@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:attendus/Services/event_share_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -688,10 +689,15 @@ class _ModernQRScannerScreenState extends State<ModernQRScannerScreen>
 
         // Handle different QR code formats
         String? eventCode;
+        final websiteEventCode = EventShareService.scannerCodeFromUrl(
+          scannedCode,
+        );
 
         // Attendance 2.0 keeps venue credentials and event-share links
         // distinct. Only the rotating venue credential can record attendance.
-        if (scannedCode.startsWith('attendus_checkin:v1:')) {
+        if (websiteEventCode != null) {
+          eventCode = websiteEventCode;
+        } else if (scannedCode.startsWith('attendus_checkin:v1:')) {
           eventCode = scannedCode;
           debugPrint('Rotating venue credential detected');
         } else if (scannedCode.startsWith('attendus_event:v1:')) {
