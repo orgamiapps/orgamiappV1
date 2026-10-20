@@ -265,6 +265,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     Logger.debug('MyApp: Added lifecycle observer');
   }
 
+  Future<void> _retryFirebase() {
+    // Route builders must share the replacement attempt after a startup retry.
+    // Retaining the original failed future makes later navigation fail again.
+    _firebaseInitialization =
+        (widget.onFirebaseRetry ?? FirebaseInitializer.retry)();
+    return _firebaseInitialization;
+  }
+
   @override
   void didUpdateWidget(covariant MyApp oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -338,7 +346,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 settings: settings,
                 builder: (_) => AppStartupGate(
                   initialization: _firebaseInitialization,
-                  onRetry: widget.onFirebaseRetry ?? FirebaseInitializer.retry,
+                  onRetry: _retryFirebase,
                   onReady: widget.onFirebaseReady,
                   child: const AuthGate(forceDiscover: true),
                 ),
@@ -375,7 +383,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               widget.homeOverride ??
               AppStartupGate(
                 initialization: _firebaseInitialization,
-                onRetry: widget.onFirebaseRetry ?? FirebaseInitializer.retry,
+                onRetry: _retryFirebase,
                 onReady: widget.onFirebaseReady,
                 child: const AuthGate(),
               ),
