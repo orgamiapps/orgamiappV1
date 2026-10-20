@@ -4,7 +4,7 @@ const {getApps, initializeApp} = require("firebase-admin/app");
 const {getFirestore} = require("firebase-admin/firestore");
 const {
   communityEligibility,
-  eventEligibility,
+  eventProjectionEligibility,
 } = require("../public-web/renderer");
 
 async function main() {
@@ -24,7 +24,7 @@ async function main() {
   const projectedCommunityIds = new Set(projectedCommunities.docs.map((entry) => entry.id));
   const failures = [];
   for (const [id, data] of eventMap) {
-    if (eventEligibility(data)) {
+    if (eventProjectionEligibility(data)) {
       if (!projectedEventIds.has(id)) failures.push(`${id}: missing event projection`);
       if (!data.eventTimeZone || data.postalCode === undefined ||
           (data.locationType !== "online" && !data.streetAddress)) {

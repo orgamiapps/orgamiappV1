@@ -16,10 +16,13 @@ const callOptions = {region: "us-central1", enforceAppCheck: process.env.FUNCTIO
 function createLaunchOperations(admin) {
   const db = admin.firestore();
   const stamp = () => admin.firestore.FieldValue.serverTimestamp();
-  async function hasEventRecords(eventId, transaction = null) {
+  async function hasEventRecords(event, transaction = null) {
+    // Checkout reserves capacity before contacting Stripe or writing a
+    // payment record. Preserve that in-flight operation and its history.
+    if (Number(event.get("reservedTickets") || 0) > 0) return true;
     const dependents = await Promise.all(["RegisterAttendance", "Tickets", "Attendance", "HistoricalAttendance",
-      "TicketPayments", "TicketUpgradePayments", "EventFeaturePayments", "FeaturePayments", "Payments"].map((name) => {
-      const query = db.collection(name).where("eventId", "==", eventId).limit(1);
+      "TicketReservations", "TicketPayments", "TicketUpgradePayments", "EventFeaturePayments", "FeaturePayments", "Payments"].map((name) => {
+      const query = db.collection(name).where("eventId", "==", event.id).limit(1);
       return transaction ? transaction.get(query) : query.get();
     }));
     return dependents.some((result) => !result.empty);
@@ -117,7 +120,7 @@ function createLaunchOperations(admin) {
     }
     const result = {permissions, staff};
     if (permissions.manageEvent && request.data?.includeRemovalEligibility === true) {
-      result.removalEligibility = {canDelete: !(await hasEventRecords(id)), eventRevision: Number(event.get("eventRevision") || 0)};
+      result.removalEligibility = {canDelete: !(await hasEventRecords(event)), eventRevision: Number(event.get("eventRevision") || 0)};
     }
     return result;
   });
@@ -422,14 +425,22 @@ function createLaunchOperations(admin) {
       const targets = preview.get("targets");
       const result = {status: "cancelled", affectedEventIds: targets.map((target) => target.eventId)};
       if (preview.get("applied")) return result;
+      const expectedRevision = request.data?.expectedEventRevision ?? null;
+      if (expectedRevision !== null && (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0)) {
+        throw new HttpsError("invalid-argument", "Refresh the event before cancelling it.");
+      }
       if (preview.get("expiresAt").toMillis() < Date.now()) throw new HttpsError("failed-precondition", "Preview expired. Review recipients again.");
       const events = await Promise.all(targets.map((target) => tx.get(db.collection("Events").doc(target.eventId))));
       for (let index = 0; index < events.length; index++) {
         const current = events[index];
         if (!current.exists || Number(current.get("eventRevision") || 0) !== targets[index].revision) throw new HttpsError("aborted", "An event changed. Refresh and review again.");
+        if (current.id === access.eventId && expectedRevision !== null && Number(current.get("eventRevision") || 0) !== expectedRevision) {
+          throw new HttpsError("aborted", "The event changed. Refresh and review again.");
+        }
         if (!(await capabilities(db, access.uid, current.data(), tx)).manageEvent) throw new HttpsError("permission-denied", "Access to an occurrence changed.");
       }
       for (const current of events) {
+        tx.delete(db.collection("PublicWebEvents").doc(current.id));
         if (current.get("status") === "cancelled") continue;
         const revision = Number(current.get("eventRevision") || 0) + 1;
         tx.update(current.ref, {status: "cancelled", cancelled: true, cancellationReason: reason,
@@ -479,7 +490,7 @@ function createLaunchOperations(admin) {
       if (expectedRevision !== null && Number(event.get("eventRevision") || 0) !== expectedRevision) {
         throw new HttpsError("aborted", "The event changed. Refresh and review again.");
       }
-      if (await hasEventRecords(eventId, tx)) throw new HttpsError("failed-precondition", "This event has records. Cancel it to preserve its history.");
+      if (await hasEventRecords(event, tx)) throw new HttpsError("failed-precondition", "This event has records. Cancel it to preserve its history.");
       tx.delete(event.ref);
       tx.delete(db.collection("PublicWebEvents").doc(eventId));
       tx.create(receiptRef, {actorUid: uid, eventId, fingerprint, status: result.status, createdAt: stamp()});

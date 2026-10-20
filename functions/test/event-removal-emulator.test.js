@@ -47,7 +47,7 @@ test("removal eligibility is optional and only exposed to event managers", async
 test("every preserved record type blocks preflight eligibility and authoritative deletion", async () => {
   const id = await seed("records");
   for (const name of ["RegisterAttendance", "Tickets", "Attendance", "HistoricalAttendance",
-    "TicketPayments", "TicketUpgradePayments", "EventFeaturePayments", "FeaturePayments", "Payments"]) {
+    "TicketReservations", "TicketPayments", "TicketUpgradePayments", "EventFeaturePayments", "FeaturePayments", "Payments"]) {
     const ref = db.collection(name).doc(`removal-record-${suffix}`);
     await ref.set({eventId: id});
     try {
@@ -61,6 +61,62 @@ test("every preserved record type blocks preflight eligibility and authoritative
     }
   }
   assert.equal((await eligibility(id)).removalEligibility.canDelete, true);
+});
+
+test("checkout reserved after preflight blocks deletion before a payment record exists without a revision change", async () => {
+  const id = await seed("checkout-race");
+  const eventRef = db.doc(`Events/${id}`);
+  const reservationRef = db.collection("TicketReservations").doc(`checkout-${suffix}`);
+  assert.deepEqual((await eligibility(id)).removalEligibility, {canDelete: true, eventRevision: 3});
+  let reserved = false;
+  const proxy = new Proxy(db, {get(target, property) {
+    if (property === "runTransaction") return async (...args) => {
+      // Pause checkout after its atomic reservation and before the external
+      // PaymentIntent call, while the organizer submits the reviewed delete.
+      const checkout = db.batch();
+      checkout.create(reservationRef, {eventId: id, customerUid: stranger, status: "reserved"});
+      checkout.update(eventRef, {reservedTickets: 1});
+      await checkout.commit();
+      reserved = true;
+      return target.runTransaction(...args);
+    };
+    const value = target[property];
+    return typeof value === "function" ? value.bind(target) : value;
+  }});
+  const firestore = () => proxy;
+  firestore.FieldValue = admin.firestore.FieldValue;
+  const isolated = createLaunchOperations({firestore});
+  await assert.rejects(isolated.deleteEmptyEventV1.run(request(owner, {
+    eventId: id, expectedEventRevision: 3, requestId: `checkout-race-${suffix}`,
+  })), {code: "failed-precondition"});
+  assert.equal(reserved, true);
+  const event = await eventRef.get();
+  assert.equal(event.exists, true);
+  assert.equal(event.get("eventRevision"), 3);
+  assert.equal(event.get("reservedTickets"), 1);
+  assert.equal((await reservationRef.get()).get("status"), "reserved");
+  assert.equal((await db.collection("TicketPayments").where("eventId", "==", id).get()).empty, true);
+  assert.equal((await db.collection("EventDeletionReceipts").where("eventId", "==", id).get()).empty, true);
+  assert.deepEqual((await eligibility(id)).removalEligibility, {canDelete: false, eventRevision: 3});
+});
+
+test("reserved capacity and retained reservation history each prevent permanent deletion", async () => {
+  const id = await seed("reserved-capacity", {reservedTickets: 1});
+  assert.equal((await eligibility(id)).removalEligibility.canDelete, false);
+  await assert.rejects(operations.deleteEmptyEventV1.run(request(owner, {
+    eventId: id, expectedEventRevision: 3, requestId: `reserved-count-${suffix}`,
+  })), {code: "failed-precondition"});
+  assert.equal((await db.doc(`Events/${id}`).get()).exists, true);
+
+  await db.doc(`Events/${id}`).update({reservedTickets: 0});
+  await db.collection("TicketReservations").doc(`released-checkout-${suffix}`).set({
+    eventId: id, customerUid: stranger, status: "released",
+  });
+  assert.equal((await eligibility(id)).removalEligibility.canDelete, false);
+  await assert.rejects(operations.deleteEmptyEventV1.run(request(owner, {
+    eventId: id, expectedEventRevision: 3, requestId: `released-reservation-${suffix}`,
+  })), {code: "failed-precondition"});
+  assert.equal((await db.doc(`Events/${id}`).get()).exists, true);
 });
 
 test("deletion atomically removes its projection and returns the same result for concurrent and later retries", async () => {
@@ -130,12 +186,38 @@ test("legacy deletion callers retain stable retry results without a request ID",
   assert.deepEqual(await operations.deleteEmptyEventV1.run(request(owner, data)), expected);
 });
 
+test("cancellation validates the optional reviewed revision while committed retries remain idempotent", async () => {
+  const id = await seed("cancel-revision");
+  const preview = await operations.previewEventCancellationV1.run(request(owner, {eventId: id}));
+  const data = {eventId: id, previewToken: preview.previewToken, reason: "Fixture cancellation"};
+  for (const expectedEventRevision of [-1, 1.5, "3", false]) {
+    await assert.rejects(operations.cancelEventV1.run(request(owner, {
+      ...data, expectedEventRevision,
+    })), {code: "invalid-argument"});
+  }
+  await assert.rejects(operations.cancelEventV1.run(request(owner, {
+    ...data, expectedEventRevision: 2,
+  })), {code: "aborted"});
+  assert.equal((await db.doc(`Events/${id}`).get()).get("status"), "active");
+  assert.equal((await db.doc(`EventCancellationPreviews/${preview.previewToken}`).get()).get("applied"), undefined);
+  const expected = {status: "cancelled", affectedEventIds: [id]};
+  assert.deepEqual(await operations.cancelEventV1.run(request(owner, {...data, expectedEventRevision: 3})), expected);
+  assert.equal((await db.doc(`Events/${id}`).get()).get("eventRevision"), 4);
+  // The old reviewed revision identifies an already committed operation.
+  assert.deepEqual(await operations.cancelEventV1.run(request(owner, {...data, expectedEventRevision: 3})), expected);
+  assert.equal((await db.collection("EventAnnouncements").where("eventId", "==", id).get()).size, 1);
+});
+
 test("series cancellation returns all affected IDs on commit and retry without duplicate notices", async () => {
   const seriesId = `removal-series-${suffix}`;
   const now = Date.now();
   const earlier = await seed("series-earlier", {seriesId, selectedDateTime: new Date(now + 86400000)});
   const current = await seed("series-current", {seriesId, selectedDateTime: new Date(now + 2 * 86400000)});
   const later = await seed("series-later", {seriesId, selectedDateTime: new Date(now + 3 * 86400000)});
+  const cancelled = await seed("series-cancelled", {seriesId, selectedDateTime: new Date(now + 4 * 86400000), status: "cancelled"});
+  for (const id of [earlier, current, later, cancelled]) {
+    await db.doc(`PublicWebEvents/${id}`).set({title: "Previously indexed fixture"});
+  }
   const preview = await operations.previewEventCancellationV1.run(request(owner, {
     eventId: current, recurrenceScope: "this_and_future",
   }));
@@ -143,7 +225,11 @@ test("series cancellation returns all affected IDs on commit and retry without d
   for (let attempt = 0; attempt < 2; attempt++) {
     const result = await operations.cancelEventV1.run(request(owner, data));
     assert.equal(result.status, "cancelled");
-    assert.deepEqual(result.affectedEventIds.sort(), [current, later].sort());
+    assert.deepEqual(result.affectedEventIds.sort(), [current, later, cancelled].sort());
+    for (const id of [current, later, cancelled]) {
+      assert.equal((await db.doc(`PublicWebEvents/${id}`).get()).exists, false);
+    }
+    assert.equal((await db.doc(`PublicWebEvents/${earlier}`).get()).exists, true);
   }
   assert.equal((await db.doc(`Events/${earlier}`).get()).get("status"), "active");
   for (const id of [current, later]) {
@@ -151,5 +237,11 @@ test("series cancellation returns all affected IDs on commit and retry without d
     assert.equal(event.get("status"), "cancelled");
     assert.equal(event.get("eventRevision"), 4);
     assert.equal((await db.collection("EventAnnouncements").where("eventId", "==", id).get()).size, 1);
+  }
+  assert.equal((await db.doc(`Events/${cancelled}`).get()).get("eventRevision"), 3);
+  assert.equal((await db.collection("EventAnnouncements").where("eventId", "==", cancelled).get()).size, 0);
+  for (const id of [current, later, cancelled]) {
+    await createMaintainPublicEventPage(admin).run({params: {eventId: id}});
+    assert.equal((await db.doc(`PublicWebEvents/${id}`).get()).exists, false);
   }
 });

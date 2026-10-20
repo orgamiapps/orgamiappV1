@@ -101,6 +101,13 @@ function eventEligibility(data) {
     INDEXABLE_EVENT_STATUSES.has(text(data.status).toLowerCase()));
 }
 
+function eventProjectionEligibility(data) {
+  // Cancelled pages remain available as direct history links, but leave
+  // public event listings and sitemaps immediately.
+  return eventEligibility(data) && data.cancelled !== true &&
+    !["cancelled", "canceled"].includes(text(data.status).toLowerCase());
+}
+
 function communityEligibility(data) {
   return Boolean(data && data.publicPageEnabled === true && text(data.name));
 }
@@ -815,7 +822,7 @@ function createMaintainPublicEventPage(admin) {
     // change retries the transaction instead of publishing a stale projection.
     return db.runTransaction(async (tx) => {
       const current = await tx.get(source);
-      if (!current.exists || !eventEligibility(current.data())) return tx.delete(ref);
+      if (!current.exists || !eventProjectionEligibility(current.data())) return tx.delete(ref);
       return tx.set(ref, projectionForEvent(id, current.data()));
     });
   });
@@ -846,6 +853,7 @@ module.exports = {
   createPublicWeb,
   escapeHtml,
   eventEligibility,
+  eventProjectionEligibility,
   eventDescription,
   eventJsonLd,
   eventState,
